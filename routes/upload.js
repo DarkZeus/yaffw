@@ -29,7 +29,7 @@ upload.post('/commit-file', async (c) => {
     console.log('📁 File committed to server:', finalPath)
     
     // Extract detailed metadata and waveform after file is saved
-    const [metadata, waveformData] = await Promise.all([
+    const [metadata, waveformResult] = await Promise.all([
       extractVideoMetadata(finalPath),
       extractAudioWaveform(finalPath)
     ])
@@ -41,7 +41,12 @@ upload.post('/commit-file', async (c) => {
       uniqueFileName: uniqueFileName,
       message: 'File committed successfully',
       metadata: metadata,
-      waveformData: waveformData
+      waveformData: waveformResult.keyPoints, // Backward compatibility
+      waveformImagePath: waveformResult.imagePath,
+      waveformImageDimensions: {
+        width: waveformResult.imageWidth,
+        height: waveformResult.imageHeight
+      }
     })
     
   } catch (error) {
@@ -94,7 +99,7 @@ upload.post('/upload-stream', async (c) => {
       try {
         // Extract metadata and waveform data after upload completes
         console.log('📊 Processing uploaded file:', finalPath)
-        const [metadata, waveformData] = await Promise.all([
+        const [metadata, waveformResult] = await Promise.all([
           extractVideoMetadata(finalPath),
           extractAudioWaveform(finalPath)
         ])
@@ -106,21 +111,28 @@ upload.post('/upload-stream', async (c) => {
           uniqueFileName: uniqueFileName,
           message: 'Upload completed successfully',
           metadata: metadata,
-          waveformData: waveformData
+          waveformData: waveformResult.keyPoints, // Backward compatibility
+          waveformImagePath: waveformResult.imagePath,
+          waveformImageDimensions: {
+            width: waveformResult.imageWidth,
+            height: waveformResult.imageHeight
+          }
         }))
       } catch (error) {
         console.error('Post-processing failed:', error)
         // Still return success but without processed data
-        resolve(c.json({
-          success: true,
-          filePath: finalPath,
-          originalFileName: originalFileName,
-          uniqueFileName: uniqueFileName,
-          message: 'Upload completed successfully',
-          metadata: null,
-          waveformData: [],
-          processingError: 'Failed to extract metadata/waveform'
-        }))
+                  resolve(c.json({
+            success: true,
+            filePath: finalPath,
+            originalFileName: originalFileName,
+            uniqueFileName: uniqueFileName,
+            message: 'Upload completed successfully',
+            metadata: null,
+            waveformData: [],
+            waveformImagePath: null,
+            waveformImageDimensions: { width: 0, height: 0 },
+            processingError: 'Failed to extract metadata/waveform'
+          }))
       }
     })
     

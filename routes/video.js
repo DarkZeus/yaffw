@@ -9,6 +9,64 @@ import { formatTimeForFFmpeg } from '../utils/videoUtils.js'
 const execAsync = promisify(exec)
 const video = new Hono()
 
+// Stream video endpoint
+video.get('/stream/:filename', async (c) => {
+  const filename = c.req.param('filename')
+  const filePath = path.join('uploads', filename)
+  
+  console.log('🎥 Video stream request for:', filename)
+  console.log('🎥 Looking for file at:', filePath)
+  console.log('🎥 File exists:', fs.existsSync(filePath))
+  console.log('🎥 Files in uploads:', fs.readdirSync('uploads').filter(f => f.includes('downloaded')))
+  
+  if (!fs.existsSync(filePath)) {
+    return c.json({ error: 'Video file not found' }, 404)
+  }
+
+  try {
+    const stat = fs.statSync(filePath)
+    const fileSize = stat.size
+    const range = c.req.header('range')
+
+    if (range) {
+      // Handle range requests for video streaming
+      const parts = range.replace(/bytes=/, "").split("-")
+      const start = parseInt(parts[0], 10)
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+      const chunksize = (end - start) + 1
+      const file = fs.createReadStream(filePath, { start, end })
+      
+      return new Response(file, {
+        status: 206,
+        headers: {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize.toString(),
+          'Content-Type': 'video/mp4',
+          'Access-Control-Allow-Origin': 'http://localhost:3000',
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Allow-Headers': 'Range',
+        }
+      })
+    } else {
+      // Serve entire file
+      const file = fs.createReadStream(filePath)
+      return new Response(file, {
+        headers: {
+          'Content-Length': fileSize.toString(),
+          'Content-Type': 'video/mp4',
+          'Access-Control-Allow-Origin': 'http://localhost:3000',
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Allow-Headers': 'Range',
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Video streaming error:', error)
+    return c.json({ error: 'Failed to stream video' }, 500)
+  }
+})
+
 // Trim video endpoint
 video.post('/trim-video', async (c) => {
   const body = await c.req.json()

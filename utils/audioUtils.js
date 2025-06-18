@@ -35,40 +35,49 @@ const extractWaveformFromImage = async (imagePath, imageWidth, imageHeight, dura
     }
     
     const time = (x / imageWidth) * duration
-    const finalAmplitude = Math.max(0.01, Math.min(1, maxAmplitude))
+    // Apply logarithmic scaling for better perception (like human hearing)
+    // This makes quiet sounds much more visible while keeping loud sounds reasonable
+    const boostedAmplitude = Math.min(1, maxAmplitude * 2.5)
+    const logAmplitude = boostedAmplitude > 0 ? 
+      Math.log10(boostedAmplitude * 9 + 1) : 0  // Maps 0->0, 1->1 logarithmically
     
     waveformData.push({
       time: time,
-      amplitude: finalAmplitude
+      amplitude: logAmplitude
     })
   }
   
   return waveformData
 }
 
-// Extract waveform using FFmpeg's showwavespic filter
-const extractWaveformViaShowwavespic = async (filePath, duration) => {
-  console.log('🎯 Using FFmpeg showwavespic filter for REAL waveform data...')
+// Generate waveform image using FFmpeg's showwavespic filter
+const generateWaveformImage = async (filePath, duration) => {
+  console.log('🎯 Generating waveform image with FFmpeg showwavespic filter...')
   
-  const tempWaveformImage = `${filePath}.waveform.png`
+  const waveformImagePath = `${filePath}.waveform.png`
   
-  // Calculate optimal width based on duration
-  const pixelsPerSecond = 15
-  const imageWidth = Math.min(4000, Math.max(800, Math.floor(duration * pixelsPerSecond)))
-  const imageHeight = 200
+  // Calculate optimal width based on duration for responsive image
+  const pixelsPerSecond = 20 // Higher resolution for better quality
+  const imageWidth = Math.min(6000, Math.max(1200, Math.floor(duration * pixelsPerSecond)))
+  const imageHeight = 120 // Reasonable height for UI
   
-  // Generate high-resolution waveform image
-  const waveformCommand = `ffmpeg -i "${filePath}" -filter_complex "aformat=channel_layouts=mono,showwavespic=s=${imageWidth}x${imageHeight}:colors=white" -frames:v 1 "${tempWaveformImage}" -y`
+  // Generate high-quality waveform image with better styling
+  const waveformCommand = `ffmpeg -i "${filePath}" -filter_complex "aformat=channel_layouts=mono,showwavespic=s=${imageWidth}x${imageHeight}:colors=#06b6d4:scale=lin" -frames:v 1 "${waveformImagePath}" -y`
   
   await execAsync(waveformCommand)
   
-  const waveformData = await extractWaveformFromImage(tempWaveformImage, imageWidth, imageHeight, duration)
+  // Generate a small set of data points for precise overlay positioning
+  const keyPoints = await extractWaveformFromImage(waveformImagePath, imageWidth, imageHeight, duration)
   
-  // Clean up temp file
-  fs.unlinkSync(tempWaveformImage)
+  console.log(`✅ Generated waveform image: ${imageWidth}x${imageHeight} saved to ${waveformImagePath}`)
+  console.log(`📊 Extracted ${keyPoints.length} key data points for overlay positioning`)
   
-  console.log(`✅ REAL HIGH-RES waveform: ${waveformData.length} data points from ${imageWidth}x${imageHeight} image`)
-  return waveformData
+  return {
+    imagePath: waveformImagePath,
+    keyPoints: keyPoints.filter((_, index) => index % 10 === 0), // Keep every 10th point for positioning
+    imageWidth,
+    imageHeight
+  }
 }
 
 // Extract waveform using direct PCM analysis
@@ -107,9 +116,12 @@ const extractWaveformViaPCM = async (filePath, duration) => {
     }
     
     const time = (i / targetSamples) * duration
-    const amplitude = Math.max(0.01, Math.min(1, peakAmplitude * 1.2)) // Slight boost for visibility
+    // Apply logarithmic scaling for better perception (like human hearing)
+    const boostedAmplitude = Math.min(1, peakAmplitude * 2.5)
+    const logAmplitude = boostedAmplitude > 0 ? 
+      Math.log10(boostedAmplitude * 9 + 1) : 0  // Maps 0->0, 1->1 logarithmically
     
-    waveformData.push({ time, amplitude })
+    waveformData.push({ time, amplitude: logAmplitude })
   }
   
   // Clean up temp file
@@ -126,37 +138,54 @@ const hasAudioStream = async (filePath) => {
   return audioCheck.trim() === 'audio'
 }
 
-// Main function to extract real audio waveform data using ffmpeg
+// Main function to generate waveform image and extract key positioning data
 export const extractAudioWaveform = async (filePath) => {
-  console.log('🎵 HIGH-RES real waveform extraction using FFmpeg:', filePath)
+  console.log('🎵 Generating waveform image using FFmpeg:', filePath)
   
   const duration = await getVideoDuration(filePath)
   console.log(`📏 Video duration: ${duration.toFixed(2)} seconds`)
   
-  // Method 1: Use FFmpeg's showwavespic filter
+  // Method 1: Generate waveform image with showwavespic filter
   try {
-    return await extractWaveformViaShowwavespic(filePath, duration)
+    return await generateWaveformImage(filePath, duration)
   } catch (error) {
-    console.log('⚠️ showwavespic method failed:', error.message)
+    console.log('⚠️ Waveform image generation failed:', error.message)
   }
   
-  // Method 2: Direct PCM analysis
+  // Method 2: Fallback - Direct PCM analysis with empty image path
   try {
-    return await extractWaveformViaPCM(filePath, duration)
+    const pcmData = await extractWaveformViaPCM(filePath, duration)
+    console.log('⚠️ Using PCM data fallback - no image generated')
+    return {
+      imagePath: null,
+      keyPoints: pcmData,
+      imageWidth: 0,
+      imageHeight: 0
+    }
   } catch (error) {
     console.log('⚠️ Direct PCM analysis failed:', error.message)
   }
   
-  // Method 3: Fallback - Basic audio detection
+  // Method 3: Final fallback - Basic audio detection
   try {
     if (await hasAudioStream(filePath)) {
-      console.log('⚠️ Using empty waveform - real extraction failed but audio detected')
-      return []
+      console.log('⚠️ Audio detected but waveform generation failed')
+      return {
+        imagePath: null,
+        keyPoints: [],
+        imageWidth: 0,
+        imageHeight: 0
+      }
     }
   } catch (error) {
     console.log('⚠️ Audio detection failed:', error.message)
   }
   
-  console.log('❌ All real waveform methods failed')
-  return []
+  console.log('❌ All waveform generation methods failed')
+  return {
+    imagePath: null,
+    keyPoints: [],
+    imageWidth: 0,
+    imageHeight: 0
+  }
 } 

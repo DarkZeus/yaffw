@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { ServerAudioWaveform } from './ServerAudioWaveform'
+import { ImageAudioWaveform } from './ImageAudioWaveform'
 
 type WaveformPoint = {
   time: number
@@ -14,6 +14,8 @@ type VideoTimelineProps = {
   onTrimChange: (start: number, end: number) => void
   onSeek: (time: number) => void
   waveformData?: WaveformPoint[]
+  waveformImagePath?: string
+  waveformImageDimensions?: { width: number; height: number }
 }
 
 export function VideoTimeline({
@@ -23,7 +25,9 @@ export function VideoTimeline({
   trimEnd,
   onTrimChange,
   onSeek,
-  waveformData
+  waveformData,
+  waveformImagePath,
+  waveformImageDimensions
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
@@ -327,8 +331,10 @@ export function VideoTimeline({
             <span className="text-xs text-gray-400">Audio Track</span>
           </div>
           
-          <ServerAudioWaveform
-            waveformData={waveformData || []}
+          <ImageAudioWaveform
+            waveformImagePath={waveformImagePath}
+            waveformImageDimensions={waveformImageDimensions}
+            keyPoints={waveformData || []}
             duration={duration}
             currentTime={displayCurrentTime}
             trimStart={displayTrimStart}

@@ -9,6 +9,8 @@ export type LocalVideoFile = {
   duration: number
   waveformData: WaveformPoint[]
   serverFilePath?: string // Only set when file is committed to server
+  waveformImagePath?: string // Server-generated waveform image path
+  waveformImageDimensions?: { width: number; height: number }
 }
 
 export type LocalFileMetadata = {

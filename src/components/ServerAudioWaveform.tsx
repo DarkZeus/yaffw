@@ -38,51 +38,65 @@ export function ServerAudioWaveform({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const { width, height: canvasHeight } = canvas
-    const centerY = canvasHeight / 2
+    // Use display dimensions for calculations, not canvas buffer dimensions
+    const rect = canvas.getBoundingClientRect()
+    const displayWidth = rect.width
+    const displayHeight = rect.height
+    const centerY = displayHeight / 2
 
-    // Clear canvas
+    // Clear canvas using actual canvas buffer size
     ctx.fillStyle = backgroundColor
-    ctx.fillRect(0, 0, width, canvasHeight)
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (duration === 0) return
 
-    // Draw waveform bars
+    // Enable smooth rendering
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+
+    // Draw waveform bars using display dimensions for positioning
     waveformData.forEach((point, index) => {
-      const x = (point.time / duration) * width
-      const barHeight = point.amplitude * centerY * 0.8 // Scale to 80% of available height
+      const x = (point.time / duration) * displayWidth
+      const maxBarHeight = centerY * 0.9 // Use 90% of available height from center
+      const barHeight = Math.min(point.amplitude * centerY * 0.8, maxBarHeight) // Constrain bar height
       
       // Determine color based on trim selection
       const isInTrimRange = point.time >= trimStart && point.time <= trimEnd
       ctx.fillStyle = isInTrimRange ? color : `${color}40` // 40 is hex for 25% opacity
       
-      // Draw symmetric waveform (top and bottom)
-      const barWidth = Math.max(1, width / waveformData.length)
-      ctx.fillRect(x, centerY - barHeight, barWidth, barHeight * 2)
+      // Calculate bar width with minimum of 0.5px for crisp rendering
+      const barWidth = Math.max(0.5, displayWidth / waveformData.length * 0.8)
+      const topY = Math.max(0, centerY - barHeight)
+      const bottomY = Math.min(displayHeight, centerY + barHeight)
+      
+      // Draw upper half
+      ctx.fillRect(x, topY, barWidth, centerY - topY)
+      // Draw lower half  
+      ctx.fillRect(x, centerY, barWidth, bottomY - centerY)
     })
 
-    // Draw playhead
+    // Draw playhead with high precision
     if (duration > 0) {
-      const playheadX = (currentTime / duration) * width
+      const playheadX = (currentTime / duration) * displayWidth
       ctx.strokeStyle = '#ef4444'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(playheadX, 0)
-      ctx.lineTo(playheadX, canvasHeight)
+      ctx.lineTo(playheadX, displayHeight)
       ctx.stroke()
     }
 
-    // Draw trim markers
+    // Draw trim markers with high precision
     if (duration > 0) {
-      const trimStartX = (trimStart / duration) * width
-      const trimEndX = (trimEnd / duration) * width
+      const trimStartX = (trimStart / duration) * displayWidth
+      const trimEndX = (trimEnd / duration) * displayWidth
 
       // Trim start marker
       ctx.strokeStyle = '#10b981'
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(trimStartX, 0)
-      ctx.lineTo(trimStartX, canvasHeight)
+      ctx.lineTo(trimStartX, displayHeight)
       ctx.stroke()
 
       // Trim end marker
@@ -90,7 +104,7 @@ export function ServerAudioWaveform({
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(trimEndX, 0)
-      ctx.lineTo(trimEndX, canvasHeight)
+      ctx.lineTo(trimEndX, displayHeight)
       ctx.stroke()
     }
   }
@@ -100,20 +114,28 @@ export function ServerAudioWaveform({
     drawWaveform()
   }, [waveformData, currentTime, trimStart, trimEnd, duration, color, backgroundColor])
 
-  // Handle canvas resize
+  // Handle canvas resize with proper high-DPI support
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
     const handleResize = () => {
       const rect = canvas.getBoundingClientRect()
-      canvas.width = rect.width * window.devicePixelRatio
-      canvas.height = rect.height * window.devicePixelRatio
+      const dpr = window.devicePixelRatio || 1
       
+      // Set the canvas buffer size to account for device pixel ratio
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      
+      // Scale the drawing context so everything draws at the correct size
       const ctx = canvas.getContext('2d')
       if (ctx) {
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
+        ctx.scale(dpr, dpr)
       }
+      
+      // Set the display size (CSS size) to the actual size we want
+      canvas.style.width = `${rect.width}px`
+      canvas.style.height = `${rect.height}px`
       
       drawWaveform()
     }

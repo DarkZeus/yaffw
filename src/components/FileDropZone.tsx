@@ -8,9 +8,10 @@ import { Alert, AlertDescription } from './ui/alert'
 type FileDropZoneProps = {
   onDrop: (files: File[]) => void
   isUploading?: boolean
+  showCard?: boolean
 }
 
-export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
+export function FileDropZone({ onDrop, isUploading, showCard = true }: FileDropZoneProps) {
   const [dragDepth, setDragDepth] = useState(0)
   
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
@@ -24,9 +25,8 @@ export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
     onDragLeave: () => setDragDepth(prev => prev - 1),
   })
 
-  return (
-    <Card className={`transition-all duration-300 ${isDragActive ? 'border-primary shadow-lg' : ''} ${isDragReject ? 'border-destructive' : ''} ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-muted-foreground'}`}>
-      <CardContent {...getRootProps()} className="p-12 text-center space-y-6">
+  const content = (
+    <div {...getRootProps()} className="p-12 text-center space-y-6 cursor-pointer transition-all duration-300">
         <input {...getInputProps()} />
         
         {/* Icon */}
@@ -86,7 +86,18 @@ export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
             </AlertDescription>
           </Alert>
         )}
-      </CardContent>
-    </Card>
+      </div>
   )
+
+  if (showCard) {
+    return (
+      <Card className={`transition-all duration-300 ${isDragActive ? 'border-primary shadow-lg' : ''} ${isDragReject ? 'border-destructive' : ''} ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-muted-foreground'}`}>
+        <CardContent className="p-0">
+          {content}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return content
 } 

@@ -23,14 +23,14 @@ import { Badge } from './ui/badge'
 import { Alert, AlertDescription } from './ui/alert'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
-import { FileDropZone } from './FileDropZone'
-import { UploadProgress } from './UploadProgress'
+import { UnifiedUploadZone } from './UnifiedUploadZone'
 import { VideoAnalytics } from './VideoAnalytics'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { VideoTimeline } from './VideoTimeline'
 import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
 import { extractDetailedVideoMetadata, type VideoMetadata } from '../utils/videoMetadata'
-import { processVideoLocally, commitFileToServer, cleanupLocalFile, type LocalVideoFile } from '../utils/localFileProcessor'
+import { processVideoLocally, commitFileToServer, cleanupLocalFile, type LocalVideoFile, type WaveformPoint } from '../utils/localFileProcessor'
+import { downloadVideoFromUrl } from '../utils/urlDownloader'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable'
 import { Separator } from './ui/separator'
@@ -46,6 +46,7 @@ export function VideoEditorLayout() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata>({})
   const [isDeleting, setIsDeleting] = useState(false)
@@ -60,6 +61,37 @@ export function VideoEditorLayout() {
   const [isPending, startTransition] = useTransition()
   const deferredUploadProgress = useDeferredValue(uploadProgress)
   const deferredCurrentTime = useDeferredValue(currentTime)
+
+  // Convert aspect ratio string to Tailwind class
+  const getAspectRatioClass = (aspectRatio?: string) => {
+    if (!aspectRatio) return 'aspect-video' // Default to 16:9
+    
+    const commonRatios: Record<string, string> = {
+      '16:9': 'aspect-video',
+      '4:3': 'aspect-[4/3]',
+      '3:2': 'aspect-[3/2]', 
+      '21:9': 'aspect-[21/9]',
+      '1:1': 'aspect-square',
+      '9:16': 'aspect-[9/16]', // Vertical/portrait
+      '3:4': 'aspect-[3/4]',   // Vertical 4:3
+      '2:3': 'aspect-[2/3]',   // Vertical 3:2
+    }
+    
+    // Check for exact match first
+    if (commonRatios[aspectRatio]) {
+      return commonRatios[aspectRatio]
+    }
+    
+    // Parse custom ratio (e.g., "17:10" -> "aspect-[17/10]")
+    const match = aspectRatio.match(/^(\d+):(\d+)$/)
+    if (match) {
+      const [, width, height] = match
+      return `aspect-[${width}/${height}]`
+    }
+    
+    // Fallback to 16:9 if parsing fails
+    return 'aspect-video'
+  }
 
   const handleTrimChange = (start: number, end: number) => {
     setTrimStart(start)
@@ -101,6 +133,91 @@ export function VideoEditorLayout() {
         setIsUploading(false)
         setUploadProgress(0)
       }
+    }
+  }
+
+  const onUrlDownload = async (url: string) => {
+    setIsDownloading(true)
+    setUploadProgress(0)
+
+    try {
+      console.log('🌐 Starting download from URL:', url)
+      
+      // Download video from URL
+      const response = await downloadVideoFromUrl(url)
+      
+      if (response.success) {
+        // Fetch the downloaded video file and create a blob URL like we do for uploads
+        console.log('📥 Fetching downloaded video for local processing...')
+        const videoResponse = await fetch(`http://localhost:3001/api/stream/${response.uniqueFileName}`)
+        
+        if (!videoResponse.ok) {
+          throw new Error('Failed to fetch downloaded video')
+        }
+        
+        const videoBlob = await videoResponse.blob()
+        const videoUrl = URL.createObjectURL(videoBlob)
+        
+        // Create a proper File object from the downloaded data
+        const videoFile = new File([videoBlob], response.originalFileName, {
+          type: 'video/mp4',
+          lastModified: Date.now()
+        })
+        
+        // Process the video locally like we do for uploaded files
+        const localVideo = await processVideoLocally(videoFile)
+        
+        // Use server waveform data directly (it's already in the correct WaveformPoint format)
+        console.log('🎵 Processing waveform data...')
+        console.log('🎵 Server waveform length:', response.waveformData?.length || 0)
+        console.log('🎵 Server waveform image:', response.waveformImagePath)
+        console.log('🎵 Sample server waveform point:', response.waveformData?.[0])
+        
+        const serverWaveformData = (response.waveformData || []) as WaveformPoint[]
+        
+        // Add server file path and use server-generated waveform (it's better quality)
+        const localVideoWithServerPath = {
+          ...localVideo,
+          waveformData: serverWaveformData.length > 0 ? serverWaveformData : localVideo.waveformData,
+          serverFilePath: response.filePath,
+          waveformImagePath: response.waveformImagePath,
+          waveformImageDimensions: response.waveformImageDimensions
+        }
+
+        startTransition(() => {
+          setCurrentVideo(localVideoWithServerPath)
+        })
+        
+        // Extract detailed metadata for analytics (like we do for uploads)
+        extractDetailedVideoMetadata(videoFile).then((metadata) => {
+          startTransition(() => {
+            setVideoMetadata(metadata)
+          })
+        }).catch(err => {
+          console.warn('Failed to extract detailed metadata:', err)
+          // Fallback to server metadata if detailed extraction fails
+          startTransition(() => {
+            setVideoMetadata(response.metadata || {})
+          })
+        })
+
+        setUploadProgress(100)
+        
+        // Reset progress after a short delay for UX
+        setTimeout(() => {
+          setUploadProgress(0)
+        }, 1000)
+        
+      } else {
+        throw new Error('Download failed')
+      }
+      
+    } catch (error) {
+      showError('URL Download Failed', error instanceof Error ? error.message : 'Unknown error')
+      resetAllVideoState()
+      setUploadProgress(0)
+    } finally {
+      setIsDownloading(false)
     }
   }
 
@@ -195,6 +312,7 @@ export function VideoEditorLayout() {
     setVideoMetadata({})
     setIsProcessing(false)
     setIsUploading(false)
+    setIsDownloading(false)
     setUploadProgress(0)
     setIsFullscreen(false)
     
@@ -358,25 +476,15 @@ export function VideoEditorLayout() {
     return (
       <TooltipProvider>
         <div className="min-h-screen bg-background flex items-center justify-center p-6">
-          <Card className="w-full max-w-2xl">
-            <CardHeader className="text-center">
-              <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-                <Scissors className="h-6 w-6" />
-                Yet Another FFmpeg Wrapper
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <FileDropZone 
-                onDrop={onDrop}
-                isUploading={isUploading}
-              />
-              <UploadProgress 
-                progress={uploadProgress}
-                isUploading={isUploading}
-                fileName={undefined}
-              />
-            </CardContent>
-          </Card>
+          <div className="w-full max-w-2xl">
+            <UnifiedUploadZone 
+              onFileDrop={onDrop}
+              onUrlDownload={onUrlDownload}
+              isUploading={isUploading}
+              isDownloading={isDownloading}
+              uploadProgress={uploadProgress}
+            />
+          </div>
         </div>
       </TooltipProvider>
     )
@@ -690,10 +798,10 @@ export function VideoEditorLayout() {
 
             {/* Main Video Area */}
             <ResizablePanel defaultSize={75}>
-              <div className="h-full flex flex-col">
+              <div className="flex flex-col">
                 {/* Video Player */}
                 <div className="flex-1 bg-black flex items-center justify-center min-h-0">
-                  <div className="w-full h-full">
+                  <div className={`w-full max-w-full max-h-full ${getAspectRatioClass(videoMetadata?.aspectRatio)}`}>
                     <ReactPlayer
                       ref={playerRef}
                       url={currentVideo?.url}
@@ -718,6 +826,8 @@ export function VideoEditorLayout() {
                       onTrimChange={handleTrimChange}
                       onSeek={handleSeek}
                       waveformData={currentVideo?.waveformData || []}
+                      waveformImagePath={currentVideo?.waveformImagePath}
+                      waveformImageDimensions={currentVideo?.waveformImageDimensions}
                     />
                   </div>
                 </div>
