@@ -1,6 +1,11 @@
 import axios from 'axios'
 
-export interface AxiosUploadOptions {
+export type WaveformPoint = {
+  time: number
+  amplitude: number
+}
+
+export type AxiosUploadOptions = {
   file: File
   onProgress?: (progress: number) => void
   onComplete?: (result: { 
@@ -26,7 +31,9 @@ export interface AxiosUploadOptions {
       audioSampleRate: number;
       aspectRatio: string | null;
     } | null;
+    waveformData?: WaveformPoint[];
     metadataError?: string;
+    processingError?: string;
   }) => void
   onError?: (error: Error) => void
 }

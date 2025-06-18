@@ -1,8 +1,9 @@
 import { Clock, FileVideo, HardDrive, Info, Monitor, Ratio, Settings, Volume2, VolumeX, Zap } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Separator } from './ui/separator'
+import { Badge } from './ui/badge'
 
-interface VideoAnalyticsProps {
+type VideoAnalyticsProps = {
   file: File
   duration: number
   videoMetadata?: {
@@ -63,27 +64,27 @@ export function VideoAnalytics({ file, duration, videoMetadata }: VideoAnalytics
   }
 
   const getQualityInfo = (bitrate?: number) => {
-    if (!bitrate) return { label: 'Unknown', color: 'text-gray-400', bgColor: 'bg-gray-500/20' }
+    if (!bitrate) return { label: 'Unknown', variant: 'secondary' as const }
     
-    if (bitrate >= 10000000) return { label: 'Excellent', color: 'text-green-400', bgColor: 'bg-green-500/20' }
-    if (bitrate >= 5000000) return { label: 'High', color: 'text-blue-400', bgColor: 'bg-blue-500/20' }
-    if (bitrate >= 2000000) return { label: 'Medium', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20' }
-    if (bitrate >= 1000000) return { label: 'Low', color: 'text-orange-400', bgColor: 'bg-orange-500/20' }
-    return { label: 'Very Low', color: 'text-red-400', bgColor: 'bg-red-500/20' }
+    if (bitrate >= 10000000) return { label: 'Excellent', variant: 'default' as const }
+    if (bitrate >= 5000000) return { label: 'High', variant: 'default' as const }
+    if (bitrate >= 2000000) return { label: 'Medium', variant: 'outline' as const }
+    if (bitrate >= 1000000) return { label: 'Low', variant: 'outline' as const }
+    return { label: 'Very Low', variant: 'destructive' as const }
   }
 
   const getAudioQualityInfo = (bitrate?: number) => {
-    if (!bitrate) return { label: 'Unknown', color: 'text-gray-400' }
+    if (!bitrate) return { label: 'Unknown', variant: 'secondary' as const }
     
     // Convert to Kbps if the value seems to be in bps (greater than 1000)
     const bitrateKbps = bitrate > 1000 ? bitrate / 1000 : bitrate
     
-    if (bitrateKbps >= 320) return { label: 'Excellent', color: 'text-green-400' }
-    if (bitrateKbps >= 192) return { label: 'High', color: 'text-blue-400' }
-    if (bitrateKbps >= 128) return { label: 'Good', color: 'text-yellow-400' }
-    if (bitrateKbps >= 96) return { label: 'Fair', color: 'text-orange-400' }
-    if (bitrateKbps >= 64) return { label: 'Low', color: 'text-red-400' }
-    return { label: 'Very Low', color: 'text-red-500' }
+    if (bitrateKbps >= 320) return { label: 'Excellent', variant: 'default' as const }
+    if (bitrateKbps >= 192) return { label: 'High', variant: 'default' as const }
+    if (bitrateKbps >= 128) return { label: 'Good', variant: 'outline' as const }
+    if (bitrateKbps >= 96) return { label: 'Fair', variant: 'outline' as const }
+    if (bitrateKbps >= 64) return { label: 'Low', variant: 'destructive' as const }
+    return { label: 'Very Low', variant: 'destructive' as const }
   }
 
   const estimatedBitrate = Math.round((file.size * 8) / duration)
@@ -92,235 +93,231 @@ export function VideoAnalytics({ file, duration, videoMetadata }: VideoAnalytics
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-        <Info className="h-4 w-4 text-blue-400" />
-        Video Analytics
-      </h3>
-      
-      <div className="space-y-4 text-xs">
-        {/* File Information */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-slate-300 flex items-center gap-2">
-            <FileVideo className="h-3 w-3" />
+      {/* File Information */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <FileVideo className="h-4 w-4" />
             File Info
-          </h4>
-          
-          <div className="space-y-2 ml-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Name</span>
-              <span className="text-slate-200 font-mono truncate max-w-24" title={file.name}>
-                {file.name.split('.').slice(0, -1).join('.')}
-              </span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Size</span>
-              <span className="text-slate-200 font-mono">
-                {formatFileSize(file.size)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Type</span>
-              <span className="text-slate-200 font-mono">
-                {file.type.split('/')[1]?.toUpperCase() || 'Unknown'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Duration</span>
-              <span className="text-slate-200 font-mono">
-                {formatDuration(duration)}
-              </span>
-            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Name</span>
+            <span className="text-sm font-mono truncate max-w-32" title={file.name}>
+              {file.name.split('.').slice(0, -1).join('.')}
+            </span>
           </div>
-        </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Size</span>
+            <Badge variant="outline" className="font-mono">
+              {formatFileSize(file.size)}
+            </Badge>
+          </div>
 
-        <Separator className="bg-slate-700" />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Type</span>
+            <Badge variant="secondary" className="font-mono">
+              {file.type.split('/')[1]?.toUpperCase() || 'Unknown'}
+            </Badge>
+          </div>
 
-        {/* Video Properties */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-slate-300 flex items-center gap-2">
-            <Monitor className="h-3 w-3" />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Duration
+            </span>
+            <Badge variant="outline" className="font-mono">
+              {formatDuration(duration)}
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Video Properties */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
             Video Track
-          </h4>
-          
-          <div className="space-y-2 ml-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Resolution</span>
-              <div className="text-right">
-                {videoMetadata?.width && videoMetadata?.height ? (
-                  <>
-                    <div className="text-slate-200 font-mono">
-                      {videoMetadata.width}×{videoMetadata.height}
-                    </div>
-                    <div className="text-xs text-blue-400">
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Resolution</span>
+            <div className="text-right space-y-1">
+              {videoMetadata?.width && videoMetadata?.height ? (
+                <>
+                  <Badge variant="outline" className="font-mono">
+                    {videoMetadata.width}×{videoMetadata.height}
+                  </Badge>
+                  <div>
+                    <Badge variant="secondary" className="text-xs">
                       {getResolutionCategory(videoMetadata.width, videoMetadata.height)}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-slate-500">Analyzing...</span>
-                )}
-              </div>
+                    </Badge>
+                  </div>
+                </>
+              ) : (
+                <Badge variant="secondary">Analyzing...</Badge>
+              )}
             </div>
-
-            {videoMetadata?.aspectRatio && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 flex items-center gap-1">
-                  <Ratio className="h-3 w-3" />
-                  Aspect Ratio
-                </span>
-                <span className="text-slate-200 font-mono">
-                  {videoMetadata.aspectRatio}
-                </span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Bitrate</span>
-              <div className="text-right">
-                <div className="text-slate-200 font-mono">
-                  {formatBitrate(videoMetadata?.bitrate || estimatedBitrate)}
-                </div>
-                <div className={`text-xs ${qualityInfo.color}`}>
-                  {qualityInfo.label}
-                </div>
-              </div>
-            </div>
-
-            {videoMetadata?.fps && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Frame Rate</span>
-                <span className="text-slate-200 font-mono">
-                  {videoMetadata.fps} fps
-                </span>
-              </div>
-            )}
-
-            {videoMetadata?.codec && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Codec</span>
-                <span className="text-indigo-400 font-mono">
-                  {videoMetadata.codec.toUpperCase()}
-                </span>
-              </div>
-            )}
           </div>
-        </div>
 
-        <Separator className="bg-slate-700" />
+          {videoMetadata?.aspectRatio && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <Ratio className="h-3 w-3" />
+                Aspect Ratio
+              </span>
+              <Badge variant="outline" className="font-mono">
+                {videoMetadata.aspectRatio}
+              </Badge>
+            </div>
+          )}
 
-        {/* Audio Properties */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-slate-300 flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Bitrate</span>
+            <div className="text-right space-y-1">
+              <Badge variant="outline" className="font-mono">
+                {formatBitrate(videoMetadata?.bitrate || estimatedBitrate)}
+              </Badge>
+              <div>
+                <Badge variant={qualityInfo.variant} className="text-xs">
+                  {qualityInfo.label}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {videoMetadata?.fps && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Frame Rate</span>
+              <Badge variant="outline" className="font-mono">
+                {videoMetadata.fps} fps
+              </Badge>
+            </div>
+          )}
+
+          {videoMetadata?.codec && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Codec</span>
+              <Badge variant="secondary" className="font-mono">
+                {videoMetadata.codec.toUpperCase()}
+              </Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Audio Properties */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
             {videoMetadata?.hasAudio !== false ? (
-              <Volume2 className="h-3 w-3 text-emerald-400" />
+              <Volume2 className="h-4 w-4" />
             ) : (
-              <VolumeX className="h-3 w-3 text-red-400" />
+              <VolumeX className="h-4 w-4" />
             )}
             Audio Track
-          </h4>
-          
-          <div className="space-y-2 ml-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Status</span>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${
-                  videoMetadata?.hasAudio !== false ? 'bg-emerald-400' : 'bg-red-400'
-                }`} />
-                <span className={`text-xs ${
-                  videoMetadata?.hasAudio !== false ? 'text-emerald-400' : 'text-red-400'
-                }`}>
-                  {videoMetadata?.hasAudio !== false ? 'Present' : 'None'}
-                </span>
-              </div>
-            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Status</span>
+            <Badge variant={videoMetadata?.hasAudio !== false ? "default" : "destructive"}>
+              {videoMetadata?.hasAudio !== false ? 'Present' : 'None'}
+            </Badge>
+          </div>
 
-            {videoMetadata?.hasAudio !== false && (
-              <>
-                {videoMetadata?.audioChannels && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Channels</span>
-                    <span className="text-slate-200 font-mono">
-                      {videoMetadata.audioChannels === 1 ? 'Mono' : 
-                       videoMetadata.audioChannels === 2 ? 'Stereo' : 
-                       videoMetadata.audioChannels === 6 ? '5.1 Surround' :
-                       videoMetadata.audioChannels === 8 ? '7.1 Surround' :
-                       `${videoMetadata.audioChannels} Channel`}
-                    </span>
-                  </div>
-                )}
+          {videoMetadata?.hasAudio !== false && (
+            <>
+              {videoMetadata?.audioChannels && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Channels</span>
+                  <Badge variant="outline" className="font-mono">
+                    {videoMetadata.audioChannels === 1 ? 'Mono' : 
+                     videoMetadata.audioChannels === 2 ? 'Stereo' : 
+                     videoMetadata.audioChannels === 6 ? '5.1 Surround' :
+                     videoMetadata.audioChannels === 8 ? '7.1 Surround' :
+                     `${videoMetadata.audioChannels} Channel`}
+                  </Badge>
+                </div>
+              )}
 
-                {videoMetadata?.audioBitrate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Bitrate</span>
-                    <div className="text-right">
-                      <div className="text-slate-200 font-mono">
-                        {formatBitrate(videoMetadata.audioBitrate)}
-                      </div>
-                      <div className={`text-xs ${audioQualityInfo.color}`}>
+              {videoMetadata?.audioSampleRate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Sample Rate</span>
+                  <Badge variant="outline" className="font-mono">
+                    {(videoMetadata.audioSampleRate / 1000).toFixed(1)} kHz
+                  </Badge>
+                </div>
+              )}
+
+              {videoMetadata?.audioBitrate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Bitrate</span>
+                  <div className="text-right space-y-1">
+                    <Badge variant="outline" className="font-mono">
+                      {formatBitrate(videoMetadata.audioBitrate)}
+                    </Badge>
+                    <div>
+                      <Badge variant={audioQualityInfo.variant} className="text-xs">
                         {audioQualityInfo.label}
-                      </div>
+                      </Badge>
                     </div>
                   </div>
-                )}
-
-                {videoMetadata?.audioSampleRate && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Sample Rate</span>
-                    <span className="text-slate-200 font-mono">
-                      {(videoMetadata.audioSampleRate / 1000).toFixed(1)} kHz
-                    </span>
-                  </div>
-                )}
-
-                {videoMetadata?.audioCodec && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Codec</span>
-                    <span className="text-emerald-400 font-mono">
-                      {videoMetadata.audioCodec.toUpperCase()}
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        <Separator className="bg-slate-700" />
-
-        {/* Overall Assessment */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-slate-300">Quality Assessment</h4>
-          
-          <div className="space-y-2 ml-4">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Video Quality</span>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${qualityInfo.color.replace('text-', 'bg-')}`} />
-                <span className={`text-xs ${qualityInfo.color}`}>{qualityInfo.label}</span>
-              </div>
-            </div>
-
-            {videoMetadata?.hasAudio !== false && videoMetadata?.audioBitrate && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Audio Quality</span>
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${audioQualityInfo.color.replace('text-', 'bg-')}`} />
-                  <span className={`text-xs ${audioQualityInfo.color}`}>{audioQualityInfo.label}</span>
                 </div>
-              </div>
-            )}
+              )}
 
+              {videoMetadata?.audioCodec && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Codec</span>
+                  <Badge variant="secondary" className="font-mono">
+                    {videoMetadata.audioCodec.toUpperCase()}
+                  </Badge>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Technical Details */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Technical Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {videoMetadata?.pixelFormat && (
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">File Efficiency</span>
-              <span className="text-slate-200 font-mono text-xs">
-                {((file.size / duration) / 1024).toFixed(1)} KB/s
-              </span>
+              <span className="text-sm text-muted-foreground">Pixel Format</span>
+              <Badge variant="outline" className="font-mono">
+                {videoMetadata.pixelFormat}
+              </Badge>
             </div>
+          )}
+
+          {videoMetadata?.profile && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Profile</span>
+              <Badge variant="outline" className="font-mono">
+                {videoMetadata.profile}
+              </Badge>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Estimated Bitrate</span>
+            <Badge variant="secondary" className="font-mono">
+              {formatBitrate(estimatedBitrate)}
+            </Badge>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 } 

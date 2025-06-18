@@ -1,41 +1,51 @@
+import { useState, useRef, useTransition, useDeferredValue } from 'react'
+import ReactPlayer from 'react-player'
 import { 
-  BarChart3,
-  Download, 
-  Home, 
-  Keyboard,
-  Maximize2,
-  Minimize2,
-  Pause, 
   Play, 
-  RotateCcw,
-  Scissors, 
-  Settings,
+  Pause, 
   SkipBack, 
   SkipForward, 
-  Sliders,
-  Square
+  Home, 
+  Square, 
+  Download, 
+  RotateCcw, 
+  Scissors, 
+  Sliders, 
+  BarChart3,
+  Loader2,
+  Clock,
+  Activity
 } from 'lucide-react'
-import React, { useState, useRef, useTransition, useDeferredValue } from 'react'
-import ReactPlayer from 'react-player'
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
-import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
-import { type VideoMetadata, extractDetailedVideoMetadata } from '../utils/videoMetadata'
-import { FileDropZone } from './FileDropZone'
-import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
-import { UploadProgress } from './UploadProgress'
-import { VideoAnalytics } from './VideoAnalytics'
-import { VideoTimeline } from './VideoTimeline'
+
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Badge } from './ui/badge'
+import { Alert, AlertDescription } from './ui/alert'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
+import { FileDropZone } from './FileDropZone'
+import { UploadProgress } from './UploadProgress'
+import { VideoAnalytics } from './VideoAnalytics'
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
+import { VideoTimeline } from './VideoTimeline'
+import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
+import { extractDetailedVideoMetadata, type VideoMetadata } from '../utils/videoMetadata'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable'
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
-interface VideoFile {
+type WaveformPoint = {
+  time: number
+  amplitude: number
+}
+
+type VideoFile = {
   file: File
   url: string
   duration: number
   filePath?: string
+  waveformData?: WaveformPoint[]
 }
 
 export function VideoEditorLayout() {
@@ -44,12 +54,19 @@ export function VideoEditorLayout() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [trimStart, setTrimStart] = useState(0)
-  const [trimEnd, setTrimEnd] = useState(100)
+  const [trimEnd, setTrimEnd] = useState(0)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata>({})
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
+  const [showLargeFileConfirmDialog, setShowLargeFileConfirmDialog] = useState(false)
+  const [largeFileSize, setLargeFileSize] = useState(0)
+  const [showErrorDialog, setShowErrorDialog] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [errorDetails, setErrorDetails] = useState('')
   const playerRef = useRef<ReactPlayer>(null)
 
   // React 19 performance optimizations
@@ -69,12 +86,15 @@ export function VideoEditorLayout() {
       const newVideo: VideoFile = {
         file: videoFile,
         url,
-        duration: 0
+        duration: 0,
+        waveformData: []
       }
       
       startTransition(() => {
         setCurrentVideo(newVideo)
       })
+      
+      // Note: Waveform data will be provided by server after upload
       
       // Client-side metadata extraction as fallback
       extractDetailedVideoMetadata(videoFile).then((metadata) => {
@@ -86,48 +106,33 @@ export function VideoEditorLayout() {
       setIsUploading(true)
       setUploadProgress(0)
       
-      try {
-        await streamingUpload({
-          file: videoFile,
-          onProgress: (progress: number) => {
-            startTransition(() => {
-              setUploadProgress(progress)
-            })
-          },
-          onComplete: (result) => {
-            startTransition(() => {
-              setCurrentVideo(prev => prev ? { ...prev, filePath: result.filePath } : null)
-              
-              // Use server metadata if available (more accurate than client estimation)
-              if (result.metadata) {
-                setVideoMetadata({
-                  width: result.metadata.width,
-                  height: result.metadata.height,
-                  bitrate: result.metadata.bitrate,
-                  codec: result.metadata.videoCodec,
-                  fps: result.metadata.fps,
-                  audioCodec: result.metadata.audioCodec,
-                  audioBitrate: result.metadata.audioBitrate,
-                  audioChannels: result.metadata.audioChannels,
-                  audioSampleRate: result.metadata.audioSampleRate,
-                  hasAudio: result.metadata.hasAudio,
-                  aspectRatio: result.metadata.aspectRatio,
-                  pixelFormat: result.metadata.pixelFormat,
-                  profile: result.metadata.profile,
-                })
-              }
-            })
-          },
-          onError: (error) => {
-            alert(`Upload failed: ${error.message}`)
-          }
-        })
-      } catch (error) {
-        alert('Upload failed. Please try again.')
-      } finally {
-        setIsUploading(false)
-        setUploadProgress(0)
-      }
+      // Use functional approach without try/catch
+      streamingUpload({
+        file: videoFile,
+        onProgress: (progress: number) => {
+          startTransition(() => {
+            setUploadProgress(progress)
+          })
+        },
+        onComplete: (result) => {
+          startTransition(() => {
+            setCurrentVideo(prev => prev ? { 
+              ...prev, 
+              filePath: result.filePath,
+              waveformData: result.waveformData || []
+            } : null)
+          })
+          setIsUploading(false)
+          setUploadProgress(0)
+        },
+        onError: (error) => {
+          showError('Upload Failed', error.message)
+          // Clean up failed upload state
+          resetAllVideoState()
+          setIsUploading(false)
+          setUploadProgress(0)
+        }
+      })
     }
   }
 
@@ -198,58 +203,151 @@ export function VideoEditorLayout() {
     handleSeek(duration)
   }
 
+  const downloadVideo = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `trimmed_${fileName}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const resetAllVideoState = () => {
+    console.log('🧹 Cleaning up all video state and data')
+    
+    // Complete cleanup of all video-related state
+    setCurrentVideo(null)
+    setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+    setTrimStart(0)
+    setTrimEnd(0) // Reset to 0, will be set to actual duration when video loads
+    setVideoMetadata({})
+    setIsProcessing(false)
+    setIsUploading(false)
+    setUploadProgress(0)
+    setIsFullscreen(false)
+    
+    // Reset player reference
+    if (playerRef.current) {
+      playerRef.current.seekTo(0, 'seconds')
+    }
+    
+    console.log('✅ Video state cleanup complete')
+  }
+
+  const handleLoadNewVideo = () => {
+    // Early return if no current video
+    if (!currentVideo) {
+      return
+    }
+
+    setShowDeleteConfirmDialog(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    setShowDeleteConfirmDialog(false)
+    
+    if (!currentVideo) {
+      return
+    }
+    
+    setIsDeleting(true)
+
+    // Clean up current video URL
+    if (currentVideo.url) {
+      URL.revokeObjectURL(currentVideo.url)
+    }
+
+    // Delete server file if it exists
+    if (currentVideo.filePath) {
+      const response = await fetch('http://localhost:3001/api/delete-video', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filePath: currentVideo.filePath,
+        }),
+      })
+
+      // Handle delete response without try/catch
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.error || 'Failed to delete video file'
+        console.warn(`Delete warning: ${errorMessage}`)
+        // Continue with reset even if delete fails
+      }
+    }
+
+    // Reset all state and cleanup
+    resetAllVideoState()
+    setIsDeleting(false)
+  }
+
+  const showError = (message: string, details: string = '') => {
+    setErrorMessage(message)
+    setErrorDetails(details)
+    setShowErrorDialog(true)
+  }
+
   const handleTrimVideo = async () => {
-    if (!currentVideo || !currentVideo.filePath) {
-      alert('Please wait for the video upload to complete before trimming.')
+    // Early returns for guard clauses
+    if (!currentVideo?.filePath) {
+      showError('Upload in Progress', 'Please wait for the video upload to complete before trimming.')
       return
     }
     
     const fileSizeGB = currentVideo.file.size / (1024 * 1024 * 1024)
     
     if (fileSizeGB > 1) {
-      const confirmed = confirm(
-        `This is a large file (${fileSizeGB.toFixed(2)} GB). Processing may take several minutes. Continue?`
-      )
-      if (!confirmed) return
+      setLargeFileSize(fileSizeGB)
+      setShowLargeFileConfirmDialog(true)
+      return
     }
     
+    await processVideoTrim()
+  }
+
+  const processVideoTrim = async () => {
+    if (!currentVideo?.filePath) return
+    
     setIsProcessing(true)
-    try {
-      const response = await fetch('http://localhost:3001/api/trim-video', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filePath: currentVideo.filePath,
-          startTime: trimStart,
-          endTime: trimEnd,
-          fileName: currentVideo.file.name,
-        }),
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        const errorMessage = errorData?.error || `Server error: ${response.status}`
-        const errorDetails = errorData?.details || 'Unknown error'
-        throw new Error(`${errorMessage}: ${errorDetails}`)
-      }
-      
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `trimmed_${currentVideo.file.name}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      
-    } catch (error) {
-      alert(`Error processing video: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
+    
+    // Use functional approach without try/catch
+    const response = await fetch('http://localhost:3001/api/trim-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        filePath: currentVideo.filePath,
+        startTime: trimStart,
+        endTime: trimEnd,
+        fileName: currentVideo.file.name,
+      }),
+    })
+    
+    // Handle error cases with early returns
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      const errorMessage = errorData?.error || `Server error: ${response.status}`
+      const errorDetails = errorData?.details || 'Unknown error'
+      showError(errorMessage, errorDetails)
       setIsProcessing(false)
+      return
     }
+    
+    const blob = await response.blob()
+    downloadVideo(blob, currentVideo.file.name)
+    setIsProcessing(false)
+  }
+
+  const handleConfirmLargeFile = async () => {
+    setShowLargeFileConfirmDialog(false)
+    await processVideoTrim()
   }
 
   // Initialize keyboard shortcuts
@@ -266,360 +364,476 @@ export function VideoEditorLayout() {
     trimEnd,
     onExport: handleTrimVideo,
     onResetTrim: handleResetTrim,
-    enabled: !!currentVideo && !isProcessing // Removed !isUploading - shortcuts should work during upload
+    enabled: !!currentVideo && !isProcessing && !isDeleting // Disabled during deletion
   })
 
   if (!currentVideo) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-gray-50">
-        <div className="max-w-2xl w-full p-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-center justify-center">
+      <TooltipProvider>
+        <div className="min-h-screen bg-background flex items-center justify-center p-6">
+          <Card className="w-full max-w-2xl">
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2 text-2xl">
                 <Scissors className="h-6 w-6" />
-                Professional Video Editor
+                Video Editor
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <FileDropZone 
                 onDrop={onDrop}
                 isUploading={isUploading}
               />
-                             <UploadProgress 
-                 progress={uploadProgress}
-                 isUploading={isUploading}
-                 fileName={undefined}
-               />
+              <UploadProgress 
+                progress={uploadProgress}
+                isUploading={isUploading}
+                fileName={undefined}
+              />
             </CardContent>
           </Card>
         </div>
-      </div>
+      </TooltipProvider>
     )
   }
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'h-dvh'} bg-gray-900 text-white flex flex-col`}>
-      {/* Top Toolbar */}
-      <div className="bg-gray-800 border-b border-gray-700 p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Scissors className="h-5 w-5 text-blue-400" />
-              <span className="font-semibold">Yet Another FFmpeg Wrapper</span>
+    <TooltipProvider>
+      <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-background flex flex-col`}>
+        {/* Header */}
+        <header className="border-b bg-card">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Scissors className="h-5 w-5" />
+                <h1 className="font-semibold">Video Editor</h1>
+              </div>
+              <Separator orientation="vertical" className="h-6" />
+              <p className="text-sm text-muted-foreground truncate">
+                {currentVideo.file.name}
+              </p>
             </div>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="text-sm text-gray-400">
-              {currentVideo.file.name}
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
+            
             <KeyboardShortcutsHelp shortcuts={shortcuts} />
           </div>
+        </header>
+
+        {/* Main Content */}
+        <div className="flex-1 min-h-0">
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            {/* Sidebar */}
+            <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+              <div className="h-full border-r bg-card">
+                <Tabs defaultValue="controls" className="h-full flex flex-col">
+                  <TabsList className="grid w-full grid-cols-2 rounded-none border-b">
+                    <TabsTrigger value="controls" className="flex items-center gap-2">
+                      <Sliders className="h-4 w-4" />
+                      Controls
+                    </TabsTrigger>
+                    <TabsTrigger value="analytics" className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Analytics
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <div className="flex-1 overflow-y-auto">
+                    <TabsContent value="controls" className="p-6 space-y-6 m-0">
+                      {/* Playback Control */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Play className="h-4 w-4" />
+                            Playback
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="text-center">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  onClick={handlePlayPause}
+                                  size="lg"
+                                  className="h-16 w-16 rounded-full"
+                                  variant={isPlaying ? "secondary" : "default"}
+                                >
+                                  {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{isPlaying ? 'Pause' : 'Play'} (Space)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            <Badge variant="secondary" className="mt-2">
+                              {isPlaying ? 'Playing' : 'Paused'}
+                            </Badge>
+                          </div>
+
+                          {/* Navigation Controls */}
+                          <div className="grid grid-cols-4 gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={handleJumpToStart}>
+                                  <Home className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Jump to start (Home)</p></TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={handleSeekBackward}>
+                                  <SkipBack className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Seek backward (←)</p></TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={handleSeekForward}>
+                                  <SkipForward className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Seek forward (→)</p></TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={handleJumpToEnd}>
+                                  <Square className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Jump to end (End)</p></TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Trim Controls */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Scissors className="h-4 w-4" />
+                            Trim Controls
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button onClick={handleSetTrimStart} className="h-12">
+                                  Set Start
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Set trim start (J)</p></TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button onClick={handleSetTrimEnd} className="h-12">
+                                  Set End
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Set trim end (K)</p></TooltipContent>
+                            </Tooltip>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button onClick={handleJumpToTrimStart} variant="outline" size="sm">
+                                  Jump to Start
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Jump to trim start (I)</p></TooltipContent>
+                            </Tooltip>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button onClick={handleJumpToTrimEnd} variant="outline" size="sm">
+                                  Jump to End
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent><p>Jump to trim end (O)</p></TooltipContent>
+                            </Tooltip>
+                          </div>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button onClick={handleResetTrim} variant="outline" className="w-full">
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Reset Trim
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Reset trim (R)</p></TooltipContent>
+                          </Tooltip>
+                        </CardContent>
+                      </Card>
+
+                      {/* Export */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Download className="h-4 w-4" />
+                            Export
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handleTrimVideo}
+                                disabled={isProcessing || isUploading || !currentVideo?.filePath}
+                                className="w-full h-12"
+                              >
+                                {isProcessing ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Processing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Export Video
+                                  </>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Export video (Enter) - Creates multiple trims from same source</p></TooltipContent>
+                          </Tooltip>
+                        </CardContent>
+                      </Card>
+
+                      {/* Status */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Activity className="h-4 w-4" />
+                            Status
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Shortcuts</span>
+                            <Badge variant={!!currentVideo && !isProcessing && !isDeleting ? "default" : "secondary"}>
+                              {!!currentVideo && !isProcessing && !isDeleting ? 'Active' : 'Disabled'}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Duration
+                            </span>
+                            <Badge variant="outline" className="font-mono">
+                              {Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Selection</span>
+                            <Badge variant="outline" className="font-mono">
+                              {(trimEnd - trimStart).toFixed(1)}s
+                            </Badge>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Progress</span>
+                            <Badge variant="outline" className="font-mono">
+                              {Math.round(((trimEnd - trimStart) / duration) * 100) || 0}%
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* File Management */}
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Square className="h-4 w-4" />
+                            File Management
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Alert className="mb-3">
+                            <AlertDescription className="text-xs">
+                              ⚠️ "Load New Video" will permanently delete the current video file. 
+                              Make sure you've exported all the trims you need first!
+                            </AlertDescription>
+                          </Alert>
+                          
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={handleLoadNewVideo}
+                                disabled={isDeleting || isProcessing || isUploading}
+                                variant="destructive"
+                                className="w-full"
+                              >
+                                {isDeleting ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Square className="h-4 w-4 mr-2" />
+                                    Done - Load New Video
+                                  </>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Finish editing, delete current video, and load a new one</p></TooltipContent>
+                          </Tooltip>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    <TabsContent value="analytics" className="p-6 m-0">
+                      <VideoAnalytics 
+                        file={currentVideo.file}
+                        duration={duration}
+                        videoMetadata={videoMetadata}
+                      />
+                    </TabsContent>
+                  </div>
+                </Tabs>
+              </div>
+            </ResizablePanel>
+
+            <ResizableHandle />
+
+            {/* Main Video Area */}
+            <ResizablePanel defaultSize={75}>
+              <div className="h-full flex flex-col">
+                {/* Video Player */}
+                <div className="flex-1 bg-black flex items-center justify-center min-h-0">
+                  <div className="w-full h-full">
+                    <ReactPlayer
+                      ref={playerRef}
+                      url={currentVideo?.url}
+                      width="100%"
+                      height="100%"
+                      playing={isPlaying}
+                      onProgress={handleProgress}
+                      onDuration={handleDuration}
+                      controls={false}
+                    />
+                  </div>
+                </div>
+
+                {/* Timeline */}
+                <div className="h-80 border-t bg-card flex-shrink-0 overflow-y-auto">
+                  <div className="p-6">
+                    <VideoTimeline
+                      duration={duration}
+                      currentTime={deferredCurrentTime}
+                      trimStart={trimStart}
+                      trimEnd={trimEnd}
+                      onTrimChange={handleTrimChange}
+                      onSeek={handleSeek}
+                      waveformData={currentVideo?.waveformData || []}
+                    />
+                  </div>
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Square className="h-5 w-5" />
+                Permanent Deletion Warning
+              </DialogTitle>
+              <DialogDescription className="space-y-3 text-left">
+                <p>This will permanently delete the uploaded video file from the server.</p>
+                <p className="font-medium">Make sure you have exported/downloaded all the video clips you need!</p>
+                <p>Once deleted, you cannot make more trims from this video.</p>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDeleteConfirmDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete & Load New Video'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Large File Confirmation Dialog */}
+        <Dialog open={showLargeFileConfirmDialog} onOpenChange={setShowLargeFileConfirmDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-600">
+                <Clock className="h-5 w-5" />
+                Large File Processing
+              </DialogTitle>
+              <DialogDescription className="space-y-3 text-left">
+                <p>This is a large file ({largeFileSize.toFixed(2)} GB).</p>
+                <p>Processing may take several minutes depending on your system and the complexity of the trim.</p>
+                <p>The application may appear unresponsive during processing. Please be patient.</p>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowLargeFileConfirmDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmLargeFile}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                Continue Processing
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Error Dialog */}
+        <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <Activity className="h-5 w-5" />
+                {errorMessage}
+              </DialogTitle>
+              {errorDetails && (
+                <DialogDescription className="text-left">
+                  {errorDetails}
+                </DialogDescription>
+              )}
+            </DialogHeader>
+            <DialogFooter>
+              <Button 
+                onClick={() => setShowErrorDialog(false)}
+                className="w-full"
+              >
+                OK
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Main Content */}
-      <div className="flex-1 min-h-0">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-                     {/* Left Sidebar - Tabbed Interface */}
-           <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-             <div className="h-full bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700">
-               <Tabs defaultValue="controls" className="h-full flex flex-col">
-                 <TabsList className="grid w-full grid-cols-2 bg-slate-800 border-b border-slate-700 rounded-none">
-                   <TabsTrigger 
-                     value="controls" 
-                     className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-                   >
-                     <Sliders className="h-4 w-4" />
-                     Controls
-                   </TabsTrigger>
-                   <TabsTrigger 
-                     value="analytics" 
-                     className="flex items-center gap-2 data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-                   >
-                     <BarChart3 className="h-4 w-4" />
-                     Analytics
-                   </TabsTrigger>
-                 </TabsList>
-
-                 <div className="flex-1 overflow-y-auto">
-                   <TabsContent value="controls" className="p-4 space-y-4 m-0">
-                     {/* Main Playback Control */}
-                     <div className="text-center">
-                       <Button
-                         onClick={handlePlayPause}
-                         size="lg"
-                         className={`w-16 h-16 rounded-full shadow-lg transition-all duration-200 ${
-                           isPlaying 
-                             ? 'bg-orange-500 hover:bg-orange-400 shadow-orange-500/25' 
-                             : 'bg-green-500 hover:bg-green-400 shadow-green-500/25'
-                         }`}
-                       >
-                         {isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8 ml-1" />}
-                       </Button>
-                       <p className="text-xs text-slate-400 mt-2">
-                         {isPlaying ? 'Playing' : 'Paused'} • Space
-                       </p>
-                     </div>
-
-                     <Separator className="bg-slate-700" />
-
-                     {/* Quick Actions */}
-                     <div className="space-y-3">
-                       <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                         <SkipBack className="h-4 w-4" />
-                         Navigation
-                       </h3>
-                       
-                       <div className="grid grid-cols-4 gap-2">
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={handleJumpToStart}
-                           className="h-10 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-slate-300"
-                           title="Jump to start (Home)"
-                         >
-                           <Home className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={handleSeekBackward}
-                           className="h-10 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-slate-300"
-                           title="Seek backward 5s (←)"
-                         >
-                           <SkipBack className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={handleSeekForward}
-                           className="h-10 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-slate-300"
-                           title="Seek forward 5s (→)"
-                         >
-                           <SkipForward className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={handleJumpToEnd}
-                           className="h-10 bg-slate-800/50 hover:bg-slate-700 border border-slate-600 text-slate-300"
-                           title="Jump to end (End)"
-                         >
-                           <Square className="h-4 w-4" />
-                         </Button>
-                       </div>
-                     </div>
-
-                     <Separator className="bg-slate-700" />
-
-                     {/* Trim Controls */}
-                     <div className="space-y-3">
-                       <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                         <Scissors className="h-4 w-4" />
-                         Trim Points
-                       </h3>
-                       
-                       <div className="space-y-2">
-                         <div className="grid grid-cols-2 gap-2">
-                           <Button
-                             onClick={handleSetTrimStart}
-                             className="h-12 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/25 border-0"
-                             title="Set trim start (J)"
-                           >
-                             <div className="text-center">
-                               <div className="text-lg font-bold">J</div>
-                               <div className="text-xs opacity-90">Start</div>
-                             </div>
-                           </Button>
-                           <Button
-                             onClick={handleSetTrimEnd}
-                             className="h-12 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/25 border-0"
-                             title="Set trim end (K)"
-                           >
-                             <div className="text-center">
-                               <div className="text-lg font-bold">K</div>
-                               <div className="text-xs opacity-90">End</div>
-                             </div>
-                           </Button>
-                         </div>
-                         
-                         <div className="grid grid-cols-2 gap-2">
-                           <Button
-                             onClick={handleJumpToTrimStart}
-                             variant="outline"
-                             className="h-10 bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-300"
-                             title="Jump to trim start (I)"
-                           >
-                             <div className="flex items-center gap-1">
-                               <span className="font-bold">I</span>
-                               <span className="text-xs">→Start</span>
-                             </div>
-                           </Button>
-                           <Button
-                             onClick={handleJumpToTrimEnd}
-                             variant="outline"
-                             className="h-10 bg-blue-500/10 border-blue-500/30 hover:bg-blue-500/20 text-blue-300"
-                             title="Jump to trim end (O)"
-                           >
-                             <div className="flex items-center gap-1">
-                               <span className="font-bold">O</span>
-                               <span className="text-xs">→End</span>
-                             </div>
-                           </Button>
-                         </div>
-
-                         <Button
-                           onClick={handleResetTrim}
-                           variant="outline"
-                           className="w-full h-10 bg-slate-800/50 border-slate-600 hover:bg-slate-700 text-slate-300"
-                           title="Reset trim (R)"
-                         >
-                           <RotateCcw className="h-4 w-4 mr-2" />
-                           Reset Trim
-                         </Button>
-                       </div>
-                     </div>
-
-                     <Separator className="bg-slate-700" />
-
-                     {/* Export Section */}
-                     <div className="space-y-3">
-                       <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                         <Download className="h-4 w-4" />
-                         Export
-                       </h3>
-                       
-                       <Button
-                         onClick={handleTrimVideo}
-                         disabled={isProcessing || isUploading || !currentVideo?.filePath}
-                         className="w-full h-12 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 shadow-lg shadow-red-500/25 disabled:from-gray-600 disabled:to-gray-500 disabled:shadow-none"
-                         title="Export video (Enter)"
-                       >
-                         {isProcessing ? (
-                           <div className="flex items-center gap-2">
-                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                             <span>Processing...</span>
-                           </div>
-                         ) : (
-                           <div className="flex items-center gap-2">
-                             <Download className="h-5 w-5" />
-                             <span className="font-medium">Export Video</span>
-                           </div>
-                         )}
-                       </Button>
-                     </div>
-
-                     <Separator className="bg-slate-700" />
-
-                     {/* Status & Info */}
-                     <div className="space-y-3">
-                       <h3 className="text-sm font-medium text-slate-300">Status</h3>
-                       
-                       <div className="space-y-2 text-sm">
-                         <div className="flex items-center justify-between">
-                           <span className="text-slate-400">Shortcuts</span>
-                           <div className="flex items-center gap-2">
-                             <div className={`w-2 h-2 rounded-full ${
-                               !!currentVideo && !isProcessing && !isUploading 
-                                 ? 'bg-green-400 animate-pulse shadow-sm shadow-green-400' 
-                                 : 'bg-slate-500'
-                             }`} />
-                             <span className={`text-xs ${
-                               !!currentVideo && !isProcessing && !isUploading 
-                                 ? 'text-green-400' 
-                                 : 'text-slate-500'
-                             }`}>
-                               {!!currentVideo && !isProcessing && !isUploading ? 'Active' : 'Disabled'}
-                             </span>
-                           </div>
-                         </div>
-                         
-                         <div className="flex items-center justify-between">
-                           <span className="text-slate-400">Duration</span>
-                           <span className="text-slate-300 font-mono text-xs">
-                             {Math.floor(duration / 60)}:{(Math.floor(duration % 60)).toString().padStart(2, '0')}
-                           </span>
-                         </div>
-                         
-                         <div className="flex items-center justify-between">
-                           <span className="text-slate-400">Selection</span>
-                           <span className="text-emerald-400 font-mono text-xs">
-                             {(trimEnd - trimStart).toFixed(1)}s
-                           </span>
-                         </div>
-
-                         <div className="flex items-center justify-between">
-                           <span className="text-slate-400">Progress</span>
-                           <span className="text-blue-400 font-mono text-xs">
-                             {Math.round(((trimEnd - trimStart) / duration) * 100) || 0}%
-                           </span>
-                         </div>
-                       </div>
-                     </div>
-
-                     {/* Quick Reset */}
-                     <Button
-                       onClick={() => setCurrentVideo(null)}
-                       variant="ghost"
-                       className="w-full h-10 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-slate-700"
-                     >
-                       <Square className="h-4 w-4 mr-2" />
-                       Load New Video
-                     </Button>
-                   </TabsContent>
-
-                   <TabsContent value="analytics" className="p-4 m-0">
-                     <VideoAnalytics 
-                       file={currentVideo.file}
-                       duration={duration}
-                       videoMetadata={videoMetadata}
-                     />
-                   </TabsContent>
-                 </div>
-               </Tabs>
-             </div>
-           </ResizablePanel>
-
-          <ResizableHandle />
-
-          {/* Main Video Area */}
-          <ResizablePanel defaultSize={80}>
-            <div className="h-full flex flex-col overflow-hidden">
-              {/* Video Player */}
-              <div className="flex-1 bg-black flex items-center justify-center min-h-0">
-                <div className="w-full h-full max-w-none">
-                  <ReactPlayer
-                    ref={playerRef}
-                    url={currentVideo?.url}
-                    width="100%"
-                    height="100%"
-                    playing={isPlaying}
-                    onProgress={handleProgress}
-                    onDuration={handleDuration}
-                    controls={false}
-                  />
-                </div>
-              </div>
-
-              {/* Timeline - Adequate Height for Full Component */}
-              <div className="h-80 bg-gradient-to-b from-slate-800 to-slate-900 border-t border-slate-600 flex-shrink-0 overflow-y-auto">
-                <div className="p-6">
-                  <VideoTimeline
-                    duration={duration}
-                    currentTime={deferredCurrentTime}
-                    trimStart={trimStart}
-                    trimEnd={trimEnd}
-                    onTrimChange={handleTrimChange}
-                    onSeek={handleSeek}
-                  />
-                </div>
-              </div>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
-    </div>
+    </TooltipProvider>
   )
 } 

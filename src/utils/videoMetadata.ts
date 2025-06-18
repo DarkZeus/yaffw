@@ -1,4 +1,4 @@
-export interface VideoMetadata {
+export type VideoMetadata = {
   width?: number
   height?: number
   bitrate?: number
@@ -14,10 +14,22 @@ export interface VideoMetadata {
   profile?: string
 }
 
-// Extended HTMLVideoElement interface for browser-specific properties
-interface ExtendedHTMLVideoElement extends HTMLVideoElement {
+// Extended HTMLVideoElement type for browser-specific properties
+type ExtendedHTMLVideoElement = HTMLVideoElement & {
   mozHasAudio?: boolean
   webkitAudioDecodedByteCount?: number
+}
+
+const calculateAspectRatio = (width: number, height: number): string => {
+  const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
+  const divisor = gcd(width, height)
+  return `${width / divisor}:${height / divisor}`
+}
+
+const detectVideoAudio = (video: ExtendedHTMLVideoElement): boolean => {
+  if (video.mozHasAudio !== undefined) return video.mozHasAudio
+  if (video.webkitAudioDecodedByteCount !== undefined) return video.webkitAudioDecodedByteCount > 0
+  return false
 }
 
 export async function extractVideoMetadata(file: File): Promise<VideoMetadata> {
@@ -34,42 +46,33 @@ export async function extractVideoMetadata(file: File): Promise<VideoMetadata> {
     let audioLoaded = false
     const metadata: VideoMetadata = {}
     
+    const cleanup = () => {
+      URL.revokeObjectURL(url)
+    }
+    
     const checkComplete = () => {
-      if (videoLoaded && audioLoaded) {
-        // Calculate additional properties
-        if (metadata.width && metadata.height) {
-          const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
-          const divisor = gcd(metadata.width, metadata.height)
-          metadata.aspectRatio = `${metadata.width / divisor}:${metadata.height / divisor}`
-        }
-        
-        // Clean up
-        URL.revokeObjectURL(url)
-        resolve(metadata)
+      if (!videoLoaded || !audioLoaded) return
+      
+      // Calculate additional properties
+      if (metadata.width && metadata.height) {
+        metadata.aspectRatio = calculateAspectRatio(metadata.width, metadata.height)
       }
+      
+      cleanup()
+      resolve(metadata)
     }
     
     video.onloadedmetadata = () => {
       metadata.width = video.videoWidth
       metadata.height = video.videoHeight
       metadata.bitrate = Math.round((file.size * 8) / video.duration)
-      
-      // Try to detect if video has audio track
-      const extendedVideo = video as ExtendedHTMLVideoElement
-      if (extendedVideo.mozHasAudio !== undefined) {
-        metadata.hasAudio = extendedVideo.mozHasAudio
-      } else if (extendedVideo.webkitAudioDecodedByteCount !== undefined) {
-        metadata.hasAudio = extendedVideo.webkitAudioDecodedByteCount > 0
-      }
+      metadata.hasAudio = detectVideoAudio(video as ExtendedHTMLVideoElement)
       
       videoLoaded = true
       checkComplete()
     }
     
     audio.onloadedmetadata = () => {
-      // Audio-specific metadata would be extracted here
-      // Note: HTML5 audio element has limited metadata access
-      // For more detailed audio info, we'd need a library like ffprobe
       metadata.hasAudio = true
       audioLoaded = true
       checkComplete()
@@ -85,17 +88,24 @@ export async function extractVideoMetadata(file: File): Promise<VideoMetadata> {
       checkComplete()
     }
     
-    // Set timeout to prevent hanging
+    // Timeout fallback
     setTimeout(() => {
-      if (!videoLoaded || !audioLoaded) {
-        URL.revokeObjectURL(url)
-        resolve(metadata)
-      }
+      if (videoLoaded && audioLoaded) return
+      cleanup()
+      resolve(metadata)
     }, 5000)
     
     video.src = url
     audio.src = url
   })
+}
+
+const estimateAudioBitrate = (totalBitrate: number): number => {
+  const estimatedAudioPercentage = 0.15 // 15% of total bitrate
+  const rawEstimate = totalBitrate * estimatedAudioPercentage
+  
+  // Clamp to realistic audio bitrate ranges (64 Kbps to 320 Kbps)
+  return Math.max(64000, Math.min(320000, rawEstimate))
 }
 
 // Enhanced metadata extraction using MediaInfo-like approach
@@ -107,24 +117,23 @@ export async function extractDetailedVideoMetadata(file: File): Promise<VideoMet
   // - MediaInfo.js (client-side library)
   // - WebCodecs API (modern browsers)
   
-  // Estimate audio bitrate more realistically
-  let estimatedAudioBitrate: number | undefined
-  if (basicMetadata.hasAudio && basicMetadata.bitrate) {
-    // Assume audio takes 10-20% of total bitrate for typical videos
-    // For a 1080p video, audio is usually 128-256 Kbps
-    const totalBitrate = basicMetadata.bitrate
-    const estimatedAudioPercentage = 0.15 // 15% of total bitrate
-    const rawEstimate = totalBitrate * estimatedAudioPercentage
-    
-    // Clamp to realistic audio bitrate ranges (64 Kbps to 320 Kbps)
-    estimatedAudioBitrate = Math.max(64000, Math.min(320000, rawEstimate))
+  // Early return if no audio
+  if (!basicMetadata.hasAudio) {
+    return {
+      ...basicMetadata,
+      audioChannels: 0,
+    }
   }
+  
+  // Calculate audio bitrate estimation
+  const audioBitrate = basicMetadata.bitrate 
+    ? estimateAudioBitrate(basicMetadata.bitrate) 
+    : undefined
   
   return {
     ...basicMetadata,
-    // Add estimated values based on file analysis
-    audioChannels: basicMetadata.hasAudio ? 2 : 0, // Assume stereo if audio present
-    audioSampleRate: basicMetadata.hasAudio ? 44100 : undefined, // Common sample rate
-    audioBitrate: estimatedAudioBitrate,
+    audioChannels: 2, // Assume stereo if audio present
+    audioSampleRate: 44100, // Common sample rate
+    audioBitrate,
   }
 } 

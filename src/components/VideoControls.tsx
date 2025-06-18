@@ -3,7 +3,7 @@ import { memo, useDeferredValue, useTransition } from 'react'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 
-interface VideoControlsProps {
+type VideoControlsProps = {
   isPlaying: boolean
   currentTime: number
   duration: number
@@ -45,7 +45,7 @@ export const VideoControls = memo(function VideoControls({
         />
       </div>
       
-      <span className="text-sm text-gray-500 min-w-[100px] font-mono">
+      <span className="text-sm text-muted-foreground min-w-[100px] font-mono">
         {formatTime(deferredCurrentTime)} / {formatTime(duration)}
         {isPending && <span className="ml-1 animate-pulse">⏳</span>}
       </span>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 
-interface KeyboardShortcutsProps {
+type KeyboardShortcutsProps = {
   // Playback controls
   onPlayPause: () => void
   onSeek: (time: number) => void
@@ -32,6 +32,39 @@ interface KeyboardShortcutsProps {
   enabled?: boolean
 }
 
+type Shortcut = {
+  key: string
+  description: string
+}
+
+const HANDLED_KEYS = [
+  'Space', 'ArrowLeft', 'ArrowRight', 'KeyJ', 'KeyK', 'KeyI', 'KeyO',
+  'Home', 'End', 'Enter', 'KeyM', 'Equal', 'Minus', 'KeyF', 'KeyR'
+] as const
+
+const SHORTCUTS: Shortcut[] = [
+  { key: 'Space', description: 'Play/Pause' },
+  { key: '← →', description: 'Seek 5 seconds' },
+  { key: 'Shift + ← →', description: 'Seek 1 second' },
+  { key: 'J', description: 'Set trim start' },
+  { key: 'K', description: 'Set trim end' },
+  { key: 'I', description: 'Jump to trim start' },
+  { key: 'O', description: 'Jump to trim end' },
+  { key: 'Home', description: 'Jump to beginning' },
+  { key: 'End', description: 'Jump to end' },
+  { key: 'Enter', description: 'Export video' },
+  { key: 'M', description: 'Toggle mute' },
+  { key: '+ -', description: 'Volume up/down' },
+  { key: 'F', description: 'Toggle fullscreen' },
+  { key: 'R', description: 'Reset trim' },
+]
+
+const isInputElement = (target: EventTarget | null): boolean => {
+  return target instanceof HTMLInputElement || 
+         target instanceof HTMLTextAreaElement ||
+         target instanceof HTMLSelectElement
+}
+
 export function useKeyboardShortcuts({
   onPlayPause,
   onSeek,
@@ -52,116 +85,39 @@ export function useKeyboardShortcuts({
 }: KeyboardShortcutsProps) {
   
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
-    // Don't trigger shortcuts if typing in input fields
-    if (!enabled || 
-        e.target instanceof HTMLInputElement || 
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement) {
-      return
-    }
+    // Early returns for guard clauses
+    if (!enabled) return
+    if (isInputElement(e.target)) return
 
     // Prevent default for handled keys
-    const handledKeys = [
-      'Space', 'ArrowLeft', 'ArrowRight', 'KeyJ', 'KeyK', 'KeyI', 'KeyO',
-      'Home', 'End', 'Enter', 'KeyM', 'Equal', 'Minus', 'KeyF', 'KeyR'
-    ]
-    
-    if (handledKeys.includes(e.code)) {
+    if (HANDLED_KEYS.includes(e.code as typeof HANDLED_KEYS[number])) {
       e.preventDefault()
     }
 
-    switch (e.code) {
-      // Basic Playback
-      case 'Space':
-        onPlayPause()
-        break
-        
-      case 'ArrowLeft':
-        if (e.shiftKey) {
-          // Fine control: 1 second
-          onSeek(Math.max(0, currentTime - 1))
-        } else {
-          // Normal: 5 seconds
-          onSeek(Math.max(0, currentTime - 5))
-        }
-        break
-        
-      case 'ArrowRight':
-        if (e.shiftKey) {
-          // Fine control: 1 second
-          onSeek(Math.min(duration, currentTime + 1))
-        } else {
-          // Normal: 5 seconds
-          onSeek(Math.min(duration, currentTime + 5))
-        }
-        break
-        
-      // Trimming
-      case 'KeyJ':
-        onSetTrimStart()
-        break
-        
-      case 'KeyK':
-        onSetTrimEnd()
-        break
-        
-      case 'KeyI':
-        onJumpToTrimStart()
-        break
-        
-      case 'KeyO':
-        onJumpToTrimEnd()
-        break
-        
-      // Navigation
-      case 'Home':
-        onSeek(0)
-        break
-        
-      case 'End':
-        onSeek(duration)
-        break
-        
-      // Export
-      case 'Enter':
-        if (onExport) {
-          onExport()
-        }
-        break
-        
-      // Volume
-      case 'KeyM':
-        if (onToggleMute) {
-          onToggleMute()
-        }
-        break
-        
-      case 'Equal': // + key
-        if (onVolumeChange) {
-          onVolumeChange(0.1)
-        }
-        break
-        
-      case 'Minus':
-        if (onVolumeChange) {
-          onVolumeChange(-0.1)
-        }
-        break
-        
-      // Fullscreen
-      case 'KeyF':
-        if (onToggleFullscreen) {
-          onToggleFullscreen()
-        }
-        break
-        
-      // Reset
-      case 'KeyR':
-        if (onResetTrim) {
-          onResetTrim()
-        }
-        break
+    // Use functional approach with early returns instead of switch
+    const seekLeft = e.shiftKey ? 1 : 5
+    const seekRight = e.shiftKey ? 1 : 5
+
+    const keyActions: Record<string, () => void> = {
+      Space: onPlayPause,
+      ArrowLeft: () => onSeek(Math.max(0, currentTime - seekLeft)),
+      ArrowRight: () => onSeek(Math.min(duration, currentTime + seekRight)),
+      KeyJ: onSetTrimStart,
+      KeyK: onSetTrimEnd,
+      KeyI: onJumpToTrimStart,
+      KeyO: onJumpToTrimEnd,
+      Home: () => onSeek(0),
+      End: () => onSeek(duration),
+      Enter: () => onExport?.(),
+      KeyM: () => onToggleMute?.(),
+      Equal: () => onVolumeChange?.(0.1),
+      Minus: () => onVolumeChange?.(-0.1),
+      KeyF: () => onToggleFullscreen?.(),
+      KeyR: () => onResetTrim?.(),
     }
+
+    const action = keyActions[e.code]
+    action?.()
   }, [
     enabled, onPlayPause, onSeek, currentTime, duration,
     onSetTrimStart, onSetTrimEnd, onJumpToTrimStart, onJumpToTrimEnd,
@@ -169,30 +125,13 @@ export function useKeyboardShortcuts({
     onToggleFullscreen, onResetTrim
   ])
 
+  // This useEffect is necessary for keyboard event handling - no way around it
   useEffect(() => {
-    if (enabled) {
-      window.addEventListener('keydown', handleKeyPress)
-      return () => window.removeEventListener('keydown', handleKeyPress)
-    }
+    if (!enabled) return
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
   }, [handleKeyPress, enabled])
 
-  // Return the shortcuts for display in UI
-  return {
-    shortcuts: [
-      { key: 'Space', description: 'Play/Pause' },
-      { key: '← →', description: 'Seek 5 seconds' },
-      { key: 'Shift + ← →', description: 'Seek 1 second' },
-      { key: 'J', description: 'Set trim start' },
-      { key: 'K', description: 'Set trim end' },
-      { key: 'I', description: 'Jump to trim start' },
-      { key: 'O', description: 'Jump to trim end' },
-      { key: 'Home', description: 'Jump to beginning' },
-      { key: 'End', description: 'Jump to end' },
-      { key: 'Enter', description: 'Export video' },
-      { key: 'M', description: 'Toggle mute' },
-      { key: '+ -', description: 'Volume up/down' },
-      { key: 'F', description: 'Toggle fullscreen' },
-      { key: 'R', description: 'Reset trim' },
-    ]
-  }
+  return { shortcuts: SHORTCUTS }
 } 

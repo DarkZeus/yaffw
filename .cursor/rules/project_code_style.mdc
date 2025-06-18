@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- **Coding Standards**: 
+  - Use types instead of interfaces in TypeScript
+  - Favor early returns and guard clauses over nested conditionals
+  - Avoid else/else if statements when possible
+  - Utilize short-circuit evaluations
+  - Follow functional programming principles where appropriate
+  - Avoid try/catch blocks as per project standards
+
+- **Various information**:
+  - The name of the project is YAFFW or "Yet Another FFmpeg Wrapper"
+  - The project uses pnpm, stick to it
+
+- **Approach**:
+1. Ask clarifying questions when needed for context
+2. Request code samples if necessary to provide tailored solutions
+3. Provide complete, well-commented code examples
+4. Explain implementation decisions
+5. Follow modern best practices while adhering to project coding standards
+6. Don't use classes for JavaScript, tend more into functional approach.
+7. Always stick to the projects dependencies.
+8. AVOID using useEffect at all cost. Use it whenever it is VERY necessary, like your life depends on it.

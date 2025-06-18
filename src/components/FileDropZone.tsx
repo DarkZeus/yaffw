@@ -1,8 +1,11 @@
 import { AlertCircle, FileVideo, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { useDropzone } from 'react-dropzone'
+import { Card, CardContent } from './ui/card'
+import { Badge } from './ui/badge'
+import { Alert, AlertDescription } from './ui/alert'
 
-interface FileDropZoneProps {
+type FileDropZoneProps = {
   onDrop: (files: File[]) => void
   isUploading?: boolean
 }
@@ -21,101 +24,69 @@ export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
     onDragLeave: () => setDragDepth(prev => prev - 1),
   })
 
-  const getDropZoneStyles = () => {
-    if (isUploading) return 'border-gray-300 bg-gray-50 cursor-not-allowed'
-    if (isDragReject) return 'border-red-400 bg-red-50 animate-pulse'
-    if (isDragActive) return 'border-blue-500 bg-blue-50 scale-[1.02] shadow-lg'
-    return 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-  }
-
   return (
-    <div
-      {...getRootProps()}
-      className={`
-        relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer 
-        transition-all duration-300 ease-out group
-        ${getDropZoneStyles()}
-      `}
-    >
-      <input {...getInputProps()} />
-      
-      {/* Animated Background Pattern */}
-      <div className="absolute inset-0 opacity-5 pointer-events-none">
-        <div className="w-full h-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 rounded-xl" />
-      </div>
-      
-      {/* Main Content */}
-      <div className="relative z-10">
-        {/* Icon with Animation */}
-        <div className="relative mb-6">
-          <div className={`
-            mx-auto w-20 h-20 rounded-full flex items-center justify-center
-            transition-all duration-300
-            ${isDragActive ? 'bg-blue-100 scale-110' : 'bg-gray-100 group-hover:bg-gray-200'}
-          `}>
+    <Card className={`transition-all duration-300 ${isDragActive ? 'border-primary shadow-lg' : ''} ${isDragReject ? 'border-destructive' : ''} ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-muted-foreground'}`}>
+      <CardContent {...getRootProps()} className="p-12 text-center space-y-6">
+        <input {...getInputProps()} />
+        
+        {/* Icon */}
+        <div className="flex justify-center">
+          <div className={`rounded-full p-6 transition-all duration-300 ${isDragActive ? 'bg-primary/10 scale-110' : 'bg-muted'}`}>
             {isDragReject ? (
-              <AlertCircle className="h-10 w-10 text-red-500" />
+              <AlertCircle className="h-12 w-12 text-destructive" />
             ) : isDragActive ? (
-              <FileVideo className="h-10 w-10 text-blue-600 animate-bounce" />
+              <FileVideo className="h-12 w-12 text-primary animate-bounce" />
             ) : (
-              <Upload className={`h-10 w-10 text-gray-500 transition-transform duration-300 ${
-                !isUploading ? 'group-hover:scale-110 group-hover:text-gray-700' : ''
-              }`} />
+              <Upload className={`h-12 w-12 text-muted-foreground transition-transform duration-300 ${!isUploading ? 'group-hover:scale-110' : ''}`} />
             )}
           </div>
-          
-          {/* Pulse Ring Animation */}
-          {isDragActive && (
-            <div className="absolute inset-0 rounded-full border-2 border-blue-400 animate-ping" />
-          )}
         </div>
 
         {/* Text Content */}
-        <div className="space-y-2">
-          <h3 className={`text-xl font-semibold transition-colors duration-300 ${
-            isDragReject ? 'text-red-600' : 
-            isDragActive ? 'text-blue-600' : 
-            'text-gray-700'
-          }`}>
-            {isDragReject ? 'Invalid file type' :
-             isDragActive ? 'Drop your video here!' :
-             isUploading ? 'Upload in progress...' :
-             'Drop your video to get started'}
-          </h3>
-          
-          <p className="text-gray-500">
-            {isDragReject ? 'Please select a valid video file' :
-             isDragActive ? 'Release to upload' :
-             isUploading ? 'Please wait while we process your file' :
-             'or click to browse files'}
-          </p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h3 className={`text-xl font-semibold transition-colors duration-300 ${
+              isDragReject ? 'text-destructive' : 
+              isDragActive ? 'text-primary' : 
+              'text-foreground'
+            }`}>
+              {isDragReject ? 'Invalid file type' :
+               isDragActive ? 'Drop your video here!' :
+               isUploading ? 'Upload in progress...' :
+               'Drop your video to get started'}
+            </h3>
+            
+            <p className="text-muted-foreground">
+              {isDragReject ? 'Please select a valid video file' :
+               isDragActive ? 'Release to upload' :
+               isUploading ? 'Please wait while we process your file' :
+               'or click to browse files'}
+            </p>
+          </div>
           
           {/* Supported Formats */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-400 mb-2">Supported formats:</p>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Supported formats:</p>
             <div className="flex flex-wrap justify-center gap-2">
               {['MP4', 'AVI', 'MOV', 'MKV', 'WebM'].map((format) => (
-                <span 
-                  key={format}
-                  className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-mono"
-                >
+                <Badge key={format} variant="secondary" className="font-mono">
                   {format}
-                </span>
+                </Badge>
               ))}
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Loading Overlay */}
-      {isUploading && (
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl flex items-center justify-center">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-gray-600 font-medium">Processing...</span>
-          </div>
-        </div>
-      )}
-    </div>
+
+        {/* Loading State */}
+        {isUploading && (
+          <Alert>
+            <Upload className="h-4 w-4 animate-spin" />
+            <AlertDescription>
+              Processing your video file...
+            </AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
   )
 } 

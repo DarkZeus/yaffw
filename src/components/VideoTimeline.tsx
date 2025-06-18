@@ -1,12 +1,19 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { ServerAudioWaveform } from './ServerAudioWaveform'
 
-interface VideoTimelineProps {
+type WaveformPoint = {
+  time: number
+  amplitude: number
+}
+
+type VideoTimelineProps = {
   duration: number
   currentTime: number
   trimStart: number
   trimEnd: number
   onTrimChange: (start: number, end: number) => void
   onSeek: (time: number) => void
+  waveformData?: WaveformPoint[]
 }
 
 export function VideoTimeline({
@@ -15,7 +22,8 @@ export function VideoTimeline({
   trimStart,
   trimEnd,
   onTrimChange,
-  onSeek
+  onSeek,
+  waveformData
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
@@ -311,6 +319,25 @@ export function VideoTimeline({
         <div className="flex justify-between mt-2 text-xs text-gray-400">
           <span>Video Track {isPending && <span className="animate-pulse">⏳</span>}</span>
           <span className="font-mono">{formattedTimes.duration} total</span>
+        </div>
+
+        {/* Audio Track */}
+        <div className="mt-4">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs text-gray-400">Audio Track</span>
+          </div>
+          
+          <ServerAudioWaveform
+            waveformData={waveformData || []}
+            duration={duration}
+            currentTime={displayCurrentTime}
+            trimStart={displayTrimStart}
+            trimEnd={displayTrimEnd}
+            height={60}
+            className="cursor-crosshair"
+            color="#06b6d4"
+            backgroundColor="#1f2937"
+          />
         </div>
       </div>
 

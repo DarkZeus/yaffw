@@ -1,8 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Button } from './ui/button'
+import { Badge } from './ui/badge'
+import { CheckCircle, Loader2 } from 'lucide-react'
 
-interface ActionButtonProps {
+type ActionButtonProps = {
   onClick: () => void
   disabled?: boolean
   loading?: boolean
@@ -33,7 +35,7 @@ export function ActionButton({
     if (loading) {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
           <span>{loadingText || 'Processing...'}</span>
         </div>
       )
@@ -42,9 +44,7 @@ export function ActionButton({
     if (showSuccess && successText) {
       return (
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-full" />
-          </div>
+          <CheckCircle className="h-4 w-4 text-green-500" />
           <span>{successText}</span>
         </div>
       )
@@ -64,12 +64,7 @@ export function ActionButton({
       disabled={disabled || loading}
       variant={showSuccess ? 'outline' : variant}
       size={size}
-      className={`
-        transition-all duration-200 transform
-        ${loading ? 'scale-95' : 'hover:scale-105'}
-        ${showSuccess ? 'border-green-500 text-green-600' : ''}
-        ${className}
-      `}
+      className={`transition-all duration-200 ${className}`}
     >
       {getButtonContent()}
     </Button>

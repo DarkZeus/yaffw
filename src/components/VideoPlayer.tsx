@@ -1,9 +1,12 @@
-import { Maximize2, Minimize2, Settings, Volume2, VolumeX } from 'lucide-react'
+import { Maximize2, Minimize2, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import ReactPlayer from 'react-player'
 import { VideoControls } from './VideoControls'
+import { Button } from './ui/button'
+import { Card } from './ui/card'
+import { Alert, AlertDescription } from './ui/alert'
 
-interface VideoPlayerProps {
+type VideoPlayerProps = {
   url: string
   isPlaying: boolean
   currentTime: number
@@ -53,13 +56,17 @@ export function VideoPlayer({
     }
   }, [isHovering, isPlaying])
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current?.requestFullscreen()
+        setIsFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      }
+    } catch (error) {
+      console.warn('Fullscreen operation failed:', error)
     }
   }
 
@@ -73,9 +80,9 @@ export function VideoPlayer({
   }
 
   return (
-    <div 
+    <Card 
       ref={containerRef}
-      className="relative bg-black rounded-lg overflow-hidden group shadow-2xl"
+      className="relative bg-black overflow-hidden group"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onMouseMove={() => setIsHovering(true)}
@@ -98,10 +105,12 @@ export function VideoPlayer({
         {/* Loading Overlay */}
         {!duration && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <div className="flex items-center gap-3 text-white">
-              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Loading video...</span>
-            </div>
+            <Alert className="bg-black/70 border-0">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription className="text-white">
+                Loading video...
+              </AlertDescription>
+            </Alert>
           </div>
         )}
 
@@ -122,17 +131,18 @@ export function VideoPlayer({
         `}>
           {/* Top Controls */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={toggleFullscreen}
-              className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+              className="bg-black/50 hover:bg-black/70 text-white border-0"
             >
               {isFullscreen ? (
                 <Minimize2 className="h-4 w-4" />
               ) : (
                 <Maximize2 className="h-4 w-4" />
               )}
-            </button>
+            </Button>
           </div>
 
           {/* Bottom Controls */}
@@ -151,17 +161,18 @@ export function VideoPlayer({
                 <div className="flex items-center gap-3">
                   {/* Volume Control */}
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={toggleMute}
-                      className="p-1 text-white hover:text-gray-300 transition-colors"
+                      className="text-white hover:text-muted-foreground p-1 h-auto"
                     >
                       {isMuted || volume === 0 ? (
                         <VolumeX className="h-4 w-4" />
                       ) : (
                         <Volume2 className="h-4 w-4" />
                       )}
-                    </button>
+                    </Button>
                     <input
                       type="range"
                       min="0"
@@ -169,21 +180,25 @@ export function VideoPlayer({
                       step="0.1"
                       value={isMuted ? 0 : volume}
                       onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                      className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      className="w-20 h-1 bg-muted rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button className="p-1 text-white hover:text-gray-300 transition-colors">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-white hover:text-muted-foreground p-1 h-auto"
+                  >
                     <Settings className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   )
 } 

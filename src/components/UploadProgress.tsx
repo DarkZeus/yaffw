@@ -2,7 +2,7 @@ import { useDeferredValue, useTransition } from 'react'
 import { Card, CardContent } from './ui/card'
 import { Progress } from './ui/progress'
 
-interface UploadProgressProps {
+type UploadProgressProps = {
   progress: number
   isUploading: boolean
   fileName?: string
