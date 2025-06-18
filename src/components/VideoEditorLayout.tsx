@@ -30,26 +30,14 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { VideoTimeline } from './VideoTimeline'
 import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
 import { extractDetailedVideoMetadata, type VideoMetadata } from '../utils/videoMetadata'
+import { processVideoLocally, commitFileToServer, cleanupLocalFile, type LocalVideoFile } from '../utils/localFileProcessor'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable'
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 
-type WaveformPoint = {
-  time: number
-  amplitude: number
-}
-
-type VideoFile = {
-  file: File
-  url: string
-  duration: number
-  filePath?: string
-  waveformData?: WaveformPoint[]
-}
-
 export function VideoEditorLayout() {
-  const [currentVideo, setCurrentVideo] = useState<VideoFile | null>(null)
+  const [currentVideo, setCurrentVideo] = useState<LocalVideoFile | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -61,7 +49,6 @@ export function VideoEditorLayout() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata>({})
   const [isDeleting, setIsDeleting] = useState(false)
-  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
   const [showLargeFileConfirmDialog, setShowLargeFileConfirmDialog] = useState(false)
   const [largeFileSize, setLargeFileSize] = useState(0)
   const [showErrorDialog, setShowErrorDialog] = useState(false)
@@ -82,57 +69,38 @@ export function VideoEditorLayout() {
   const onDrop = async (acceptedFiles: File[]) => {
     const videoFile = acceptedFiles[0]
     if (videoFile?.type.startsWith('video/')) {
-      const url = URL.createObjectURL(videoFile)
-      const newVideo: VideoFile = {
-        file: videoFile,
-        url,
-        duration: 0,
-        waveformData: []
-      }
-      
-      startTransition(() => {
-        setCurrentVideo(newVideo)
-      })
-      
-      // Note: Waveform data will be provided by server after upload
-      
-      // Client-side metadata extraction as fallback
-      extractDetailedVideoMetadata(videoFile).then((metadata) => {
-        startTransition(() => {
-          setVideoMetadata(metadata)
-        })
-      })
-      
       setIsUploading(true)
       setUploadProgress(0)
       
-      // Use functional approach without try/catch
-      streamingUpload({
-        file: videoFile,
-        onProgress: (progress: number) => {
+      try {
+        // Process file locally for immediate preview
+        const localVideo = await processVideoLocally(videoFile)
+        
+        startTransition(() => {
+          setCurrentVideo(localVideo)
+        })
+        
+        // Extract detailed metadata for analytics
+        extractDetailedVideoMetadata(videoFile).then((metadata) => {
           startTransition(() => {
-            setUploadProgress(progress)
+            setVideoMetadata(metadata)
           })
-        },
-        onComplete: (result) => {
-          startTransition(() => {
-            setCurrentVideo(prev => prev ? { 
-              ...prev, 
-              filePath: result.filePath,
-              waveformData: result.waveformData || []
-            } : null)
-          })
-          setIsUploading(false)
+        })
+        
+        setIsUploading(false)
+        setUploadProgress(100)
+        
+        // Reset progress after a short delay for UX
+        setTimeout(() => {
           setUploadProgress(0)
-        },
-        onError: (error) => {
-          showError('Upload Failed', error.message)
-          // Clean up failed upload state
-          resetAllVideoState()
-          setIsUploading(false)
-          setUploadProgress(0)
-        }
-      })
+        }, 1000)
+        
+      } catch (error) {
+        showError('File Processing Failed', error instanceof Error ? error.message : 'Unknown error')
+        resetAllVideoState()
+        setIsUploading(false)
+        setUploadProgress(0)
+      }
     }
   }
 
@@ -238,46 +206,38 @@ export function VideoEditorLayout() {
     console.log('✅ Video state cleanup complete')
   }
 
-  const handleLoadNewVideo = () => {
+  const handleLoadNewVideo = async () => {
     // Early return if no current video
-    if (!currentVideo) {
-      return
-    }
-
-    setShowDeleteConfirmDialog(true)
-  }
-
-  const handleConfirmDelete = async () => {
-    setShowDeleteConfirmDialog(false)
-    
     if (!currentVideo) {
       return
     }
     
     setIsDeleting(true)
 
-    // Clean up current video URL
-    if (currentVideo.url) {
-      URL.revokeObjectURL(currentVideo.url)
-    }
+    // Clean up local resources
+    cleanupLocalFile(currentVideo)
 
     // Delete server file if it exists
-    if (currentVideo.filePath) {
-      const response = await fetch('http://localhost:3001/api/delete-video', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filePath: currentVideo.filePath,
-        }),
-      })
+    if (currentVideo.serverFilePath) {
+      try {
+        const response = await fetch('http://localhost:3001/api/delete-video', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filePath: currentVideo.serverFilePath,
+          }),
+        })
 
-      // Handle delete response without try/catch
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
-        const errorMessage = errorData?.error || 'Failed to delete video file'
-        console.warn(`Delete warning: ${errorMessage}`)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          const errorMessage = errorData?.error || 'Failed to delete video file'
+          console.warn(`Delete warning: ${errorMessage}`)
+          // Continue with reset even if delete fails
+        }
+      } catch (error) {
+        console.warn('Failed to delete server file:', error)
         // Continue with reset even if delete fails
       }
     }
@@ -294,10 +254,36 @@ export function VideoEditorLayout() {
   }
 
   const handleTrimVideo = async () => {
-    // Early returns for guard clauses
-    if (!currentVideo?.filePath) {
-      showError('Upload in Progress', 'Please wait for the video upload to complete before trimming.')
+    if (!currentVideo) {
+      showError('No Video', 'Please select a video file first.')
       return
+    }
+
+    // If file hasn't been committed to server yet, commit it first
+    if (!currentVideo.serverFilePath) {
+      showError('Committing to Server', 'Preparing file for processing...')
+      setIsUploading(true)
+      
+      try {
+        const serverFilePath = await commitFileToServer(currentVideo, (progress) => {
+          setUploadProgress(progress)
+        })
+        
+        // Update currentVideo with server file path
+        setCurrentVideo(prev => prev ? { ...prev, serverFilePath } : null)
+        setIsUploading(false)
+        setUploadProgress(0)
+        
+        // Continue with trimming after commit
+        await processVideoTrim(serverFilePath)
+        return
+        
+      } catch (error) {
+        showError('Commit Failed', error instanceof Error ? error.message : 'Unknown error')
+        setIsUploading(false)
+        setUploadProgress(0)
+        return
+      }
     }
     
     const fileSizeGB = currentVideo.file.size / (1024 * 1024 * 1024)
@@ -308,11 +294,12 @@ export function VideoEditorLayout() {
       return
     }
     
-    await processVideoTrim()
+    await processVideoTrim(currentVideo.serverFilePath)
   }
 
-  const processVideoTrim = async () => {
-    if (!currentVideo?.filePath) return
+  const processVideoTrim = async (serverFilePath?: string) => {
+    const filePath = serverFilePath || currentVideo?.serverFilePath
+    if (!filePath || !currentVideo) return
     
     setIsProcessing(true)
     
@@ -323,7 +310,7 @@ export function VideoEditorLayout() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filePath: currentVideo.filePath,
+        filePath: filePath,
         startTime: trimStart,
         endTime: trimEnd,
         fileName: currentVideo.file.name,
@@ -375,7 +362,7 @@ export function VideoEditorLayout() {
             <CardHeader className="text-center">
               <CardTitle className="flex items-center justify-center gap-2 text-2xl">
                 <Scissors className="h-6 w-6" />
-                Video Editor
+                Yet Another FFmpeg Wrapper
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -404,7 +391,7 @@ export function VideoEditorLayout() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Scissors className="h-5 w-5" />
-                <h1 className="font-semibold">Video Editor</h1>
+                <h1 className="font-semibold">Yet Another FFmpeg Wrapper</h1>
               </div>
               <Separator orientation="vertical" className="h-6" />
               <p className="text-sm text-muted-foreground truncate">
@@ -581,7 +568,7 @@ export function VideoEditorLayout() {
                             <TooltipTrigger asChild>
                               <Button
                                 onClick={handleTrimVideo}
-                                disabled={isProcessing || isUploading || !currentVideo?.filePath}
+                                disabled={isProcessing || isUploading || !currentVideo}
                                 className="w-full h-12"
                               >
                                 {isProcessing ? (
@@ -655,8 +642,8 @@ export function VideoEditorLayout() {
                         <CardContent>
                           <Alert className="mb-3">
                             <AlertDescription className="text-xs">
-                              ⚠️ "Load New Video" will permanently delete the current video file. 
-                              Make sure you've exported all the trims you need first!
+                              💡 "Load New Video" will clear the current video from memory. 
+                              Make sure you've exported any trims you need first!
                             </AlertDescription>
                           </Alert>
                           
@@ -665,23 +652,23 @@ export function VideoEditorLayout() {
                               <Button
                                 onClick={handleLoadNewVideo}
                                 disabled={isDeleting || isProcessing || isUploading}
-                                variant="destructive"
+                                variant="secondary"
                                 className="w-full"
                               >
                                 {isDeleting ? (
                                   <>
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Deleting...
+                                    Clearing...
                                   </>
                                 ) : (
                                   <>
                                     <Square className="h-4 w-4 mr-2" />
-                                    Done - Load New Video
+                                    Load New Video
                                   </>
                                 )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent><p>Finish editing, delete current video, and load a new one</p></TooltipContent>
+                            <TooltipContent><p>Clear current video and load a new one</p></TooltipContent>
                           </Tooltip>
                         </CardContent>
                       </Card>
@@ -739,44 +726,7 @@ export function VideoEditorLayout() {
           </ResizablePanelGroup>
         </div>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={showDeleteConfirmDialog} onOpenChange={setShowDeleteConfirmDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <Square className="h-5 w-5" />
-                Permanent Deletion Warning
-              </DialogTitle>
-              <DialogDescription className="space-y-3 text-left">
-                <p>This will permanently delete the uploaded video file from the server.</p>
-                <p className="font-medium">Make sure you have exported/downloaded all the video clips you need!</p>
-                <p>Once deleted, you cannot make more trims from this video.</p>
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowDeleteConfirmDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete & Load New Video'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
 
         {/* Large File Confirmation Dialog */}
         <Dialog open={showLargeFileConfirmDialog} onOpenChange={setShowLargeFileConfirmDialog}>

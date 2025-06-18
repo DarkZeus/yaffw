@@ -7,7 +7,60 @@ import { extractAudioWaveform } from '../utils/audioUtils.js'
 
 const upload = new Hono()
 
-// Endpoint for streaming file upload
+// Endpoint for committing file to server (hybrid approach)
+// Only called when user wants to actually process the video
+upload.post('/commit-file', async (c) => {
+  const originalFileName = c.req.header('x-filename')
+  const fileSize = c.req.header('x-file-size')
+  
+  if (!originalFileName) {
+    return c.json({ error: 'Filename required in x-filename header' }, 400)
+  }
+
+  // Generate unique filename to prevent collisions
+  const uniqueFileName = generateUniqueFilename(originalFileName)
+  const finalPath = path.join('uploads', uniqueFileName)
+  
+  try {
+    // Simple file copy instead of streaming
+    const buffer = await c.req.arrayBuffer()
+    fs.writeFileSync(finalPath, Buffer.from(buffer))
+    
+    console.log('📁 File committed to server:', finalPath)
+    
+    // Extract detailed metadata and waveform after file is saved
+    const [metadata, waveformData] = await Promise.all([
+      extractVideoMetadata(finalPath),
+      extractAudioWaveform(finalPath)
+    ])
+    
+    return c.json({
+      success: true,
+      filePath: finalPath,
+      originalFileName: originalFileName,
+      uniqueFileName: uniqueFileName,
+      message: 'File committed successfully',
+      metadata: metadata,
+      waveformData: waveformData
+    })
+    
+  } catch (error) {
+    console.error('File commit failed:', error)
+    
+    // Clean up partial file if it exists
+    if (fs.existsSync(finalPath)) {
+      fs.unlinkSync(finalPath)
+    }
+    
+    return c.json({ 
+      error: 'Failed to commit file', 
+      details: error.message 
+    }, 500)
+  }
+})
+
+// Keep the old streaming endpoint for backward compatibility
+// But it's now optional - hybrid approach
 upload.post('/upload-stream', async (c) => {
   // Get filename from headers
   const originalFileName = c.req.header('x-filename')

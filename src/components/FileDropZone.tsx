@@ -52,14 +52,14 @@ export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
             }`}>
               {isDragReject ? 'Invalid file type' :
                isDragActive ? 'Drop your video here!' :
-               isUploading ? 'Upload in progress...' :
+               isUploading ? 'Analyzing video...' :
                'Drop your video to get started'}
             </h3>
             
             <p className="text-muted-foreground">
               {isDragReject ? 'Please select a valid video file' :
-               isDragActive ? 'Release to upload' :
-               isUploading ? 'Please wait while we process your file' :
+               isDragActive ? 'Release to load' :
+               isUploading ? 'Please wait while we analyze your file' :
                'or click to browse files'}
             </p>
           </div>
@@ -82,7 +82,7 @@ export function FileDropZone({ onDrop, isUploading }: FileDropZoneProps) {
           <Alert>
             <Upload className="h-4 w-4 animate-spin" />
             <AlertDescription>
-              Processing your video file...
+              Analyzing your video file locally...
             </AlertDescription>
           </Alert>
         )}
