@@ -37,11 +37,13 @@
     "clsx": "^2.1.1",
     "hono": "^4.6.10",
     "lucide-react": "^0.476.0",
+    "next-themes": "^0.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.8",
     "react-player": "^2.16.0",
     "react-resizable-panels": "^3.0.3",
+    "sonner": "^2.0.5",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.6",
     "tailwindcss-animate": "^1.0.7"

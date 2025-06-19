@@ -1,40 +1,41 @@
-import { useState, useRef, useTransition, useDeferredValue } from 'react'
-import ReactPlayer from 'react-player'
 import { 
-  Play, 
-  Pause, 
-  SkipBack, 
-  SkipForward, 
-  Home, 
-  Square, 
+  Activity,
+  BarChart3,
+  Clock,
   Download, 
+  Home, 
+  Loader2,
+  Pause, 
+  Play, 
   RotateCcw, 
   Scissors, 
+  SkipBack, 
+  SkipForward, 
   Sliders, 
-  BarChart3,
-  Loader2,
-  Clock,
-  Activity
+  Square 
 } from 'lucide-react'
+import { useDeferredValue, useRef, useState, useTransition } from 'react'
+import ReactPlayer from 'react-player'
+import { toast } from 'sonner'
 
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
-import { Alert, AlertDescription } from './ui/alert'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
+import { type LocalVideoFile, type WaveformPoint, cleanupLocalFile, commitFileToServer, processVideoLocally } from '../utils/localFileProcessor'
+import { downloadVideoFromUrl } from '../utils/urlDownloader'
+import { type VideoMetadata, extractDetailedVideoMetadata } from '../utils/videoMetadata'
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { UnifiedUploadZone } from './UnifiedUploadZone'
 import { VideoAnalytics } from './VideoAnalytics'
-import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { VideoTimeline } from './VideoTimeline'
-import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
-import { extractDetailedVideoMetadata, type VideoMetadata } from '../utils/videoMetadata'
-import { processVideoLocally, commitFileToServer, cleanupLocalFile, type LocalVideoFile, type WaveformPoint } from '../utils/localFileProcessor'
-import { downloadVideoFromUrl } from '../utils/urlDownloader'
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { Alert, AlertDescription } from './ui/alert'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable'
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 
 export function VideoEditorLayout() {
   const [currentVideo, setCurrentVideo] = useState<LocalVideoFile | null>(null)
@@ -52,9 +53,6 @@ export function VideoEditorLayout() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showLargeFileConfirmDialog, setShowLargeFileConfirmDialog] = useState(false)
   const [largeFileSize, setLargeFileSize] = useState(0)
-  const [showErrorDialog, setShowErrorDialog] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const [errorDetails, setErrorDetails] = useState('')
   const playerRef = useRef<ReactPlayer>(null)
 
   // React 19 performance optimizations
@@ -127,6 +125,11 @@ export function VideoEditorLayout() {
           setUploadProgress(0)
         }, 1000)
         
+        // Show success toast
+        toast.success("File uploaded successfully!", {
+          description: `Loaded ${videoFile.name}`,
+        })
+        
       } catch (error) {
         showError('File Processing Failed', error instanceof Error ? error.message : 'Unknown error')
         resetAllVideoState()
@@ -139,6 +142,11 @@ export function VideoEditorLayout() {
   const onUrlDownload = async (url: string) => {
     setIsDownloading(true)
     setUploadProgress(0)
+
+    // Show info toast that download started
+    toast.info("Download started", {
+      description: "Downloading video from URL...",
+    })
 
     try {
       console.log('🌐 Starting download from URL:', url)
@@ -207,6 +215,11 @@ export function VideoEditorLayout() {
         setTimeout(() => {
           setUploadProgress(0)
         }, 1000)
+        
+        // Show success toast
+        toast.success("Video downloaded successfully!", {
+          description: `Loaded ${response.originalFileName}`,
+        })
         
       } else {
         throw new Error('Download failed')
@@ -297,6 +310,11 @@ export function VideoEditorLayout() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    
+    // Show success toast
+    toast.success("Video exported successfully!", {
+      description: `Downloaded as trimmed_${fileName}`,
+    })
   }
 
   const resetAllVideoState = () => {
@@ -365,10 +383,10 @@ export function VideoEditorLayout() {
     setIsDeleting(false)
   }
 
-  const showError = (message: string, details: string = '') => {
-    setErrorMessage(message)
-    setErrorDetails(details)
-    setShowErrorDialog(true)
+  const showError = (message: string, details = '') => {
+    toast.error(message, {
+      description: details || undefined,
+    })
   }
 
   const handleTrimVideo = async () => {
@@ -869,30 +887,7 @@ export function VideoEditorLayout() {
           </DialogContent>
         </Dialog>
 
-        {/* Error Dialog */}
-        <Dialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-destructive">
-                <Activity className="h-5 w-5" />
-                {errorMessage}
-              </DialogTitle>
-              {errorDetails && (
-                <DialogDescription className="text-left">
-                  {errorDetails}
-                </DialogDescription>
-              )}
-            </DialogHeader>
-            <DialogFooter>
-              <Button 
-                onClick={() => setShowErrorDialog(false)}
-                className="w-full"
-              >
-                OK
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+
       </div>
     </TooltipProvider>
   )
