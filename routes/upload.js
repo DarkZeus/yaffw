@@ -177,4 +177,78 @@ upload.post('/upload-stream', async (c) => {
   })
 })
 
+// New endpoint for generating waveform only (using streaming for large files)
+upload.post('/generate-waveform', async (c) => {
+  const originalFileName = c.req.header('x-filename')
+  
+  if (!originalFileName) {
+    return c.json({ error: 'Filename required in x-filename header' }, 400)
+  }
+
+  // Generate unique filename to prevent collisions
+  const uniqueFileName = generateUniqueFilename(originalFileName)
+  const finalPath = path.join('uploads', uniqueFileName)
+  
+  try {
+    // Stream the file to disk instead of loading into memory
+    const writeStream = fs.createWriteStream(finalPath)
+    
+    // Use streaming approach
+    const request = c.req.raw
+    const reader = request.body?.getReader()
+    
+    if (!reader) {
+      throw new Error('No request body')
+    }
+    
+    // Stream data chunk by chunk
+    let done = false
+    while (!done) {
+      const { value, done: readerDone } = await reader.read()
+      done = readerDone
+      if (value) {
+        writeStream.write(Buffer.from(value))
+      }
+    }
+    
+    // Close write stream
+    writeStream.end()
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve)
+      writeStream.on('error', reject)
+    })
+    
+    console.log('📁 File streamed for waveform generation:', finalPath)
+    
+    // Generate waveform only
+    const waveformResult = await extractAudioWaveform(finalPath)
+    
+    // Clean up the temporary file after waveform generation
+    fs.unlinkSync(finalPath)
+    
+    return c.json({
+      success: true,
+      waveformData: waveformResult.keyPoints,
+      waveformImagePath: waveformResult.imagePath,
+      waveformImageDimensions: {
+        width: waveformResult.imageWidth,
+        height: waveformResult.imageHeight
+      }
+    })
+    
+  } catch (error) {
+    console.error('Waveform generation failed:', error)
+    
+    // Clean up partial file if it exists
+    if (fs.existsSync(finalPath)) {
+      fs.unlinkSync(finalPath)
+    }
+    
+    return c.json({ 
+      error: 'Failed to generate waveform', 
+      details: error.message 
+    }, 500)
+  }
+})
+
 export default upload 

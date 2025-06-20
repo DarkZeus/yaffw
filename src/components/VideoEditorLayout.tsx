@@ -24,7 +24,7 @@ import { toast } from 'sonner'
 
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { axiosUpload as streamingUpload } from '../utils/axiosUpload'
-import { type LocalVideoFile, type WaveformPoint, cleanupLocalFile, commitFileToServer, processVideoLocally } from '../utils/localFileProcessor'
+import { type LocalVideoFile, type WaveformPoint, cleanupLocalFile, commitFileToServer, generateServerWaveform, processVideoLocally } from '../utils/localFileProcessor'
 import { downloadVideoFromUrl } from '../utils/urlDownloader'
 import { type VideoMetadata, extractDetailedVideoMetadata } from '../utils/videoMetadata'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
@@ -39,6 +39,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable'
+import { ScrollArea } from './ui/scroll-area'
 import { Separator } from './ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
@@ -134,6 +135,22 @@ export function VideoEditorLayout() {
         
         startTransition(() => {
           setCurrentVideo(localVideo)
+        })
+        
+        // Generate server-side waveform in the background for better quality
+        generateServerWaveform(videoFile).then((serverWaveform) => {
+          if (serverWaveform.waveformImagePath) {
+            startTransition(() => {
+              setCurrentVideo(prev => prev ? {
+                ...prev,
+                waveformImagePath: serverWaveform.waveformImagePath,
+                waveformImageDimensions: serverWaveform.waveformImageDimensions,
+                waveformData: serverWaveform.waveformData || prev.waveformData
+              } : null)
+            })
+          }
+        }).catch(err => {
+          console.warn('Server waveform generation failed:', err)
         })
         
         // Extract detailed metadata for analytics
@@ -521,17 +538,24 @@ export function VideoEditorLayout() {
       setIsUploading(true)
       
       try {
-        const serverFilePath = await commitFileToServer(currentVideo, (progress) => {
+        const serverResult = await commitFileToServer(currentVideo, (progress) => {
           setUploadProgress(progress)
         })
         
-        // Update currentVideo with server file path
-        setCurrentVideo(prev => prev ? { ...prev, serverFilePath } : null)
+        // Update currentVideo with server file path and waveform data
+        setCurrentVideo(prev => prev ? { 
+          ...prev, 
+          serverFilePath: serverResult.filePath,
+          waveformImagePath: serverResult.waveformImagePath,
+          waveformImageDimensions: serverResult.waveformImageDimensions,
+          // Use server waveform data if available, otherwise keep client-side data
+          waveformData: serverResult.waveformData || prev.waveformData
+        } : null)
         setIsUploading(false)
         setUploadProgress(0)
         
         // Continue with trimming after commit
-        await processVideoTrim(serverFilePath)
+        await processVideoTrim(serverResult.filePath)
         return
         
       } catch (error) {
@@ -657,7 +681,7 @@ export function VideoEditorLayout() {
 
         {/* Main Content */}
         <div className="flex-1 min-h-0">
-          <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanelGroup direction="horizontal" className="!h-[calc(100dvh-64px)]">
             {/* Sidebar */}
             <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
               <div className="h-full border-r bg-card">
@@ -867,19 +891,7 @@ export function VideoEditorLayout() {
                             </Badge>
                           </div>
                           
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Selection</span>
-                            <Badge variant="outline" className="font-mono">
-                              {(trimEnd - trimStart).toFixed(1)}s
-                            </Badge>
-                          </div>
 
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Progress</span>
-                            <Badge variant="outline" className="font-mono">
-                              {Math.round(((trimEnd - trimStart) / duration) * 100) || 0}%
-                            </Badge>
-                          </div>
 
                           {/* Volume Control */}
                           <div className="space-y-2">
@@ -955,105 +967,139 @@ export function VideoEditorLayout() {
 
             {/* Main Video Area */}
             <ResizablePanel defaultSize={75}>
-              <div className="flex flex-col">
-                {/* Video Player */}
-                <div ref={cleanupRef} className="flex-1 bg-black flex items-center justify-center min-h-0 relative group">
-                  <div className={`w-full max-w-full max-h-full ${getAspectRatioClass(videoMetadata?.aspectRatio)} relative`}>
-                    <ReactPlayer
-                      ref={playerRef}
-                      url={currentVideo?.url}
-                      width="100%"
-                      height="100%"
-                      playing={isPlaying}
-                      onProgress={handleProgress}
-                      onDuration={handleDuration}
-                      controls={false}
-                    />
-                    
-                    {/* Video Controls Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none select-none">
-                      {/* Center Play/Pause Button */}
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                        <Button
-                          variant="secondary"
-                          size="lg"
-                          onClick={handlePlayPause}
-                          className="bg-black/70 hover:bg-black/90 text-white border-0 w-16 h-16 rounded-full opacity-80 hover:opacity-100 transition-opacity duration-200"
-                        >
-                          {isPlaying ? (
-                            <Pause className="h-8 w-8" />
-                          ) : (
-                            <Play className="h-8 w-8 ml-1" />
-                          )}
-                        </Button>
-                      </div>
-                      {/* Top Right Controls */}
-                      <div className="absolute top-4 right-4 flex items-center gap-2 pointer-events-auto" style={{ zIndex: 20 }}>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleToggleFullscreen}
-                          className="bg-black/50 hover:bg-black/70 text-white border-0"
-                        >
-                          {isFullscreen ? (
-                            <Minimize2 className="h-4 w-4" />
-                          ) : (
-                            <Maximize2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
+              <ResizablePanelGroup direction="vertical" className="h-full">
+                {/* Video Player Panel */}
+                <ResizablePanel defaultSize={60} minSize={30}>
+                  <div ref={cleanupRef} className="h-full bg-black flex items-center justify-center relative group">
+                    <div className={`w-full max-w-full max-h-full ${getAspectRatioClass(videoMetadata?.aspectRatio)} relative`}>
+                      <ReactPlayer
+                        ref={playerRef}
+                        url={currentVideo?.url}
+                        width="100%"
+                        height="100%"
+                        playing={isPlaying}
+                        onProgress={handleProgress}
+                        onDuration={handleDuration}
+                        controls={false}
+                      />
                       
-                      {/* Bottom Left Volume Controls */}
-                      <div className="absolute bottom-4 left-4" style={{ zIndex: 20 }}>
-                        <VolumeControl
-                          ref={volumeControlRef}
-                          onVolumeChange={handleVolumeUpdate}
+                      {/* Video Controls Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none select-none">
+                        {/* Center Play/Pause Button */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+                          <Button
+                            variant="secondary"
+                            size="lg"
+                            onClick={handlePlayPause}
+                            className="bg-black/70 hover:bg-black/90 text-white border-0 w-16 h-16 rounded-full opacity-80 hover:opacity-100 transition-opacity duration-200"
+                          >
+                            {isPlaying ? (
+                              <Pause className="h-8 w-8" />
+                            ) : (
+                              <Play className="h-8 w-8 ml-1" />
+                            )}
+                          </Button>
+                        </div>
+                        {/* Top Right Controls */}
+                        <div className="absolute top-4 right-4 flex items-center gap-2 pointer-events-auto" style={{ zIndex: 20 }}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleToggleFullscreen}
+                            className="bg-black/50 hover:bg-black/70 text-white border-0"
+                          >
+                            {isFullscreen ? (
+                              <Minimize2 className="h-4 w-4" />
+                            ) : (
+                              <Maximize2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        
+                        {/* Bottom Left Volume Controls */}
+                        <div className="absolute bottom-4 left-4" style={{ zIndex: 20 }}>
+                          <VolumeControl
+                            ref={volumeControlRef}
+                            onVolumeChange={handleVolumeUpdate}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Click overlay for play/pause and fullscreen - positioned above controls */}
+                      <div 
+                        className="absolute inset-0 cursor-pointer select-none pointer-events-none"
+                        style={{ zIndex: 10 }}
+                      >
+                        {/* Clickable area that avoids controls */}
+                        <div
+                          className="absolute inset-0 pointer-events-auto"
+                          onClick={handleVideoClick}
+                          onDoubleClick={handleVideoDoubleClick}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handlePlayPause()
+                            if (e.key === 'f' || e.key === 'F') handleToggleFullscreen()
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          style={{
+                            /* Exclude control areas from clicks */
+                            clipPath: 'polygon(0% 0%, 100% 0%, 100% calc(100% - 80px), 0% calc(100% - 80px))'
+                          }}
                         />
                       </div>
                     </div>
+                  </div>
+                </ResizablePanel>
 
-                    {/* Click overlay for play/pause and fullscreen - positioned above controls */}
-                    <div 
-                      className="absolute inset-0 cursor-pointer select-none pointer-events-none"
-                      style={{ zIndex: 10 }}
-                    >
-                      {/* Clickable area that avoids controls */}
-                      <div
-                        className="absolute inset-0 pointer-events-auto"
-                        onClick={handleVideoClick}
-                        onDoubleClick={handleVideoDoubleClick}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handlePlayPause()
-                          if (e.key === 'f' || e.key === 'F') handleToggleFullscreen()
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        style={{
-                          /* Exclude control areas from clicks */
-                          clipPath: 'polygon(0% 0%, 100% 0%, 100% calc(100% - 80px), 0% calc(100% - 80px))'
-                        }}
-                      />
+                <ResizableHandle />
+
+                {/* Timeline Panel */}
+                <ResizablePanel defaultSize={20} minSize={15}>
+                  <ScrollArea className="h-full">
+                  <div className="h-full border-t bg-card">
+                    {/* Status Bar */}
+                    <div className="px-6 pt-4 pb-2 border-b border-border/50">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Time:</span>
+                            <Badge variant="outline" className="font-mono">
+                              {Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')} / {Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">Trim Duration:</span>
+                            <Badge variant="outline" className="font-mono">
+                              {(trimEnd - trimStart).toFixed(1)}s
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Coverage:</span>
+                          <Badge variant="secondary" className="font-mono">
+                            {Math.round(((trimEnd - trimStart) / duration) * 100) || 0}%
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Timeline */}
-                <div className="h-80 border-t bg-card flex-shrink-0 overflow-y-auto">
-                  <div className="p-6">
-                    <VideoTimeline
-                      duration={duration}
-                      currentTime={deferredCurrentTime}
-                      trimStart={trimStart}
-                      trimEnd={trimEnd}
-                      onTrimChange={handleTrimChange}
-                      onSeek={handleSeek}
-                      waveformData={currentVideo?.waveformData || []}
-                      waveformImagePath={currentVideo?.waveformImagePath}
-                      waveformImageDimensions={currentVideo?.waveformImageDimensions}
-                    />
-                  </div>
-                </div>
-              </div>
+                    <div className="p-6">
+                      <VideoTimeline
+                        duration={duration}
+                        currentTime={deferredCurrentTime}
+                        trimStart={trimStart}
+                        trimEnd={trimEnd}
+                        onTrimChange={handleTrimChange}
+                        onSeek={handleSeek}
+                        waveformData={currentVideo?.waveformData || []}
+                        waveformImagePath={currentVideo?.waveformImagePath}
+                        waveformImageDimensions={currentVideo?.waveformImageDimensions}
+                      />
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>

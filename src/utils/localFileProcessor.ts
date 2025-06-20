@@ -154,7 +154,12 @@ async function generateClientWaveform(file: File): Promise<WaveformPoint[]> {
 export async function commitFileToServer(
   localVideo: LocalVideoFile,
   onProgress?: (progress: number) => void
-): Promise<string> {
+): Promise<{
+  filePath: string
+  waveformImagePath?: string
+  waveformImageDimensions?: { width: number; height: number }
+  waveformData?: WaveformPoint[]
+}> {
   try {
     const response = await fetch('http://localhost:3001/api/commit-file', {
       method: 'POST',
@@ -170,8 +175,19 @@ export async function commitFileToServer(
       throw new Error(`Server error: ${response.status}`)
     }
     
-    const result = await response.json()
-    return result.filePath
+    const responseData = await response.json()
+    const result = responseData as {
+      filePath: string
+      waveformImagePath?: string
+      waveformImageDimensions?: { width: number; height: number }
+      waveformData?: WaveformPoint[]
+    }
+    return {
+      filePath: result.filePath,
+      waveformImagePath: result.waveformImagePath,
+      waveformImageDimensions: result.waveformImageDimensions,
+      waveformData: result.waveformData
+    }
     
   } catch (error) {
     throw new Error(`Failed to commit file to server: ${error}`)
@@ -184,5 +200,49 @@ export async function commitFileToServer(
 export function cleanupLocalFile(localVideo: LocalVideoFile) {
   if (localVideo.url) {
     URL.revokeObjectURL(localVideo.url)
+  }
+}
+
+/**
+ * Generate server-side waveform for local file
+ * This sends the file to server just for waveform generation, then discards the server copy
+ */
+export async function generateServerWaveform(
+  file: File
+): Promise<{
+  waveformImagePath?: string
+  waveformImageDimensions?: { width: number; height: number }
+  waveformData?: WaveformPoint[]
+}> {
+  try {
+    const response = await fetch('http://localhost:3001/api/generate-waveform', {
+      method: 'POST',
+      headers: {
+        'x-filename': file.name,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: file
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`)
+    }
+    
+    const responseData = await response.json()
+    const result = responseData as {
+      waveformImagePath?: string
+      waveformImageDimensions?: { width: number; height: number }
+      waveformData?: WaveformPoint[]
+    }
+    
+    return {
+      waveformImagePath: result.waveformImagePath,
+      waveformImageDimensions: result.waveformImageDimensions,
+      waveformData: result.waveformData
+    }
+    
+  } catch (error) {
+    console.warn('Failed to generate server waveform:', error)
+    return {}
   }
 } 

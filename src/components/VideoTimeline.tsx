@@ -205,7 +205,7 @@ export const VideoTimeline = memo(function VideoTimeline({
       <div className="bg-gray-900 rounded-xl p-4 shadow-2xl">
         {/* Time Ruler */}
         <div className="relative h-8 mb-2">
-          <div className="flex justify-between items-center h-full">
+          <div className="flex justify-between items-center h-auto">
             {timeMarkers.map((marker) => (
               <div key={marker.id} className="flex flex-col items-center">
                 <div className="w-px h-4 bg-gray-600" />
@@ -346,28 +346,6 @@ export const VideoTimeline = memo(function VideoTimeline({
           />
         </div>
       </div>
-
-      {/* Professional Stats Bar */}
-      <div className="flex justify-between items-center p-3 bg-white rounded border border-gray-200">
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="font-mono text-gray-700">{formattedTimes.currentTime}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-              <span className="font-mono text-gray-700">Selection: {formattedTimes.selectionDuration}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full" />
-              <span className="font-mono text-gray-700">Duration: {formattedTimes.duration}</span>
-            </div>
-          </div>
-          
-          <div className="text-xs text-gray-500">
-            {Math.round(((displayTrimEnd - displayTrimStart) / duration) * 100)}% selected
-          </div>
-        </div>
     </div>
   )
 }) 
