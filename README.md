@@ -2,7 +2,7 @@
 
 A simple, browser-based video editor built with React and FFmpeg. Trim, convert (TBD), and concatenate (TBD) videos with an intuitive interface and keyboard shortcuts.
 
-![Video Editor Screenshot](https://raw.githubusercontent.com/DarkZeus/yaffw/refs/heads/master/public/screenshot.jpg)
+![Video Editor Screenshot](https://raw.githubusercontent.com/DarkZeus/yaffw/2faee70b697650b4b761970d6a2b5390b7a19fc4/public/screenshot.jpg)
 
 > **⚠️ Personal Project Disclaimer**  
 > This project is highly opinionated and was built specifically to address my personal video editing workflow needs. While it's open source and you're welcome to use or fork it, please note that feature requests, extensive customizations, or significant architectural changes may not align with the project's focused scope. Consider it a reference implementation rather than a general-purpose solution.
