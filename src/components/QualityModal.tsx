@@ -49,7 +49,7 @@ export function QualityModal({ isOpen, onClose, onExport, videoMetadata }: Quali
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60dvh] w-full">
+        <ScrollArea className="max-h-[60dvh] w-full pb-4">
           <div className="space-y-6 px-4">
             {/* Resolution Section */}
             <ResolutionSection 

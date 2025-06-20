@@ -965,7 +965,6 @@ export function VideoEditorLayout() {
                       width="100%"
                       height="100%"
                       playing={isPlaying}
-                      volume={1}
                       onProgress={handleProgress}
                       onDuration={handleDuration}
                       controls={false}
