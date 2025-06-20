@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { ImageAudioWaveform } from './ImageAudioWaveform'
 
 type WaveformPoint = {
@@ -18,7 +18,7 @@ type VideoTimelineProps = {
   waveformImageDimensions?: { width: number; height: number }
 }
 
-export function VideoTimeline({
+export const VideoTimeline = memo(function VideoTimeline({
   duration,
   currentTime,
   trimStart,
@@ -370,4 +370,4 @@ export function VideoTimeline({
         </div>
     </div>
   )
-} 
+}) 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 
 type WaveformPoint = {
   time: number
@@ -19,7 +19,7 @@ type ImageAudioWaveformProps = {
   backgroundColor?: string
 }
 
-export function ImageAudioWaveform({
+export const ImageAudioWaveform = memo(function ImageAudioWaveform({
   waveformImagePath,
   waveformImageDimensions,
   keyPoints = [],
@@ -50,9 +50,17 @@ export function ImageAudioWaveform({
   const imageUrl = useMemo(() => {
     if (!waveformImagePath) return null
     
-    // Extract just the filename from the full path
-    const filename = waveformImagePath.split('/').pop() || waveformImagePath
-    return `http://localhost:3001/api/waveform/${filename}`
+    // Extract just the filename from the full path - handle both Windows (\) and Unix (/) paths
+    const filename = waveformImagePath.split(/[/\\]/).pop() || waveformImagePath
+    const url = `http://localhost:3001/api/waveform/${filename}`
+    
+    console.log('🎵 Waveform URL generation:', {
+      originalPath: waveformImagePath,
+      extractedFilename: filename,
+      generatedURL: url
+    })
+    
+    return url
   }, [waveformImagePath])
 
   // Reset loading state when image URL changes
@@ -91,7 +99,7 @@ export function ImageAudioWaveform({
               
               return (
                 <div
-                  key={index}
+                  key={`${point.time}-${point.amplitude}`}
                   className="flex-1 rounded-sm"
                   style={{
                     height: `${barHeight}px`,
@@ -162,4 +170,4 @@ export function ImageAudioWaveform({
       )}
     </div>
   )
-} 
+}) 

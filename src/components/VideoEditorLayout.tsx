@@ -5,6 +5,8 @@ import {
   Download, 
   Home, 
   Loader2,
+  Maximize2,
+  Minimize2,
   Pause, 
   Play, 
   RotateCcw, 
@@ -12,9 +14,11 @@ import {
   SkipBack, 
   SkipForward, 
   Sliders, 
-  Square 
+  Square,
+  Volume2,
+  VolumeX
 } from 'lucide-react'
-import { useDeferredValue, useRef, useState, useTransition } from 'react'
+import { useCallback, useDeferredValue, useRef, useState, useTransition } from 'react'
 import ReactPlayer from 'react-player'
 import { toast } from 'sonner'
 
@@ -27,6 +31,7 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 import { UnifiedUploadZone } from './UnifiedUploadZone'
 import { VideoAnalytics } from './VideoAnalytics'
 import { VideoTimeline } from './VideoTimeline'
+import { VolumeControl } from './VolumeControl'
 import { Alert, AlertDescription } from './ui/alert'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -54,11 +59,30 @@ export function VideoEditorLayout() {
   const [showLargeFileConfirmDialog, setShowLargeFileConfirmDialog] = useState(false)
   const [largeFileSize, setLargeFileSize] = useState(0)
   const playerRef = useRef<ReactPlayer>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const volumeRef = useRef(1)
+  const isMutedRef = useRef(false)
+  const volumeControlRef = useRef<{ updateState: (volume: number, isMuted: boolean) => void }>(null)
 
   // React 19 performance optimizations
   const [isPending, startTransition] = useTransition()
   const deferredUploadProgress = useDeferredValue(uploadProgress)
   const deferredCurrentTime = useDeferredValue(currentTime)
+
+  // Callback ref to handle cleanup on unmount
+  const cleanupRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      // Setup when ref is attached
+      containerRef.current = node
+    } else {
+      // Cleanup when component unmounts
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+        clickTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   // Convert aspect ratio string to Tailwind class
   const getAspectRatioClass = (aspectRatio?: string) => {
@@ -301,6 +325,93 @@ export function VideoEditorLayout() {
     handleSeek(duration)
   }
 
+  // Handle volume changes without causing rerenders
+  const handleVolumeUpdate = (volume: number, isMuted: boolean) => {
+    volumeRef.current = volume
+    isMutedRef.current = isMuted
+    // Force ReactPlayer to update volume without component rerender
+    if (playerRef.current) {
+      const internalPlayer = playerRef.current.getInternalPlayer()
+      if (internalPlayer && internalPlayer.volume !== undefined) {
+        internalPlayer.volume = isMuted ? 0 : volume
+      }
+    }
+  }
+
+  const handleToggleMute = () => {
+    const newMuted = !isMutedRef.current
+    handleVolumeUpdate(volumeRef.current, newMuted)
+    // Update VolumeControl's visual state
+    volumeControlRef.current?.updateState(volumeRef.current, newMuted)
+  }
+
+  const handleVolumeChange = (delta: number) => {
+    const newVolume = Math.max(0, Math.min(1, volumeRef.current + delta))
+    handleVolumeUpdate(newVolume, newVolume === 0)
+  }
+
+  // Fullscreen handler
+  const handleToggleFullscreen = async () => {
+    if (!containerRef.current) return
+    
+    if (!document.fullscreenElement) {
+      try {
+        await containerRef.current.requestFullscreen()
+        setIsFullscreen(true)
+      } catch {
+        // Fallback: set state based on actual fullscreen status
+        setIsFullscreen(!!document.fullscreenElement)
+      }
+    } else {
+      try {
+        await document.exitFullscreen()
+        setIsFullscreen(false)
+      } catch {
+        // Fallback: set state based on actual fullscreen status
+        setIsFullscreen(!!document.fullscreenElement)
+      }
+    }
+  }
+
+  // Handle video click with single/double click detection
+  const handleVideoClick = (e: React.MouseEvent) => {
+    // Don't handle clicks on interactive controls
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[role="slider"]')) {
+      return
+    }
+
+    // Clear any existing timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = null
+    }
+
+    // Set a timeout for single click
+    clickTimeoutRef.current = setTimeout(() => {
+      handlePlayPause()
+      clickTimeoutRef.current = null
+    }, 150) // 150ms delay for snappier response
+  }
+
+  // Handle double click for fullscreen
+  const handleVideoDoubleClick = (e: React.MouseEvent) => {
+    // Don't handle double clicks on interactive controls
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[role="slider"]')) {
+      return
+    }
+
+    // Clear the single click timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = null
+    }
+    
+    // Trigger fullscreen
+    handleToggleFullscreen()
+  }
+
   const downloadVideo = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -486,6 +597,9 @@ export function VideoEditorLayout() {
     trimStart,
     trimEnd,
     onExport: handleTrimVideo,
+    onToggleMute: handleToggleMute,
+    onVolumeChange: handleVolumeChange,
+    onToggleFullscreen: handleToggleFullscreen,
     onResetTrim: handleResetTrim,
     enabled: !!currentVideo && !isProcessing && !isDeleting // Disabled during deletion
   })
@@ -754,6 +868,19 @@ export function VideoEditorLayout() {
                               {Math.round(((trimEnd - trimStart) / duration) * 100) || 0}%
                             </Badge>
                           </div>
+
+                          {/* Volume Control */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Volume2 className="h-3 w-3" />
+                                Volume
+                              </span>
+                              <Badge variant="outline" className="font-mono">
+                                Use overlay controls
+                              </Badge>
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
 
@@ -818,18 +945,84 @@ export function VideoEditorLayout() {
             <ResizablePanel defaultSize={75}>
               <div className="flex flex-col">
                 {/* Video Player */}
-                <div className="flex-1 bg-black flex items-center justify-center min-h-0">
-                  <div className={`w-full max-w-full max-h-full ${getAspectRatioClass(videoMetadata?.aspectRatio)}`}>
+                <div ref={cleanupRef} className="flex-1 bg-black flex items-center justify-center min-h-0 relative group">
+                  <div className={`w-full max-w-full max-h-full ${getAspectRatioClass(videoMetadata?.aspectRatio)} relative`}>
                     <ReactPlayer
                       ref={playerRef}
                       url={currentVideo?.url}
                       width="100%"
                       height="100%"
                       playing={isPlaying}
+                      volume={1}
                       onProgress={handleProgress}
                       onDuration={handleDuration}
                       controls={false}
                     />
+                    
+                    {/* Video Controls Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none select-none">
+                      {/* Center Play/Pause Button */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={handlePlayPause}
+                          className="bg-black/70 hover:bg-black/90 text-white border-0 w-16 h-16 rounded-full opacity-80 hover:opacity-100 transition-opacity duration-200"
+                        >
+                          {isPlaying ? (
+                            <Pause className="h-8 w-8" />
+                          ) : (
+                            <Play className="h-8 w-8 ml-1" />
+                          )}
+                        </Button>
+                      </div>
+                      {/* Top Right Controls */}
+                      <div className="absolute top-4 right-4 flex items-center gap-2 pointer-events-auto" style={{ zIndex: 20 }}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleToggleFullscreen}
+                          className="bg-black/50 hover:bg-black/70 text-white border-0"
+                        >
+                          {isFullscreen ? (
+                            <Minimize2 className="h-4 w-4" />
+                          ) : (
+                            <Maximize2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {/* Bottom Left Volume Controls */}
+                      <div className="absolute bottom-4 left-4" style={{ zIndex: 20 }}>
+                        <VolumeControl
+                          ref={volumeControlRef}
+                          onVolumeChange={handleVolumeUpdate}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Click overlay for play/pause and fullscreen - positioned above controls */}
+                    <div 
+                      className="absolute inset-0 cursor-pointer select-none pointer-events-none"
+                      style={{ zIndex: 10 }}
+                    >
+                      {/* Clickable area that avoids controls */}
+                      <div
+                        className="absolute inset-0 pointer-events-auto"
+                        onClick={handleVideoClick}
+                        onDoubleClick={handleVideoDoubleClick}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handlePlayPause()
+                          if (e.key === 'f' || e.key === 'F') handleToggleFullscreen()
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        style={{
+                          /* Exclude control areas from clicks */
+                          clipPath: 'polygon(0% 0%, 100% 0%, 100% calc(100% - 80px), 0% calc(100% - 80px))'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -853,8 +1046,6 @@ export function VideoEditorLayout() {
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
-
-
 
         {/* Large File Confirmation Dialog */}
         <Dialog open={showLargeFileConfirmDialog} onOpenChange={setShowLargeFileConfirmDialog}>
@@ -886,8 +1077,6 @@ export function VideoEditorLayout() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-
       </div>
     </TooltipProvider>
   )

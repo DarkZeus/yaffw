@@ -1,10 +1,10 @@
-import { Maximize2, Minimize2, Settings, Volume2, VolumeX, Loader2 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Loader2, Maximize2, Minimize2, Settings, Volume2, VolumeX } from 'lucide-react'
+import { useDeferredValue, useEffect, useRef, useState, useTransition } from 'react'
 import ReactPlayer from 'react-player'
 import { VideoControls } from './VideoControls'
+import { Alert, AlertDescription } from './ui/alert'
 import { Button } from './ui/button'
 import { Card } from './ui/card'
-import { Alert, AlertDescription } from './ui/alert'
 
 type VideoPlayerProps = {
   url: string
@@ -34,7 +34,8 @@ export function VideoPlayer({
   const [isHovering, setIsHovering] = useState(false)
   const playerRef = useRef<ReactPlayer>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>()
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Auto-hide controls after 3 seconds
   useEffect(() => {
@@ -52,6 +53,10 @@ export function VideoPlayer({
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current)
+      }
+      // Cleanup click timeout on unmount
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
       }
     }
   }, [isHovering, isPlaying])
@@ -77,6 +82,45 @@ export function VideoPlayer({
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume)
     setIsMuted(newVolume === 0)
+  }
+
+  // Handle video click with single/double click detection
+  const handleVideoClick = (e: React.MouseEvent) => {
+    // Don't handle clicks on interactive controls
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[role="slider"]')) {
+      return
+    }
+
+    // Clear any existing timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = null
+    }
+
+    // Set a timeout for single click
+    clickTimeoutRef.current = setTimeout(() => {
+      onPlayPause()
+      clickTimeoutRef.current = null
+    }, 150) // 150ms delay for snappier response
+  }
+
+  // Handle double click for fullscreen
+  const handleVideoDoubleClick = (e: React.MouseEvent) => {
+    // Don't handle double clicks on interactive controls
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[role="slider"]')) {
+      return
+    }
+
+    // Clear the single click timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = null
+    }
+    
+    // Trigger fullscreen
+    toggleFullscreen()
   }
 
   return (
@@ -114,19 +158,10 @@ export function VideoPlayer({
           </div>
         )}
 
-        {/* Click to Play/Pause Overlay */}
-        <div 
-          className="absolute inset-0 cursor-pointer"
-          onClick={onPlayPause}
-          onKeyDown={(e) => e.key === 'Enter' && onPlayPause()}
-          role="button"
-          tabIndex={0}
-        />
-
         {/* Controls Overlay */}
         <div className={`
           absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent
-          transition-opacity duration-300
+          transition-opacity duration-300 select-none
           ${showControls ? 'opacity-100' : 'opacity-0'}
         `}>
           {/* Top Controls */}
@@ -160,7 +195,7 @@ export function VideoPlayer({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {/* Volume Control */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 select-none">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -177,7 +212,7 @@ export function VideoPlayer({
                       type="range"
                       min="0"
                       max="1"
-                      step="0.1"
+                      step="0.01"
                       value={isMuted ? 0 : volume}
                       onChange={(e) => handleVolumeChange(Number(e.target.value))}
                       className="w-20 h-1 bg-muted rounded-lg appearance-none cursor-pointer"
@@ -197,6 +232,29 @@ export function VideoPlayer({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Click overlay for play/pause and fullscreen - positioned above controls */}
+        <div 
+          className="absolute inset-0 cursor-pointer select-none pointer-events-none"
+          style={{ zIndex: 10 }}
+        >
+          {/* Clickable area that avoids controls */}
+          <div
+            className="absolute inset-0 pointer-events-auto"
+            onClick={handleVideoClick}
+            onDoubleClick={handleVideoDoubleClick}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onPlayPause()
+              if (e.key === 'f' || e.key === 'F') toggleFullscreen()
+            }}
+            role="button"
+            tabIndex={0}
+            style={{
+              /* Exclude control areas from clicks */
+              clipPath: 'polygon(0% 0%, 100% 0%, 100% calc(100% - 120px), 0% calc(100% - 120px))'
+            }}
+          />
         </div>
       </div>
     </Card>
