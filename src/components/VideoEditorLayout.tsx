@@ -24,6 +24,7 @@ import { type LocalVideoFile, type WaveformPoint, cleanupLocalFile, commitFileTo
 import { downloadVideoFromUrl } from '../utils/urlDownloader'
 import { type VideoMetadata, extractDetailedVideoMetadata } from '../utils/videoMetadata'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
+import { QualityModal } from './QualityModal'
 import { UnifiedUploadZone } from './UnifiedUploadZone'
 import { VideoAnalytics } from './VideoAnalytics'
 import { VideoTimeline } from './VideoTimeline'
@@ -53,6 +54,7 @@ export function VideoEditorLayout() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showLargeFileConfirmDialog, setShowLargeFileConfirmDialog] = useState(false)
   const [largeFileSize, setLargeFileSize] = useState(0)
+  const [showQualityModal, setShowQualityModal] = useState(false)
   const playerRef = useRef<ReactPlayer>(null)
 
   // React 19 performance optimizations
@@ -395,6 +397,13 @@ export function VideoEditorLayout() {
       return
     }
 
+    // Show quality modal instead of directly processing
+    setShowQualityModal(true)
+  }
+
+  const handleExportWithQuality = async (qualitySettings: { resolution: string; bitrate: number; codec: string; useGpuAcceleration?: boolean; gpuVendor?: string }) => {
+    if (!currentVideo) return
+    
     // If file hasn't been committed to server yet, commit it first
     if (!currentVideo.serverFilePath) {
       showError('Committing to Server', 'Preparing file for processing...')
@@ -431,6 +440,9 @@ export function VideoEditorLayout() {
     }
     
     await processVideoTrim(currentVideo.serverFilePath)
+    
+    // TODO: In the future, use qualitySettings to customize the export
+    console.log('Quality settings selected:', qualitySettings)
   }
 
   const processVideoTrim = async (serverFilePath?: string) => {
@@ -855,6 +867,14 @@ export function VideoEditorLayout() {
         </div>
 
 
+
+        {/* Quality Modal */}
+        <QualityModal
+          isOpen={showQualityModal}
+          onClose={() => setShowQualityModal(false)}
+          onExport={handleExportWithQuality}
+          videoMetadata={videoMetadata}
+        />
 
         {/* Large File Confirmation Dialog */}
         <Dialog open={showLargeFileConfirmDialog} onOpenChange={setShowLargeFileConfirmDialog}>
