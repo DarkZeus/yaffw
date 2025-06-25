@@ -11,6 +11,7 @@ export type LocalVideoFile = {
   serverFilePath?: string // Only set when file is committed to server
   waveformImagePath?: string // Server-generated waveform image path
   waveformImageDimensions?: { width: number; height: number }
+  hasAudio?: boolean // Whether the video contains audio streams
 }
 
 export type LocalFileMetadata = {
@@ -24,6 +25,17 @@ export type LocalFileMetadata = {
   aspectRatio: string | null
 }
 
+type ExtendedHTMLVideoElement = HTMLVideoElement & {
+  mozHasAudio?: boolean
+  webkitAudioDecodedByteCount?: number
+}
+
+const detectVideoAudio = (video: ExtendedHTMLVideoElement): boolean => {
+  if (video.mozHasAudio !== undefined) return video.mozHasAudio
+  if (video.webkitAudioDecodedByteCount !== undefined) return video.webkitAudioDecodedByteCount > 0
+  return false
+}
+
 /**
  * Process a video file locally for preview and analysis
  * This reads the file directly without uploading to server
@@ -34,14 +46,17 @@ export async function processVideoLocally(file: File): Promise<LocalVideoFile> {
   // Get basic metadata
   const metadata = await extractBasicMetadata(file, url)
   
-  // Generate waveform data (client-side)
-  const waveformData = await generateClientWaveform(file)
+  // Generate waveform data (client-side) only if video has audio
+  const waveformData = metadata.hasAudio 
+    ? await generateClientWaveform(file)
+    : []
   
   return {
     file,
     url,
     duration: metadata.duration,
     waveformData,
+    hasAudio: metadata.hasAudio,
   }
 }
 
@@ -72,7 +87,7 @@ async function extractBasicMetadata(file: File, url: string): Promise<LocalFileM
         width: video.videoWidth,
         height: video.videoHeight,
         fps: 30, // Estimate, would need server-side FFprobe for exact
-        hasAudio: true, // Assume true, would need server analysis for exact
+        hasAudio: detectVideoAudio(video as ExtendedHTMLVideoElement), // Detect audio on client-side
         aspectRatio: video.videoWidth && video.videoHeight 
           ? `${video.videoWidth}:${video.videoHeight}` 
           : null,
@@ -98,7 +113,7 @@ async function extractBasicMetadata(file: File, url: string): Promise<LocalFileM
 async function generateClientWaveform(file: File): Promise<WaveformPoint[]> {
   try {
     // Create audio context
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer()

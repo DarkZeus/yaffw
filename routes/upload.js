@@ -28,11 +28,24 @@ upload.post('/commit-file', async (c) => {
     
     console.log('📁 File committed to server:', finalPath)
     
-    // Extract detailed metadata and waveform after file is saved
-    const [metadata, waveformResult] = await Promise.all([
-      extractVideoMetadata(finalPath),
-      extractAudioWaveform(finalPath)
-    ])
+    // Extract detailed metadata first
+    const metadata = await extractVideoMetadata(finalPath)
+    
+    // Only generate waveform if video has audio
+    let waveformResult
+    if (metadata?.hasAudio) {
+      console.log('🎵 Video has audio - generating waveform')
+      waveformResult = await extractAudioWaveform(finalPath)
+    } else {
+      console.log('🔇 Video has no audio - skipping waveform generation')
+      waveformResult = {
+        imagePath: null,
+        keyPoints: [],
+        imageWidth: 0,
+        imageHeight: 0,
+        hasAudio: false
+      }
+    }
     
     return c.json({
       success: true,
@@ -46,7 +59,8 @@ upload.post('/commit-file', async (c) => {
       waveformImageDimensions: {
         width: waveformResult.imageWidth,
         height: waveformResult.imageHeight
-      }
+        },
+        hasAudio: waveformResult.hasAudio
     })
     
   } catch (error) {
@@ -99,10 +113,23 @@ upload.post('/upload-stream', async (c) => {
       try {
         // Extract metadata and waveform data after upload completes
         console.log('📊 Processing uploaded file:', finalPath)
-        const [metadata, waveformResult] = await Promise.all([
-          extractVideoMetadata(finalPath),
-          extractAudioWaveform(finalPath)
-        ])
+        const metadata = await extractVideoMetadata(finalPath)
+        
+        // Only generate waveform if video has audio
+        let waveformResult
+        if (metadata?.hasAudio) {
+          console.log('🎵 Video has audio - generating waveform')
+          waveformResult = await extractAudioWaveform(finalPath)
+        } else {
+          console.log('🔇 Video has no audio - skipping waveform generation')
+          waveformResult = {
+            imagePath: null,
+            keyPoints: [],
+            imageWidth: 0,
+            imageHeight: 0,
+            hasAudio: false
+          }
+        }
         
         resolve(c.json({
           success: true,
@@ -116,7 +143,8 @@ upload.post('/upload-stream', async (c) => {
           waveformImageDimensions: {
             width: waveformResult.imageWidth,
             height: waveformResult.imageHeight
-          }
+            },
+            hasAudio: waveformResult.hasAudio
         }))
       } catch (error) {
         console.error('Post-processing failed:', error)

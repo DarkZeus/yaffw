@@ -140,14 +140,44 @@ const hasAudioStream = async (filePath) => {
 
 // Main function to generate waveform image and extract key positioning data
 export const extractAudioWaveform = async (filePath) => {
-  console.log('🎵 Generating waveform image using FFmpeg:', filePath)
+  console.log('🎵 Checking for audio stream before waveform generation:', filePath)
+  
+  // First, check if the video has any audio streams
+  try {
+    const hasAudio = await hasAudioStream(filePath)
+    if (!hasAudio) {
+      console.log('🔇 No audio stream detected - skipping waveform generation')
+      return {
+        imagePath: null,
+        keyPoints: [],
+        imageWidth: 0,
+        imageHeight: 0,
+        hasAudio: false
+      }
+    }
+    console.log('🔊 Audio stream detected - proceeding with waveform generation')
+  } catch (error) {
+    console.log('⚠️ Audio detection failed:', error.message)
+    console.log('🔇 Assuming no audio - skipping waveform generation')
+    return {
+      imagePath: null,
+      keyPoints: [],
+      imageWidth: 0,
+      imageHeight: 0,
+      hasAudio: false
+    }
+  }
   
   const duration = await getVideoDuration(filePath)
   console.log(`📏 Video duration: ${duration.toFixed(2)} seconds`)
   
   // Method 1: Generate waveform image with showwavespic filter
   try {
-    return await generateWaveformImage(filePath, duration)
+    const result = await generateWaveformImage(filePath, duration)
+    return {
+      ...result,
+      hasAudio: true
+    }
   } catch (error) {
     console.log('⚠️ Waveform image generation failed:', error.message)
   }
@@ -160,32 +190,20 @@ export const extractAudioWaveform = async (filePath) => {
       imagePath: null,
       keyPoints: pcmData,
       imageWidth: 0,
-      imageHeight: 0
+      imageHeight: 0,
+      hasAudio: true
     }
   } catch (error) {
     console.log('⚠️ Direct PCM analysis failed:', error.message)
   }
   
-  // Method 3: Final fallback - Basic audio detection
-  try {
-    if (await hasAudioStream(filePath)) {
+  // Method 3: Final fallback - Audio exists but processing failed
       console.log('⚠️ Audio detected but waveform generation failed')
-      return {
-        imagePath: null,
-        keyPoints: [],
-        imageWidth: 0,
-        imageHeight: 0
-      }
-    }
-  } catch (error) {
-    console.log('⚠️ Audio detection failed:', error.message)
-  }
-  
-  console.log('❌ All waveform generation methods failed')
   return {
     imagePath: null,
     keyPoints: [],
     imageWidth: 0,
-    imageHeight: 0
+    imageHeight: 0,
+    hasAudio: true
   }
 } 

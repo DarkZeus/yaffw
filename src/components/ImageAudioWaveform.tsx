@@ -17,6 +17,7 @@ type ImageAudioWaveformProps = {
   className?: string
   color?: string
   backgroundColor?: string
+  hasAudio?: boolean // Whether the video actually contains audio
 }
 
 export const ImageAudioWaveform = memo(function ImageAudioWaveform({
@@ -30,7 +31,8 @@ export const ImageAudioWaveform = memo(function ImageAudioWaveform({
   height = 60,
   className = '',
   color = '#06b6d4',
-  backgroundColor = '#1f2937'
+  backgroundColor = '#1f2937',
+  hasAudio = true
 }: ImageAudioWaveformProps) {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
@@ -72,6 +74,11 @@ export const ImageAudioWaveform = memo(function ImageAudioWaveform({
   const handleImageError = () => {
     setImageLoaded(false)
     setImageError(true)
+  }
+
+  // Don't render anything if the video has no audio
+  if (!hasAudio) {
+    return null
   }
 
   return (

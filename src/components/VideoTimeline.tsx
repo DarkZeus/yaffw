@@ -16,6 +16,7 @@ type VideoTimelineProps = {
   waveformData?: WaveformPoint[]
   waveformImagePath?: string
   waveformImageDimensions?: { width: number; height: number }
+  hasAudio?: boolean
 }
 
 export const VideoTimeline = memo(function VideoTimeline({
@@ -27,7 +28,8 @@ export const VideoTimeline = memo(function VideoTimeline({
   onSeek,
   waveformData,
   waveformImagePath,
-  waveformImageDimensions
+  waveformImageDimensions,
+  hasAudio = true
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
@@ -325,7 +327,8 @@ export const VideoTimeline = memo(function VideoTimeline({
           <span className="font-mono">{formattedTimes.duration} total</span>
         </div>
 
-        {/* Audio Track */}
+        {/* Audio Track - Only show if video has audio */}
+        {hasAudio && (
         <div className="mt-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs text-gray-400">Audio Track</span>
@@ -343,8 +346,10 @@ export const VideoTimeline = memo(function VideoTimeline({
             className="cursor-crosshair"
             color="#06b6d4"
             backgroundColor="#1f2937"
+              hasAudio={hasAudio}
           />
         </div>
+        )}
       </div>
     </div>
   )

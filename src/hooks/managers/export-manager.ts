@@ -67,6 +67,7 @@ export const createExportManager: ExportManager = (state, setState, utils) => {
       return
     }
     
+    // File is already committed and not large, proceed with export
     await processVideoTrim(state.currentVideo.serverFilePath)
     
     // TODO: In the future, use qualitySettings to customize the export

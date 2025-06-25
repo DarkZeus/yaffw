@@ -161,18 +161,31 @@ download.post('/from-url', async (c) => {
       console.log('📁 File exists check:', fs.existsSync(finalPath))
       console.log('📁 File stats:', fs.existsSync(finalPath) ? fs.statSync(finalPath) : 'File not found')
 
-      // Extract metadata and waveform
-      console.log('🔍 Extracting metadata and waveform...')
-      const [metadata, waveformResult] = await Promise.all([
-        extractVideoMetadata(finalPath).catch(err => {
+      // Extract metadata first
+      console.log('🔍 Extracting metadata...')
+      const metadata = await extractVideoMetadata(finalPath).catch(err => {
           console.error('Metadata extraction failed:', err)
           return null
-        }),
-        extractAudioWaveform(finalPath).catch(err => {
+      })
+      
+      // Only generate waveform if video has audio
+      let waveformResult
+      if (metadata?.hasAudio) {
+        console.log('🎵 Video has audio - generating waveform')
+        waveformResult = await extractAudioWaveform(finalPath).catch(err => {
           console.error('Waveform extraction failed:', err)
-          return { imagePath: null, keyPoints: [], imageWidth: 0, imageHeight: 0 }
+          return { imagePath: null, keyPoints: [], imageWidth: 0, imageHeight: 0, hasAudio: true }
         })
-      ])
+      } else {
+        console.log('🔇 Video has no audio - skipping waveform generation')
+        waveformResult = {
+          imagePath: null,
+          keyPoints: [],
+          imageWidth: 0,
+          imageHeight: 0,
+          hasAudio: false
+        }
+      }
 
       console.log('📊 Extracted metadata:', metadata)
       console.log('🎵 Generated waveform image:', waveformResult.imagePath)
@@ -196,6 +209,7 @@ download.post('/from-url', async (c) => {
           width: waveformResult.imageWidth,
           height: waveformResult.imageHeight
         },
+        hasAudio: waveformResult.hasAudio,
         source: 'url-download'
       })
 
