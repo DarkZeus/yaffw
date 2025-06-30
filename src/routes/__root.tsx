@@ -1,12 +1,10 @@
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.tsx'
 import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { ThemeProvider } from 'next-themes'
 
-import Header from '../components/Header'
 import { Toaster } from '../components/ui/sonner'
 
-import TanStackQueryLayout from '../integrations/tanstack-query/layout.tsx'
-
+import { AppSidebar } from '@/components/app-sidebar.tsx'
 import type { QueryClient } from '@tanstack/react-query'
 
 type MyRouterContext = {
@@ -16,11 +14,18 @@ type MyRouterContext = {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <Outlet />
-      <Toaster />
-      {/* <TanStackRouterDevtools /> */}
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <main className="flex-1 overflow-y-auto p-4">
+          <Outlet />
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+    <Toaster />
+    {/* <TanStackRouterDevtools /> */}
 
-      {/* <TanStackQueryLayout /> */}
-    </ThemeProvider>
-  ),
+    {/* <TanStackQueryLayout /> */}
+  </ThemeProvider>
+  )
 })
