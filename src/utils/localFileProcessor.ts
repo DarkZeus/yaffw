@@ -113,7 +113,7 @@ async function extractBasicMetadata(file: File, url: string): Promise<LocalFileM
 async function generateClientWaveform(file: File): Promise<WaveformPoint[]> {
   try {
     // Create audio context
-    const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    const audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
     
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer()
@@ -163,7 +163,7 @@ async function generateClientWaveform(file: File): Promise<WaveformPoint[]> {
 }
 
 /**
- * Commit file to server for processing
+ * Commit file to server for processing with progress tracking
  * Only called when user actually wants to process the video
  */
 export async function commitFileToServer(
@@ -176,33 +176,64 @@ export async function commitFileToServer(
   waveformData?: WaveformPoint[]
 }> {
   try {
-    const response = await fetch('http://localhost:3001/api/commit-file', {
-      method: 'POST',
-      headers: {
-        'x-filename': localVideo.file.name,
-        'x-file-size': localVideo.file.size.toString(),
-        'Content-Type': 'application/octet-stream'
-      },
-      body: localVideo.file
+    // Report initial progress
+    onProgress?.(0)
+    
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = (event.loaded / event.total) * 100
+          console.log(`📤 Upload progress: ${progress.toFixed(1)}% (${event.loaded}/${event.total} bytes)`)
+          onProgress?.(progress)
+        }
+      })
+      
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const responseData: {
+              filePath: string
+              waveformImagePath?: string
+              waveformImageDimensions?: { width: number; height: number }
+              waveformData?: WaveformPoint[]
+            } = JSON.parse(xhr.responseText)
+            
+            onProgress?.(100)
+            resolve({
+              filePath: responseData.filePath,
+              waveformImagePath: responseData.waveformImagePath,
+              waveformImageDimensions: responseData.waveformImageDimensions,
+              waveformData: responseData.waveformData
+            })
+          } catch (parseError) {
+            reject(new Error(`Failed to parse server response: ${parseError}`))
+          }
+        } else {
+          reject(new Error(`Server error: ${xhr.status} ${xhr.statusText}`))
+        }
+      })
+      
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during file upload'))
+      })
+      
+      // Handle abort
+      xhr.addEventListener('abort', () => {
+        reject(new Error('File upload was aborted'))
+      })
+      
+      // Start the upload
+      xhr.open('POST', 'http://localhost:3001/api/commit-file')
+      xhr.setRequestHeader('x-filename', localVideo.file.name)
+      xhr.setRequestHeader('x-file-size', localVideo.file.size.toString())
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream')
+      xhr.send(localVideo.file)
     })
-    
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`)
-    }
-    
-    const responseData = await response.json()
-    const result = responseData as {
-      filePath: string
-      waveformImagePath?: string
-      waveformImageDimensions?: { width: number; height: number }
-      waveformData?: WaveformPoint[]
-    }
-    return {
-      filePath: result.filePath,
-      waveformImagePath: result.waveformImagePath,
-      waveformImageDimensions: result.waveformImageDimensions,
-      waveformData: result.waveformData
-    }
     
   } catch (error) {
     throw new Error(`Failed to commit file to server: ${error}`)
@@ -230,25 +261,8 @@ export async function generateServerWaveform(
   waveformData?: WaveformPoint[]
 }> {
   try {
-    const response = await fetch('http://localhost:3001/api/generate-waveform', {
-      method: 'POST',
-      headers: {
-        'x-filename': file.name,
-        'Content-Type': 'application/octet-stream'
-      },
-      body: file
-    })
-    
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`)
-    }
-    
-    const responseData = await response.json()
-    const result = responseData as {
-      waveformImagePath?: string
-      waveformImageDimensions?: { width: number; height: number }
-      waveformData?: WaveformPoint[]
-    }
+    const { yaffwApi } = await import('./apiClient')
+    const result = await yaffwApi.generateWaveform(file)
     
     return {
       waveformImagePath: result.waveformImagePath,

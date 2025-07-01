@@ -102,24 +102,39 @@ video.post('/trim-video', async (c) => {
     console.log(`   Duration: ${endTimeFloat - startTimeFloat}s`)
     
     // Use precise frame-accurate cutting
-    const command = `ffmpeg -i "${tempInputPath}" -ss ${formattedStartTime} -to ${formattedEndTime} -c copy "${outputPath}"`
+    const command = `ffmpeg -ss ${formattedStartTime} -to ${formattedEndTime} -i "${tempInputPath}" -c copy "${outputPath}"`
     
     console.log('Executing FFmpeg command:', command)
     
     try {
       await execAsync(command)
       
-      // Read the trimmed video file
-      const fileBuffer = fs.readFileSync(outputPath)
+      // Stream the trimmed video file directly (no memory buffering)
+      const fileStats = fs.statSync(outputPath)
+      const fileStream = fs.createReadStream(outputPath)
       
+      console.log(`📤 Streaming trimmed video: ${(fileStats.size / (1024 * 1024)).toFixed(1)} MB`)
+      
+      // Clean up temp files, but keep output file until stream completes
       cleanupTempFiles()
-      fs.unlink(outputPath, () => {}) // Clean up output file after reading
       
-      resolve(new Response(fileBuffer, {
+      // Clean up output file after streaming
+      fileStream.on('end', () => {
+        fs.unlink(outputPath, (err) => {
+          if (err) console.warn('Failed to cleanup output file:', err)
+        })
+      })
+      
+      fileStream.on('error', (err) => {
+        console.error('Stream error:', err)
+        fs.unlink(outputPath, () => {}) // Clean up on error
+      })
+      
+      resolve(new Response(fileStream, {
         headers: {
           'Content-Type': 'video/mp4',
           'Content-Disposition': `attachment; filename="trimmed-${safeFileName}"`,
-          'Content-Length': fileBuffer.length.toString(),
+          'Content-Length': fileStats.size.toString(),
         },
       }))
       

@@ -62,7 +62,9 @@ const generateWaveformImage = async (filePath, duration) => {
   const imageHeight = 120 // Reasonable height for UI
   
   // Generate high-quality waveform image with better styling
-  const waveformCommand = `ffmpeg -i "${filePath}" -filter_complex "aformat=channel_layouts=mono,showwavespic=s=${imageWidth}x${imageHeight}:colors=#06b6d4:scale=lin" -frames:v 1 "${waveformImagePath}" -y`
+  // Using sqrt scale for optimal video editing: good balance between showing
+  // quiet parts (dialog/ambient) and loud parts (music/effects) clearly
+  const waveformCommand = `ffmpeg -i "${filePath}" -filter_complex "aformat=channel_layouts=mono,showwavespic=s=${imageWidth}x${imageHeight}:colors=#06b6d4:scale=sqrt" -frames:v 1 "${waveformImagePath}" -y`
   
   await execAsync(waveformCommand)
   
@@ -90,14 +92,42 @@ const extractWaveformViaPCM = async (filePath, duration) => {
   const extractCommand = `ffmpeg -i "${filePath}" -ac 1 -ar 22050 -f s16le "${tempAudioFile}" -y`
   await execAsync(extractCommand)
   
-  // Read raw PCM data
-  const audioBuffer = fs.readFileSync(tempAudioFile)
+  // Check PCM file size and handle appropriately
+  const pcmFileStats = fs.statSync(tempAudioFile)
+  const pcmFileSizeMB = pcmFileStats.size / (1024 * 1024)
+  
+  console.log(`📊 PCM file size: ${pcmFileSizeMB.toFixed(1)} MB`)
+  
+  // For very large PCM files (>100MB), use streaming; otherwise use direct read
   const samples = []
   
-  // Read 16-bit signed samples
-  for (let i = 0; i < audioBuffer.length; i += 2) {
-    const sample = audioBuffer.readInt16LE(i)
-    samples.push(Math.abs(sample) / 32768) // Normalize to 0-1
+  if (pcmFileSizeMB > 100) {
+    console.log('🌊 Large PCM file detected, using streaming approach...')
+    
+    // Stream PCM data in chunks to avoid memory issues
+    const CHUNK_SIZE = 8192 // 8KB chunks
+    const fileStream = fs.createReadStream(tempAudioFile, { highWaterMark: CHUNK_SIZE })
+    
+    for await (const chunk of fileStream) {
+      // Read 16-bit signed samples from chunk
+      for (let i = 0; i < chunk.length; i += 2) {
+        if (i + 1 < chunk.length) {
+          const sample = chunk.readInt16LE(i)
+          samples.push(Math.abs(sample) / 32768) // Normalize to 0-1
+        }
+      }
+    }
+  } else {
+    console.log('⚡ Small PCM file, using direct read...')
+    
+    // Read raw PCM data directly for smaller files
+    const audioBuffer = fs.readFileSync(tempAudioFile)
+    
+    // Read 16-bit signed samples
+    for (let i = 0; i < audioBuffer.length; i += 2) {
+      const sample = audioBuffer.readInt16LE(i)
+      samples.push(Math.abs(sample) / 32768) // Normalize to 0-1
+    }
   }
   
   // Create high-resolution waveform (8 samples per second)

@@ -14,18 +14,17 @@ type MyRouterContext = {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <main className="flex-1 overflow-y-auto p-4">
-          <Outlet />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
-    <Toaster />
-    {/* <TanStackRouterDevtools /> */}
-
-    {/* <TanStackQueryLayout /> */}
-  </ThemeProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <main className="flex-1 overflow-y-auto p-4">
+            <Outlet />
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+      <Toaster expand={true} />
+      {/* <TanStackRouterDevtools /> */}
+      {/* <TanStackQueryLayout /> */}
+    </ThemeProvider>
   )
 })

@@ -1,13 +1,15 @@
-import { useCallback, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import type ReactPlayer from 'react-player'
 import { toast } from 'sonner'
 
+import { DEFAULT_PLAYBACK_SPEED } from '../constants/video-player.constants'
 import type { QualitySettings, VideoEditorMediator, VideoEditorState } from '../types/video-editor-mediator.types'
 import { createExportManager } from './managers/export-manager'
-import { createFileManager } from './managers/file-manager'
+import { createFileManager } from './managers/file-manager.tsx'
 import { createTrimManager } from './managers/trim-manager'
 import { createUIManager } from './managers/ui-manager'
 import { createVideoManager } from './managers/video-manager'
+import { useBeforeUnload } from './useBeforeUnload'
 
 const initialState: VideoEditorState = {
   // Video state
@@ -16,6 +18,7 @@ const initialState: VideoEditorState = {
   currentTime: 0,
   duration: 0,
   videoMetadata: {},
+  playbackSpeed: DEFAULT_PLAYBACK_SPEED,
   
   // Trim state
   trimStart: 0,
@@ -27,6 +30,10 @@ const initialState: VideoEditorState = {
   isProcessing: false,
   isDeleting: false,
   uploadProgress: 0,
+  // Background commit states
+  isCommittingToServer: false,
+  commitProgress: 0,
+  isCommitComplete: false,
   
   // UI state
   isFullscreen: false,
@@ -103,6 +110,24 @@ export const useVideoEditorMediator = (): VideoEditorMediator => {
       description: `Downloaded as trimmed_${fileName}`,
     })
   }, [])
+
+  // Before unload protection
+  const beforeUnloadHook = useBeforeUnload({
+    state,
+    onCleanup: resetAllVideoState
+  })
+
+  // Update beforeunload listeners when state changes
+  useEffect(() => {
+    beforeUnloadHook.updateEventListeners()
+  }, [beforeUnloadHook.updateEventListeners])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      beforeUnloadHook.cleanup()
+    }
+  }, [beforeUnloadHook.cleanup])
 
   // Create managers
   const videoOps = createVideoManager(state, updateState, {

@@ -107,6 +107,7 @@ export function VideoEditorLayout() {
                     isPlaying={state.isPlaying}
                     isFullscreen={state.isFullscreen}
                     aspectRatioClass={getAspectRatioClass(state.videoMetadata?.aspectRatio)}
+                    playbackSpeed={state.playbackSpeed}
                     videoOps={videoOps}
                     playerRef={playerRef}
                     volumeControlRef={volumeControlRef}
@@ -120,11 +121,16 @@ export function VideoEditorLayout() {
                   <TimelineSection
                     videoState={{
                       currentTime: state.currentTime,
-                      duration: state.duration
+                      duration: state.duration,
+                      isPlaying: state.isPlaying,
+                      playbackSpeed: state.playbackSpeed
                     }}
                     trimState={{
                       trimStart: state.trimStart,
                       trimEnd: state.trimEnd
+                    }}
+                    uiState={{
+                      isFullscreen: state.isFullscreen
                     }}
                     currentVideo={state.currentVideo}
                     deferredCurrentTime={deferredCurrentTime}

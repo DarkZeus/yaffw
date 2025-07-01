@@ -76,6 +76,10 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
     volumeControlRef.current?.updateState(newVolume, newVolume === 0)
   }
 
+  const handlePlaybackSpeedChange = (speed: number) => {
+    setState({ playbackSpeed: speed })
+  }
+
   return {
     handlePlayPause,
     handleSeek,
@@ -84,6 +88,7 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
     handleVolumeUpdate,
     handleToggleFullscreen,
     handleToggleMute,
-    handleVolumeChange
+    handleVolumeChange,
+    handlePlaybackSpeedChange
   }
 } 

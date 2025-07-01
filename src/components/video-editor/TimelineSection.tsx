@@ -3,10 +3,12 @@ import type { LocalVideoFile } from '../../utils/localFileProcessor'
 import { VideoTimeline } from '../VideoTimeline'
 import { Badge } from '../ui/badge'
 import { ScrollArea } from '../ui/scroll-area'
+import { VideoControlBar } from './VideoControlBar'
 
 type TimelineSectionProps = {
-  videoState: Pick<VideoState, 'currentTime' | 'duration'>
+  videoState: Pick<VideoState, 'currentTime' | 'duration' | 'isPlaying' | 'playbackSpeed'>
   trimState: TrimState
+  uiState: { isFullscreen: boolean }
   currentVideo: LocalVideoFile
   deferredCurrentTime: number
   videoOps: VideoOperations
@@ -16,17 +18,29 @@ type TimelineSectionProps = {
 export const TimelineSection = ({ 
   videoState, 
   trimState, 
+  uiState,
   currentVideo, 
   deferredCurrentTime, 
   videoOps, 
   trimOps 
 }: TimelineSectionProps) => {
-  const { currentTime, duration } = videoState
+  const { currentTime, duration, isPlaying, playbackSpeed } = videoState
   const { trimStart, trimEnd } = trimState
+  const { isFullscreen } = uiState
 
   return (
     <ScrollArea className="h-full">
       <div className="h-full border-t bg-card">
+        {/* Video Control Bar */}
+        <VideoControlBar
+          isPlaying={isPlaying}
+          isFullscreen={isFullscreen}
+          currentTime={currentTime}
+          duration={duration}
+          playbackSpeed={playbackSpeed}
+          videoOps={videoOps}
+        />
+
         {/* Status Bar */}
         <div className="px-6 pt-4 pb-2 border-b border-border/50">
           <div className="flex items-center justify-between text-sm">

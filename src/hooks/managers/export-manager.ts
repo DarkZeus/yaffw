@@ -1,122 +1,152 @@
 import { toast } from 'sonner'
 
 import type { ExportManager, QualitySettings } from '../../types/video-editor-mediator.types'
-import { commitFileToServer } from '../../utils/localFileProcessor'
+import { yaffwApi } from '../../utils/apiClient'
 
 export const createExportManager: ExportManager = (state, setState, utils) => {
   const { showError, downloadVideo } = utils
 
-  const handleTrimVideo = async () => {
-    if (!state.currentVideo) {
-      showError('No Video', 'Please select a video file first.')
-      return
-    }
-
-    // Show quality modal instead of directly processing
-    setState({ showQualityModal: true })
-  }
-
-  const handleExportWithQuality = async (qualitySettings: QualitySettings) => {
-    if (!state.currentVideo) return
-    
-    // Close quality modal first
-    setState({ showQualityModal: false })
-    
-    // If file hasn't been committed to server yet, commit it first
-    if (!state.currentVideo.serverFilePath) {
-      toast.info('Committing to Server', { description: 'Preparing file for processing...' })
-      setState({ isUploading: true })
+  // Wait for background commit to complete
+  const waitForBackgroundCommit = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const maxWaitTime = 300000 // 5 minutes timeout
+      const startTime = Date.now()
       
-      try {
-        const serverResult = await commitFileToServer(state.currentVideo, (progress) => {
-          setState({ uploadProgress: progress })
-        })
+      const checkCommitStatus = () => {
+        // Check if commit completed successfully
+        if (state.isCommitComplete && state.currentVideo?.serverFilePath) {
+          console.log('✅ Background commit completed while waiting')
+          resolve()
+          return
+        }
         
-        // Update currentVideo with server file path and waveform data
-        setState({
-          currentVideo: state.currentVideo ? { 
-            ...state.currentVideo, 
-            serverFilePath: serverResult.filePath,
-            waveformImagePath: serverResult.waveformImagePath,
-            waveformImageDimensions: serverResult.waveformImageDimensions,
-            // Use server waveform data if available, otherwise keep client-side data
-            waveformData: serverResult.waveformData || state.currentVideo.waveformData
-          } : null,
-          isUploading: false,
-          uploadProgress: 0
-        })
+        // Check if commit failed (no longer committing but also not complete)
+        if (!state.isCommittingToServer && !state.isCommitComplete) {
+          console.log('❌ Background commit failed while waiting')
+          reject(new Error('Background commit failed'))
+          return
+        }
         
-        // Continue with trimming after commit
-        await processVideoTrim(serverResult.filePath)
-        return
+        // Check timeout
+        if (Date.now() - startTime > maxWaitTime) {
+          console.log('⏰ Background commit timeout')
+          reject(new Error('Background commit timeout'))
+          return
+        }
         
-      } catch (error) {
-        showError('Commit Failed', error instanceof Error ? error.message : 'Unknown error')
-        setState({ isUploading: false, uploadProgress: 0 })
-        return
+        // Still in progress, check again in 500ms
+        setTimeout(checkCommitStatus, 500)
       }
-    }
-    
-    const fileSizeGB = state.currentVideo.file.size / (1024 * 1024 * 1024)
-    
-    if (fileSizeGB > 1) {
-      setState({ 
-        largeFileSize: fileSizeGB,
-        showLargeFileConfirmDialog: true 
-      })
-      return
-    }
-    
-    // File is already committed and not large, proceed with export
-    await processVideoTrim(state.currentVideo.serverFilePath)
-    
-    // TODO: In the future, use qualitySettings to customize the export
-    console.log('Quality settings selected:', qualitySettings)
+      
+      checkCommitStatus()
+    })
   }
 
-  const processVideoTrim = async (serverFilePath?: string) => {
-    const filePath = serverFilePath || state.currentVideo?.serverFilePath
-    if (!filePath || !state.currentVideo) return
+  const handleTrimVideo = async () => {
+    const { currentVideo, trimStart, trimEnd } = state
+    
+    if (!currentVideo) {
+      showError('No video loaded')
+      return
+    }
     
     setState({ isProcessing: true })
     
-    // Use functional approach without try/catch
-    const response = await fetch('http://localhost:3001/api/trim-video', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        filePath: filePath,
-        startTime: state.trimStart,
-        endTime: state.trimEnd,
-        fileName: state.currentVideo.file.name,
-      }),
-    })
-    
-    // Handle error cases with early returns
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null)
-      const errorMessage = errorData?.error || `Server error: ${response.status}`
-      const errorDetails = errorData?.details || 'Unknown error'
-      showError(errorMessage, errorDetails)
+    try {
+      // Use server file path if available, otherwise we'll need to upload first
+      const filePath = currentVideo.serverFilePath
+      
+      if (!filePath) {
+        // This shouldn't happen in normal flow since we commit to server on load
+        // But if it does, we need to handle it
+        throw new Error('Video not yet committed to server. Please wait for upload to complete.')
+      }
+
+      console.log('🔄 Trimming video:', filePath)
+      console.log(`📐 Trim range: ${trimStart}s - ${trimEnd}s`)
+      
+      const response = await yaffwApi.trimVideo({
+        filePath,
+        start: trimStart,
+        end: trimEnd,
+        fileName: currentVideo.file.name
+      })
+      
+      // Server returns blob response directly, not JSON
+      if (response.status !== 200) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+      }
+
+      // Create download blob from response data
+      const videoBlob = response.data
+      
+      // Download the trimmed video
+      downloadVideo(videoBlob, currentVideo.file.name)
+      
+      console.log('✅ Video trimmed and downloaded successfully')
+      
+    } catch (error) {
+      console.error('❌ Trim operation failed:', error)
+      showError('Video trimming failed', error instanceof Error ? error.message : 'Unknown error')
+    } finally {
       setState({ isProcessing: false })
+    }
+  }
+
+  const handleExportWithQuality = async (qualitySettings: QualitySettings) => {
+    const { currentVideo, trimStart, trimEnd } = state
+    
+    if (!currentVideo) {
+      showError('No video loaded')
       return
     }
     
-    const blob = await response.blob()
-    downloadVideo(blob, state.currentVideo.file.name)
-    setState({ isProcessing: false })
+    setState({ isProcessing: true })
+    
+    try {
+      const filePath = currentVideo.serverFilePath
+      
+      if (!filePath) {
+        throw new Error('Video not yet committed to server. Please wait for upload to complete.')
+      }
+
+      console.log('🎬 Exporting video with quality settings:', qualitySettings)
+      console.log(`📐 Trim range: ${trimStart}s - ${trimEnd}s`)
+      
+      const response = await yaffwApi.trimVideo({
+        filePath,
+        start: trimStart,
+        end: trimEnd,
+        fileName: currentVideo.file.name,
+        qualitySettings
+      })
+      
+      // Server returns blob response directly, not JSON
+      if (response.status !== 200) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+      }
+
+      const videoBlob = response.data
+      downloadVideo(videoBlob, currentVideo.file.name)
+      
+      console.log('✅ Video exported with quality settings successfully')
+      
+    } catch (error) {
+      console.error('❌ Export operation failed:', error)
+      showError('Video export failed', error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setState({ isProcessing: false })
+    }
   }
 
   const handleConfirmLargeFile = async () => {
-    setState({ showLargeFileConfirmDialog: false })
-    await processVideoTrim()
+    // Same as handleTrimVideo but for large files
+    await handleTrimVideo()
   }
 
   return {
     handleTrimVideo,
     handleExportWithQuality,
-    handleConfirmLargeFile: handleConfirmLargeFile
+    handleConfirmLargeFile
   }
 } 

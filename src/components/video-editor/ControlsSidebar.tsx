@@ -56,7 +56,8 @@ export const ControlsSidebar = ({ state, videoOps, trimOps, exportOps, fileOps }
             <ExportControls 
               processingState={{
                 isProcessing: state.isProcessing,
-                isUploading: state.isUploading
+                isUploading: state.isUploading,
+                isCommittingToServer: state.isCommittingToServer
               }}
               hasCurrentVideo={!!currentVideo}
               exportOps={exportOps}

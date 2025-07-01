@@ -9,6 +9,7 @@ export type VideoState = {
   currentTime: number
   duration: number
   videoMetadata: VideoMetadata
+  playbackSpeed: number
 }
 
 // Trimming state
@@ -24,6 +25,10 @@ export type ProcessingState = {
   isProcessing: boolean
   isDeleting: boolean
   uploadProgress: number
+  // Background commit states
+  isCommittingToServer: boolean
+  commitProgress: number
+  isCommitComplete: boolean
 }
 
 // UI state
@@ -37,6 +42,22 @@ export type UIState = {
 // Combined mediator state
 export type VideoEditorState = VideoState & TrimState & ProcessingState & UIState
 
+// Video Player Section specific types
+export type VideoPlayerSectionProps = {
+  videoUrl: string
+  isPlaying: boolean
+  isFullscreen: boolean
+  aspectRatioClass: string
+  playbackSpeed: number
+  videoOps: VideoOperations
+  playerRef: React.RefObject<ReactPlayer | null>
+  volumeControlRef: React.RefObject<VolumeControlRef | null>
+}
+
+export type VolumeControlRef = {
+  updateState: (volume: number, isMuted: boolean) => void
+}
+
 // Video operations
 export type VideoOperations = {
   handlePlayPause: () => void
@@ -47,6 +68,7 @@ export type VideoOperations = {
   handleToggleFullscreen: () => Promise<void>
   handleToggleMute: () => void
   handleVolumeChange: (delta: number) => void
+  handlePlaybackSpeedChange: (speed: number) => void
 }
 
 // File operations
