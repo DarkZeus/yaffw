@@ -1,12 +1,18 @@
 export type BulkDownloadUrl = {
   id: string
   url: string
-  status: 'pending' | 'validating' | 'valid' | 'invalid' | 'downloading' | 'completed' | 'failed'
+  status: 'pending' | 'validating' | 'downloading' | 'completed' | 'failed'
+  selected?: boolean
   title?: string
   thumbnail?: string
   duration?: string
+  description?: string
+  viewCount?: number
+  uploadDate?: string
+  uploader?: string
   error?: string
   progress?: number
+  message?: string
   downloadSpeed?: string
   eta?: string
   fileName?: string

@@ -8,6 +8,7 @@ import videoRoutes from './routes/video.js'
 import cleanupRoutes from './routes/cleanup.js'
 import downloadRoutes from './routes/download.js'
 import waveformRoutes from './routes/waveform.js'
+import metadataRoutes from './routes/metadata.js'
 
 // Increase max listeners to prevent warnings
 EventEmitter.defaultMaxListeners = 15
@@ -29,6 +30,7 @@ app.route('/api', videoRoutes)
 app.route('/api', cleanupRoutes)
 app.route('/api/download', downloadRoutes)
 app.route('/api', waveformRoutes)
+app.route('/api/metadata', metadataRoutes)
 
 const port = 3001
 console.log(`Video processing server with chunked upload support running on http://localhost:${port}`)
