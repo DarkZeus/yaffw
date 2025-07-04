@@ -82,7 +82,8 @@ export const createFileManager: FileManager = (state, setState, utils) => {
             // Use server waveform if available and better than current
             waveformImagePath: serverResult.waveformImagePath || localVideo.waveformImagePath,
             waveformImageDimensions: serverResult.waveformImageDimensions || localVideo.waveformImageDimensions,
-            waveformData: serverResult.waveformData || localVideo.waveformData
+            waveformData: serverResult.waveformData || localVideo.waveformData,
+            hasAudio: serverResult.hasAudio ?? localVideo.hasAudio
           } : null,
           isCommittingToServer: false,
           commitProgress: 100,
@@ -283,7 +284,8 @@ export const createFileManager: FileManager = (state, setState, utils) => {
           waveformData: response.waveformData || localVideo.waveformData,
           waveformImagePath: response.waveformImagePath,
           waveformImageDimensions: response.waveformImageDimensions,
-          serverFilePath: response.filePath
+          serverFilePath: response.filePath,
+          hasAudio: response.hasAudio ?? localVideo.hasAudio
         }
         
         // Set the processed video data with server enhancements

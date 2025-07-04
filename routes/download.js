@@ -484,56 +484,7 @@ download.get('/stream/:fileName', async (c) => {
   }
 })
 
-// Bulk download endpoint - streams directly to user without server storage
-download.get('/bulk/:progressId', async (c) => {
-  try {
-    const progressId = c.req.param('progressId')
-    const { url, filename } = c.req.query()
-    
-    if (!url) {
-      return c.json({ error: 'URL parameter is required' }, 400)
-    }
-
-    console.log('🌐 Starting direct bulk download from:', url)
-
-    // Use yt-dlp to stream directly to user without saving to server
-    const ytDlpArgs = [
-      url,
-      '-o', '-', // Output to stdout
-      '--no-playlist',
-      '--format', 'best[ext=mp4]/best',
-      '--merge-output-format', 'mp4'
-    ]
-
-    const ytDlp = spawn('yt-dlp', ytDlpArgs)
-    
-    // Set headers for download
-    const downloadFilename = filename || 'video.mp4'
-    c.header('Content-Type', 'video/mp4')
-    c.header('Content-Disposition', `attachment; filename="${downloadFilename}"`)
-    c.header('Transfer-Encoding', 'chunked')
-
-    console.log('📥 Streaming video directly to user:', downloadFilename)
-
-    // Create a readable stream from yt-dlp stdout
-    return new Response(ytDlp.stdout, {
-      headers: {
-        'Content-Type': 'video/mp4',
-        'Content-Disposition': `attachment; filename="${downloadFilename}"`,
-        'Transfer-Encoding': 'chunked'
-      }
-    })
-
-  } catch (error) {
-    console.error('❌ Bulk download streaming failed:', error)
-    return c.json({ 
-      error: 'Failed to stream download', 
-      details: error.message 
-    }, 500)
-  }
-})
-
-// Bulk download endpoint - gets direct download URL
+// Simple bulk download - get direct URL and let browser handle it
 download.post('/bulk', async (c) => {
   try {
     const { url, title } = await c.req.json()
@@ -542,26 +493,50 @@ download.post('/bulk', async (c) => {
       return c.json({ error: 'URL is required' }, 400)
     }
 
-    console.log('🌐 Preparing bulk download for:', url)
+    console.log('🌐 Getting download URL for:', url)
 
-    // Generate a simple download ID
-    const downloadId = 'bulk_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    // Get direct download URL using yt-dlp
+    const ytDlpArgs = [url, '--get-url', '--no-playlist', '--format', 'best[ext=mp4]/best']
+    const ytDlp = spawn('yt-dlp', ytDlpArgs)
     
-    // Return immediate response with download URL
+    let stdout = ''
+    let stderr = ''
+
+    ytDlp.stdout.on('data', (data) => {
+      stdout += data.toString()
+    })
+
+    ytDlp.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    const directUrl = await new Promise((resolve, reject) => {
+      ytDlp.on('close', (code) => {
+        if (code === 0) {
+          const url = stdout.trim().split('\n')[0]
+          if (url && url.startsWith('http')) {
+            resolve(url)
+          } else {
+            reject(new Error('No valid URL returned'))
+          }
+        } else {
+          reject(new Error(`yt-dlp failed: ${stderr}`))
+        }
+      })
+    })
+
     const filename = title ? `${title}.mp4`.replace(/[^\w\s.-]/g, '_') : 'video.mp4'
     
     return c.json({
       success: true,
-      downloadId: downloadId,
-      downloadUrl: `/api/download/bulk/${downloadId}?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`,
-      filename: filename,
-      message: 'Ready for download'
+      downloadUrl: directUrl,
+      filename: filename
     })
 
   } catch (error) {
-    console.error('❌ Bulk download preparation failed:', error)
+    console.error('❌ Failed to get download URL:', error)
     return c.json({ 
-      error: 'Failed to prepare download', 
+      error: 'Failed to get download URL', 
       details: error.message 
     }, 500)
   }

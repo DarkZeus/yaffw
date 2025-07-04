@@ -10,6 +10,7 @@ export type DownloadResponse = {
   waveformData: Array<{time: number, amplitude: number}>
   waveformImagePath?: string
   waveformImageDimensions?: { width: number; height: number }
+  hasAudio?: boolean
   source: string
 }
 

@@ -19,5 +19,5 @@ export const DOWNLOAD_SIMULATION_CONFIG = {
 
 
 
-export const SCROLL_AREA_HEIGHT = 'h-[400px]'
+export const SCROLL_AREA_HEIGHT = 'h-[70vh]'
 export const SMART_PASTE_MAX_HEIGHT = 'max-h-[300px]' 

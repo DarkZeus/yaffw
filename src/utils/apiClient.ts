@@ -52,7 +52,8 @@ apiInstance.interceptors.response.use(
     return response
   },
   (error) => {
-    const errorMessage = error.response?.data?.error || error.message || 'API request failed'
+    // Use detailed error message when available, fallback to generic error
+    const errorMessage = error.response?.data?.details || error.response?.data?.error || error.message || 'API request failed'
     console.error(`❌ API Error: ${error.response?.status || 'Network'} ${error.config?.url}`, errorMessage)
     return Promise.reject(new Error(errorMessage))
   }

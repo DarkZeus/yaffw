@@ -1,4 +1,5 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useSmoothTimelinePlayhead } from '../hooks/useSmoothTimelinePlayhead'
 import { ImageAudioWaveform } from './ImageAudioWaveform'
 
 type WaveformPoint = {
@@ -17,6 +18,7 @@ type VideoTimelineProps = {
   waveformImagePath?: string
   waveformImageDimensions?: { width: number; height: number }
   hasAudio?: boolean
+  isPlaying?: boolean
 }
 
 export const VideoTimeline = memo(function VideoTimeline({
@@ -29,7 +31,8 @@ export const VideoTimeline = memo(function VideoTimeline({
   waveformData,
   waveformImagePath,
   waveformImageDimensions,
-  hasAudio = true
+  hasAudio = true,
+  isPlaying = false
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
@@ -185,12 +188,20 @@ export const VideoTimeline = memo(function VideoTimeline({
   const displayTrimEnd = isDragging ? trimEnd : deferredTrimEnd
   const displayCurrentTime = isDragging === 'playhead' ? currentTime : deferredCurrentTime
 
+  // GPU-accelerated smooth playhead with 120fps updates
+  const { playheadRef, fallbackPosition } = useSmoothTimelinePlayhead({
+    currentTime: displayCurrentTime,
+    duration,
+    isPlaying,
+    isDragging: isDragging === 'playhead'
+  })
+
   // Memoize position calculations with deferred values for smooth performance
   const positions = useMemo(() => ({
     trimStartPos: (displayTrimStart / duration) * 100,
     trimEndPos: (displayTrimEnd / duration) * 100,
-    playheadPos: (displayCurrentTime / duration) * 100
-  }), [displayTrimStart, displayTrimEnd, displayCurrentTime, duration])
+    playheadPos: fallbackPosition // Use fallback for initial render and non-GPU updates
+  }), [displayTrimStart, displayTrimEnd, fallbackPosition, duration])
 
   // Memoize frequently used formatted times with deferred values
   const formattedTimes = useMemo(() => ({
@@ -295,12 +306,15 @@ export const VideoTimeline = memo(function VideoTimeline({
             )}
           </div>
 
-          {/* Professional Playhead */}
+          {/* Professional Playhead - GPU Accelerated */}
           <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 cursor-ew-resize z-30 transition-all duration-100 select-none"
+            ref={playheadRef}
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 cursor-ew-resize z-30 select-none"
             style={{ 
-              left: `${positions.playheadPos}%`,
+              left: `${positions.playheadPos}%`, // Fallback position for initial render
               boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+              willChange: 'transform', // GPU acceleration hint
+              transform: 'translateX(0)' // Will be overridden by RAF loop
             }}
             onMouseDown={(e) => handleMouseDown(e, 'playhead')}
           >

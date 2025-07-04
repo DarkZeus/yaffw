@@ -45,7 +45,7 @@ export function VideoEditorLayout() {
   if (!state.currentVideo) {
     return (
       <TooltipProvider>
-        <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="min-h-[calc(100dvh-1rem)] bg-background flex items-center justify-center px-6">
           <div className="w-full max-w-2xl">
             <UnifiedUploadZone 
               onFileDrop={fileOps.onFileDrop}
@@ -62,7 +62,7 @@ export function VideoEditorLayout() {
 
   return (
     <TooltipProvider>
-      <div className={`${state.isFullscreen ? 'fixed inset-0 z-50' : 'min-h-screen'} bg-background flex flex-col`}>
+      <div className={`${state.isFullscreen ? 'fixed inset-0 z-50' : 'min-h-[calc(100dvh-1rem)]'} bg-background flex flex-col`}>
         {/* Header */}
         <header className="border-b bg-card">
           <div className="flex items-center justify-between p-4">
@@ -98,7 +98,7 @@ export function VideoEditorLayout() {
 
             {/* Main Video Area */}
             <ResizablePanel defaultSize={75}>
-              <ResizablePanelGroup direction="vertical" className="h-full">
+              <ResizablePanelGroup direction="vertical" className="min-h-[calc(100dvh-1rem)]">
                 {/* Video Player Panel */}
                 <ResizablePanel defaultSize={60} minSize={30}>
                   <VideoPlayerSection

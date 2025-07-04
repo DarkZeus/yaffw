@@ -30,10 +30,8 @@ type ExtendedHTMLVideoElement = HTMLVideoElement & {
   webkitAudioDecodedByteCount?: number
 }
 
-const detectVideoAudio = (video: ExtendedHTMLVideoElement): boolean => {
-  if (video.mozHasAudio !== undefined) return video.mozHasAudio
-  if (video.webkitAudioDecodedByteCount !== undefined) return video.webkitAudioDecodedByteCount > 0
-  return false
+const detectVideoAudio = (): boolean => {
+  return true // Default to true, server will provide accurate hasAudio value
 }
 
 /**
@@ -87,7 +85,7 @@ async function extractBasicMetadata(file: File, url: string): Promise<LocalFileM
         width: video.videoWidth,
         height: video.videoHeight,
         fps: 30, // Estimate, would need server-side FFprobe for exact
-        hasAudio: detectVideoAudio(video as ExtendedHTMLVideoElement), // Detect audio on client-side
+        hasAudio: detectVideoAudio(),
         aspectRatio: video.videoWidth && video.videoHeight 
           ? `${video.videoWidth}:${video.videoHeight}` 
           : null,
@@ -174,69 +172,42 @@ export async function commitFileToServer(
   waveformImagePath?: string
   waveformImageDimensions?: { width: number; height: number }
   waveformData?: WaveformPoint[]
+  hasAudio?: boolean
 }> {
-  try {
-    // Report initial progress
-    onProgress?.(0)
-    
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      
-      // Track upload progress
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = (event.loaded / event.total) * 100
-          console.log(`📤 Upload progress: ${progress.toFixed(1)}% (${event.loaded}/${event.total} bytes)`)
-          onProgress?.(progress)
-        }
-      })
-      
-      // Handle completion
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const responseData: {
-              filePath: string
-              waveformImagePath?: string
-              waveformImageDimensions?: { width: number; height: number }
-              waveformData?: WaveformPoint[]
-            } = JSON.parse(xhr.responseText)
-            
-            onProgress?.(100)
-            resolve({
-              filePath: responseData.filePath,
-              waveformImagePath: responseData.waveformImagePath,
-              waveformImageDimensions: responseData.waveformImageDimensions,
-              waveformData: responseData.waveformData
-            })
-          } catch (parseError) {
-            reject(new Error(`Failed to parse server response: ${parseError}`))
-          }
-        } else {
-          reject(new Error(`Server error: ${xhr.status} ${xhr.statusText}`))
-        }
-      })
-      
-      // Handle errors
-      xhr.addEventListener('error', () => {
-        reject(new Error('Network error during file upload'))
-      })
-      
-      // Handle abort
-      xhr.addEventListener('abort', () => {
-        reject(new Error('File upload was aborted'))
-      })
-      
-      // Start the upload
-      xhr.open('POST', 'http://localhost:3001/api/commit-file')
-      xhr.setRequestHeader('x-filename', localVideo.file.name)
-      xhr.setRequestHeader('x-file-size', localVideo.file.size.toString())
-      xhr.setRequestHeader('Content-Type', 'application/octet-stream')
-      xhr.send(localVideo.file)
-    })
-    
-  } catch (error) {
-    throw new Error(`Failed to commit file to server: ${error}`)
+  const { apiClient } = await import('./apiClient')
+  
+  onProgress?.(0)
+  
+  type CommitResponse = {
+    filePath: string
+    waveformImagePath?: string
+    waveformImageDimensions?: { width: number; height: number }
+    waveformData?: WaveformPoint[]
+    hasAudio?: boolean
+  }
+  
+  const response = await apiClient.post<CommitResponse>('/commit-file', localVideo.file, {
+    headers: {
+      'x-filename': localVideo.file.name,
+      'x-file-size': localVideo.file.size.toString(),
+      'Content-Type': 'application/octet-stream'
+    },
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total) {
+        const progress = (progressEvent.loaded / progressEvent.total) * 100
+        console.log(`📤 Upload progress: ${progress.toFixed(1)}% (${progressEvent.loaded}/${progressEvent.total} bytes)`)
+        onProgress?.(progress)
+      }
+    },
+    timeout: 5 * 60 * 1000 // 5 minutes for large files
+  })
+  
+  return {
+    filePath: response.filePath,
+    waveformImagePath: response.waveformImagePath,
+    waveformImageDimensions: response.waveformImageDimensions,
+    waveformData: response.waveformData,
+    hasAudio: response.hasAudio
   }
 }
 

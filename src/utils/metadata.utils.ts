@@ -21,20 +21,24 @@ export type VideoFormat = {
 }
 
 export const extractVideoMetadata = async (url: string): Promise<VideoMetadata> => {
-  const response = await apiClient.post<{ success: boolean; metadata: VideoMetadata; error?: string }>('/metadata/extract', { url })
+  const response = await apiClient.post<{ success: boolean; metadata: VideoMetadata; error?: string; details?: string }>('/metadata/extract', { url })
   
   if (!response.success) {
-    throw new Error(response.error || 'Failed to extract metadata')
+    // Use the detailed error message when available, fallback to generic error
+    const errorMessage = response.details || response.error || 'Failed to extract metadata'
+    throw new Error(errorMessage)
   }
 
   return response.metadata
 }
 
 export const extractVideoFormats = async (url: string): Promise<VideoFormat[]> => {
-  const response = await apiClient.post<{ success: boolean; formats: VideoFormat[]; error?: string }>('/metadata/formats', { url })
+  const response = await apiClient.post<{ success: boolean; formats: VideoFormat[]; error?: string; details?: string }>('/metadata/formats', { url })
   
   if (!response.success) {
-    throw new Error(response.error || 'Failed to extract formats')
+    // Use the detailed error message when available, fallback to generic error
+    const errorMessage = response.details || response.error || 'Failed to extract formats'
+    throw new Error(errorMessage)
   }
 
   return response.formats

@@ -41,20 +41,20 @@ export const useBulkDownloadMediator = (): BulkDownloadMediator => {
       updateUrlStatus(url.id, { 
         status: 'downloading', 
         progress: 50,
-        message: 'Starting download...'
+        message: 'Getting download URL...'
       })
 
-      // Start the direct bulk download
+      // Simple bulk download - get URL and trigger browser download
       await startBulkDownload(url.url, url.title)
       
-      // Mark as completed immediately (download has been triggered in browser)
+      // Mark as completed
       updateUrlStatus(url.id, { 
         status: 'completed', 
         progress: 100,
-        message: 'Downloaded to your computer!'
+        message: 'Download started in browser!'
       })
       
-      console.log('✅ Bulk download started for:', url.title || url.url)
+      console.log('✅ Bulk download triggered for:', url.title || url.url)
 
     } catch (error) {
       console.error('❌ Bulk download failed for:', url.title, error)
@@ -138,7 +138,10 @@ export const useBulkDownloadMediator = (): BulkDownloadMediator => {
         const { selected } = event.payload
         setState(prev => ({
           ...prev,
-          urls: prev.urls.map(u => ({ ...u, selected }))
+          urls: prev.urls.map(u => ({ 
+            ...u, 
+            selected: u.status === 'failed' ? false : selected 
+          }))
         }))
         break
       }
@@ -240,7 +243,8 @@ export const useBulkDownloadMediator = (): BulkDownloadMediator => {
   const selectedForDownload = state.urls.filter(u => u.selected)
   const completedUrls = state.urls.filter(u => u.status === 'completed')
   const failedUrls = state.urls.filter(u => u.status === 'failed')
-  const allSelected = state.urls.length > 0 && state.urls.every(u => u.selected)
+  const selectableUrls = state.urls.filter(u => u.status !== 'failed')
+  const allSelected = selectableUrls.length > 0 && selectableUrls.every(u => u.selected)
   const canStartDownload = selectedForDownload.length > 0 && !state.isDownloading
 
   // Cleanup active downloads on unmount

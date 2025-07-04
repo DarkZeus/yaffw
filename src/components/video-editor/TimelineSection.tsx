@@ -79,6 +79,7 @@ export const TimelineSection = ({
             waveformImagePath={currentVideo?.waveformImagePath}
             waveformImageDimensions={currentVideo?.waveformImageDimensions}
             hasAudio={currentVideo?.hasAudio}
+            isPlaying={isPlaying}
           />
         </div>
       </div>

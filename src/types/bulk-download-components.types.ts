@@ -19,15 +19,13 @@ export type UrlListSectionProps = {
   selectedCount: number
   canStartDownload: boolean
   isDownloading: boolean
+  completedUrls: BulkDownloadUrl[]
+  failedUrls: BulkDownloadUrl[]
   onEvent: ComponentEventHandler
   onShowSettings: () => void
 }
 
-export type ResultsSectionProps = {
-  completedUrls: BulkDownloadUrl[]
-  failedUrls: BulkDownloadUrl[]
-  onEvent: ComponentEventHandler
-}
+
 
 // Dialog component prop types
 export type SmartPasteDialogProps = {

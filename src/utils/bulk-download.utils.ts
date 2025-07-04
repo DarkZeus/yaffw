@@ -14,7 +14,8 @@ export const isValidUrl = (url: string): boolean => {
 export const createNewUrl = (url: string): BulkDownloadUrl => ({
   id: crypto.randomUUID(),
   url: url.trim(),
-  status: 'pending'
+  status: 'pending',
+  selected: true // Auto-check URLs when added
 })
 
 export const extractUrlsFromText = (text: string): string[] => {
@@ -34,42 +35,53 @@ export const getStatusBadgeVariant = (status: BulkDownloadUrl['status']) => {
 
 export type BulkDownloadResponse = {
   success: boolean
-  downloadId: string
   downloadUrl: string
   filename: string
-  message: string
 }
 
-// Simple bulk download function - downloads directly to user
+// Simple bulk download function - fetch as blob and download (your approach!)
 export const startBulkDownload = async (url: string, title?: string): Promise<void> => {
   try {
     const { apiClient } = await import('../utils/apiClient')
     
-    console.log('🚀 Starting bulk download for:', title || url)
+    console.log('🚀 Getting download URL for:', title || url)
     
-    // Get download URL from server
+    // Get direct download URL from server
     const response = await apiClient.post<BulkDownloadResponse>('/download/bulk', { 
       url, 
       title 
     })
     
     if (!response.success) {
-      throw new Error(response.message || 'Failed to prepare download')
+      throw new Error('Failed to get download URL')
     }
     
-    console.log('📥 Got download URL, triggering browser download...')
+    console.log('📥 Fetching video as blob...')
     
-    // Trigger direct download in browser
+    // Use your approach: fetch as blob then download
+    const videoResponse = await fetch(response.downloadUrl)
+    
+    if (!videoResponse.ok) {
+      throw new Error(`Failed to fetch video: ${videoResponse.status}`)
+    }
+    
+    const blob = await videoResponse.blob()
+    
+    // Create blob URL and trigger download
+    const blobUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.style.display = 'none'
-    a.href = response.downloadUrl
+    a.href = blobUrl
     a.download = response.filename
     
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     
-    console.log('✅ Download started for:', response.filename)
+    // Clean up blob URL
+    URL.revokeObjectURL(blobUrl)
+    
+    console.log('✅ Download completed for:', response.filename)
     
   } catch (error) {
     console.error('❌ Bulk download failed:', error)
