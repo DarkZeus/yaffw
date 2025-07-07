@@ -1,5 +1,7 @@
+import { motion } from 'motion/react'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { useSmoothTimelinePlayhead } from '../hooks/useSmoothTimelinePlayhead'
+import type ReactPlayer from 'react-player'
+import { useVideoTimelineSync } from '../hooks/useVideoTimelineSync'
 import { ImageAudioWaveform } from './ImageAudioWaveform'
 
 type WaveformPoint = {
@@ -19,6 +21,7 @@ type VideoTimelineProps = {
   waveformImageDimensions?: { width: number; height: number }
   hasAudio?: boolean
   isPlaying?: boolean
+  playerRef: React.RefObject<ReactPlayer | null>
 }
 
 export const VideoTimeline = memo(function VideoTimeline({
@@ -32,7 +35,8 @@ export const VideoTimeline = memo(function VideoTimeline({
   waveformImagePath,
   waveformImageDimensions,
   hasAudio = true,
-  isPlaying = false
+  isPlaying = false,
+  playerRef
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
@@ -40,6 +44,15 @@ export const VideoTimeline = memo(function VideoTimeline({
   const [initialTrimStart, setInitialTrimStart] = useState(0)
   const [initialTrimEnd, setInitialTrimEnd] = useState(0)
   const [isHovering, setIsHovering] = useState<string | null>(null)
+
+  // Real-time playhead sync with video element
+  const { playheadPosition, forceUpdatePosition } = useVideoTimelineSync({
+    playerRef,
+    duration,
+    isPlaying,
+    isDragging: isDragging === 'playhead',
+    currentTime // Pass React state currentTime to detect external seeks
+  })
 
   // Use transitions for non-urgent updates
   const [isPending, startTransition] = useTransition()
@@ -60,16 +73,29 @@ export const VideoTimeline = memo(function VideoTimeline({
     if (!timelineRef.current) return 0
     const rect = timelineRef.current.getBoundingClientRect()
     const position = (clientX - rect.left) / rect.width
-    return Math.max(0, Math.min(duration, position * duration))
+    const calculatedTime = Math.max(0, Math.min(duration, position * duration))
+    
+    console.log('🎯 Position calculation:', {
+      clientX,
+      rectLeft: rect.left,
+      rectWidth: rect.width,
+      position,
+      duration,
+      calculatedTime
+    })
+    
+    return calculatedTime
   }, [duration])
 
   const handleMouseDown = useCallback((e: React.MouseEvent, type: 'playhead' | 'trimStart' | 'trimEnd') => {
     e.stopPropagation()
+    e.preventDefault() // Also prevent default to ensure no interference
     setIsDragging(type)
   }, [])
 
   const handleSelectionMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
+    e.preventDefault() // Also prevent default to ensure no interference
     setIsDragging('selection')
     setDragStartX(e.clientX)
     setInitialTrimStart(trimStart)
@@ -77,12 +103,22 @@ export const VideoTimeline = memo(function VideoTimeline({
   }, [trimStart, trimEnd])
 
   const handleTimelineClick = useCallback((e: React.MouseEvent) => {
-    if (isDragging) return
+    console.log('🖱️ Timeline clicked!', { isDragging, target: e.target, currentTarget: e.currentTarget })
+    
+    if (isDragging) {
+      console.log('🚫 Click ignored - currently dragging')
+      return
+    }
+    
     const newTime = getTimeFromPosition(e.clientX)
+    console.log('📍 Seeking to time:', newTime)
+    
     startTransition(() => {
       onSeek(newTime)
+      // Force update playhead position immediately for responsiveness
+      forceUpdatePosition(newTime)
     })
-  }, [isDragging, getTimeFromPosition, onSeek])
+  }, [isDragging, getTimeFromPosition, onSeek, forceUpdatePosition])
 
   // Throttle mouse move events for better performance
   const lastMoveTime = useRef(0)
@@ -91,7 +127,33 @@ export const VideoTimeline = memo(function VideoTimeline({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return
     
-    // Throttle to 60fps for smooth performance
+    if (isDragging === 'selection') {
+      // Immediate selection drag - no throttling, no rAF, no startTransition
+      const pixelOffset = e.clientX - dragStartX
+      if (!timelineRef.current) return
+      
+      const timelineWidth = timelineRef.current.offsetWidth
+      const timeOffset = (pixelOffset / timelineWidth) * duration
+      
+      const selectionDuration = initialTrimEnd - initialTrimStart
+      let newTrimStart = initialTrimStart + timeOffset
+      let newTrimEnd = initialTrimEnd + timeOffset
+      
+      // Constrain to video boundaries
+      if (newTrimStart < 0) {
+        newTrimStart = 0
+        newTrimEnd = selectionDuration
+      } else if (newTrimEnd > duration) {
+        newTrimEnd = duration
+        newTrimStart = duration - selectionDuration
+      }
+      
+      // Update immediately for snappy response
+      onTrimChange(newTrimStart, newTrimEnd)
+      return
+    }
+    
+    // For other drag types, keep some throttling for performance
     const now = Date.now()
     if (now - lastMoveTime.current < 16) return
     lastMoveTime.current = now
@@ -99,51 +161,22 @@ export const VideoTimeline = memo(function VideoTimeline({
     if (animationFrameId.current) return
     
     animationFrameId.current = requestAnimationFrame(() => {
-      if (isDragging === 'selection') {
-        // Calculate the offset in pixels, then convert to time
-        const pixelOffset = e.clientX - dragStartX
-        if (!timelineRef.current) return
-        
-        const timelineWidth = timelineRef.current.offsetWidth
-        const timeOffset = (pixelOffset / timelineWidth) * duration
-        
-        const selectionDuration = initialTrimEnd - initialTrimStart
-        let newTrimStart = initialTrimStart + timeOffset
-        let newTrimEnd = initialTrimEnd + timeOffset
-        
-        // Constrain to video boundaries
-        if (newTrimStart < 0) {
-          newTrimStart = 0
-          newTrimEnd = selectionDuration
-        } else if (newTrimEnd > duration) {
-          newTrimEnd = duration
-          newTrimStart = duration - selectionDuration
-        }
-        
-        startTransition(() => {
-          onTrimChange(newTrimStart, newTrimEnd)
-        })
-        animationFrameId.current = null
-        return
-      }
-      
       const newTime = getTimeFromPosition(e.clientX)
       
       if (isDragging === 'playhead') {
         onSeek(newTime)
+        // Force update playhead position during dragging for immediate feedback
+        forceUpdatePosition(newTime)
       } else if (isDragging === 'trimStart') {
-        startTransition(() => {
-          onTrimChange(Math.min(newTime, trimEnd - 0.1), trimEnd)
-        })
+        // Update trim handles immediately too
+        onTrimChange(Math.min(newTime, trimEnd - 0.1), trimEnd)
       } else if (isDragging === 'trimEnd') {
-        startTransition(() => {
-          onTrimChange(trimStart, Math.max(newTime, trimStart + 0.1))
-        })
+        onTrimChange(trimStart, Math.max(newTime, trimStart + 0.1))
       }
       
       animationFrameId.current = null
     })
-  }, [isDragging, getTimeFromPosition, onSeek, onTrimChange, trimStart, trimEnd, dragStartX, duration, initialTrimStart, initialTrimEnd])
+  }, [isDragging, getTimeFromPosition, onSeek, onTrimChange, trimStart, trimEnd, dragStartX, duration, initialTrimStart, initialTrimEnd, forceUpdatePosition])
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(null)
@@ -188,20 +221,14 @@ export const VideoTimeline = memo(function VideoTimeline({
   const displayTrimEnd = isDragging ? trimEnd : deferredTrimEnd
   const displayCurrentTime = isDragging === 'playhead' ? currentTime : deferredCurrentTime
 
-  // GPU-accelerated smooth playhead with 120fps updates
-  const { playheadRef, fallbackPosition } = useSmoothTimelinePlayhead({
-    currentTime: displayCurrentTime,
-    duration,
-    isPlaying,
-    isDragging: isDragging === 'playhead'
-  })
-
   // Memoize position calculations with deferred values for smooth performance
-  const positions = useMemo(() => ({
-    trimStartPos: (displayTrimStart / duration) * 100,
-    trimEndPos: (displayTrimEnd / duration) * 100,
-    playheadPos: fallbackPosition // Use fallback for initial render and non-GPU updates
-  }), [displayTrimStart, displayTrimEnd, fallbackPosition, duration])
+  // Note: playheadPos is no longer used since we use the real-time MotionValue
+  const positions = useMemo(() => {
+    return {
+      trimStartPos: (displayTrimStart / duration) * 100,
+      trimEndPos: (displayTrimEnd / duration) * 100
+    }
+  }, [displayTrimStart, displayTrimEnd, duration])
 
   // Memoize frequently used formatted times with deferred values
   const formattedTimes = useMemo(() => ({
@@ -235,6 +262,19 @@ export const VideoTimeline = memo(function VideoTimeline({
           ref={timelineRef}
           className="relative h-16 bg-gray-800 rounded-lg cursor-crosshair overflow-hidden group select-none"
           onClick={handleTimelineClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              const newTime = getTimeFromPosition(e.currentTarget.offsetWidth / 2) // Seek to middle when using keyboard
+              onSeek(newTime)
+            }
+          }}
+          tabIndex={0}
+          role="slider"
+          aria-label="Video timeline"
+          aria-valuemin={0}
+          aria-valuemax={duration}
+          aria-valuenow={currentTime}
           onMouseEnter={() => setIsHovering('timeline')}
           onMouseLeave={() => setIsHovering(null)}
         >
@@ -254,30 +294,42 @@ export const VideoTimeline = memo(function VideoTimeline({
             ))}
           </div>
 
-          {/* Trim Selection Area */}
-          <div 
-            className="absolute top-0 bottom-0 bg-gradient-to-r from-emerald-400/80 to-emerald-500/80 border-2 border-emerald-400 transition-all duration-200 ease-out cursor-move select-none"
-            style={{
+          {/* Trim Selection Area - Motion Powered */}
+          <motion.div 
+            className="absolute top-0 bottom-0 bg-gradient-to-r from-emerald-400/80 to-emerald-500/80 border-2 border-emerald-400 cursor-move select-none"
+            animate={{
               left: `${positions.trimStartPos}%`,
               width: `${positions.trimEndPos - positions.trimStartPos}%`,
               boxShadow: isHovering === 'trim' || isDragging === 'selection' ? '0 0 20px rgba(52, 211, 153, 0.6)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
+            }}
+            transition={{
+              duration: isDragging === 'selection' ? 0 : 0.15,
+              ease: isDragging === 'selection' ? "linear" : "easeOut"
             }}
             onMouseDown={handleSelectionMouseDown}
             onMouseEnter={() => setIsHovering('trim')}
             onMouseLeave={() => setIsHovering(null)}
           >
-            {/* Selection Label */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-white font-bold text-xs bg-black/60 px-2 py-1 rounded backdrop-blur-sm">
+            {/* Selection Label - prevent it from blocking timeline clicks */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="text-white font-bold text-xs bg-black/60 px-2 py-1 rounded backdrop-blur-sm pointer-events-none">
                 {formattedTimes.selectionDuration}
               </span>
             </div>
-          </div>
+          </motion.div>
 
-          {/* Trim Start Handle */}
-          <div
-            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize hover:bg-emerald-400 transition-all duration-200 flex items-center justify-center group/handle z-20 select-none"
-            style={{ left: `${positions.trimStartPos}%`, transform: 'translateX(-50%)' }}
+          {/* Trim Start Handle - Motion Powered */}
+          <motion.div
+            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
+            style={{ transform: 'translateX(-50%)' }}
+            animate={{
+              left: `${positions.trimStartPos}%`,
+              backgroundColor: isHovering === 'trimStart' ? '#34d399' : '#10b981', // emerald-400 : emerald-500
+            }}
+            transition={{
+              duration: isDragging === 'trimStart' ? 0 : 0.15,
+              ease: isDragging === 'trimStart' ? "linear" : "easeOut"
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'trimStart')}
             onMouseEnter={() => setIsHovering('trimStart')}
             onMouseLeave={() => setIsHovering(null)}
@@ -288,12 +340,20 @@ export const VideoTimeline = memo(function VideoTimeline({
                 {formatTime(trimStart)}
               </div>
             )}
-          </div>
+          </motion.div>
 
-          {/* Trim End Handle */}
-          <div
-            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize hover:bg-emerald-400 transition-all duration-200 flex items-center justify-center group/handle z-20 select-none"
-            style={{ left: `${positions.trimEndPos}%`, transform: 'translateX(-50%)' }}
+          {/* Trim End Handle - Motion Powered */}
+          <motion.div
+            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
+            style={{ transform: 'translateX(-50%)' }}
+            animate={{
+              left: `${positions.trimEndPos}%`,
+              backgroundColor: isHovering === 'trimEnd' ? '#34d399' : '#10b981', // emerald-400 : emerald-500
+            }}
+            transition={{
+              duration: isDragging === 'trimEnd' ? 0 : 0.15,
+              ease: isDragging === 'trimEnd' ? "linear" : "easeOut"
+            }}
             onMouseDown={(e) => handleMouseDown(e, 'trimEnd')}
             onMouseEnter={() => setIsHovering('trimEnd')}
             onMouseLeave={() => setIsHovering(null)}
@@ -304,19 +364,18 @@ export const VideoTimeline = memo(function VideoTimeline({
                 {formatTime(trimEnd)}
               </div>
             )}
-          </div>
+          </motion.div>
 
-          {/* Professional Playhead - GPU Accelerated */}
-          <div
-            ref={playheadRef}
+          {/* Professional Playhead - Real-time Synced */}
+          <motion.div
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 cursor-ew-resize z-30 select-none"
             style={{ 
-              left: `${positions.playheadPos}%`, // Fallback position for initial render
+              left: playheadPosition,
               boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
-              willChange: 'transform', // GPU acceleration hint
-              transform: 'translateX(0)' // Will be overridden by RAF loop
             }}
             onMouseDown={(e) => handleMouseDown(e, 'playhead')}
+            onMouseEnter={() => setIsHovering('playhead')}
+            onMouseLeave={() => setIsHovering(null)}
           >
             {/* Playhead Top Triangle */}
             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-red-500" />
@@ -327,7 +386,7 @@ export const VideoTimeline = memo(function VideoTimeline({
                 {formatTime(currentTime)}
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Hover Effects */}
           {isHovering === 'timeline' && (
@@ -354,6 +413,7 @@ export const VideoTimeline = memo(function VideoTimeline({
             keyPoints={waveformData || []}
             duration={duration}
             currentTime={displayCurrentTime}
+            playheadPosition={playheadPosition} // Real-time playhead sync
             trimStart={displayTrimStart}
             trimEnd={displayTrimEnd}
             height={60}

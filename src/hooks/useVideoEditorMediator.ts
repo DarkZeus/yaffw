@@ -19,6 +19,7 @@ const initialState: VideoEditorState = {
   duration: 0,
   videoMetadata: {},
   playbackSpeed: DEFAULT_PLAYBACK_SPEED,
+  fps: 30, // Default FPS, will be updated with actual video metadata
   
   // Trim state
   trimStart: 0,
@@ -111,23 +112,35 @@ export const useVideoEditorMediator = (): VideoEditorMediator => {
     })
   }, [])
 
-  // Before unload protection
+  // Before unload protection - call updateListeners when relevant state changes
   const beforeUnloadHook = useBeforeUnload({
     state,
     onCleanup: resetAllVideoState
   })
 
-  // Update beforeunload listeners when state changes
-  useEffect(() => {
-    beforeUnloadHook.updateEventListeners()
-  }, [beforeUnloadHook.updateEventListeners])
+  // Update listeners only when work status might have changed
+  const prevStateRef = useRef<{
+    hasVideo: boolean
+    isProcessing: boolean
+    hasTrim: boolean
+  }>({ hasVideo: false, isProcessing: false, hasTrim: false })
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      beforeUnloadHook.cleanup()
-    }
-  }, [beforeUnloadHook.cleanup])
+  // Track state changes that affect work status
+  const currentStateSnapshot = {
+    hasVideo: !!state.currentVideo,
+    isProcessing: state.isUploading || state.isDownloading || state.isProcessing || state.isCommittingToServer,
+    hasTrim: state.trimStart > 0 || (state.trimEnd > 0 && !!state.currentVideo && state.trimEnd < state.currentVideo.duration)
+  }
+
+  // Only update listeners if relevant state changed
+  if (
+    prevStateRef.current.hasVideo !== currentStateSnapshot.hasVideo ||
+    prevStateRef.current.isProcessing !== currentStateSnapshot.isProcessing ||
+    prevStateRef.current.hasTrim !== currentStateSnapshot.hasTrim
+  ) {
+    prevStateRef.current = currentStateSnapshot
+    beforeUnloadHook.updateListeners()
+  }
 
   // Create managers
   const videoOps = createVideoManager(state, updateState, {
@@ -138,7 +151,7 @@ export const useVideoEditorMediator = (): VideoEditorMediator => {
     volumeControlRef
   })
 
-  const trimOps = createTrimManager(state, updateState, playerRef)
+  const trimOps = createTrimManager(state, updateState, playerRef, videoOps.handleSeek)
 
   const fileOps = createFileManager(state, updateState, {
     showError,
@@ -159,6 +172,7 @@ export const useVideoEditorMediator = (): VideoEditorMediator => {
     trimOps,
     exportOps,
     uiOps,
+    updateState,
     playerRef,
     containerRef,
     volumeControlRef

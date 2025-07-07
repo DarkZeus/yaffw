@@ -4,15 +4,47 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
   const { playerRef, containerRef, volumeRef, isMutedRef, volumeControlRef } = refs
 
   const handlePlayPause = () => {
-    setState({ isPlaying: !state.isPlaying })
+    const newIsPlaying = !state.isPlaying
+    
+    // When pausing, sync React state with the actual video element's current time
+    if (!newIsPlaying && playerRef.current) {
+      const actualCurrentTime = playerRef.current.getCurrentTime() ?? state.currentTime
+      setState({ isPlaying: false, currentTime: actualCurrentTime })
+      // Seek to ensure frame-accurate stopping at the exact pause position
+      playerRef.current.seekTo(actualCurrentTime, 'seconds')
+    } else {
+      setState({ isPlaying: newIsPlaying })
+    }
   }
 
   const handleSeek = (time: number) => {
+    console.log('🎮 Video Manager handleSeek called with time:', time)
+    console.log('🎮 Current state before seek:', { currentTime: state.currentTime, duration: state.duration })
+    
     setState({ currentTime: time })
     playerRef.current?.seekTo(time, 'seconds')
+    
+    console.log('🎮 Seek completed, should be at:', time)
+  }
+
+  const handleFrameSeek = (direction: 'prev' | 'next') => {
+    if (!state.fps || state.fps <= 0) return // Guard against invalid FPS
+    
+    const frameTime = 1 / state.fps // Time for one frame in seconds
+    const newTime = direction === 'prev' 
+      ? Math.max(0, state.currentTime - frameTime)
+      : Math.min(state.duration, state.currentTime + frameTime)
+    
+    setState({ currentTime: newTime })
+    playerRef.current?.seekTo(newTime, 'seconds')
   }
 
   const handleProgress = (progressState: { played: number; playedSeconds: number }) => {
+    console.log('📊 Progress update from ReactPlayer:', {
+      playedSeconds: progressState.playedSeconds,
+      currentStateTime: state.currentTime,
+      timeDifference: Math.abs(progressState.playedSeconds - state.currentTime)
+    })
     setState({ currentTime: progressState.playedSeconds })
   }
 
@@ -83,6 +115,7 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
   return {
     handlePlayPause,
     handleSeek,
+    handleFrameSeek,
     handleProgress,
     handleDuration,
     handleVolumeUpdate,

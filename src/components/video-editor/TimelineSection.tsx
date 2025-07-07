@@ -1,3 +1,4 @@
+import type ReactPlayer from 'react-player'
 import type { TrimOperations, TrimState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
 import type { LocalVideoFile } from '../../utils/localFileProcessor'
 import { VideoTimeline } from '../VideoTimeline'
@@ -13,6 +14,7 @@ type TimelineSectionProps = {
   deferredCurrentTime: number
   videoOps: VideoOperations
   trimOps: TrimOperations
+  playerRef: React.RefObject<ReactPlayer | null>
 }
 
 export const TimelineSection = ({ 
@@ -22,7 +24,8 @@ export const TimelineSection = ({
   currentVideo, 
   deferredCurrentTime, 
   videoOps, 
-  trimOps 
+  trimOps,
+  playerRef
 }: TimelineSectionProps) => {
   const { currentTime, duration, isPlaying, playbackSpeed } = videoState
   const { trimStart, trimEnd } = trimState
@@ -80,6 +83,7 @@ export const TimelineSection = ({
             waveformImageDimensions={currentVideo?.waveformImageDimensions}
             hasAudio={currentVideo?.hasAudio}
             isPlaying={isPlaying}
+            playerRef={playerRef}
           />
         </div>
       </div>

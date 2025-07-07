@@ -8,10 +8,10 @@ export function SettingsDialog({
   open,
   onOpenChange,
   settings,
-  onEvent
+  onUpdateSettings
 }: SettingsDialogProps) {
   const handleSettingChange = (key: keyof BulkDownloadSettings, value: string) => {
-    onEvent({ type: 'SETTINGS_UPDATED', payload: { key, value } })
+    onUpdateSettings(key, value)
   }
 
   return (

@@ -6,6 +6,7 @@ import axios from 'axios'
 import { generateUniqueFilename } from '../utils/fileUtils.js'
 import { extractVideoMetadata } from '../utils/videoUtils.js'
 import { extractAudioWaveform } from '../utils/audioUtils.js'
+import { broadcastProgress, broadcastCompletion } from './sse.js'
 
 const download = new Hono()
 
@@ -19,16 +20,23 @@ const generateProgressId = () => {
 
 // Helper function to update progress
 const updateProgress = (progressId, progress, message = 'Downloading...', speed = null) => {
-  progressTracking.set(progressId, {
+  const progressData = {
     progress,
     message,
     speed,
     timestamp: Date.now()
-  })
+  }
+  
+  // Store in memory for backward compatibility (polling fallback)
+  progressTracking.set(progressId, progressData)
+  
+  // Broadcast to SSE clients
+  broadcastProgress(progressId, progressData)
+  
   console.log(`📊 Progress ${progressId}: ${progress}% - ${message}`)
 }
 
-// Progress polling endpoint
+// Progress polling endpoint (deprecated - use SSE instead)
 download.get('/progress/:progressId', (c) => {
   const progressId = c.req.param('progressId')
   const progressData = progressTracking.get(progressId)
@@ -37,6 +45,10 @@ download.get('/progress/:progressId', (c) => {
     return c.json({ error: 'Progress not found' }, 404)
   }
 
+  // Add deprecation warning header
+  c.header('X-Deprecated', 'This endpoint is deprecated. Use SSE /api/sse/progress/:progressId instead')
+  
+  console.log(`⚠️ Using deprecated polling endpoint for ${progressId}. Consider upgrading to SSE.`)
   return c.json(progressData)
 })
 
@@ -395,14 +407,19 @@ download.post('/from-url', async (c) => {
         }
         
         // Mark as complete with result
-        progressTracking.set(progressId, {
+        const completionData = {
           progress: 100,
           message: 'Download complete!',
           speed: null,
           timestamp: Date.now(),
           completed: true,
           result: result
-        })
+        }
+        
+        progressTracking.set(progressId, completionData)
+        
+        // Broadcast completion to SSE clients
+        broadcastCompletion(progressId, completionData)
         
         // Schedule cleanup
         cleanupProgress(progressId)
@@ -411,14 +428,19 @@ download.post('/from-url', async (c) => {
         console.error('❌ Background download failed:', error)
         
         // Store error in progress tracking
-        progressTracking.set(progressId, {
+        const errorData = {
           progress: 0,
           message: 'Download failed',
           speed: null,
           timestamp: Date.now(),
           error: error.message,
           completed: true
-        })
+        }
+        
+        progressTracking.set(progressId, errorData)
+        
+        // Broadcast error to SSE clients
+        broadcastCompletion(progressId, errorData)
         
         // Schedule cleanup
         cleanupProgress(progressId)

@@ -20,7 +20,12 @@ export function UrlListSection({
   isDownloading,
   completedUrls,
   failedUrls,
-  onEvent,
+  onSelectUrl,
+  onSelectAll,
+  onRemoveUrl,
+  onStartDownloads,
+  onCancelDownloads,
+  onShowThumbnail,
   onShowSettings
 }: UrlListSectionProps) {
   const getStatusIcon = useCallback((status: BulkDownloadUrl['status']) => {
@@ -41,24 +46,24 @@ export function UrlListSection({
   ), [])
 
   const handleSelectAll = (checked: boolean) => {
-    onEvent({ type: 'ALL_SELECTED', payload: { selected: checked } })
+    onSelectAll(checked)
   }
 
   const handleUrlSelect = (id: string, checked: boolean) => {
-    onEvent({ type: 'URL_SELECTED', payload: { id, selected: checked } })
+    onSelectUrl(id, checked)
   }
 
   const handleRemoveUrl = (id: string) => {
-    onEvent({ type: 'URL_REMOVED', payload: { id } })
+    onRemoveUrl(id)
   }
 
   const handleStartDownload = () => {
     const selectedIds = urls.filter(u => u.selected).map(u => u.id)
-    onEvent({ type: 'DOWNLOAD_STARTED', payload: { urlIds: selectedIds } })
+    onStartDownloads(selectedIds)
   }
 
   const handleCancelDownloads = () => {
-    onEvent({ type: 'DOWNLOADS_CANCELLED' })
+    onCancelDownloads()
   }
 
   if (urls.length === 0) return null
@@ -125,10 +130,7 @@ export function UrlListSection({
                         {url.thumbnail && (
                           <button
                             type="button"
-                            onClick={() => onEvent({ 
-                              type: 'THUMBNAIL_CLICKED', 
-                              payload: { thumbnailUrl: url.thumbnail || '', title: url.title } 
-                            })}
+                            onClick={() => onShowThumbnail(url.thumbnail || '', url.title)}
                             className="p-0 border-0 bg-transparent cursor-pointer hover:opacity-80 transition-opacity"
                           >
                             <img 
@@ -205,10 +207,7 @@ export function UrlListSection({
                       {url.thumbnail && (
                         <button
                           type="button"
-                          onClick={() => onEvent({ 
-                            type: 'THUMBNAIL_CLICKED', 
-                            payload: { thumbnailUrl: url.thumbnail || '', title: url.title } 
-                          })}
+                          onClick={() => onShowThumbnail(url.thumbnail || '', url.title)}
                           className="p-0 border-0 bg-transparent cursor-pointer hover:opacity-80 transition-opacity"
                         >
                           <img 

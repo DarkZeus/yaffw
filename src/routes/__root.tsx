@@ -14,7 +14,7 @@ type MyRouterContext = {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <AppSidebar />
         <SidebarInset>
           <main className="flex-1 overflow-y-auto px-4">

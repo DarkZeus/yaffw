@@ -58,14 +58,14 @@ export const startBulkDownload = async (url: string, title?: string): Promise<vo
     
     console.log('📥 Fetching video as blob...')
     
-    // Use your approach: fetch as blob then download
-    const videoResponse = await fetch(response.downloadUrl)
+    // Use axios client to fetch as blob then download
+    const videoResponse = await apiClient.instance.get(response.downloadUrl, { responseType: 'blob' })
     
-    if (!videoResponse.ok) {
+    if (videoResponse.status !== 200) {
       throw new Error(`Failed to fetch video: ${videoResponse.status}`)
     }
     
-    const blob = await videoResponse.blob()
+    const blob = videoResponse.data
     
     // Create blob URL and trigger download
     const blobUrl = URL.createObjectURL(blob)

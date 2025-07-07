@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
+import { createSSEProgressTracker } from './sseClient'
 
 // Base API configuration
 const API_BASE_URL = 'http://localhost:3001/api'
@@ -102,6 +103,76 @@ export const apiClient = {
 
   // Raw axios instance for advanced usage
   instance: apiInstance,
+
+  // SSE progress tracking with polling fallback
+  trackProgress: async <T = unknown>(
+    progressId: string, 
+    onProgress?: (progress: number, message: string, speed?: number) => void
+  ): Promise<T> => {
+    try {
+      // Try SSE first
+      const result = await createSSEProgressTracker(progressId, onProgress)
+      return result as T
+    } catch (sseError) {
+      console.warn('⚠️ SSE failed, falling back to polling:', sseError)
+      
+      // Fallback to polling
+      return new Promise((resolve, reject) => {
+        const pollInterval = setInterval(async () => {
+          try {
+            const progressResponse = await apiInstance.get<{
+              progress: number
+              message: string
+              speed?: number
+              timestamp: number
+              completed?: boolean
+              result?: T
+              error?: string
+            }>(`/download/progress/${progressId}`, { timeout: 5000 })
+
+            const progressData = progressResponse.data
+            console.log(`📊 Polling progress: ${progressData.progress}% - ${progressData.message}`)
+
+            // Call progress callback if provided
+            if (onProgress) {
+              onProgress(progressData.progress, progressData.message, progressData.speed)
+            }
+
+            // Check if completed
+            if (progressData.completed) {
+              clearInterval(pollInterval)
+              
+              if (progressData.error) {
+                reject(new Error(progressData.error))
+              } else if (progressData.result) {
+                console.log('✅ Polling completed successfully!')
+                resolve(progressData.result)
+              } else {
+                reject(new Error('Download completed but no result available'))
+              }
+            }
+          } catch (pollError) {
+            if (axios.isAxiosError(pollError)) {
+              if (pollError.response?.status === 404) {
+                clearInterval(pollInterval)
+                reject(new Error('Download progress lost or expired'))
+              } else {
+                console.warn('⚠️ Progress polling error:', pollError.message)
+              }
+            } else {
+              console.warn('⚠️ Unexpected polling error:', pollError)
+            }
+          }
+        }, 1000) // Poll every second
+
+        // Set maximum polling time (5 minutes)
+        setTimeout(() => {
+          clearInterval(pollInterval)
+          reject(new Error('Progress tracking timeout - no updates received'))
+        }, 5 * 60 * 1000)
+      })
+    }
+  }
 }
 
 // Specialized API methods for common YAFFW operations

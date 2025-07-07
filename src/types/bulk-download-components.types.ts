@@ -1,4 +1,3 @@
-import type { ComponentEventHandler } from './bulk-download-mediator.types'
 import type { BulkDownloadSettings, BulkDownloadUrl } from './bulk-download.types'
 
 // Section component prop types
@@ -6,7 +5,7 @@ export type UrlInputSectionProps = {
   currentUrl: string
   setCurrentUrl: (url: string) => void
   handlePaste: (e: React.ClipboardEvent) => void
-  onEvent: ComponentEventHandler
+  onAddUrl: (url: string) => void
   totalUrls: number
   selectedCount: number
   completedCount: number
@@ -21,11 +20,14 @@ export type UrlListSectionProps = {
   isDownloading: boolean
   completedUrls: BulkDownloadUrl[]
   failedUrls: BulkDownloadUrl[]
-  onEvent: ComponentEventHandler
+  onSelectUrl: (id: string, selected: boolean) => void
+  onSelectAll: (selected: boolean) => void
+  onRemoveUrl: (id: string) => void
+  onStartDownloads: (urlIds: string[]) => void
+  onCancelDownloads: () => void
+  onShowThumbnail: (thumbnailUrl: string, title?: string) => void
   onShowSettings: () => void
 }
-
-
 
 // Dialog component prop types
 export type SmartPasteDialogProps = {
@@ -34,14 +36,14 @@ export type SmartPasteDialogProps = {
   detectedUrls: string[]
   selectedUrls: Set<string>
   onUrlToggle: (url: string, checked: boolean) => void
-  onEvent: ComponentEventHandler
+  onConfirm: () => void
 }
 
 export type SettingsDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   settings: BulkDownloadSettings
-  onEvent: ComponentEventHandler
+  onUpdateSettings: (key: string, value: string) => void
 }
 
 export type ThumbnailModalProps = {

@@ -1,6 +1,6 @@
 import type { TrimManager } from '../../types/video-editor-mediator.types'
 
-export const createTrimManager: TrimManager = (state, setState, playerRef) => {
+export const createTrimManager: TrimManager = (state, setState, playerRef, handleSeek) => {
   const handleTrimChange = (start: number, end: number) => {
     setState({ trimStart: start, trimEnd: end })
   }
@@ -14,13 +14,11 @@ export const createTrimManager: TrimManager = (state, setState, playerRef) => {
   }
 
   const handleJumpToTrimStart = () => {
-    setState({ currentTime: state.trimStart })
-    playerRef.current?.seekTo(state.trimStart, 'seconds')
+    handleSeek(state.trimStart)
   }
 
   const handleJumpToTrimEnd = () => {
-    setState({ currentTime: state.trimEnd })
-    playerRef.current?.seekTo(state.trimEnd, 'seconds')
+    handleSeek(state.trimEnd)
   }
 
   const handleResetTrim = () => {

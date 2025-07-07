@@ -1,3 +1,4 @@
+import { type MotionValue, motion } from 'motion/react'
 import { memo, useMemo, useState } from 'react'
 
 type WaveformPoint = {
@@ -11,6 +12,7 @@ type ImageAudioWaveformProps = {
   keyPoints?: WaveformPoint[] // For precise positioning when needed
   duration: number
   currentTime: number
+  playheadPosition?: MotionValue<string> // Real-time playhead position from video timeline sync
   trimStart: number
   trimEnd: number
   height?: number
@@ -26,6 +28,7 @@ export const ImageAudioWaveform = memo(function ImageAudioWaveform({
   keyPoints = [],
   duration,
   currentTime,
+  playheadPosition,
   trimStart,
   trimEnd,
   height = 60,
@@ -147,14 +150,25 @@ export const ImageAudioWaveform = memo(function ImageAudioWaveform({
           style={{ left: `${overlayPositions.trimEnd}%` }}
         />
         
-        {/* Playhead */}
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-          style={{ 
-            left: `${overlayPositions.playhead}%`,
-            boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)'
-          }}
-        />
+        {/* Playhead - Real-time Synced */}
+        {playheadPosition ? (
+          <motion.div
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+            style={{ 
+              left: playheadPosition, // Use real-time MotionValue
+              boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)'
+            }}
+          />
+        ) : (
+          /* Fallback to React state-based positioning if real-time sync not available */
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+            style={{ 
+              left: `${overlayPositions.playhead}%`,
+              boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)'
+            }}
+          />
+        )}
       </div>
 
       {/* Loading state - only show while image is loading */}

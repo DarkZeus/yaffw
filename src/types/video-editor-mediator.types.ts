@@ -10,6 +10,7 @@ export type VideoState = {
   duration: number
   videoMetadata: VideoMetadata
   playbackSpeed: number
+  fps: number // Frames per second for frame-accurate seeking
 }
 
 // Trimming state
@@ -62,6 +63,7 @@ export type VolumeControlRef = {
 export type VideoOperations = {
   handlePlayPause: () => void
   handleSeek: (time: number) => void
+  handleFrameSeek: (direction: 'prev' | 'next') => void
   handleProgress: (state: { played: number; playedSeconds: number }) => void
   handleDuration: (duration: number) => void
   handleVolumeUpdate: (volume: number, isMuted: boolean) => void
@@ -118,6 +120,7 @@ export type VideoEditorMediator = {
   trimOps: TrimOperations
   exportOps: ExportOperations
   uiOps: UIOperations
+  updateState: (updates: Partial<VideoEditorState>) => void // For direct state updates
   playerRef: React.RefObject<ReactPlayer | null>
   containerRef: React.RefObject<HTMLDivElement | null>
   volumeControlRef: React.RefObject<{ updateState: (volume: number, isMuted: boolean) => void } | null>
@@ -148,7 +151,8 @@ export type FileManager = (
 export type TrimManager = (
   state: VideoEditorState,
   setState: (updates: Partial<VideoEditorState>) => void,
-  playerRef: React.RefObject<ReactPlayer | null>
+  playerRef: React.RefObject<ReactPlayer | null>,
+  handleSeek: (time: number) => void
 ) => TrimOperations
 
 export type ExportManager = (

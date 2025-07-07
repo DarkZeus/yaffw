@@ -10,8 +10,9 @@ type UseBeforeUnloadOptions = {
 
 export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) => {
   const hasBeforeUnloadListener = useRef(false)
+  const lastWorkStatusRef = useRef(false)
 
-  // Determine if user has work in progress
+  // Determine if user has work in progress - functional approach with early returns
   const hasWorkInProgress = useCallback(() => {
     const { 
       currentVideo, 
@@ -23,15 +24,15 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
       trimEnd 
     } = state
 
-    // No work if no video is loaded
+    // Early return - no work if no video is loaded
     if (!currentVideo) return false
 
-    // Has work if any processing is happening
+    // Early return - has work if any processing is happening
     if (isUploading || isDownloading || isProcessing || isCommittingToServer) {
       return true
     }
 
-    // Has work if user has set custom trim points
+    // Early return - has work if user has set custom trim points
     const hasCustomTrim = trimStart > 0 || (trimEnd > 0 && trimEnd < currentVideo.duration)
     if (hasCustomTrim) return true
 
@@ -65,60 +66,84 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
   const handleUnload = useCallback(() => {
     const { currentVideo } = state
     
-    if (currentVideo) {
-      // Cleanup local file resources
-      cleanupLocalFile(currentVideo)
-      
-      // Trigger server cleanup (best effort, may not complete due to page unload)
-      if (currentVideo.serverFilePath) {
-        // Use sendBeacon for better reliability on page unload
-        const cleanupData = JSON.stringify({ action: 'cleanup' })
-        if (navigator.sendBeacon) {
-          navigator.sendBeacon('http://localhost:3001/api/cleanup-old-files', cleanupData)
-        } else {
-          // Fallback using API client (though may not complete due to page unload)
-          triggerServerCleanup()
-        }
+    if (!currentVideo) return
+    
+    // Cleanup local file resources
+    cleanupLocalFile(currentVideo)
+    
+    // Trigger server cleanup (best effort, may not complete due to page unload)
+    if (currentVideo.serverFilePath) {
+      // Use sendBeacon for better reliability on page unload
+      const cleanupData = JSON.stringify({ action: 'cleanup' })
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('http://localhost:3001/api/cleanup-old-files', cleanupData)
       }
-      
-      // Trigger additional cleanup if provided
-      onCleanup?.()
-      
-      console.log('🧹 Cleaned up resources before page unload')
+      if (!navigator.sendBeacon) {
+        // Fallback using API client (though may not complete due to page unload)
+        triggerServerCleanup()
+      }
     }
+    
+    // Trigger additional cleanup if provided
+    onCleanup?.()
+    
+    console.log('🧹 Cleaned up resources before page unload')
   }, [state, onCleanup, triggerServerCleanup])
 
-  // Set up or remove event listeners based on work status
-  const updateEventListeners = useCallback(() => {
-    const shouldHaveListener = hasWorkInProgress()
+  // Add listeners - functional approach with guard clause
+  const addListeners = useCallback(() => {
+    if (hasBeforeUnloadListener.current) return
     
-    if (shouldHaveListener && !hasBeforeUnloadListener.current) {
-      // Add listeners
-      window.addEventListener('beforeunload', handleBeforeUnload)
-      window.addEventListener('unload', handleUnload)
-      hasBeforeUnloadListener.current = true
-      console.log('🔒 Added beforeunload protection')
-    } else if (!shouldHaveListener && hasBeforeUnloadListener.current) {
-      // Remove listeners
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('unload', handleUnload)
-      hasBeforeUnloadListener.current = false
-      console.log('🔓 Removed beforeunload protection')
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('unload', handleUnload)
+    hasBeforeUnloadListener.current = true
+    console.log('🔒 Added beforeunload protection')
+  }, [handleBeforeUnload, handleUnload])
+
+  // Remove listeners - functional approach with guard clause
+  const removeListeners = useCallback(() => {
+    if (!hasBeforeUnloadListener.current) return
+    
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+    window.removeEventListener('unload', handleUnload)
+    hasBeforeUnloadListener.current = false
+    console.log('🔓 Removed beforeunload protection')
+  }, [handleBeforeUnload, handleUnload])
+
+  // Update listeners based on work status - avoid useEffect, use ref-based state tracking
+  const updateListeners = useCallback(() => {
+    const currentWorkStatus = hasWorkInProgress()
+    
+    // Early return if status hasn't changed
+    if (currentWorkStatus === lastWorkStatusRef.current) return
+    
+    // Update ref state
+    lastWorkStatusRef.current = currentWorkStatus
+    
+    // Guard clauses instead of if/else
+    if (currentWorkStatus) {
+      addListeners()
+      return
     }
-  }, [hasWorkInProgress, handleBeforeUnload, handleUnload])
+    
+    removeListeners()
+  }, [hasWorkInProgress, addListeners, removeListeners])
 
   // Cleanup function to remove listeners
   const cleanup = useCallback(() => {
-    if (hasBeforeUnloadListener.current) {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('unload', handleUnload)
-      hasBeforeUnloadListener.current = false
-      console.log('🧹 Cleaned up beforeunload listeners')
-    }
+    if (!hasBeforeUnloadListener.current) return
+    
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+    window.removeEventListener('unload', handleUnload)
+    hasBeforeUnloadListener.current = false
+    console.log('🧹 Cleaned up beforeunload listeners')
   }, [handleBeforeUnload, handleUnload])
 
+  // Call updateListeners immediately to sync current state
+  updateListeners()
+
   return {
-    updateEventListeners,
+    updateListeners,
     cleanup,
     hasWorkInProgress: hasWorkInProgress()
   }

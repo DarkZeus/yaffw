@@ -11,11 +11,10 @@ export function SmartPasteDialog({
   detectedUrls,
   selectedUrls,
   onUrlToggle,
-  onEvent
+  onConfirm
 }: SmartPasteDialogProps) {
   const handleConfirm = () => {
-    const urls = Array.from(selectedUrls)
-    onEvent({ type: 'SMART_PASTE_CONFIRMED', payload: { urls } })
+    onConfirm()
   }
 
   return (

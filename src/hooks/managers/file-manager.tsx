@@ -167,7 +167,10 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       // Extract detailed metadata for analytics
       extractDetailedVideoMetadata(videoFile).then((metadata) => {
         startTransition(() => {
-          setState({ videoMetadata: metadata })
+          setState({ 
+            videoMetadata: metadata,
+            fps: metadata.fps || 30 // Use metadata FPS or fallback to 30
+          })
         })
       })
       

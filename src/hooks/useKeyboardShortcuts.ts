@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import type ReactPlayer from 'react-player'
 
 type KeyboardShortcutsProps = {
   // Playback controls
@@ -6,6 +7,13 @@ type KeyboardShortcutsProps = {
   onSeek: (time: number) => void
   currentTime: number
   duration: number
+  fps: number // For frame-accurate seeking
+  playerRef: React.RefObject<ReactPlayer | null> // For real-time video element access
+  isPlaying: boolean // Current playing state
+  updateState: (updates: { currentTime?: number; isPlaying?: boolean }) => void // Direct state updater
+  
+  // Frame controls
+  onFrameSeek?: (direction: 'prev' | 'next') => void
   
   // Trim controls
   onSetTrimStart: () => void
@@ -39,13 +47,15 @@ type Shortcut = {
 
 const HANDLED_KEYS = [
   'Space', 'ArrowLeft', 'ArrowRight', 'KeyJ', 'KeyK', 'KeyI', 'KeyO',
-  'Home', 'End', 'Enter', 'KeyM', 'Equal', 'Minus', 'KeyF', 'KeyR'
+  'Home', 'End', 'Enter', 'KeyM', 'Equal', 'Minus', 'KeyF', 'KeyR',
+  'BracketLeft', 'BracketRight' // Frame seeking shortcuts
 ] as const
 
 const SHORTCUTS: Shortcut[] = [
   { key: 'Space', description: 'Play/Pause' },
   { key: '← →', description: 'Seek 5 seconds' },
   { key: 'Shift + ← →', description: 'Seek 1 second' },
+  { key: '[ ]', description: 'Frame by frame' },
   { key: 'J', description: 'Set trim start' },
   { key: 'K', description: 'Set trim end' },
   { key: 'I', description: 'Jump to trim start' },
@@ -70,6 +80,11 @@ export function useKeyboardShortcuts({
   onSeek,
   currentTime,
   duration,
+  fps,
+  playerRef,
+  isPlaying,
+  updateState,
+  onFrameSeek,
   onSetTrimStart,
   onSetTrimEnd,
   onJumpToTrimStart,
@@ -83,6 +98,21 @@ export function useKeyboardShortcuts({
   onResetTrim,
   enabled = true
 }: KeyboardShortcutsProps) {
+
+  // Frame-accurate pause handler for keyboard shortcuts
+  const handleKeyboardPlayPause = useCallback(() => {
+    const newIsPlaying = !isPlaying
+    
+    // When pausing via keyboard, sync React state with actual video element time
+    if (!newIsPlaying && playerRef.current) {
+      const actualCurrentTime = playerRef.current.getCurrentTime() ?? currentTime
+      updateState({ isPlaying: false, currentTime: actualCurrentTime })
+      // Seek to ensure frame-accurate stopping at the exact pause position
+      playerRef.current.seekTo(actualCurrentTime, 'seconds')
+    } else {
+      updateState({ isPlaying: newIsPlaying })
+    }
+  }, [isPlaying, playerRef, currentTime, updateState])
   
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
     // Early returns for guard clauses
@@ -99,9 +129,11 @@ export function useKeyboardShortcuts({
     const seekRight = e.shiftKey ? 1 : 5
 
     const keyActions: Record<string, () => void> = {
-      Space: onPlayPause,
+      Space: handleKeyboardPlayPause, // Use frame-accurate pause for keyboard
       ArrowLeft: () => onSeek(Math.max(0, currentTime - seekLeft)),
       ArrowRight: () => onSeek(Math.min(duration, currentTime + seekRight)),
+      BracketLeft: () => onFrameSeek?.('prev'), // Previous frame
+      BracketRight: () => onFrameSeek?.('next'), // Next frame
       KeyJ: onSetTrimStart,
       KeyK: onSetTrimEnd,
       KeyI: onJumpToTrimStart,
@@ -119,8 +151,8 @@ export function useKeyboardShortcuts({
     const action = keyActions[e.code]
     action?.()
   }, [
-    enabled, onPlayPause, onSeek, currentTime, duration,
-    onSetTrimStart, onSetTrimEnd, onJumpToTrimStart, onJumpToTrimEnd,
+    enabled, handleKeyboardPlayPause, onSeek, currentTime, duration,
+    onFrameSeek, onSetTrimStart, onSetTrimEnd, onJumpToTrimStart, onJumpToTrimEnd,
     onExport, onToggleMute, onVolumeChange,
     onToggleFullscreen, onResetTrim
   ])

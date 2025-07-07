@@ -27,6 +27,11 @@ export function VideoEditorLayout() {
     onSeek: videoOps.handleSeek,
     currentTime: state.currentTime,
     duration: state.duration,
+    fps: state.fps,
+    playerRef: playerRef,
+    isPlaying: state.isPlaying,
+    updateState: mediator.updateState, // Direct state updater for keyboard shortcuts
+    onFrameSeek: videoOps.handleFrameSeek,
     onSetTrimStart: trimOps.handleSetTrimStart,
     onSetTrimEnd: trimOps.handleSetTrimEnd,
     onJumpToTrimStart: trimOps.handleJumpToTrimStart,
@@ -136,6 +141,7 @@ export function VideoEditorLayout() {
                     deferredCurrentTime={deferredCurrentTime}
                     videoOps={videoOps}
                     trimOps={trimOps}
+                    playerRef={playerRef}
                   />
                 </ResizablePanel>
               </ResizablePanelGroup>

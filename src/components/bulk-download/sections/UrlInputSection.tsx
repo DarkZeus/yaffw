@@ -9,7 +9,7 @@ export function UrlInputSection({
   currentUrl,
   setCurrentUrl,
   handlePaste,
-  onEvent,
+  onAddUrl,
   totalUrls,
   selectedCount,
   completedCount,
@@ -18,7 +18,7 @@ export function UrlInputSection({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleAddUrl = () => {
-    onEvent({ type: 'URL_ADDED', payload: { url: currentUrl } })
+    onAddUrl(currentUrl)
   }
 
   return (
