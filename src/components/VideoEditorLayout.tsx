@@ -1,5 +1,5 @@
 import { Scissors } from 'lucide-react'
-import { useDeferredValue } from 'react'
+import { useCallback, useDeferredValue, useState } from 'react'
 
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useVideoEditorMediator } from '../hooks/useVideoEditorMediator'
@@ -15,7 +15,36 @@ import { TimelineSection } from './video-editor/TimelineSection'
 import { VideoPlayerSection } from './video-editor/VideoPlayerSection'
 
 export function VideoEditorLayout() {
-  const mediator = useVideoEditorMediator()
+  // Cookie management dialog state
+  const [showCookieManagement, setShowCookieManagement] = useState(false)
+  const [cookieUploadResolver, setCookieUploadResolver] = useState<((sessionId: string | null) => void) | null>(null)
+
+  // Cookie restriction error handler
+  const handleRestrictionError = useCallback(async (error: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setCookieUploadResolver(() => resolve)
+      setShowCookieManagement(true)
+    })
+  }, [])
+
+  // Cookie management handlers
+  const handleCloseCookieManagement = useCallback(() => {
+    setShowCookieManagement(false)
+    if (cookieUploadResolver) {
+      cookieUploadResolver(null) // Resolve with null if dialog is closed without upload
+      setCookieUploadResolver(null)
+    }
+  }, [cookieUploadResolver])
+
+  const handleCookieUploaded = useCallback((sessionId: string) => {
+    setShowCookieManagement(false)
+    if (cookieUploadResolver) {
+      cookieUploadResolver(sessionId)
+      setCookieUploadResolver(null)
+    }
+  }, [cookieUploadResolver])
+
+  const mediator = useVideoEditorMediator(handleRestrictionError)
   const { state, videoOps, fileOps, trimOps, exportOps, uiOps, playerRef, containerRef, volumeControlRef } = mediator
 
   // Performance optimization - defer non-urgent updates
@@ -61,6 +90,26 @@ export function VideoEditorLayout() {
             />
           </div>
         </div>
+
+        {/* Cookie Management Dialog - needs to be available even when no video is loaded */}
+        <ModalsSection
+          uiState={{
+            showQualityModal: false, // No quality modal when no video
+            showLargeFileConfirmDialog: false, // No large file dialog when no video
+            largeFileSize: 0,
+            isFullscreen: false
+          }}
+          videoState={{
+            videoMetadata: {}
+          }}
+          exportOps={exportOps}
+          onCloseQualityModal={uiOps.handleCloseQualityModal}
+          onToggleLargeFileDialog={uiOps.handleToggleLargeFileDialog}
+          onConfirmLargeFile={exportOps.handleConfirmLargeFile}
+          showCookieManagement={showCookieManagement}
+          onCloseCookieManagement={handleCloseCookieManagement}
+          onCookieUploaded={handleCookieUploaded}
+        />
       </TooltipProvider>
     )
   }
@@ -164,6 +213,9 @@ export function VideoEditorLayout() {
           onCloseQualityModal={uiOps.handleCloseQualityModal}
           onToggleLargeFileDialog={uiOps.handleToggleLargeFileDialog}
           onConfirmLargeFile={exportOps.handleConfirmLargeFile}
+          showCookieManagement={showCookieManagement}
+          onCloseCookieManagement={handleCloseCookieManagement}
+          onCookieUploaded={handleCookieUploaded}
         />
       </div>
     </TooltipProvider>

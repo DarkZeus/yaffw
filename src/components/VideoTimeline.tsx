@@ -127,32 +127,32 @@ export const VideoTimeline = memo(function VideoTimeline({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return
     
-    if (isDragging === 'selection') {
+      if (isDragging === 'selection') {
       // Immediate selection drag - no throttling, no rAF, no startTransition
-      const pixelOffset = e.clientX - dragStartX
-      if (!timelineRef.current) return
-      
-      const timelineWidth = timelineRef.current.offsetWidth
-      const timeOffset = (pixelOffset / timelineWidth) * duration
-      
-      const selectionDuration = initialTrimEnd - initialTrimStart
-      let newTrimStart = initialTrimStart + timeOffset
-      let newTrimEnd = initialTrimEnd + timeOffset
-      
-      // Constrain to video boundaries
-      if (newTrimStart < 0) {
-        newTrimStart = 0
-        newTrimEnd = selectionDuration
-      } else if (newTrimEnd > duration) {
-        newTrimEnd = duration
-        newTrimStart = duration - selectionDuration
+        const pixelOffset = e.clientX - dragStartX
+        if (!timelineRef.current) return
+        
+        const timelineWidth = timelineRef.current.offsetWidth
+        const timeOffset = (pixelOffset / timelineWidth) * duration
+        
+        const selectionDuration = initialTrimEnd - initialTrimStart
+        let newTrimStart = initialTrimStart + timeOffset
+        let newTrimEnd = initialTrimEnd + timeOffset
+        
+        // Constrain to video boundaries
+        if (newTrimStart < 0) {
+          newTrimStart = 0
+          newTrimEnd = selectionDuration
+        } else if (newTrimEnd > duration) {
+          newTrimEnd = duration
+          newTrimStart = duration - selectionDuration
+        }
+        
+      // Update immediately for snappy response
+          onTrimChange(newTrimStart, newTrimEnd)
+        return
       }
       
-      // Update immediately for snappy response
-      onTrimChange(newTrimStart, newTrimEnd)
-      return
-    }
-    
     // For other drag types, keep some throttling for performance
     const now = Date.now()
     if (now - lastMoveTime.current < 16) return
@@ -169,9 +169,9 @@ export const VideoTimeline = memo(function VideoTimeline({
         forceUpdatePosition(newTime)
       } else if (isDragging === 'trimStart') {
         // Update trim handles immediately too
-        onTrimChange(Math.min(newTime, trimEnd - 0.1), trimEnd)
+          onTrimChange(Math.min(newTime, trimEnd - 0.1), trimEnd)
       } else if (isDragging === 'trimEnd') {
-        onTrimChange(trimStart, Math.max(newTime, trimStart + 0.1))
+          onTrimChange(trimStart, Math.max(newTime, trimStart + 0.1))
       }
       
       animationFrameId.current = null
@@ -225,7 +225,7 @@ export const VideoTimeline = memo(function VideoTimeline({
   // Note: playheadPos is no longer used since we use the real-time MotionValue
   const positions = useMemo(() => {
     return {
-      trimStartPos: (displayTrimStart / duration) * 100,
+    trimStartPos: (displayTrimStart / duration) * 100,
       trimEndPos: (displayTrimEnd / duration) * 100
     }
   }, [displayTrimStart, displayTrimEnd, duration])

@@ -11,13 +11,14 @@ export type SSEProgressData = {
   completed?: boolean
   result?: unknown
   error?: string
+  isRestrictionError?: boolean
 }
 
 export type SSEOptions = {
   progressId: string
   onProgress?: (progress: number, message: string, speed?: number) => void
   onComplete?: (result: unknown) => void
-  onError?: (error: string) => void
+  onError?: (error: string, isRestrictionError?: boolean) => void
   onConnected?: () => void
 }
 
@@ -40,13 +41,11 @@ export class SSEProgressClient {
       }
 
       const url = `${SSE_BASE_URL}/progress/${this.options.progressId}`
-      console.log(`🔗 Connecting to SSE: ${url}`)
 
       this.eventSource = new EventSource(url)
 
       // Connection opened
       this.eventSource.onopen = () => {
-        console.log(`✅ SSE connection opened for: ${this.options.progressId}`)
         this.isConnected = true
         this.reconnectAttempts = 0
         this.reconnectDelay = 1000
@@ -58,7 +57,6 @@ export class SSEProgressClient {
       this.eventSource.onmessage = (event) => {
         try {
           const data: SSEProgressData = JSON.parse(event.data)
-                     console.log('📡 SSE message received:', data)
 
           switch (data.type) {
             case 'connected':
@@ -72,8 +70,9 @@ export class SSEProgressClient {
               break
 
             case 'completed':
+              
               if (data.error) {
-                this.options.onError?.(data.error)
+                this.options.onError?.(data.error, data.isRestrictionError)
               } else if (data.result) {
                 this.options.onComplete?.(data.result)
               } else {
@@ -83,16 +82,16 @@ export class SSEProgressClient {
               break
 
             default:
-              console.warn('Unknown SSE message type:', data.type)
+              // console.warn('Unknown SSE message type:', data.type)
           }
         } catch (error) {
-          console.error('Failed to parse SSE message:', error)
+          // console.error('Failed to parse SSE message:', error)
         }
       }
 
       // Connection error
       this.eventSource.onerror = (error) => {
-        console.error(`❌ SSE connection error for ${this.options.progressId}:`, error)
+        // console.error(`❌ SSE connection error for ${this.options.progressId}:`, error)
         this.isConnected = false
 
         if (this.eventSource?.readyState === EventSource.CLOSED) {
@@ -100,7 +99,7 @@ export class SSEProgressClient {
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.attemptReconnect()
           } else {
-            console.error('❌ Max reconnection attempts reached, giving up')
+            // console.error('❌ Max reconnection attempts reached, giving up')
             this.options.onError?.('Connection lost and reconnection failed')
             reject(new Error('SSE connection failed after multiple attempts'))
           }
@@ -110,7 +109,7 @@ export class SSEProgressClient {
       // Set a timeout for initial connection
       setTimeout(() => {
         if (!this.isConnected) {
-          console.error('❌ SSE connection timeout')
+          // console.error('❌ SSE connection timeout')
           this.disconnect()
           reject(new Error('SSE connection timeout'))
         }
@@ -120,11 +119,11 @@ export class SSEProgressClient {
 
   private attemptReconnect() {
     this.reconnectAttempts++
-    console.log(`🔄 Attempting SSE reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms`)
+    // console.log(`🔄 Attempting SSE reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms`)
 
     setTimeout(() => {
       this.connect().catch(error => {
-        console.error('Reconnection failed:', error)
+        // console.error('Reconnection failed:', error)
       })
     }, this.reconnectDelay)
 
@@ -134,7 +133,7 @@ export class SSEProgressClient {
 
   disconnect() {
     if (this.eventSource) {
-      console.log(`🔌 Disconnecting SSE for: ${this.options.progressId}`)
+      // console.log(`🔌 Disconnecting SSE for: ${this.options.progressId}`)
       this.eventSource.close()
       this.eventSource = null
       this.isConnected = false
@@ -156,21 +155,27 @@ export const createSSEProgressTracker = (
       progressId,
       onProgress,
       onComplete: (result) => {
-        console.log('✅ SSE progress completed')
+        // console.log('✅ SSE progress completed')
         resolve(result)
       },
-      onError: (error) => {
-        console.error('❌ SSE progress error:', error)
-        reject(new Error(error))
+      onError: (error, isRestrictionError) => {
+        // console.error('❌ SSE progress error:', error)
+        // console.log('🔍 SSE error isRestrictionError flag:', isRestrictionError)
+        const errorObj = new Error(error)
+        // @ts-ignore - Adding custom property
+        errorObj.isRestrictionError = isRestrictionError
+        // console.log('🔍 Created error object with keys:', Object.keys(errorObj))
+        // console.log('🔍 Error object isRestrictionError property:', (errorObj as Error & { isRestrictionError?: boolean }).isRestrictionError)
+        reject(errorObj)
       },
       onConnected: () => {
-        console.log('🔗 SSE progress tracker connected')
+        // console.log('🔗 SSE progress tracker connected')
       }
     })
 
     // Start the connection
     sseClient.connect().catch(error => {
-      console.error('Failed to establish SSE connection:', error)
+      // console.error('Failed to establish SSE connection:', error)
       reject(error)
     })
 

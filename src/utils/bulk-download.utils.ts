@@ -40,17 +40,18 @@ export type BulkDownloadResponse = {
 }
 
 // Simple bulk download function - fetch as blob and download (your approach!)
-export const startBulkDownload = async (url: string, title?: string): Promise<void> => {
+export const startBulkDownload = async (url: string, title?: string, cookieSessionId?: string): Promise<void> => {
   try {
     const { apiClient } = await import('../utils/apiClient')
     
-    console.log('🚀 Getting download URL for:', title || url)
+    console.log('🚀 Getting download URL for:', title || url, cookieSessionId ? 'with cookies' : 'without cookies')
     
-    // Get direct download URL from server
-    const response = await apiClient.post<BulkDownloadResponse>('/download/bulk', { 
-      url, 
-      title 
-    })
+    // Get direct download URL from server (with optional cookie support)
+    const requestBody: { url: string; title?: string; cookieSessionId?: string } = { url }
+    if (title) requestBody.title = title
+    if (cookieSessionId) requestBody.cookieSessionId = cookieSessionId
+    
+    const response = await apiClient.post<BulkDownloadResponse>('/download/bulk', requestBody)
     
     if (!response.success) {
       throw new Error('Failed to get download URL')

@@ -5,11 +5,11 @@ import { ProgressToast } from '../../components/ui/progress-toast'
 import type { FileManager } from '../../types/video-editor-mediator.types'
 import { yaffwApi } from '../../utils/apiClient'
 import { type LocalVideoFile, cleanupLocalFile, commitFileToServer, generateServerWaveform, processVideoLocally } from '../../utils/localFileProcessor'
-import { downloadVideoFromUrl } from '../../utils/urlDownloader'
+import { downloadTwitterVideo, downloadVideoFromUrl } from '../../utils/urlDownloader'
 import { type VideoMetadata, extractDetailedVideoMetadata } from '../../utils/videoMetadata'
 
 export const createFileManager: FileManager = (state, setState, utils) => {
-  const { showError, resetAllVideoState } = utils
+  const { showError, resetAllVideoState, onRestrictionError } = utils
 
   // Background commit function for local files
   const startBackgroundCommit = async (videoFile: File, localVideo: LocalVideoFile) => {
@@ -220,24 +220,51 @@ export const createFileManager: FileManager = (state, setState, utils) => {
 
       console.log('🌐 Starting download from URL:', url)
       
-      // Download video from URL with progress tracking
-      const response = await downloadVideoFromUrl(url, (progress, message, speed) => {
-        console.log(`📊 Progress update: ${progress}% - ${message}`)
-        setState({ uploadProgress: progress })
-        
-        // Update progress toast with real progress - using consistent ID
-        toast(
-          <ProgressToast 
-            progress={progress} 
-            message={message}
-            speed={speed}
-          />,
-          {
-            duration: Number.POSITIVE_INFINITY,
-            id: toastId
-          }
-        )
-      })
+      // Check if this is a Twitter URL and use appropriate download function
+      const isTwitterUrl = url.includes('twitter.com') || url.includes('x.com') || url.includes('vxtwitter.com')
+      
+      console.log('🔍 FILE MANAGER DEBUG: URL:', url)
+      console.log('🔍 FILE MANAGER DEBUG: isTwitterUrl:', isTwitterUrl)
+      
+      let response
+      if (isTwitterUrl) {
+        // Use enhanced Twitter download with restriction handling
+        response = await downloadTwitterVideo(url, (progress, message, speed) => {
+          setState({ uploadProgress: progress })
+          
+          // Update progress toast with real progress - using consistent ID
+          toast(
+            <ProgressToast 
+              progress={progress} 
+              message={message}
+              speed={speed}
+            />,
+            {
+              duration: Number.POSITIVE_INFINITY,
+              id: toastId
+            }
+          )
+        }, onRestrictionError || (async () => null))
+      } else {
+        // Download video from URL with progress tracking
+        response = await downloadVideoFromUrl(url, (progress, message, speed) => {
+          console.log(`📊 Progress update: ${progress}% - ${message}`)
+          setState({ uploadProgress: progress })
+          
+          // Update progress toast with real progress - using consistent ID
+          toast(
+            <ProgressToast 
+              progress={progress} 
+              message={message}
+              speed={speed}
+            />,
+            {
+              duration: Number.POSITIVE_INFINITY,
+              id: toastId
+            }
+          )
+        })
+      }
       
       if (response.success) {
         // Update progress - fetching video file
@@ -341,6 +368,9 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       
     } catch (error) {
       console.error('❌ URL download failed:', error)
+      console.log('🔍 FILE MANAGER DEBUG: Error caught in onUrlDownload:', error)
+      console.log('🔍 FILE MANAGER DEBUG: Error type:', typeof error)
+      console.log('🔍 FILE MANAGER DEBUG: Error message:', error instanceof Error ? error.message : String(error))
       
       // Show error toast
       toast.error("Download failed", {

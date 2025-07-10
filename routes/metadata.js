@@ -1,20 +1,31 @@
 import { Hono } from 'hono'
 import { spawn } from 'child_process'
+import fs from 'fs'
 
 const metadata = new Hono()
 
+// Import the same cookie store from twitter-download for consistency
+// Note: In a real application, this would be a shared module
+const tempCookieStore = new Map()
+
 // Extract metadata using yt-dlp (following same pattern as download.js)
-const extractMetadataWithYtDlp = (url) => {
+const extractMetadataWithYtDlp = (url, cookieFilePath = null) => {
   return new Promise((resolve, reject) => {
     const ytDlpArgs = [
       '--print', '%(id)s|||%(title)s|||%(duration_string)s|||%(thumbnail)s|||%(description)s|||%(view_count)s|||%(upload_date)s|||%(uploader)s',
       '--simulate',
       '--no-warnings',
-      '--no-playlist',
-      url
+      '--no-playlist'
     ]
+    
+    // Add cookie file if provided
+    if (cookieFilePath) {
+      ytDlpArgs.push('--cookies', cookieFilePath)
+    }
+    
+    ytDlpArgs.push(url)
 
-    console.log('🔍 Extracting metadata with yt-dlp for:', url)
+    console.log('🔍 Extracting metadata with yt-dlp for:', url, cookieFilePath ? 'with cookies' : 'without cookies')
     const ytDlp = spawn('yt-dlp', ytDlpArgs)
     let stdout = ''
     let stderr = ''
@@ -72,7 +83,7 @@ const extractMetadataWithYtDlp = (url) => {
 // Extract metadata from a single URL
 metadata.post('/extract', async (c) => {
   try {
-    const { url } = await c.req.json()
+    const { url, cookieSessionId } = await c.req.json()
 
     if (!url) {
       return c.json({ error: 'URL is required' }, 400)
@@ -85,8 +96,23 @@ metadata.post('/extract', async (c) => {
       return c.json({ error: 'Invalid URL format' }, 400)
     }
 
-    // Extract metadata using yt-dlp
-    const metadata = await extractMetadataWithYtDlp(url)
+    // Check if cookie session is provided and valid
+    let cookieFilePath = null
+    if (cookieSessionId) {
+      // For simplicity, check if the cookie file exists in the temp directory
+      const tempDir = 'temp-cookies'
+      const potentialCookiePath = `${tempDir}/${cookieSessionId}.txt`
+      
+      if (fs.existsSync(potentialCookiePath)) {
+        cookieFilePath = potentialCookiePath
+        console.log('🍪 Using cookie file for metadata extraction:', cookieSessionId)
+      } else {
+        console.log('⚠️ Cookie session provided but file not found:', cookieSessionId)
+      }
+    }
+
+    // Extract metadata using yt-dlp with optional cookies
+    const metadata = await extractMetadataWithYtDlp(url, cookieFilePath)
     return c.json({ success: true, metadata })
 
   } catch (error) {

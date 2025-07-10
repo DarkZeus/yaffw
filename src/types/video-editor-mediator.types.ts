@@ -145,6 +145,7 @@ export type FileManager = (
   utils: {
     showError: (message: string, details?: string) => void
     resetAllVideoState: () => void
+    onRestrictionError?: (error: string) => Promise<string | null>
   }
 ) => FileOperations
 

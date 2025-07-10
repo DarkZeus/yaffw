@@ -161,13 +161,13 @@ export const ImageAudioWaveform = memo(function ImageAudioWaveform({
           />
         ) : (
           /* Fallback to React state-based positioning if real-time sync not available */
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-            style={{ 
-              left: `${overlayPositions.playhead}%`,
-              boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)'
-            }}
-          />
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+          style={{ 
+            left: `${overlayPositions.playhead}%`,
+            boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)'
+          }}
+        />
         )}
       </div>
 

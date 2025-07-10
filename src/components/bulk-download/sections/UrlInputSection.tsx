@@ -29,7 +29,7 @@ export function UrlInputSection({
           Add URLs
         </CardTitle>
         <CardDescription>
-          Paste a URL or multiple URLs at once for smart detection
+          Add URLs to analyze and select for downloading. Restricted content will prompt for cookie authentication.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

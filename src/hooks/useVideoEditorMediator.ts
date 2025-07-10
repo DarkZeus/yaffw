@@ -43,7 +43,7 @@ const initialState: VideoEditorState = {
   largeFileSize: 0
 }
 
-export const useVideoEditorMediator = (): VideoEditorMediator => {
+export const useVideoEditorMediator = (onRestrictionError?: (error: string) => Promise<string | null>): VideoEditorMediator => {
   const [state, setState] = useState<VideoEditorState>(initialState)
   const [isPending, startTransition] = useTransition()
   
@@ -155,7 +155,8 @@ export const useVideoEditorMediator = (): VideoEditorMediator => {
 
   const fileOps = createFileManager(state, updateState, {
     showError,
-    resetAllVideoState
+    resetAllVideoState,
+    onRestrictionError
   })
 
   const exportOps = createExportManager(state, updateState, {

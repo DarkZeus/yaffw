@@ -19,8 +19,6 @@ sse.get('/progress/:progressId', async (c) => {
     return c.json({ error: 'Progress ID is required' }, 400)
   }
 
-  console.log(`🔗 New SSE connection for progress: ${progressId}`)
-
   // Set SSE headers
   c.header('Content-Type', 'text/event-stream')
   c.header('Cache-Control', 'no-cache')
@@ -47,7 +45,6 @@ sse.get('/progress/:progressId', async (c) => {
       })}\n\n`
       controller.enqueue(new TextEncoder().encode(initialMessage))
 
-      console.log(`✅ SSE connection established for: ${progressId}`)
     },
     cancel() {
       // Clean up when client disconnects
@@ -55,7 +52,6 @@ sse.get('/progress/:progressId', async (c) => {
       if (connection) {
         connection.connected = false
         sseConnections.delete(progressId)
-        console.log(`🔌 SSE connection closed for: ${progressId}`)
       }
     }
   })
@@ -85,9 +81,7 @@ export const broadcastProgress = (progressId, progressData) => {
       })}\n\n`
       
       connection.controller.enqueue(new TextEncoder().encode(message))
-      console.log(`📡 SSE progress sent for ${progressId}: ${progressData.progress}% - ${progressData.message}`)
     } catch (error) {
-      console.error(`❌ Failed to send SSE message for ${progressId}:`, error)
       // Mark connection as disconnected if sending fails
       connection.connected = false
       sseConnections.delete(progressId)
@@ -101,27 +95,26 @@ export const broadcastCompletion = (progressId, resultData) => {
   
   if (connection && connection.connected) {
     try {
-      const message = `data: ${JSON.stringify({
+      const completionMessage = {
         type: 'completed',
         progressId,
         ...resultData,
         timestamp: Date.now()
-      })}\n\n`
+      }
+      
+      const message = `data: ${JSON.stringify(completionMessage)}\n\n`
       
       connection.controller.enqueue(new TextEncoder().encode(message))
-      console.log(`🏁 SSE completion sent for ${progressId}`)
       
       // Close the connection after sending completion
       setTimeout(() => {
         if (sseConnections.has(progressId)) {
           connection.controller.close()
           sseConnections.delete(progressId)
-          console.log(`🔌 SSE connection auto-closed for completed: ${progressId}`)
         }
       }, 1000) // Give client time to receive the message
       
     } catch (error) {
-      console.error(`❌ Failed to send SSE completion for ${progressId}:`, error)
       sseConnections.delete(progressId)
     }
   }
@@ -134,7 +127,6 @@ const cleanupStaleConnections = () => {
   
   for (const [progressId, connection] of sseConnections.entries()) {
     if (now - connection.startTime > staleThreshold) {
-      console.log(`🧹 Cleaning up stale SSE connection: ${progressId}`)
       try {
         connection.controller.close()
       } catch (error) {

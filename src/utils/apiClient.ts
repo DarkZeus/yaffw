@@ -37,11 +37,9 @@ const apiInstance: AxiosInstance = axios.create({
 // Request interceptor for logging and common headers
 apiInstance.interceptors.request.use(
   (config) => {
-    console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.url}`)
     return config
   },
   (error) => {
-    console.error('❌ API Request Error:', error)
     return Promise.reject(error)
   }
 )
@@ -49,13 +47,11 @@ apiInstance.interceptors.request.use(
 // Response interceptor for logging and error handling
 apiInstance.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.log(`✅ API Response: ${response.status} ${response.config.url}`)
     return response
   },
   (error) => {
     // Use detailed error message when available, fallback to generic error
     const errorMessage = error.response?.data?.details || error.response?.data?.error || error.message || 'API request failed'
-    console.error(`❌ API Error: ${error.response?.status || 'Network'} ${error.config?.url}`, errorMessage)
     return Promise.reject(new Error(errorMessage))
   }
 )
@@ -114,7 +110,18 @@ export const apiClient = {
       const result = await createSSEProgressTracker(progressId, onProgress)
       return result as T
     } catch (sseError) {
-      console.warn('⚠️ SSE failed, falling back to polling:', sseError)
+      
+      // Check if this is a restriction error - if so, preserve it instead of falling back to polling
+      const isRestrictionError = sseError instanceof Error && 'isRestrictionError' in sseError 
+        ? (sseError as Error & { isRestrictionError?: boolean }).isRestrictionError 
+        : false
+      
+      
+      if (isRestrictionError) {
+        // Don't fall back to polling for restriction errors - preserve the error with its flag
+        throw sseError
+      }
+      
       
       // Fallback to polling
       return new Promise((resolve, reject) => {
@@ -131,7 +138,7 @@ export const apiClient = {
             }>(`/download/progress/${progressId}`, { timeout: 5000 })
 
             const progressData = progressResponse.data
-            console.log(`📊 Polling progress: ${progressData.progress}% - ${progressData.message}`)
+            
 
             // Call progress callback if provided
             if (onProgress) {
@@ -145,7 +152,6 @@ export const apiClient = {
               if (progressData.error) {
                 reject(new Error(progressData.error))
               } else if (progressData.result) {
-                console.log('✅ Polling completed successfully!')
                 resolve(progressData.result)
               } else {
                 reject(new Error('Download completed but no result available'))
@@ -157,10 +163,8 @@ export const apiClient = {
                 clearInterval(pollInterval)
                 reject(new Error('Download progress lost or expired'))
               } else {
-                console.warn('⚠️ Progress polling error:', pollError.message)
               }
             } else {
-              console.warn('⚠️ Unexpected polling error:', pollError)
             }
           }
         }, 1000) // Poll every second

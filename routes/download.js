@@ -66,10 +66,15 @@ const isDirectVideoUrl = (url) => {
   return videoExtensions.some(ext => url.toLowerCase().includes(ext))
 }
 
-// Helper function to detect social media platforms
+// Helper function to detect Twitter URLs specifically
+const isTwitterUrl = (url) => {
+  return url.includes('twitter.com') || url.includes('x.com')
+}
+
+// Helper function to detect social media platforms (excluding Twitter)
 const isSocialMediaUrl = (url) => {
   const socialPlatforms = [
-    'youtube.com', 'youtu.be', 'twitter.com', 'x.com', 'instagram.com', 
+    'youtube.com', 'youtu.be', 'instagram.com', 
     'tiktok.com', 'facebook.com', 'vimeo.com', 'dailymotion.com',
     'twitch.tv', 'reddit.com'
   ]
@@ -282,7 +287,30 @@ download.post('/from-url', async (c) => {
       let finalPath
 
       try {
-        if (isDirectVideoUrl(url)) {
+        if (isTwitterUrl(url)) {
+          console.log('🐦 Detected Twitter URL, using yt-dlp as fallback...')
+          updateProgress(progressId, 5, 'Processing Twitter URL with yt-dlp...')
+          
+          // Allow yt-dlp to handle Twitter URLs as fallback
+          // Frontend should use /api/twitter/from-twitter for optimal experience
+          const baseOutputPath = path.join('uploads', baseFileName)
+          finalPath = await downloadWithYtDlp(url, `${baseOutputPath}.%(ext)s`, (progress, speed) => {
+            updateProgress(progressId, Math.min(progress, 85), 'Downloading Twitter media...', speed)
+          })
+          
+          // Find the actual downloaded file
+          const uploadDir = 'uploads'
+          const files = fs.readdirSync(uploadDir)
+          const downloadedFile = files.find(file => file.startsWith(baseFileName))
+          
+          if (downloadedFile) {
+            finalPath = path.join(uploadDir, downloadedFile)
+          } else {
+            throw new Error('Downloaded file not found')
+          }
+          
+          updateProgress(progressId, 90, 'Download complete, processing...')
+        } else if (isDirectVideoUrl(url)) {
           console.log('📥 Downloading direct video URL with axios...')
           updateProgress(progressId, 5, 'Starting direct download...')
           finalPath = await downloadWithAxios(url, outputPath, (progress, speed) => {
@@ -509,16 +537,36 @@ download.get('/stream/:fileName', async (c) => {
 // Simple bulk download - get direct URL and let browser handle it
 download.post('/bulk', async (c) => {
   try {
-    const { url, title } = await c.req.json()
+    const { url, title, cookieSessionId } = await c.req.json()
     
     if (!url) {
       return c.json({ error: 'URL is required' }, 400)
     }
 
-    console.log('🌐 Getting download URL for:', url)
+    console.log('🌐 Getting download URL for:', url, cookieSessionId ? 'with cookies' : 'without cookies')
 
-    // Get direct download URL using yt-dlp
+    // Check if cookie session is provided and valid (for Twitter URLs)
+    let cookieFilePath = null
+    if (cookieSessionId) {
+      const tempDir = 'temp-cookies'
+      const potentialCookiePath = `${tempDir}/${cookieSessionId}.txt`
+      
+      if (fs.existsSync(potentialCookiePath)) {
+        cookieFilePath = potentialCookiePath
+        console.log('🍪 Using cookie file for bulk download:', cookieSessionId)
+      } else {
+        console.log('⚠️ Cookie session provided but file not found:', cookieSessionId)
+      }
+    }
+
+    // Get direct download URL using yt-dlp with optional cookies
     const ytDlpArgs = [url, '--get-url', '--no-playlist', '--format', 'best[ext=mp4]/best']
+    
+    // Add cookie file if provided
+    if (cookieFilePath) {
+      ytDlpArgs.push('--cookies', cookieFilePath)
+    }
+    
     const ytDlp = spawn('yt-dlp', ytDlpArgs)
     
     let stdout = ''

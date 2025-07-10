@@ -2,6 +2,7 @@ import { Clock } from 'lucide-react'
 
 import type { ExportOperations, UIState, VideoState } from '../../types/video-editor-mediator.types'
 import { QualityModal } from '../QualityModal'
+import { CookieManagementDialog } from '../bulk-download/dialogs/CookieManagementDialog'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
 
@@ -12,6 +13,10 @@ type ModalsSectionProps = {
   onCloseQualityModal: () => void
   onToggleLargeFileDialog: (open: boolean) => void
   onConfirmLargeFile: () => void
+  // Cookie management props
+  showCookieManagement?: boolean
+  onCloseCookieManagement?: () => void
+  onCookieUploaded?: (sessionId: string) => void
 }
 
 export const ModalsSection = ({
@@ -20,7 +25,10 @@ export const ModalsSection = ({
   exportOps,
   onCloseQualityModal,
   onToggleLargeFileDialog,
-  onConfirmLargeFile
+  onConfirmLargeFile,
+  showCookieManagement,
+  onCloseCookieManagement,
+  onCookieUploaded
 }: ModalsSectionProps) => {
   const { showQualityModal, showLargeFileConfirmDialog, largeFileSize } = uiState
   const { videoMetadata } = videoState
@@ -65,6 +73,15 @@ export const ModalsSection = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cookie Management Dialog */}
+      {showCookieManagement && onCloseCookieManagement && onCookieUploaded && (
+        <CookieManagementDialog
+          isOpen={showCookieManagement}
+          onClose={onCloseCookieManagement}
+          onCookieUploaded={onCookieUploaded}
+        />
+      )}
     </>
   )
 } 
