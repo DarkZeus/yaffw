@@ -267,6 +267,11 @@ ffmpeg_*
 *.ffmpeg
 filelist-*.txt
 
+# Cookie files (sensitive data)
+*_cookies.txt
+*.cookies
+cookies.txt
+
 # Chunk upload files
 chunks/
 *.chunk
