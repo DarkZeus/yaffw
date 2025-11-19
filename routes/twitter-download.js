@@ -4,7 +4,6 @@ import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 import { extractVideoMetadata } from '../utils/videoUtils.js'
-import { extractAudioWaveform } from '../utils/audioUtils.js'
 import { generateUniqueFilename } from '../utils/fileUtils.js'
 import { broadcastProgress, broadcastCompletion } from './sse.js'
 import { isTwitterUrl } from '../routes/download.js'
@@ -256,22 +255,6 @@ twitterDownload.post('/from-twitter', async (c) => {
           return null
         })
         
-        // Generate waveform if video has audio
-        let waveformResult
-        if (metadata?.hasAudio) {
-          waveformResult = await extractAudioWaveform(finalPath).catch(err => {
-            return { imagePath: null, keyPoints: [], imageWidth: 0, imageHeight: 0, hasAudio: true }
-          })
-        } else {
-          waveformResult = {
-            imagePath: null,
-            keyPoints: [],
-            imageWidth: 0,
-            imageHeight: 0,
-            hasAudio: false
-          }
-        }
-        
         updateProgress(progressId, 95, 'Processing complete...')
         
         const fileName = path.basename(finalPath)
@@ -283,12 +266,7 @@ twitterDownload.post('/from-twitter', async (c) => {
           uniqueFileName: fileName,
           message: 'Twitter media downloaded successfully',
           metadata: metadata,
-          waveformImagePath: waveformResult.imagePath,
-          waveformImageDimensions: {
-            width: waveformResult.imageWidth,
-            height: waveformResult.imageHeight
-          },
-          hasAudio: waveformResult.hasAudio,
+          hasAudio: metadata?.hasAudio,
           source: 'twitter-download'
         }
         

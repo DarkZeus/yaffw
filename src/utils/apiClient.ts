@@ -31,10 +31,6 @@ export type CleanupResponse = {
   error?: string
 }
 
-export type WaveformResponse = {
-  waveformImagePath?: string
-  waveformImageDimensions?: { width: number; height: number }
-}
 
 // Create axios instance with common configuration
 const apiInstance: AxiosInstance = axios.create({
@@ -245,7 +241,7 @@ export const yaffwApi = {
     
     // Apply resolution if specified and not 'original'
     if (payload.qualitySettings?.resolution && payload.qualitySettings.resolution !== 'original') {
-      const resolutionOption = STANDARD_RESOLUTIONS.find(r => r.value === payload.qualitySettings.resolution)
+      const resolutionOption = STANDARD_RESOLUTIONS.find(r => r.value === payload.qualitySettings?.resolution)
       if (resolutionOption && resolutionOption.width > 0) {
         videoConfig.width = resolutionOption.width
         videoConfig.height = resolutionOption.height
@@ -292,27 +288,28 @@ export const yaffwApi = {
     }
     
 
-    const conversionConfig: any = {
+    const baseConfig = {
       input,
       output,
       trim: {
         start: payload.start,
         end: payload.end
-      }
+      },
+      audio: {}
     }
     
-    if (Object.keys(videoConfig).length > 0) {
-      conversionConfig.video = videoConfig
-    }
-    
-    // Explicitly pass through audio without modification
-    conversionConfig.audio = {}
+    const conversionConfig = Object.keys(videoConfig).length > 0 
+      ? { ...baseConfig, video: videoConfig }
+      : baseConfig
     
     const conversion = await Conversion.init(conversionConfig)
     
     await conversion.execute()
     
     const buffer = bufferTarget.buffer
+    if (!buffer) {
+      throw new Error('Conversion failed: no output buffer generated')
+    }
     const blob = new Blob([buffer], { type: getMimeType() })
     
     return {
@@ -332,16 +329,6 @@ export const yaffwApi = {
   cleanupOldFiles: async (): Promise<CleanupResponse> => {
     return apiClient.post<CleanupResponse>('/cleanup-old-files', { action: 'cleanup' }, {
       timeout: 30000, // 30 seconds for cleanup
-    })
-  },
-
-  generateWaveform: async (file: File): Promise<WaveformResponse> => {
-    return apiClient.post<WaveformResponse>('/generate-waveform', file, {
-      headers: {
-        'x-filename': file.name,
-        'Content-Type': 'application/octet-stream',
-      },
-      timeout: 2 * 60 * 1000, // 2 minutes for waveform generation
     })
   },
 

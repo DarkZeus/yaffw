@@ -2,6 +2,7 @@ import { motion } from 'motion/react'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type ReactPlayer from 'react-player'
 import { useVideoTimelineSync } from '../hooks/useVideoTimelineSync'
+import { useWavesurfer } from '../hooks/useWavesurfer'
 
 type VideoTimelineProps = {
   duration: number
@@ -10,11 +11,12 @@ type VideoTimelineProps = {
   trimEnd: number
   onTrimChange: (start: number, end: number) => void
   onSeek: (time: number) => void
-  waveformImagePath?: string
   hasAudio?: boolean
   isPlaying?: boolean
   playerRef: React.RefObject<ReactPlayer | null>
   zoomLevel?: number
+  videoFile?: File // Video file for audio extraction
+  useWavesurferMode?: boolean // Toggle between FFmpeg and wavesurfer
 }
 
 export const VideoTimeline = memo(function VideoTimeline({
@@ -24,19 +26,36 @@ export const VideoTimeline = memo(function VideoTimeline({
   trimEnd,
   onTrimChange,
   onSeek,
-  waveformImagePath,
   hasAudio = true,
   isPlaying = false,
   playerRef,
-  zoomLevel = 1
+  zoomLevel = 1,
+  videoFile,
+  useWavesurferMode = false
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
+  const wavesurferContainerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
   const [dragStartX, setDragStartX] = useState(0)
   const [initialTrimStart, setInitialTrimStart] = useState(0)
   const [initialTrimEnd, setInitialTrimEnd] = useState(0)
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageError, setImageError] = useState(false)
+
+  // Initialize wavesurfer - it will extract audio automatically from the video file
+  const { wavesurfer, isReady: isWavesurferReady } = useWavesurfer({
+    containerRef: wavesurferContainerRef,
+    audioFile: (useWavesurferMode && hasAudio) ? videoFile || null : null,
+    onSeek: (time) => onSeek(time),
+    waveColor: '#4F4A85',
+    progressColor: '#06b6d4',
+    height: 64,
+  })
+
+  // Sync wavesurfer progress with video currentTime
+  useEffect(() => {
+    if (!wavesurfer || !isWavesurferReady || isDragging === 'playhead') return
+    
+    wavesurfer.setTime(currentTime)
+  }, [wavesurfer, isWavesurferReady, currentTime, isDragging])
 
   // Simple zoom calculation - let parent ScrollArea handle containment
 
@@ -226,29 +245,6 @@ export const VideoTimeline = memo(function VideoTimeline({
     selectionDuration: formatTime(displayTrimEnd - displayTrimStart)
   }), [formatTime, displayCurrentTime, displayTrimStart, displayTrimEnd, duration])
 
-  // Reset loading state when image URL changes
-  const handleImageLoad = () => {
-    setImageLoaded(true)
-    setImageError(false)
-  }
-
-  const handleImageError = () => {
-    setImageLoaded(false)
-    setImageError(true)
-  }
-
-  // Generate waveform image 
-  const imageUrl = useMemo(() => {
-    if (!waveformImagePath) return null
-    
-    // Extract just the filename from the full path - handle both Windows (\) and Unix (/) paths
-    const filename = waveformImagePath.split(/[/\\]/).pop() || waveformImagePath
-    const url = `http://localhost:3001/api/waveform/${filename}`
-
-    
-    return url
-  }, [waveformImagePath])
-
   return (
     <div 
       className="bg-gray-900 rounded-xl p-4 shadow-2xl"
@@ -281,35 +277,24 @@ export const VideoTimeline = memo(function VideoTimeline({
             }
           }}
         >
-        {imageUrl && hasAudio && (
-            <img
-              src={imageUrl}
-              alt="Audio waveform"
-              className="w-full h-full object-fill rounded-md"
-              style={{ backgroundColor: '#1f2937' }}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
+        {/* Wavesurfer Waveform */}
+        {hasAudio && (
+          <>
+            <div 
+              ref={wavesurferContainerRef} 
+              className="absolute inset-0 w-full h-full"
+              style={{ pointerEvents: 'none' }} // Let timeline handle clicks
             />
-          )}
-
-          {/* Loading state - only show while image is loading */}
-          {imageUrl && !imageLoaded && !imageError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-md">
-              <div className="flex items-center space-x-2 text-gray-400">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm">Loading waveform...</span>
+            {!isWavesurferReady && videoFile && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-md">
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm">Loading waveform...</span>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Error state */}
-          {imageUrl && imageError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-md">
-              <div className="text-gray-400 text-sm">
-                Failed to load waveform image
-              </div>
-            </div>
-          )}
+            )}
+          </>
+        )}
           
           {/* Trim Selection Area */}
           <motion.div 

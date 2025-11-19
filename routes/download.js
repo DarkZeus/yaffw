@@ -5,7 +5,6 @@ import { spawn } from 'child_process'
 import axios from 'axios'
 import { generateUniqueFilename } from '../utils/fileUtils.js'
 import { extractVideoMetadata } from '../utils/videoUtils.js'
-import { extractAudioWaveform } from '../utils/audioUtils.js'
 import { broadcastProgress, broadcastCompletion } from './sse.js'
 
 const download = new Hono()
@@ -368,23 +367,6 @@ download.post('/from-url', async (c) => {
           return null
         })
         
-        // Only generate waveform if video has audio
-        let waveformResult
-        if (metadata?.hasAudio) {
-          waveformResult = await extractAudioWaveform(finalPath).catch(err => {
-            console.error('Waveform extraction failed:', err)
-            return { imagePath: null, keyPoints: [], imageWidth: 0, imageHeight: 0, hasAudio: true }
-          })
-        } else {
-          waveformResult = {
-            imagePath: null,
-            keyPoints: [],
-            imageWidth: 0,
-            imageHeight: 0,
-            hasAudio: false
-          }
-        }
-
         updateProgress(progressId, 95, 'Processing complete...')
 
         const fileName = path.basename(finalPath)
@@ -397,12 +379,7 @@ download.post('/from-url', async (c) => {
           uniqueFileName: fileName,
           message: 'Video downloaded successfully',
           metadata: metadata,
-          waveformImagePath: waveformResult.imagePath,
-          waveformImageDimensions: {
-            width: waveformResult.imageWidth,
-            height: waveformResult.imageHeight
-          },
-          hasAudio: waveformResult.hasAudio,
+          hasAudio: metadata?.hasAudio,
           source: 'url-download'
         }
         

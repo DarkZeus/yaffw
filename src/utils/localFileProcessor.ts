@@ -3,8 +3,6 @@ export type LocalVideoFile = {
   file: File
   url: string
   serverFilePath?: string // Only set when file is committed to server
-  waveformImagePath?: string // Server-generated waveform image path
-  waveformImageDimensions?: { width: number; height: number }
   hasAudio?: boolean // Whether the video contains audio streams
 }
 
@@ -50,8 +48,6 @@ export async function commitFileToServer(
   onProgress?: (progress: number) => void
 ): Promise<{
   filePath: string
-  waveformImagePath?: string
-  waveformImageDimensions?: { width: number; height: number }
   hasAudio?: boolean
 }> {
   const { apiClient } = await import('./apiClient')
@@ -60,8 +56,6 @@ export async function commitFileToServer(
   
   type CommitResponse = {
     filePath: string
-    waveformImagePath?: string
-    waveformImageDimensions?: { width: number; height: number }
     hasAudio?: boolean
   }
   
@@ -82,8 +76,6 @@ export async function commitFileToServer(
   
   return {
     filePath: response.filePath,
-    waveformImagePath: response.waveformImagePath,
-    waveformImageDimensions: response.waveformImageDimensions,
     hasAudio: response.hasAudio
   }
 }
@@ -96,28 +88,3 @@ export function cleanupLocalFile(localVideo: LocalVideoFile) {
     URL.revokeObjectURL(localVideo.url)
   }
 }
-
-/**
- * Generate server-side waveform for local file
- * This sends the file to server just for waveform generation, then discards the server copy
- */
-export async function generateServerWaveform(
-  file: File
-): Promise<{
-  waveformImagePath?: string
-  waveformImageDimensions?: { width: number; height: number }
-}> {
-  try {
-    const { yaffwApi } = await import('./apiClient')
-    const result = await yaffwApi.generateWaveform(file)
-    
-    return {
-      waveformImagePath: result.waveformImagePath,
-      waveformImageDimensions: result.waveformImageDimensions,
-    }
-    
-  } catch (error) {
-    console.warn('Failed to generate server waveform:', error)
-    return {}
-  }
-} 

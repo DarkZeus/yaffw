@@ -2,7 +2,7 @@
 import type ReactPlayer from 'react-player'
 import type { TrimOperations, TrimState, UIState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
 import type { LocalVideoFile } from '../../utils/localFileProcessor'
-import { VideoTimeline } from '../VideoTimeline'
+import { WaveformTimeline } from '../WaveformTimeline'
 import { Badge } from '../ui/badge'
 import { ScrollArea, ScrollBar } from '../ui/scroll-area'
 import { VideoControlBar } from './VideoControlBar'
@@ -72,24 +72,18 @@ export const TimelineSection = ({
           </div>
         </div>
 
-        <div className="p-6">
-          <ZoomControls zoomLevel={zoomLevel} onZoomChange={handleZoomChange} />
-          <ScrollArea type="always">
-          <VideoTimeline
+        <div className="p-6 space-y-4">
+          <WaveformTimeline
+            videoFile={currentVideo?.file || null}
+            hasAudio={currentVideo?.hasAudio ?? false}
             duration={duration}
-            currentTime={deferredCurrentTime}
+            currentTime={currentTime}
             trimStart={trimStart}
             trimEnd={trimEnd}
-            onTrimChange={trimOps.handleTrimChange}
             onSeek={videoOps.handleSeek}
-            waveformImagePath={currentVideo?.waveformImagePath}
-            hasAudio={currentVideo?.hasAudio}
-            isPlaying={isPlaying}
+            onTrimChange={trimOps.handleTrimChange}
             playerRef={playerRef}
-            zoomLevel={zoomLevel}
           />
-          <ScrollBar orientation="horizontal" />
-          </ScrollArea>
         </div>
       </div>
     </ScrollArea>

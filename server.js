@@ -8,7 +8,6 @@ import videoRoutes from './routes/video.js'
 import cleanupRoutes from './routes/cleanup.js'
 import downloadRoutes from './routes/download.js'
 import twitterDownloadRoutes from './routes/twitter-download.js'
-import waveformRoutes from './routes/waveform.js'
 import metadataRoutes from './routes/metadata.js'
 import sseRoutes from './routes/sse.js'
 
@@ -32,7 +31,6 @@ app.route('/api', videoRoutes)
 app.route('/api', cleanupRoutes)
 app.route('/api/download', downloadRoutes)
 app.route('/api/twitter', twitterDownloadRoutes)
-app.route('/api', waveformRoutes)
 app.route('/api/metadata', metadataRoutes)
 app.route('/api/sse', sseRoutes)
 

@@ -40,11 +40,6 @@ type DownloadResponse = {
     hasAudio?: boolean
     format?: string
   }
-  waveformImagePath?: string | null
-  waveformImageDimensions?: {
-    width: number
-    height: number
-  }
   hasAudio?: boolean
   source: string
 }

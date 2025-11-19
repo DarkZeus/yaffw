@@ -3,7 +3,6 @@ import fs from 'fs'
 import path from 'path'
 import { generateUniqueFilename } from '../utils/fileUtils.js'
 import { extractVideoMetadata } from '../utils/videoUtils.js'
-import { extractAudioWaveform } from '../utils/audioUtils.js'
 
 const upload = new Hono()
 
@@ -63,11 +62,8 @@ async function handleLargeFileStreaming(c, finalPath, originalFileName, uniqueFi
       
       try {
         
-        // Extract detailed metadata and waveform after file is saved
-        const [metadata, waveformResult] = await Promise.all([
-          extractVideoMetadata(finalPath),
-          extractAudioWaveform(finalPath)
-        ])
+        // Extract detailed metadata after file is saved
+        const metadata = await extractVideoMetadata(finalPath)
         
         resolve(c.json({
           success: true,
@@ -75,12 +71,7 @@ async function handleLargeFileStreaming(c, finalPath, originalFileName, uniqueFi
           originalFileName: originalFileName,
           uniqueFileName: uniqueFileName,
           message: 'File committed successfully (streamed)',
-          metadata: metadata,
-          waveformImagePath: waveformResult.imagePath,
-          waveformImageDimensions: {
-            width: waveformResult.imageWidth,
-            height: waveformResult.imageHeight
-          }
+          metadata: metadata
         }))
       } catch (error) {
         console.error('❌ Post-processing failed:', error)
@@ -174,20 +165,6 @@ async function handleSmallFileBuffer(c, finalPath, originalFileName, uniqueFileN
     // Extract detailed metadata first
     const metadata = await extractVideoMetadata(finalPath)
     
-    // Only generate waveform if video has audio
-    let waveformResult
-    if (metadata?.hasAudio) {
-      waveformResult = await extractAudioWaveform(finalPath)
-    } else {
-      waveformResult = {
-        imagePath: null,
-        keyPoints: [],
-        imageWidth: 0,
-        imageHeight: 0,
-        hasAudio: false
-      }
-    }
-    
     return c.json({
       success: true,
       filePath: finalPath,
@@ -195,12 +172,7 @@ async function handleSmallFileBuffer(c, finalPath, originalFileName, uniqueFileN
       uniqueFileName: uniqueFileName,
       message: 'File committed successfully (buffered)',
       metadata: metadata,
-      waveformImagePath: waveformResult.imagePath,
-      waveformImageDimensions: {
-        width: waveformResult.imageWidth,
-        height: waveformResult.imageHeight
-        },
-        hasAudio: waveformResult.hasAudio
+      hasAudio: metadata?.hasAudio
     })
     
   } catch (error) {
@@ -251,22 +223,8 @@ upload.post('/upload-stream', async (c) => {
     // Handle successful completion
     writeStream.on('finish', async () => {
       try {
-        // Extract metadata and waveform data after upload completes
+        // Extract metadata after upload completes
         const metadata = await extractVideoMetadata(finalPath)
-        
-        // Only generate waveform if video has audio
-        let waveformResult
-        if (metadata?.hasAudio) {
-          waveformResult = await extractAudioWaveform(finalPath)
-        } else {
-          waveformResult = {
-            imagePath: null,
-            keyPoints: [],
-            imageWidth: 0,
-            imageHeight: 0,
-            hasAudio: false
-          }
-        }
         
         resolve(c.json({
           success: true,
@@ -275,27 +233,20 @@ upload.post('/upload-stream', async (c) => {
           uniqueFileName: uniqueFileName,
           message: 'Upload completed successfully',
           metadata: metadata,
-          waveformImagePath: waveformResult.imagePath,
-          waveformImageDimensions: {
-            width: waveformResult.imageWidth,
-            height: waveformResult.imageHeight
-            },
-            hasAudio: waveformResult.hasAudio
+          hasAudio: metadata?.hasAudio
         }))
       } catch (error) {
         console.error('Post-processing failed:', error)
         // Still return success but without processed data
-                  resolve(c.json({
-            success: true,
-            filePath: finalPath,
-            originalFileName: originalFileName,
-            uniqueFileName: uniqueFileName,
-            message: 'Upload completed successfully',
-            metadata: null,
-            waveformImagePath: null,
-            waveformImageDimensions: { width: 0, height: 0 },
-            processingError: 'Failed to extract metadata/waveform'
-          }))
+        resolve(c.json({
+          success: true,
+          filePath: finalPath,
+          originalFileName: originalFileName,
+          uniqueFileName: uniqueFileName,
+          message: 'Upload completed successfully',
+          metadata: null,
+          processingError: 'Failed to extract metadata'
+        }))
       }
     })
     
@@ -338,77 +289,6 @@ upload.post('/upload-stream', async (c) => {
       }, 500))
     })
   })
-})
-
-// New endpoint for generating waveform only (using streaming for large files)
-upload.post('/generate-waveform', async (c) => {
-  const originalFileName = c.req.header('x-filename')
-  
-  if (!originalFileName) {
-    return c.json({ error: 'Filename required in x-filename header' }, 400)
-  }
-
-  // Generate unique filename to prevent collisions
-  const uniqueFileName = generateUniqueFilename(originalFileName)
-  const finalPath = path.join('uploads', uniqueFileName)
-  
-  try {
-    // Stream the file to disk instead of loading into memory
-    const writeStream = fs.createWriteStream(finalPath)
-    
-    // Use streaming approach
-    const request = c.req.raw
-    const reader = request.body?.getReader()
-    
-    if (!reader) {
-      throw new Error('No request body')
-    }
-    
-    // Stream data chunk by chunk
-    let done = false
-    while (!done) {
-      const { value, done: readerDone } = await reader.read()
-      done = readerDone
-      if (value) {
-        writeStream.write(Buffer.from(value))
-      }
-    }
-    
-    // Close write stream
-    writeStream.end()
-    await new Promise((resolve, reject) => {
-      writeStream.on('finish', resolve)
-      writeStream.on('error', reject)
-    })
-    
-    // Generate waveform only
-    const waveformResult = await extractAudioWaveform(finalPath)
-    
-    // Clean up the temporary file after waveform generation
-    fs.unlinkSync(finalPath)
-    
-    return c.json({
-      success: true,
-      waveformImagePath: waveformResult.imagePath,
-      waveformImageDimensions: {
-        width: waveformResult.imageWidth,
-        height: waveformResult.imageHeight
-      }
-    })
-    
-  } catch (error) {
-    console.error('Waveform generation failed:', error)
-    
-    // Clean up partial file if it exists
-    if (fs.existsSync(finalPath)) {
-      fs.unlinkSync(finalPath)
-    }
-    
-    return c.json({ 
-      error: 'Failed to generate waveform', 
-      details: error.message 
-    }, 500)
-  }
 })
 
 export default upload 

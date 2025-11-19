@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { ProgressToast } from '../../components/ui/progress-toast'
 import type { FileManager } from '../../types/video-editor-mediator.types'
 import { yaffwApi } from '../../utils/apiClient'
-import { type LocalVideoFile, cleanupLocalFile, commitFileToServer, generateServerWaveform, processVideoLocally } from '../../utils/localFileProcessor'
+import { type LocalVideoFile, cleanupLocalFile, commitFileToServer, processVideoLocally } from '../../utils/localFileProcessor'
 import { downloadTwitterVideo, downloadVideoFromUrl } from '../../utils/urlDownloader'
 import { type VideoMetadata, extractDetailedVideoMetadata } from '../../utils/videoMetadata'
 
@@ -73,9 +73,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
           currentVideo: localVideo ? {
             ...localVideo,
             serverFilePath: serverResult.filePath,
-            // Use server waveform if available and better than current
-            waveformImagePath: serverResult.waveformImagePath || localVideo.waveformImagePath,
-            waveformImageDimensions: serverResult.waveformImageDimensions || localVideo.waveformImageDimensions,
             hasAudio: serverResult.hasAudio ?? localVideo.hasAudio
           } : null,
           isCommittingToServer: false,
@@ -135,26 +132,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         setState({ currentVideo: localVideo })
       })
       
-      // Store the local video reference to avoid stale closure
-      const localVideoRef = localVideo
-      
-      // Generate server-side waveform in the background for better quality
-      generateServerWaveform(videoFile).then((serverWaveform) => {
-        if (serverWaveform.waveformImagePath) {
-          startTransition(() => {
-            setState({ 
-              currentVideo: {
-                ...localVideoRef,
-                waveformImagePath: serverWaveform.waveformImagePath,
-                waveformImageDimensions: serverWaveform.waveformImageDimensions,
-              }
-            })
-          })
-        }
-      }).catch(err => {
-        console.error('Server waveform generation failed:', err)
-      })
-      
       // Extract detailed metadata for analytics
       extractDetailedVideoMetadata(videoFile).then((metadata) => {
         startTransition(() => {
@@ -166,7 +143,7 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       })
       
       // Start background commit to server immediately after local processing
-      startBackgroundCommit(videoFile, localVideoRef)
+      startBackgroundCommit(videoFile, localVideo)
       
       setState({ isUploading: false, uploadProgress: 100 })
       
@@ -296,8 +273,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         // Create enhanced local video with server data
         const enhancedLocalVideo: LocalVideoFile = {
           ...localVideo,
-          waveformImagePath: response.waveformImagePath,
-          waveformImageDimensions: response.waveformImageDimensions,
           serverFilePath: response.filePath,
           hasAudio: response.hasAudio ?? localVideo.hasAudio
         }
