@@ -10,14 +10,4 @@ export const DEFAULT_BULK_DOWNLOAD_SETTINGS: BulkDownloadSettings = {
 
 export const URL_REGEX = /https?:\/\/[^\s]+/g
 
-export const DOWNLOAD_SIMULATION_CONFIG = {
-  PROGRESS_INTERVAL: 500,
-  MAX_PROGRESS_INCREMENT: 20,
-  COMPLETION_THRESHOLD: 95,
-  DOWNLOAD_DELAY_MULTIPLIER: 1000
-} as const
-
-
-
-export const SCROLL_AREA_HEIGHT = 'h-[70vh]'
 export const SMART_PASTE_MAX_HEIGHT = 'max-h-[300px]' 

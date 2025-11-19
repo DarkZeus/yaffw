@@ -1,5 +1,6 @@
-import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Settings, Trash2, X, XCircle } from 'lucide-react'
-import { useCallback } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Settings, Trash, Trash2, X, XCircle } from 'lucide-react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { UrlListSectionProps } from '../../../types/bulk-download-components.types'
 import type { BulkDownloadUrl } from '../../../types/bulk-download.types'
 import { getStatusBadgeVariant } from '../../../utils/bulk-download.utils'
@@ -23,11 +24,21 @@ export function UrlListSection({
   onSelectUrl,
   onSelectAll,
   onRemoveUrl,
+  onResetUrls,
   onStartDownloads,
   onCancelDownloads,
   onShowThumbnail,
-  onShowSettings
+  onShowSettings,
 }: UrlListSectionProps) {
+  const lastUrlRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to latest URL when list grows
+  useLayoutEffect(() => {
+    if (lastUrlRef.current) {
+      lastUrlRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    }
+  }, [urls.length])
+
   const getStatusIcon = useCallback((status: BulkDownloadUrl['status']) => {
     const iconMap = {
       validating: <Loader2 className="h-4 w-4 animate-spin text-orange-500" />,
@@ -56,6 +67,8 @@ export function UrlListSection({
   const handleRemoveUrl = (id: string) => {
     onRemoveUrl(id)
   }
+
+  const handleResetUrls = () => onResetUrls()
 
   const handleStartDownload = () => {
     const selectedIds = urls.filter(u => u.selected).map(u => u.id)
@@ -92,11 +105,23 @@ export function UrlListSection({
                 Cancel Downloads
               </Button>
             ) : (
-              <Button onClick={handleStartDownload} disabled={!canStartDownload} className="gap-2">
-                <Download className="h-4 w-4" />
-                Download Selected ({selectedCount})
-              </Button>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button onClick={handleStartDownload} disabled={!canStartDownload} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <TooltipContent>Download Selected ({selectedCount})</TooltipContent>
+                  </Button>
+                </TooltipTrigger>
+              </Tooltip>
             )}
+            <Tooltip>
+              <TooltipTrigger>
+                <Button onClick={handleResetUrls} variant={'destructive'} disabled={!canStartDownload} className="gap-2">
+                  <Trash className="size-4" />
+                  <TooltipContent>Delete Selected ({selectedCount})</TooltipContent>
+                </Button>
+              </TooltipTrigger>
+            </Tooltip>
           </div>
         </div>
       </CardHeader>
@@ -117,8 +142,12 @@ export function UrlListSection({
           <TabsContent value="all" className="flex-1 min-h-0">
             <ScrollArea className="h-full w-full">
               <div className="space-y-3">
-                {urls.map((url) => (
-                  <div key={url.id} className="border rounded-lg p-4 space-y-3">
+                {urls.map((url, index) => (
+                  <div 
+                    key={url.id} 
+                    ref={index === urls.length - 1 ? lastUrlRef : null}
+                    className="border rounded-lg p-4 space-y-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Checkbox
@@ -256,4 +285,4 @@ export function UrlListSection({
       </CardContent>
     </Card>
   )
-} 
+}

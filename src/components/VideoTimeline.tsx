@@ -2,12 +2,6 @@ import { motion } from 'motion/react'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type ReactPlayer from 'react-player'
 import { useVideoTimelineSync } from '../hooks/useVideoTimelineSync'
-import { ImageAudioWaveform } from './ImageAudioWaveform'
-
-type WaveformPoint = {
-  time: number
-  amplitude: number
-}
 
 type VideoTimelineProps = {
   duration: number
@@ -16,12 +10,11 @@ type VideoTimelineProps = {
   trimEnd: number
   onTrimChange: (start: number, end: number) => void
   onSeek: (time: number) => void
-  waveformData?: WaveformPoint[]
   waveformImagePath?: string
-  waveformImageDimensions?: { width: number; height: number }
   hasAudio?: boolean
   isPlaying?: boolean
   playerRef: React.RefObject<ReactPlayer | null>
+  zoomLevel?: number
 }
 
 export const VideoTimeline = memo(function VideoTimeline({
@@ -31,19 +24,21 @@ export const VideoTimeline = memo(function VideoTimeline({
   trimEnd,
   onTrimChange,
   onSeek,
-  waveformData,
   waveformImagePath,
-  waveformImageDimensions,
   hasAudio = true,
   isPlaying = false,
-  playerRef
+  playerRef,
+  zoomLevel = 1
 }: VideoTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState<'playhead' | 'trimStart' | 'trimEnd' | 'selection' | null>(null)
   const [dragStartX, setDragStartX] = useState(0)
   const [initialTrimStart, setInitialTrimStart] = useState(0)
   const [initialTrimEnd, setInitialTrimEnd] = useState(0)
-  const [isHovering, setIsHovering] = useState<string | null>(null)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
+
+  // Simple zoom calculation - let parent ScrollArea handle containment
 
   // Real-time playhead sync with video element
   const { playheadPosition, forceUpdatePosition } = useVideoTimelineSync({
@@ -74,17 +69,12 @@ export const VideoTimeline = memo(function VideoTimeline({
     const rect = timelineRef.current.getBoundingClientRect()
     const position = (clientX - rect.left) / rect.width
     const calculatedTime = Math.max(0, Math.min(duration, position * duration))
-    
-    console.log('🎯 Position calculation:', {
-      clientX,
-      rectLeft: rect.left,
-      rectWidth: rect.width,
-      position,
-      duration,
-      calculatedTime
-    })
-    
     return calculatedTime
+  }, [duration])
+
+  // Convert time to position percentage (0-100%)
+  const getPositionFromTime = useCallback((time: number) => {
+    return (time / duration) * 100
   }, [duration])
 
   const handleMouseDown = useCallback((e: React.MouseEvent, type: 'playhead' | 'trimStart' | 'trimEnd') => {
@@ -103,15 +93,11 @@ export const VideoTimeline = memo(function VideoTimeline({
   }, [trimStart, trimEnd])
 
   const handleTimelineClick = useCallback((e: React.MouseEvent) => {
-    console.log('🖱️ Timeline clicked!', { isDragging, target: e.target, currentTarget: e.currentTarget })
-    
     if (isDragging) {
-      console.log('🚫 Click ignored - currently dragging')
       return
     }
     
     const newTime = getTimeFromPosition(e.clientX)
-    console.log('📍 Seeking to time:', newTime)
     
     startTransition(() => {
       onSeek(newTime)
@@ -197,14 +183,15 @@ export const VideoTimeline = memo(function VideoTimeline({
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
-  // Memoize expensive calculations
+  // Memoize expensive calculations - limit markers to prevent layout issues
   const timeMarkers = useMemo(() => {
-    return Array.from({ length: 11 }, (_, i) => ({
+    const markerCount = Math.min(50, Math.max(11, Math.floor(zoomLevel * 11))) // Cap at 50 markers
+    return Array.from({ length: markerCount }, (_, i) => ({
       id: `marker-${i}`,
-      time: (i / 10) * duration,
-      position: (i / 10) * 100
+      time: (i / (markerCount - 1)) * duration,
+      position: (i / (markerCount - 1)) * 100
     }))
-  }, [duration])
+  }, [duration, zoomLevel])
 
   const waveformPattern = useMemo(() => {
     // Reduce DOM elements from 50 to 20 for better performance
@@ -225,10 +212,10 @@ export const VideoTimeline = memo(function VideoTimeline({
   // Note: playheadPos is no longer used since we use the real-time MotionValue
   const positions = useMemo(() => {
     return {
-    trimStartPos: (displayTrimStart / duration) * 100,
-      trimEndPos: (displayTrimEnd / duration) * 100
+    trimStartPos: getPositionFromTime(displayTrimStart),
+      trimEndPos: getPositionFromTime(displayTrimEnd)
     }
-  }, [displayTrimStart, displayTrimEnd, duration])
+  }, [displayTrimStart, displayTrimEnd, getPositionFromTime])
 
   // Memoize frequently used formatted times with deferred values
   const formattedTimes = useMemo(() => ({
@@ -239,10 +226,34 @@ export const VideoTimeline = memo(function VideoTimeline({
     selectionDuration: formatTime(displayTrimEnd - displayTrimStart)
   }), [formatTime, displayCurrentTime, displayTrimStart, displayTrimEnd, duration])
 
+  // Reset loading state when image URL changes
+  const handleImageLoad = () => {
+    setImageLoaded(true)
+    setImageError(false)
+  }
+
+  const handleImageError = () => {
+    setImageLoaded(false)
+    setImageError(true)
+  }
+
+  // Generate waveform image 
+  const imageUrl = useMemo(() => {
+    if (!waveformImagePath) return null
+    
+    // Extract just the filename from the full path - handle both Windows (\) and Unix (/) paths
+    const filename = waveformImagePath.split(/[/\\]/).pop() || waveformImagePath
+    const url = `http://localhost:3001/api/waveform/${filename}`
+
+    
+    return url
+  }, [waveformImagePath])
+
   return (
-    <div className="space-y-6">
-      {/* Professional Timeline Container */}
-      <div className="bg-gray-900 rounded-xl p-4 shadow-2xl">
+    <div 
+      className="bg-gray-900 rounded-xl p-4 shadow-2xl"
+      style={{ minWidth: `${100 * zoomLevel}%` }}
+    >
         {/* Time Ruler */}
         <div className="relative h-8 mb-2">
           <div className="flex justify-between items-center h-auto">
@@ -263,168 +274,121 @@ export const VideoTimeline = memo(function VideoTimeline({
           className="relative h-16 bg-gray-800 rounded-lg cursor-crosshair overflow-hidden group select-none"
           onClick={handleTimelineClick}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+            if (e.key === ' ') {
               e.preventDefault()
               const newTime = getTimeFromPosition(e.currentTarget.offsetWidth / 2) // Seek to middle when using keyboard
               onSeek(newTime)
             }
           }}
-          tabIndex={0}
-          role="slider"
-          aria-label="Video timeline"
-          aria-valuemin={0}
-          aria-valuemax={duration}
-          aria-valuenow={currentTime}
-          onMouseEnter={() => setIsHovering('timeline')}
-          onMouseLeave={() => setIsHovering(null)}
         >
-          {/* Waveform-style background pattern */}
-          <div className="absolute inset-0 opacity-20">
-            {waveformPattern.map((wave) => (
-              <div
-                key={wave.id}
-                className="absolute bg-blue-400 rounded-full"
-                style={{
-                  left: `${wave.left}%`,
-                  top: `${wave.top}px`,
-                  width: '2px',
-                  height: `${wave.height}px`,
-                }}
-              />
-            ))}
-          </div>
+        {imageUrl && hasAudio && (
+            <img
+              src={imageUrl}
+              alt="Audio waveform"
+              className="w-full h-full object-fill rounded-md"
+              style={{ backgroundColor: '#1f2937' }}
+              onLoad={handleImageLoad}
+              onError={handleImageError}
+            />
+          )}
 
-          {/* Trim Selection Area - Motion Powered */}
+          {/* Loading state - only show while image is loading */}
+          {imageUrl && !imageLoaded && !imageError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-md">
+              <div className="flex items-center space-x-2 text-gray-400">
+                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm">Loading waveform...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Error state */}
+          {imageUrl && imageError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 rounded-md">
+              <div className="text-gray-400 text-sm">
+                Failed to load waveform image
+              </div>
+            </div>
+          )}
+          
+          {/* Trim Selection Area */}
           <motion.div 
-            className="absolute top-0 bottom-0 bg-gradient-to-r from-emerald-400/80 to-emerald-500/80 border-2 border-emerald-400 cursor-move select-none"
+            className="absolute top-0 bottom-0 bg-emerald-400/30 border-2 border-emerald-400 cursor-move select-none"
             animate={{
               left: `${positions.trimStartPos}%`,
               width: `${positions.trimEndPos - positions.trimStartPos}%`,
-              boxShadow: isHovering === 'trim' || isDragging === 'selection' ? '0 0 20px rgba(52, 211, 153, 0.6)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
             }}
             transition={{
-              duration: isDragging === 'selection' ? 0 : 0.15,
-              ease: isDragging === 'selection' ? "linear" : "easeOut"
+              duration: 0,
+              ease: 'linear'
             }}
             onMouseDown={handleSelectionMouseDown}
-            onMouseEnter={() => setIsHovering('trim')}
-            onMouseLeave={() => setIsHovering(null)}
           >
             {/* Selection Label - prevent it from blocking timeline clicks */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-white font-bold text-xs bg-black/60 px-2 py-1 rounded backdrop-blur-sm pointer-events-none">
-                {formattedTimes.selectionDuration}
+              {formattedTimes.selectionDuration}
               </span>
             </div>
           </motion.div>
 
-          {/* Trim Start Handle - Motion Powered */}
+          {/* Trim Start Handle */}
           <motion.div
-            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
-            style={{ transform: 'translateX(-50%)' }}
+            className="absolute top-0 bottom-0 transform-gpu -translate-x-3 w-6 bg-transparent cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
             animate={{
               left: `${positions.trimStartPos}%`,
-              backgroundColor: isHovering === 'trimStart' ? '#34d399' : '#10b981', // emerald-400 : emerald-500
             }}
             transition={{
-              duration: isDragging === 'trimStart' ? 0 : 0.15,
-              ease: isDragging === 'trimStart' ? "linear" : "easeOut"
+              duration: 0,
+              ease: 'linear'
             }}
             onMouseDown={(e) => handleMouseDown(e, 'trimStart')}
-            onMouseEnter={() => setIsHovering('trimStart')}
-            onMouseLeave={() => setIsHovering(null)}
-          >
-            <div className="w-1 h-8 bg-white rounded opacity-80 group-hover/handle:opacity-100" />
-            {isHovering === 'trimStart' && (
-              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                {formatTime(trimStart)}
-              </div>
-            )}
-          </motion.div>
+          />
 
-          {/* Trim End Handle - Motion Powered */}
+          {/* Trim End Handle */}
           <motion.div
-            className="absolute top-0 bottom-0 w-3 bg-emerald-500 cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
-            style={{ transform: 'translateX(-50%)' }}
+            className="absolute top-0 bottom-0 transform-gpu -translate-x-3 w-6 bg-transparent cursor-ew-resize flex items-center justify-center group/handle z-20 select-none"
             animate={{
               left: `${positions.trimEndPos}%`,
-              backgroundColor: isHovering === 'trimEnd' ? '#34d399' : '#10b981', // emerald-400 : emerald-500
             }}
             transition={{
-              duration: isDragging === 'trimEnd' ? 0 : 0.15,
-              ease: isDragging === 'trimEnd' ? "linear" : "easeOut"
+              duration: 0,
+              ease: 'linear'
             }}
             onMouseDown={(e) => handleMouseDown(e, 'trimEnd')}
-            onMouseEnter={() => setIsHovering('trimEnd')}
-            onMouseLeave={() => setIsHovering(null)}
-          >
-            <div className="w-1 h-8 bg-white rounded opacity-80 group-hover/handle:opacity-100" />
-            {isHovering === 'trimEnd' && (
-              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                {formatTime(trimEnd)}
-              </div>
-            )}
-          </motion.div>
+          />
 
-          {/* Professional Playhead - Real-time Synced */}
+          {/* Playhead */}
           <motion.div
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 cursor-ew-resize z-30 select-none"
             style={{ 
               left: playheadPosition,
-              boxShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
             }}
             onMouseDown={(e) => handleMouseDown(e, 'playhead')}
-            onMouseEnter={() => setIsHovering('playhead')}
-            onMouseLeave={() => setIsHovering(null)}
           >
-            {/* Playhead Top Triangle */}
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-8 border-l-transparent border-r-transparent border-b-red-500" />
             
             {/* Playhead Time Display */}
-            {(isDragging === 'playhead' || isHovering === 'playhead') && (
+            {(isDragging === 'playhead') && (
               <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap font-mono">
                 {formatTime(currentTime)}
               </div>
             )}
           </motion.div>
 
-          {/* Hover Effects */}
-          {isHovering === 'timeline' && (
-            <div className="absolute inset-0 bg-blue-500/10 pointer-events-none transition-opacity duration-200" />
-          )}
         </div>
 
         {/* Timeline Labels */}
         <div className="flex justify-between mt-2 text-xs text-gray-400">
-          <span>Video Track {isPending && <span className="animate-pulse">⏳</span>}</span>
+          <span className="font-mono">
+            {zoomLevel > 1 && (
+              <span className="text-blue-400">
+                Scroll horizontally to navigate
+              </span>
+            )}
+            {zoomLevel === 1 && <span>&nbsp;</span>}
+          </span>
           <span className="font-mono">{formattedTimes.duration} total</span>
         </div>
-
-        {/* Audio Track - Only show if video has audio */}
-        {hasAudio && (
-        <div className="mt-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-gray-400">Audio Track</span>
-          </div>
-          
-          <ImageAudioWaveform
-            waveformImagePath={waveformImagePath}
-            waveformImageDimensions={waveformImageDimensions}
-            keyPoints={waveformData || []}
-            duration={duration}
-            currentTime={displayCurrentTime}
-            playheadPosition={playheadPosition} // Real-time playhead sync
-            trimStart={displayTrimStart}
-            trimEnd={displayTrimEnd}
-            height={60}
-            className="cursor-crosshair"
-            color="#06b6d4"
-            backgroundColor="#1f2937"
-              hasAudio={hasAudio}
-          />
-        </div>
-        )}
       </div>
-    </div>
   )
-}) 
+})

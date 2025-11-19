@@ -38,6 +38,8 @@ export type UIState = {
   showQualityModal: boolean
   showLargeFileConfirmDialog: boolean
   largeFileSize: number
+  zoomLevel: number
+  handleZoomChange: (zoomLevel: number) => void
 }
 
 // Combined mediator state
@@ -108,6 +110,7 @@ export type QualitySettings = {
 
 // UI operations
 export type UIOperations = {
+  handleOpenQualityModal: () => void
   handleCloseQualityModal: () => void
   handleToggleLargeFileDialog: (open: boolean) => void
 }
@@ -124,6 +127,7 @@ export type VideoEditorMediator = {
   playerRef: React.RefObject<ReactPlayer | null>
   containerRef: React.RefObject<HTMLDivElement | null>
   volumeControlRef: React.RefObject<{ updateState: (volume: number, isMuted: boolean) => void } | null>
+  zoomLevelRef: React.MutableRefObject<number>
 }
 
 // Manager function types

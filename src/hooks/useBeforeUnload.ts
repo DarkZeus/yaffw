@@ -44,7 +44,6 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
   const triggerServerCleanup = useCallback(async () => {
     try {
       await yaffwApi.cleanupOldFiles()
-      console.log('🧹 Triggered server cleanup')
     } catch (error) {
       console.warn('Server cleanup failed:', error)
     }
@@ -87,7 +86,6 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
     // Trigger additional cleanup if provided
     onCleanup?.()
     
-    console.log('🧹 Cleaned up resources before page unload')
   }, [state, onCleanup, triggerServerCleanup])
 
   // Add listeners - functional approach with guard clause
@@ -97,7 +95,6 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
     window.addEventListener('beforeunload', handleBeforeUnload)
     window.addEventListener('unload', handleUnload)
     hasBeforeUnloadListener.current = true
-    console.log('🔒 Added beforeunload protection')
   }, [handleBeforeUnload, handleUnload])
 
   // Remove listeners - functional approach with guard clause
@@ -107,7 +104,6 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
     window.removeEventListener('beforeunload', handleBeforeUnload)
     window.removeEventListener('unload', handleUnload)
     hasBeforeUnloadListener.current = false
-    console.log('🔓 Removed beforeunload protection')
   }, [handleBeforeUnload, handleUnload])
 
   // Update listeners based on work status - avoid useEffect, use ref-based state tracking
@@ -136,7 +132,6 @@ export const useBeforeUnload = ({ state, onCleanup }: UseBeforeUnloadOptions) =>
     window.removeEventListener('beforeunload', handleBeforeUnload)
     window.removeEventListener('unload', handleUnload)
     hasBeforeUnloadListener.current = false
-    console.log('🧹 Cleaned up beforeunload listeners')
   }, [handleBeforeUnload, handleUnload])
 
   // Call updateListeners immediately to sync current state

@@ -93,6 +93,7 @@ export function FrameInterpolationSection({ settings, videoMetadata, onSettingsC
           id="use-frame-interpolation"
           checked={settings.useFrameInterpolation}
           onCheckedChange={handleFrameInterpolationToggle}
+          disabled={true}
         />
         <label htmlFor="use-frame-interpolation" className="text-sm font-medium">
           Enable Frame Interpolation

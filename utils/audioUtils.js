@@ -52,8 +52,6 @@ const extractWaveformFromImage = async (imagePath, imageWidth, imageHeight, dura
 
 // Generate waveform image using FFmpeg's showwavespic filter
 const generateWaveformImage = async (filePath, duration) => {
-  console.log('🎯 Generating waveform image with FFmpeg showwavespic filter...')
-  
   const waveformImagePath = `${filePath}.waveform.png`
   
   // Calculate optimal width based on duration for responsive image
@@ -68,97 +66,11 @@ const generateWaveformImage = async (filePath, duration) => {
   
   await execAsync(waveformCommand)
   
-  // Generate a small set of data points for precise overlay positioning
-  const keyPoints = await extractWaveformFromImage(waveformImagePath, imageWidth, imageHeight, duration)
-  
-  console.log(`✅ Generated waveform image: ${imageWidth}x${imageHeight} saved to ${waveformImagePath}`)
-  console.log(`📊 Extracted ${keyPoints.length} key data points for overlay positioning`)
-  
   return {
     imagePath: waveformImagePath,
-    keyPoints: keyPoints.filter((_, index) => index % 10 === 0), // Keep every 10th point for positioning
     imageWidth,
     imageHeight
   }
-}
-
-// Extract waveform using direct PCM analysis
-const extractWaveformViaPCM = async (filePath, duration) => {
-  console.log('🔊 Using direct PCM analysis for real audio data...')
-  
-  const tempAudioFile = `${filePath}.temp.raw`
-  
-  // Extract raw PCM data at reasonable sample rate for analysis
-  const extractCommand = `ffmpeg -i "${filePath}" -ac 1 -ar 22050 -f s16le "${tempAudioFile}" -y`
-  await execAsync(extractCommand)
-  
-  // Check PCM file size and handle appropriately
-  const pcmFileStats = fs.statSync(tempAudioFile)
-  const pcmFileSizeMB = pcmFileStats.size / (1024 * 1024)
-  
-  console.log(`📊 PCM file size: ${pcmFileSizeMB.toFixed(1)} MB`)
-  
-  // For very large PCM files (>100MB), use streaming; otherwise use direct read
-  const samples = []
-  
-  if (pcmFileSizeMB > 100) {
-    console.log('🌊 Large PCM file detected, using streaming approach...')
-    
-    // Stream PCM data in chunks to avoid memory issues
-    const CHUNK_SIZE = 8192 // 8KB chunks
-    const fileStream = fs.createReadStream(tempAudioFile, { highWaterMark: CHUNK_SIZE })
-    
-    for await (const chunk of fileStream) {
-      // Read 16-bit signed samples from chunk
-      for (let i = 0; i < chunk.length; i += 2) {
-        if (i + 1 < chunk.length) {
-          const sample = chunk.readInt16LE(i)
-          samples.push(Math.abs(sample) / 32768) // Normalize to 0-1
-        }
-      }
-    }
-  } else {
-    console.log('⚡ Small PCM file, using direct read...')
-    
-    // Read raw PCM data directly for smaller files
-    const audioBuffer = fs.readFileSync(tempAudioFile)
-    
-    // Read 16-bit signed samples
-    for (let i = 0; i < audioBuffer.length; i += 2) {
-      const sample = audioBuffer.readInt16LE(i)
-      samples.push(Math.abs(sample) / 32768) // Normalize to 0-1
-    }
-  }
-  
-  // Create high-resolution waveform (8 samples per second)
-  const targetSamples = Math.floor(duration * 8)
-  const step = Math.floor(samples.length / targetSamples)
-  
-  const waveformData = []
-  for (let i = 0; i < targetSamples; i++) {
-    const startIdx = i * step
-    const endIdx = Math.min(startIdx + step, samples.length)
-    
-    // Calculate peak amplitude for this segment
-    let peakAmplitude = 0
-    for (let j = startIdx; j < endIdx; j++) {
-      peakAmplitude = Math.max(peakAmplitude, samples[j])
-    }
-    
-    const time = (i / targetSamples) * duration
-    // Apply logarithmic scaling for better perception (like human hearing)
-    const boostedAmplitude = Math.min(1, peakAmplitude * 2.5)
-    const logAmplitude = boostedAmplitude > 0 ? 
-      Math.log10(boostedAmplitude * 9 + 1) : 0  // Maps 0->0, 1->1 logarithmically
-    
-    waveformData.push({ time, amplitude: logAmplitude })
-  }
-  
-  // Clean up temp file
-  fs.unlinkSync(tempAudioFile)
-  
-  console.log(`✅ Direct PCM analysis: ${waveformData.length} high-res data points`)
-  return waveformData
 }
 
 // Check if file has audio stream
@@ -170,28 +82,21 @@ const hasAudioStream = async (filePath) => {
 
 // Main function to generate waveform image and extract key positioning data
 export const extractAudioWaveform = async (filePath) => {
-  console.log('🎵 Checking for audio stream before waveform generation:', filePath)
   
   // First, check if the video has any audio streams
   try {
     const hasAudio = await hasAudioStream(filePath)
     if (!hasAudio) {
-      console.log('🔇 No audio stream detected - skipping waveform generation')
       return {
         imagePath: null,
-        keyPoints: [],
         imageWidth: 0,
         imageHeight: 0,
         hasAudio: false
       }
     }
-    console.log('🔊 Audio stream detected - proceeding with waveform generation')
   } catch (error) {
-    console.log('⚠️ Audio detection failed:', error.message)
-    console.log('🔇 Assuming no audio - skipping waveform generation')
     return {
       imagePath: null,
-      keyPoints: [],
       imageWidth: 0,
       imageHeight: 0,
       hasAudio: false
@@ -199,41 +104,10 @@ export const extractAudioWaveform = async (filePath) => {
   }
   
   const duration = await getVideoDuration(filePath)
-  console.log(`📏 Video duration: ${duration.toFixed(2)} seconds`)
   
-  // Method 1: Generate waveform image with showwavespic filter
-  try {
-    const result = await generateWaveformImage(filePath, duration)
+  const result = await generateWaveformImage(filePath, duration)
     return {
       ...result,
       hasAudio: true
     }
-  } catch (error) {
-    console.log('⚠️ Waveform image generation failed:', error.message)
-  }
-  
-  // Method 2: Fallback - Direct PCM analysis with empty image path
-  try {
-    const pcmData = await extractWaveformViaPCM(filePath, duration)
-    console.log('⚠️ Using PCM data fallback - no image generated')
-    return {
-      imagePath: null,
-      keyPoints: pcmData,
-      imageWidth: 0,
-      imageHeight: 0,
-      hasAudio: true
-    }
-  } catch (error) {
-    console.log('⚠️ Direct PCM analysis failed:', error.message)
-  }
-  
-  // Method 3: Final fallback - Audio exists but processing failed
-      console.log('⚠️ Audio detected but waveform generation failed')
-  return {
-    imagePath: null,
-    keyPoints: [],
-    imageWidth: 0,
-    imageHeight: 0,
-    hasAudio: true
-  }
 } 

@@ -1,15 +1,17 @@
+
 import type ReactPlayer from 'react-player'
-import type { TrimOperations, TrimState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
+import type { TrimOperations, TrimState, UIState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
 import type { LocalVideoFile } from '../../utils/localFileProcessor'
 import { VideoTimeline } from '../VideoTimeline'
 import { Badge } from '../ui/badge'
-import { ScrollArea } from '../ui/scroll-area'
+import { ScrollArea, ScrollBar } from '../ui/scroll-area'
 import { VideoControlBar } from './VideoControlBar'
+import { ZoomControls } from './ZoomControls'
 
 type TimelineSectionProps = {
   videoState: Pick<VideoState, 'currentTime' | 'duration' | 'isPlaying' | 'playbackSpeed'>
   trimState: TrimState
-  uiState: { isFullscreen: boolean }
+  uiState: UIState
   currentVideo: LocalVideoFile
   deferredCurrentTime: number
   videoOps: VideoOperations
@@ -29,7 +31,7 @@ export const TimelineSection = ({
 }: TimelineSectionProps) => {
   const { currentTime, duration, isPlaying, playbackSpeed } = videoState
   const { trimStart, trimEnd } = trimState
-  const { isFullscreen } = uiState
+  const { isFullscreen, zoomLevel, handleZoomChange } = uiState
 
   return (
     <ScrollArea className="h-full">
@@ -71,6 +73,8 @@ export const TimelineSection = ({
         </div>
 
         <div className="p-6">
+          <ZoomControls zoomLevel={zoomLevel} onZoomChange={handleZoomChange} />
+          <ScrollArea type="always">
           <VideoTimeline
             duration={duration}
             currentTime={deferredCurrentTime}
@@ -78,13 +82,14 @@ export const TimelineSection = ({
             trimEnd={trimEnd}
             onTrimChange={trimOps.handleTrimChange}
             onSeek={videoOps.handleSeek}
-            waveformData={currentVideo?.waveformData || []}
             waveformImagePath={currentVideo?.waveformImagePath}
-            waveformImageDimensions={currentVideo?.waveformImageDimensions}
             hasAudio={currentVideo?.hasAudio}
             isPlaying={isPlaying}
             playerRef={playerRef}
+            zoomLevel={zoomLevel}
           />
+          <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
       </div>
     </ScrollArea>

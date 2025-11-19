@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes'
 import { Toaster } from '../components/ui/sonner'
 
 import { AppSidebar } from '@/components/app-sidebar.tsx'
+import { CookieProvider } from '@/providers/CookieProvider'
 import type { QueryClient } from '@tanstack/react-query'
 
 type MyRouterContext = {
@@ -14,17 +15,17 @@ type MyRouterContext = {
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <SidebarProvider defaultOpen={false}>
-        <AppSidebar />
-        <SidebarInset>
-          <main className="flex-1 overflow-y-auto px-4">
-            <Outlet />
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-      <Toaster expand={true} />
-      {/* <TanStackRouterDevtools /> */}
-      {/* <TanStackQueryLayout /> */}
+      <CookieProvider>
+        <SidebarProvider defaultOpen={false}>
+          <AppSidebar />
+          <SidebarInset>
+              <Outlet />
+          </SidebarInset>
+        </SidebarProvider>
+        <Toaster expand={true} />
+        {/* <TanStackRouterDevtools /> */}
+        {/* <TanStackQueryLayout /> */}
+      </CookieProvider>
     </ThemeProvider>
   )
 })

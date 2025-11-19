@@ -79,7 +79,7 @@ export function VideoEditorLayout() {
   if (!state.currentVideo) {
     return (
       <TooltipProvider>
-        <div className="min-h-[calc(100dvh-1rem)] bg-background flex items-center justify-center px-6">
+        <div className="min-h-full bg-background flex items-center justify-center px-6">
           <div className="w-full max-w-2xl">
             <UnifiedUploadZone 
               onFileDrop={fileOps.onFileDrop}
@@ -97,7 +97,9 @@ export function VideoEditorLayout() {
             showQualityModal: false, // No quality modal when no video
             showLargeFileConfirmDialog: false, // No large file dialog when no video
             largeFileSize: 0,
-            isFullscreen: false
+            isFullscreen: false,
+            zoomLevel: 1,
+            handleZoomChange: () => {}
           }}
           videoState={{
             videoMetadata: {}
@@ -116,87 +118,89 @@ export function VideoEditorLayout() {
 
   return (
     <TooltipProvider>
-      <div className={`${state.isFullscreen ? 'fixed inset-0 z-50' : 'min-h-[calc(100dvh-1rem)]'} bg-background flex flex-col`}>
-        {/* Header */}
-        <header className="border-b bg-card">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Scissors className="h-5 w-5" />
-                <h1 className="font-semibold">Yet Another FFmpeg Wrapper</h1>
-              </div>
-              <Separator orientation="vertical" className="h-6" />
-              <p className="text-sm text-muted-foreground truncate">
-                {state.currentVideo.file.name}
-              </p>
+      {/* Header */}
+      <header className="border-b bg-card">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Scissors className="h-5 w-5" />
+              <h1 className="font-semibold">Yet Another FFmpeg Wrapper</h1>
             </div>
-            <KeyboardShortcutsHelp shortcuts={shortcuts} />
+            <Separator orientation="vertical" className="h-6" />
+            <p className="text-sm text-muted-foreground truncate">
+              {state.currentVideo.file.name}
+            </p>
           </div>
-        </header>
-
-        {/* Main Content with Resizable Panels */}
-        <div className="flex-1 min-h-0">
-          <ResizablePanelGroup direction="horizontal" className="!h-[calc(100dvh-64px)]">
-            {/* Sidebar */}
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-              <ControlsSidebar 
-                state={state}
-                videoOps={videoOps}
-                trimOps={trimOps}
-                exportOps={exportOps}
-                fileOps={fileOps}
-              />
-            </ResizablePanel>
-
-            <ResizableHandle />
-
-            {/* Main Video Area */}
-            <ResizablePanel defaultSize={75}>
-              <ResizablePanelGroup direction="vertical" className="min-h-[calc(100dvh-1rem)]">
-                {/* Video Player Panel */}
-                <ResizablePanel defaultSize={60} minSize={30}>
-                  <VideoPlayerSection
-                    ref={containerRef}
-                    videoUrl={state.currentVideo.url}
-                    isPlaying={state.isPlaying}
-                    isFullscreen={state.isFullscreen}
-                    aspectRatioClass={getAspectRatioClass(state.videoMetadata?.aspectRatio)}
-                    playbackSpeed={state.playbackSpeed}
-                    videoOps={videoOps}
-                    playerRef={playerRef}
-                    volumeControlRef={volumeControlRef}
-                  />
-                </ResizablePanel>
-
-                <ResizableHandle />
-
-                {/* Timeline Panel */}
-                <ResizablePanel defaultSize={20} minSize={15}>
-                  <TimelineSection
-                    videoState={{
-                      currentTime: state.currentTime,
-                      duration: state.duration,
-                      isPlaying: state.isPlaying,
-                      playbackSpeed: state.playbackSpeed
-                    }}
-                    trimState={{
-                      trimStart: state.trimStart,
-                      trimEnd: state.trimEnd
-                    }}
-                    uiState={{
-                      isFullscreen: state.isFullscreen
-                    }}
-                    currentVideo={state.currentVideo}
-                    deferredCurrentTime={deferredCurrentTime}
-                    videoOps={videoOps}
-                    trimOps={trimOps}
-                    playerRef={playerRef}
-                  />
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+          <KeyboardShortcutsHelp shortcuts={shortcuts} />
         </div>
+      </header>
+      
+      <div className={`${state.isFullscreen && 'fixed inset-0 z-50'} bg-background h-full max-h-svh`}>
+        {/* Main Content with Resizable Panels */}
+        <ResizablePanelGroup direction="horizontal">
+          
+          {/* Sidebar */}
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+            <ControlsSidebar 
+              state={state}
+              videoOps={videoOps}
+              trimOps={trimOps}
+              exportOps={exportOps}
+              fileOps={fileOps}
+              uiOps={uiOps}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Main Video Area */}
+          <ResizablePanel defaultSize={75}>
+            <ResizablePanelGroup direction="vertical" className="aspect-video">
+              {/* Video Player Panel */}
+              <ResizablePanel defaultSize={60} minSize={30}>
+                <VideoPlayerSection
+                  ref={containerRef}
+                  videoUrl={state.currentVideo.url}
+                  isPlaying={state.isPlaying}
+                  isFullscreen={state.isFullscreen}
+                  aspectRatioClass={getAspectRatioClass(state.videoMetadata?.aspectRatio)}
+                  playbackSpeed={state.playbackSpeed}
+                  videoOps={videoOps}
+                  playerRef={playerRef}
+                  volumeControlRef={volumeControlRef}
+                />
+              </ResizablePanel>
+
+              <ResizableHandle withHandle />
+
+              {/* Timeline Panel */}
+              <ResizablePanel defaultSize={20} minSize={15}>
+                <TimelineSection
+                  videoState={{
+                    currentTime: state.currentTime,
+                    duration: state.duration,
+                    isPlaying: state.isPlaying,
+                    playbackSpeed: state.playbackSpeed
+                  }}
+                  trimState={{
+                    trimStart: state.trimStart,
+                    trimEnd: state.trimEnd
+                  }}
+                  uiState={{
+                    isFullscreen: state.isFullscreen,
+                    zoomLevel: state.zoomLevel,
+                    handleZoomChange: uiOps.handleZoomChange
+                  }}
+                  currentVideo={state.currentVideo}
+                  deferredCurrentTime={deferredCurrentTime}
+                  videoOps={videoOps}
+                  trimOps={trimOps}
+                  playerRef={playerRef}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
 
         {/* Modals */}
         <ModalsSection
@@ -204,7 +208,9 @@ export function VideoEditorLayout() {
             showQualityModal: state.showQualityModal,
             showLargeFileConfirmDialog: state.showLargeFileConfirmDialog,
             largeFileSize: state.largeFileSize,
-            isFullscreen: state.isFullscreen
+            isFullscreen: state.isFullscreen,
+            zoomLevel: state.zoomLevel,
+            handleZoomChange: uiOps.handleZoomChange
           }}
           videoState={{
             videoMetadata: state.videoMetadata

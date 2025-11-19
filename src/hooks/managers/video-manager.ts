@@ -18,13 +18,9 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
   }
 
   const handleSeek = (time: number) => {
-    console.log('🎮 Video Manager handleSeek called with time:', time)
-    console.log('🎮 Current state before seek:', { currentTime: state.currentTime, duration: state.duration })
-    
     setState({ currentTime: time })
     playerRef.current?.seekTo(time, 'seconds')
     
-    console.log('🎮 Seek completed, should be at:', time)
   }
 
   const handleFrameSeek = (direction: 'prev' | 'next') => {
@@ -40,25 +36,17 @@ export const createVideoManager: VideoManager = (state, setState, refs) => {
   }
 
   const handleProgress = (progressState: { played: number; playedSeconds: number }) => {
-    console.log('📊 Progress update from ReactPlayer:', {
-      playedSeconds: progressState.playedSeconds,
-      currentStateTime: state.currentTime,
-      timeDifference: Math.abs(progressState.playedSeconds - state.currentTime)
-    })
+    
     setState({ currentTime: progressState.playedSeconds })
   }
 
   const handleDuration = (duration: number) => {
     setState({ 
       duration,
+      // Initialize trim values when duration is first set
+      trimStart: state.trimStart === 0 ? 0 : state.trimStart,
       trimEnd: state.trimEnd === 0 ? duration : state.trimEnd
     })
-    
-    if (state.currentVideo) {
-      setState({
-        currentVideo: { ...state.currentVideo, duration }
-      })
-    }
   }
 
   const handleVolumeUpdate = (volume: number, isMuted: boolean) => {

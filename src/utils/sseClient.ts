@@ -119,7 +119,6 @@ export class SSEProgressClient {
 
   private attemptReconnect() {
     this.reconnectAttempts++
-    // console.log(`🔄 Attempting SSE reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${this.reconnectDelay}ms`)
 
     setTimeout(() => {
       this.connect().catch(error => {
@@ -133,7 +132,6 @@ export class SSEProgressClient {
 
   disconnect() {
     if (this.eventSource) {
-      // console.log(`🔌 Disconnecting SSE for: ${this.options.progressId}`)
       this.eventSource.close()
       this.eventSource = null
       this.isConnected = false
@@ -155,27 +153,20 @@ export const createSSEProgressTracker = (
       progressId,
       onProgress,
       onComplete: (result) => {
-        // console.log('✅ SSE progress completed')
         resolve(result)
       },
       onError: (error, isRestrictionError) => {
-        // console.error('❌ SSE progress error:', error)
-        // console.log('🔍 SSE error isRestrictionError flag:', isRestrictionError)
         const errorObj = new Error(error)
         // @ts-ignore - Adding custom property
         errorObj.isRestrictionError = isRestrictionError
-        // console.log('🔍 Created error object with keys:', Object.keys(errorObj))
-        // console.log('🔍 Error object isRestrictionError property:', (errorObj as Error & { isRestrictionError?: boolean }).isRestrictionError)
         reject(errorObj)
       },
       onConnected: () => {
-        // console.log('🔗 SSE progress tracker connected')
       }
     })
 
     // Start the connection
     sseClient.connect().catch(error => {
-      // console.error('Failed to establish SSE connection:', error)
       reject(error)
     })
 

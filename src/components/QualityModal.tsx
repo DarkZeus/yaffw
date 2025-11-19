@@ -5,7 +5,6 @@ import type { ExportSettings, QualityModalProps } from '../types/quality-modal.t
 import { getFinalCodec } from '../utils/quality-modal.utils'
 import { BitrateSection } from './quality-sections/BitrateSection'
 import { CodecSection } from './quality-sections/CodecSection'
-import { FrameInterpolationSection } from './quality-sections/FrameInterpolationSection'
 import { GpuSection } from './quality-sections/GpuSection'
 import { ResolutionSection } from './quality-sections/ResolutionSection'
 import { Button } from './ui/button'
@@ -21,16 +20,11 @@ export function QualityModal({ isOpen, onClose, onExport, videoMetadata }: Quali
     const acceleration = mediator.getAvailableGpuAcceleration()
     
     onExport({
-      resolution: settings.useAIUpscaling ? `ai_${settings.aiModel}` : settings.resolution,
-      bitrate: settings.bitrate[0],
+      resolution: settings.resolution,
+      bitrate: settings.bitrate,
       codec: getFinalCodec(settings),
       useGpuAcceleration: settings.useGpuAcceleration,
       gpuVendor: settings.useGpuAcceleration ? acceleration?.vendor : undefined,
-      useAIUpscaling: settings.useAIUpscaling,
-      aiModel: settings.useAIUpscaling ? settings.aiModel : undefined,
-      useFrameInterpolation: settings.useFrameInterpolation,
-      frameInterpolationModel: settings.useFrameInterpolation ? settings.frameInterpolationModel : undefined,
-      targetFps: settings.useFrameInterpolation ? settings.targetFps : undefined,
     })
     
     onClose()
@@ -82,15 +76,6 @@ export function QualityModal({ isOpen, onClose, onExport, videoMetadata }: Quali
               settings={settings}
               videoMetadata={videoMetadata}
               mediator={mediator}
-              onSettingsChange={mediator.updateSettings}
-            />
-
-            <Separator />
-
-            {/* Frame Interpolation Section */}
-            <FrameInterpolationSection 
-              settings={settings}
-              videoMetadata={videoMetadata}
               onSettingsChange={mediator.updateSettings}
             />
           </div>

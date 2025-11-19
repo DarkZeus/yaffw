@@ -3,15 +3,11 @@ import { spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
-import { 
-  isTwitterUrl, 
-  downloadTwitterMedia as callTwitterDownloader,
-  getTwitterMediaInfo as twitterMediaInfo
-} from '../utils/twitterUtils.js'
 import { extractVideoMetadata } from '../utils/videoUtils.js'
 import { extractAudioWaveform } from '../utils/audioUtils.js'
 import { generateUniqueFilename } from '../utils/fileUtils.js'
 import { broadcastProgress, broadcastCompletion } from './sse.js'
+import { isTwitterUrl } from '../routes/download.js'
 import crypto from 'crypto'
 
 const twitterDownload = new Hono()
@@ -287,7 +283,6 @@ twitterDownload.post('/from-twitter', async (c) => {
           uniqueFileName: fileName,
           message: 'Twitter media downloaded successfully',
           metadata: metadata,
-          waveformData: waveformResult.keyPoints,
           waveformImagePath: waveformResult.imagePath,
           waveformImageDimensions: {
             width: waveformResult.imageWidth,

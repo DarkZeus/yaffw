@@ -32,8 +32,6 @@ const updateProgress = (progressId, progress, message = 'Downloading...', speed 
   
   // Broadcast to SSE clients
   broadcastProgress(progressId, progressData)
-  
-  console.log(`📊 Progress ${progressId}: ${progress}% - ${message}`)
 }
 
 // Progress polling endpoint (deprecated - use SSE instead)
@@ -46,9 +44,7 @@ download.get('/progress/:progressId', (c) => {
   }
 
   // Add deprecation warning header
-  c.header('X-Deprecated', 'This endpoint is deprecated. Use SSE /api/sse/progress/:progressId instead')
-  
-  console.log(`⚠️ Using deprecated polling endpoint for ${progressId}. Consider upgrading to SSE.`)
+  c.header('X-Deprecated', 'This endpoint is deprecated. Use SSE /api/sse/progress/:progressId instead')  
   return c.json(progressData)
 })
 
@@ -56,7 +52,6 @@ download.get('/progress/:progressId', (c) => {
 const cleanupProgress = (progressId) => {
   setTimeout(() => {
     progressTracking.delete(progressId)
-    console.log(`🧹 Cleaned up progress tracking for ${progressId}`)
   }, 30000) // Clean up after 30 seconds
 }
 
@@ -67,7 +62,7 @@ const isDirectVideoUrl = (url) => {
 }
 
 // Helper function to detect Twitter URLs specifically
-const isTwitterUrl = (url) => {
+export const isTwitterUrl = (url) => {
   return url.includes('twitter.com') || url.includes('x.com')
 }
 
@@ -88,7 +83,7 @@ const downloadWithYtDlp = (url, outputPath, progressCallback = null) => {
       url,
       '-o', outputPath,
       '--no-playlist',
-      '--format', 'best[ext=mp4]/best',
+      '--format', 'bv+ba/b',
       '--merge-output-format', 'mp4',
       // Add progress tracking
       '--newline',
@@ -101,7 +96,6 @@ const downloadWithYtDlp = (url, outputPath, progressCallback = null) => {
     // Listen to stdout for progress updates
     ytDlp.stdout.on('data', (data) => {
       const output = data.toString()
-      console.log('yt-dlp stdout:', output)
       
       // Parse progress lines
       const lines = output.split('\n')
@@ -128,7 +122,6 @@ const downloadWithYtDlp = (url, outputPath, progressCallback = null) => {
                 }
               }
               
-              console.log(`📊 Real yt-dlp progress: ${percent}% (speed: ${speed ? speed.toFixed(1) + ' MB/s' : 'unknown'})`)
               progressCallback(percent, speed)
             }
           } catch (e) {
@@ -141,7 +134,6 @@ const downloadWithYtDlp = (url, outputPath, progressCallback = null) => {
 
     ytDlp.stderr.on('data', (data) => {
       stderr += data.toString()
-      console.log('yt-dlp stderr:', data.toString())
     })
 
     ytDlp.on('close', (code) => {
@@ -180,8 +172,6 @@ const downloadWithAxios = async (url, outputPath, progressCallback = null) => {
     const totalBytes = contentLength ? parseInt(contentLength, 10) : null
     let downloadedBytes = 0
 
-    console.log(`📊 Direct download: Total size ${totalBytes ? (totalBytes / (1024 * 1024)).toFixed(1) + ' MB' : 'unknown'}`)
-
     const writer = fs.createWriteStream(outputPath)
     
     // Track download progress if we know the total size
@@ -204,7 +194,6 @@ const downloadWithAxios = async (url, outputPath, progressCallback = null) => {
           const elapsed = (now - startTime) / 1000
           const speed = elapsed > 0 ? (downloadedBytes / (1024 * 1024)) / elapsed : 0
           
-          console.log(`📊 Direct download progress: ${progress.toFixed(1)}% (${(downloadedBytes / (1024 * 1024)).toFixed(1)}/${(totalBytes / (1024 * 1024)).toFixed(1)} MB, ${speed.toFixed(1)} MB/s)`)
           progressCallback(progress, speed > 0.1 ? speed : null)
           
           lastProgressUpdate = progress
@@ -220,7 +209,6 @@ const downloadWithAxios = async (url, outputPath, progressCallback = null) => {
         
         // Show growing progress based on time, but cap at 80%
         const timeBasedProgress = Math.min(80, 5 + (elapsed * 2))
-        console.log(`📊 Direct download (unknown size): ${timeBasedProgress.toFixed(1)}% (${(downloadedBytes / (1024 * 1024)).toFixed(1)} MB downloaded, ${speed.toFixed(1)} MB/s)`)
         progressCallback(timeBasedProgress, speed > 0.1 ? speed : null)
       }, 1000)
       
@@ -241,7 +229,6 @@ const downloadWithAxios = async (url, outputPath, progressCallback = null) => {
 
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
-        console.log(`✅ Direct download completed: ${(downloadedBytes / (1024 * 1024)).toFixed(1)} MB`)
         resolve(outputPath)
       })
       writer.on('error', reject)
@@ -268,8 +255,6 @@ download.post('/from-url', async (c) => {
       return c.json({ error: 'Invalid URL format' }, 400)
     }
 
-    console.log('🌐 Starting video download from:', url)
-
     // Generate progress ID and start download in background
     const progressId = generateProgressId()
     
@@ -288,7 +273,6 @@ download.post('/from-url', async (c) => {
 
       try {
         if (isTwitterUrl(url)) {
-          console.log('🐦 Detected Twitter URL, using yt-dlp as fallback...')
           updateProgress(progressId, 5, 'Processing Twitter URL with yt-dlp...')
           
           // Allow yt-dlp to handle Twitter URLs as fallback
@@ -310,8 +294,7 @@ download.post('/from-url', async (c) => {
           }
           
           updateProgress(progressId, 90, 'Download complete, processing...')
-        } else if (isDirectVideoUrl(url)) {
-          console.log('📥 Downloading direct video URL with axios...')
+        } else if (isDirectVideoUrl(url)) { 
           updateProgress(progressId, 5, 'Starting direct download...')
           finalPath = await downloadWithAxios(url, outputPath, (progress, speed) => {
             // Real progress from direct download with speed
@@ -319,7 +302,6 @@ download.post('/from-url', async (c) => {
           })
           updateProgress(progressId, 90, 'Download complete, processing...')
         } else if (isSocialMediaUrl(url)) {
-          console.log('📱 Downloading from social media with yt-dlp...')
           updateProgress(progressId, 5, 'Downloading from social media...')
           
           // For yt-dlp, let it determine the extension
@@ -343,7 +325,6 @@ download.post('/from-url', async (c) => {
           updateProgress(progressId, 90, 'Download complete, processing...')
         } else {
           // Try yt-dlp first, fallback to axios
-          console.log('🔄 Trying yt-dlp first, will fallback to axios if needed...')
           try {
             updateProgress(progressId, 5, 'Attempting download with yt-dlp...')
             
@@ -365,7 +346,6 @@ download.post('/from-url', async (c) => {
             
             updateProgress(progressId, 90, 'Download complete, processing...')
           } catch (ytDlpError) {
-            console.log('⚠️ yt-dlp failed, trying direct download with axios...')
             updateProgress(progressId, 10, 'Fallback to direct download...')
             finalPath = await downloadWithAxios(url, outputPath, (progress, speed) => {
               // Real progress from direct download fallback with speed
@@ -380,11 +360,9 @@ download.post('/from-url', async (c) => {
           throw new Error('Downloaded file is empty or does not exist')
         }
 
-        console.log('✅ Video downloaded successfully:', finalPath)
         updateProgress(progressId, 92, 'Extracting metadata...')
 
         // Extract metadata first to check for audio
-        console.log('🔍 Extracting metadata...')
         const metadata = await extractVideoMetadata(finalPath).catch(err => {
           console.error('Metadata extraction failed:', err)
           return null
@@ -393,13 +371,11 @@ download.post('/from-url', async (c) => {
         // Only generate waveform if video has audio
         let waveformResult
         if (metadata?.hasAudio) {
-          console.log('🎵 Video has audio - generating waveform')
           waveformResult = await extractAudioWaveform(finalPath).catch(err => {
             console.error('Waveform extraction failed:', err)
             return { imagePath: null, keyPoints: [], imageWidth: 0, imageHeight: 0, hasAudio: true }
           })
         } else {
-          console.log('🔇 Video has no audio - skipping waveform generation')
           waveformResult = {
             imagePath: null,
             keyPoints: [],
@@ -411,9 +387,6 @@ download.post('/from-url', async (c) => {
 
         updateProgress(progressId, 95, 'Processing complete...')
 
-        console.log('📊 Extracted metadata:', metadata)
-        console.log('🎵 Generated waveform image:', waveformResult.imagePath)
-
         const fileName = path.basename(finalPath)
         
         // Store final result in progress tracking
@@ -424,7 +397,6 @@ download.post('/from-url', async (c) => {
           uniqueFileName: fileName,
           message: 'Video downloaded successfully',
           metadata: metadata,
-          waveformData: waveformResult.keyPoints,
           waveformImagePath: waveformResult.imagePath,
           waveformImageDimensions: {
             width: waveformResult.imageWidth,
@@ -501,8 +473,6 @@ download.get('/stream/:fileName', async (c) => {
       return c.json({ error: 'File not found' }, 404)
     }
 
-    console.log('📁 Streaming file to browser:', fileName)
-
     // Get file stats
     const stats = fs.statSync(filePath)
     const fileSize = stats.size
@@ -543,8 +513,6 @@ download.post('/bulk', async (c) => {
       return c.json({ error: 'URL is required' }, 400)
     }
 
-    console.log('🌐 Getting download URL for:', url, cookieSessionId ? 'with cookies' : 'without cookies')
-
     // Check if cookie session is provided and valid (for Twitter URLs)
     let cookieFilePath = null
     if (cookieSessionId) {
@@ -553,9 +521,8 @@ download.post('/bulk', async (c) => {
       
       if (fs.existsSync(potentialCookiePath)) {
         cookieFilePath = potentialCookiePath
-        console.log('🍪 Using cookie file for bulk download:', cookieSessionId)
       } else {
-        console.log('⚠️ Cookie session provided but file not found:', cookieSessionId)
+        console.error('⚠️ Cookie session provided but file not found:', cookieSessionId)
       }
     }
 

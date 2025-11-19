@@ -1,6 +1,7 @@
 import { Clock, Shield, Trash2, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { useCookie } from '../../../providers/CookieProvider'
 import { cleanupCookieSession, uploadTwitterCookieFile } from '../../../utils/urlDownloader'
 import { Alert, AlertDescription } from '../../ui/alert'
 import { Badge } from '../../ui/badge'
@@ -8,13 +9,6 @@ import { Button } from '../../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog'
 import { Input } from '../../ui/input'
-
-type CookieSession = {
-  sessionId: string
-  originalName: string
-  uploadTime: number
-  used: boolean
-}
 
 type CookieManagementDialogProps = {
   isOpen: boolean
@@ -24,7 +18,7 @@ type CookieManagementDialogProps = {
 
 export function CookieManagementDialog({ isOpen, onClose, onCookieUploaded }: CookieManagementDialogProps) {
   const [isUploading, setIsUploading] = useState(false)
-  const [cookieSessions, setCookieSessions] = useState<CookieSession[]>([])
+  const { state, addSession, removeSession, setCurrentSession, markSessionUsed } = useCookie()
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -40,14 +34,14 @@ export function CookieManagementDialog({ isOpen, onClose, onCookieUploaded }: Co
     try {
       const response = await uploadTwitterCookieFile(file)
       
-      const newSession: CookieSession = {
+      const newSession = {
         sessionId: response.sessionId,
         originalName: file.name,
         uploadTime: Date.now(),
         used: false
       }
       
-      setCookieSessions(prev => [...prev, newSession])
+      addSession(newSession)
       
       toast.success('Cookie file uploaded successfully')
       
@@ -68,7 +62,7 @@ export function CookieManagementDialog({ isOpen, onClose, onCookieUploaded }: Co
   const handleDeleteSession = async (sessionId: string) => {
     try {
       await cleanupCookieSession(sessionId)
-      setCookieSessions(prev => prev.filter(session => session.sessionId !== sessionId))
+      removeSession(sessionId)
       toast.success('Cookie file deleted successfully')
     } catch (error) {
       toast.error('Failed to delete cookie file')
@@ -155,7 +149,7 @@ export function CookieManagementDialog({ isOpen, onClose, onCookieUploaded }: Co
           </Card>
 
           {/* Active Sessions */}
-          {cookieSessions.length > 0 && (
+          {state.sessions.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -168,10 +162,21 @@ export function CookieManagementDialog({ isOpen, onClose, onCookieUploaded }: Co
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {cookieSessions.map(session => (
+                  {state.sessions.map(session => (
                     <div key={session.sessionId} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
+                        <Button
+                            onClick={() => {
+                              setCurrentSession(session.sessionId)
+                              markSessionUsed(session.sessionId)
+                              onCookieUploaded?.(session.sessionId)
+                            }}
+                            variant={'outline'}
+                            size={'sm'}
+                          >
+                            Use this
+                          </Button>
                           <span className="font-medium text-sm">{session.originalName}</span>
                           {session.used && (
                             <Badge variant="secondary" className="text-xs">Used</Badge>

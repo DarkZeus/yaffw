@@ -44,8 +44,6 @@ export const startBulkDownload = async (url: string, title?: string, cookieSessi
   try {
     const { apiClient } = await import('../utils/apiClient')
     
-    console.log('🚀 Getting download URL for:', title || url, cookieSessionId ? 'with cookies' : 'without cookies')
-    
     // Get direct download URL from server (with optional cookie support)
     const requestBody: { url: string; title?: string; cookieSessionId?: string } = { url }
     if (title) requestBody.title = title
@@ -56,8 +54,6 @@ export const startBulkDownload = async (url: string, title?: string, cookieSessi
     if (!response.success) {
       throw new Error('Failed to get download URL')
     }
-    
-    console.log('📥 Fetching video as blob...')
     
     // Use axios client to fetch as blob then download
     const videoResponse = await apiClient.instance.get(response.downloadUrl, { responseType: 'blob' })
@@ -82,10 +78,7 @@ export const startBulkDownload = async (url: string, title?: string, cookieSessi
     // Clean up blob URL
     URL.revokeObjectURL(blobUrl)
     
-    console.log('✅ Download completed for:', response.filename)
-    
   } catch (error) {
-    console.error('❌ Bulk download failed:', error)
     throw new Error(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 } 

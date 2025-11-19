@@ -1,12 +1,8 @@
 import { Hono } from 'hono'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import fs from 'fs'
 import path from 'path'
-import { createSafeFileName, deleteFile } from '../utils/fileUtils.js'
-import { formatTimeForFFmpeg } from '../utils/videoUtils.js'
+import { deleteFile } from '../utils/fileUtils.js'
 
-const execAsync = promisify(exec)
 const video = new Hono()
 
 // Stream video endpoint
@@ -14,10 +10,6 @@ video.get('/stream/:filename', async (c) => {
   const filename = c.req.param('filename')
   const filePath = path.join('uploads', filename)
   
-  console.log('🎥 Video stream request for:', filename)
-  console.log('🎥 Looking for file at:', filePath)
-  console.log('🎥 File exists:', fs.existsSync(filePath))
-  console.log('🎥 Files in uploads:', fs.readdirSync('uploads').filter(f => f.includes('downloaded')))
   
   if (!fs.existsSync(filePath)) {
     return c.json({ error: 'Video file not found' }, 404)
@@ -67,89 +59,6 @@ video.get('/stream/:filename', async (c) => {
   }
 })
 
-// Trim video endpoint
-video.post('/trim-video', async (c) => {
-  const body = await c.req.json()
-  const { filePath, startTime, endTime, fileName } = body
-  
-  if (!filePath || !fs.existsSync(filePath)) {
-    return c.json({ error: 'Video file not found' }, 400)
-  }
-
-  // Create safe output filename
-  const safeFileName = createSafeFileName(fileName)
-  const outputPath = path.join('uploads', `trimmed-${Date.now()}-${safeFileName}`)
-
-  return new Promise(async (resolve) => {
-    // Create safe temporary filename for processing
-    const tempInputPath = path.join('uploads', `temp-${Date.now()}.mp4`)
-    fs.copyFileSync(filePath, tempInputPath)
-    
-    const cleanupTempFiles = () => {
-      fs.unlink(tempInputPath, () => {}) // Only clean up temp file, keep original
-    }
-    
-    const startTimeFloat = parseFloat(startTime)
-    const endTimeFloat = parseFloat(endTime)
-    
-    const formattedStartTime = formatTimeForFFmpeg(startTimeFloat)
-    const formattedEndTime = formatTimeForFFmpeg(endTimeFloat)
-    
-    // Debug logging
-    console.log(`🎬 Trim request:`)
-    console.log(`   Start: ${startTimeFloat}s (${formattedStartTime})`)
-    console.log(`   End: ${endTimeFloat}s (${formattedEndTime})`)
-    console.log(`   Duration: ${endTimeFloat - startTimeFloat}s`)
-    
-    // Use precise frame-accurate cutting
-    const command = `ffmpeg -ss ${formattedStartTime} -to ${formattedEndTime} -i "${tempInputPath}" -c copy "${outputPath}"`
-    
-    console.log('Executing FFmpeg command:', command)
-    
-    try {
-      await execAsync(command)
-      
-      // Stream the trimmed video file directly (no memory buffering)
-      const fileStats = fs.statSync(outputPath)
-      const fileStream = fs.createReadStream(outputPath)
-      
-      console.log(`📤 Streaming trimmed video: ${(fileStats.size / (1024 * 1024)).toFixed(1)} MB`)
-      
-      // Clean up temp files, but keep output file until stream completes
-      cleanupTempFiles()
-      
-      // Clean up output file after streaming
-      fileStream.on('end', () => {
-        fs.unlink(outputPath, (err) => {
-          if (err) console.warn('Failed to cleanup output file:', err)
-        })
-      })
-      
-      fileStream.on('error', (err) => {
-        console.error('Stream error:', err)
-        fs.unlink(outputPath, () => {}) // Clean up on error
-      })
-      
-      resolve(new Response(fileStream, {
-        headers: {
-          'Content-Type': 'video/mp4',
-          'Content-Disposition': `attachment; filename="trimmed-${safeFileName}"`,
-          'Content-Length': fileStats.size.toString(),
-        },
-      }))
-      
-    } catch (ffmpegError) {
-      cleanupTempFiles()
-      console.error('FFmpeg command failed:', ffmpegError)
-      resolve(c.json({ 
-        error: 'Failed to trim video', 
-        details: ffmpegError.message || 'FFmpeg processing failed',
-        command: command
-      }, 500))
-    }
-  })
-})
-
 // Delete video endpoint
 video.delete('/delete-video', async (c) => {
   const body = await c.req.json()
@@ -167,7 +76,6 @@ video.delete('/delete-video', async (c) => {
   
   try {
     await deleteFile(filePath)
-    console.log(`🗑️ User deleted file: ${filePath}`)
     return c.json({ 
       success: true, 
       message: 'Video file deleted successfully' 

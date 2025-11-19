@@ -42,10 +42,7 @@ export const VideoControlBar = ({
 
         {/* Time Display */}
         <TimeDisplay currentTime={currentTime} duration={duration} />
-      </div>
 
-      <div className={VIDEO_PLAYER_CLASSES.CONTROL_BAR_RIGHT}>
-        {/* Speed Control */}
         <SpeedControl
           currentSpeed={playbackSpeed}
           onSpeedChange={videoOps.handlePlaybackSpeedChange}

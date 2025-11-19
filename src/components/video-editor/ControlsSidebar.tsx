@@ -1,12 +1,11 @@
 import { BarChart3, Sliders } from 'lucide-react'
 
-import type { ExportOperations, FileOperations, ProcessingState, TrimOperations, TrimState, VideoEditorState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
+import type { ExportOperations, FileOperations, ProcessingState, TrimOperations, TrimState, UIOperations, VideoEditorState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
 import { VideoAnalytics } from '../VideoAnalytics'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { ExportControls } from './ExportControls'
 import { FileManagementSection } from './FileManagementSection'
 import { PlaybackControls } from './PlaybackControls'
-import { StatusSection } from './StatusSection'
 import { TrimControls } from './TrimControls'
 
 type ControlsSidebarProps = {
@@ -15,9 +14,10 @@ type ControlsSidebarProps = {
   trimOps: TrimOperations
   exportOps: ExportOperations
   fileOps: FileOperations
+  uiOps: UIOperations
 }
 
-export const ControlsSidebar = ({ state, videoOps, trimOps, exportOps, fileOps }: ControlsSidebarProps) => {
+export const ControlsSidebar = ({ state, videoOps, trimOps, exportOps, fileOps, uiOps }: ControlsSidebarProps) => {
   const { currentVideo, duration, videoMetadata } = state
 
   return (
@@ -61,17 +61,7 @@ export const ControlsSidebar = ({ state, videoOps, trimOps, exportOps, fileOps }
               }}
               hasCurrentVideo={!!currentVideo}
               exportOps={exportOps}
-            />
-
-            <StatusSection 
-              videoState={{
-                currentVideo: state.currentVideo,
-                duration: state.duration
-              }}
-              processingState={{
-                isProcessing: state.isProcessing,
-                isDeleting: state.isDeleting
-              }}
+              uiOps={uiOps}
             />
 
             <FileManagementSection 

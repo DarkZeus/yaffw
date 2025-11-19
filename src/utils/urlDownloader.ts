@@ -2,7 +2,7 @@ import axios from 'axios'
 import { apiClient } from './apiClient'
 
 // Helper function to detect Twitter URLs
-const isTwitterUrl = (url: string): boolean => {
+export const isTwitterUrl = (url: string): boolean => {
   try {
     const parsedUrl = new URL(url)
     const hostname = parsedUrl.hostname.toLowerCase()
@@ -40,7 +40,6 @@ type DownloadResponse = {
     hasAudio?: boolean
     format?: string
   }
-  waveformData?: number[]
   waveformImagePath?: string | null
   waveformImageDimensions?: {
     width: number

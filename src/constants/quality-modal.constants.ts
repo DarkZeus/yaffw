@@ -145,7 +145,7 @@ export const CODECS: Record<string, CodecInfo> = {
 
 export const DEFAULT_SETTINGS: QualitySettings = {
   resolution: 'original',
-  bitrate: [10],
+  bitrate: 10,
   bitrateInput: '10',
   codec: 'h264_mp4',
   useGpuAcceleration: false,

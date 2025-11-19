@@ -33,13 +33,14 @@ export const useQualityMediator = (videoMetadata?: QualityModalProps['videoMetad
 
         case 'bitrate':
           if (field === 'bitrate') {
-            newSettings.bitrate = value as number[]
-            newSettings.bitrateInput = (value as number[])[0].toString()
+            newSettings.bitrate = value as number
+            newSettings.bitrateInput = (value as number).toString()
           }
           if (field === 'bitrateInput') {
             newSettings.bitrateInput = value as string
             if (validateBitrateInput(value as string)) {
-              newSettings.bitrate = [Number.parseInt(value as string, 10)]
+              const parsedBitrate = Number.parseInt(value as string, 10)
+              newSettings.bitrate = parsedBitrate
             }
           }
           break

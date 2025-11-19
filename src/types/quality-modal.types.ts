@@ -48,7 +48,7 @@ export type FrameInterpolationModel = {
 
 export type QualitySettings = {
   resolution: string
-  bitrate: number[]
+  bitrate: number
   bitrateInput: string
   codec: string
   useGpuAcceleration: boolean

@@ -37,7 +37,7 @@ app.route('/api/metadata', metadataRoutes)
 app.route('/api/sse', sseRoutes)
 
 const port = 3001
-console.log(`Video processing server with chunked upload support running on http://localhost:${port}`)
+console.log(`Video processing server running on http://localhost:${port}`)
 
 serve({
   fetch: app.fetch,

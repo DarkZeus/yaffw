@@ -24,8 +24,6 @@ const extractMetadataWithYtDlp = (url, cookieFilePath = null) => {
     }
     
     ytDlpArgs.push(url)
-
-    console.log('🔍 Extracting metadata with yt-dlp for:', url, cookieFilePath ? 'with cookies' : 'without cookies')
     const ytDlp = spawn('yt-dlp', ytDlpArgs)
     let stdout = ''
     let stderr = ''
@@ -36,7 +34,6 @@ const extractMetadataWithYtDlp = (url, cookieFilePath = null) => {
 
     ytDlp.stderr.on('data', (data) => {
       stderr += data.toString()
-      console.log('yt-dlp stderr:', data.toString())
     })
 
     ytDlp.on('close', (code) => {
@@ -63,7 +60,6 @@ const extractMetadataWithYtDlp = (url, cookieFilePath = null) => {
             url: url
           }
 
-          console.log('✅ Metadata extracted successfully for:', metadata.title)
           resolve(metadata)
         } catch (parseError) {
           console.error('Parse error:', parseError)
@@ -105,9 +101,8 @@ metadata.post('/extract', async (c) => {
       
       if (fs.existsSync(potentialCookiePath)) {
         cookieFilePath = potentialCookiePath
-        console.log('🍪 Using cookie file for metadata extraction:', cookieSessionId)
       } else {
-        console.log('⚠️ Cookie session provided but file not found:', cookieSessionId)
+        console.error('⚠️ Cookie session provided but file not found:', cookieSessionId)
       }
     }
 
@@ -135,7 +130,6 @@ const extractFormatsWithYtDlp = (url) => {
       url
     ]
 
-    console.log('🔍 Extracting formats with yt-dlp for:', url)
     const ytDlp = spawn('yt-dlp', ytDlpArgs)
     let stdout = ''
     let stderr = ''
@@ -146,7 +140,6 @@ const extractFormatsWithYtDlp = (url) => {
 
     ytDlp.stderr.on('data', (data) => {
       stderr += data.toString()
-      console.log('yt-dlp stderr:', data.toString())
     })
 
     ytDlp.on('close', (code) => {
@@ -173,7 +166,6 @@ const extractFormatsWithYtDlp = (url) => {
             }
           }
 
-          console.log(`✅ Formats extracted successfully: ${formats.length} formats found`)
           resolve(formats)
         } catch (parseError) {
           console.error('Formats parse error:', parseError)

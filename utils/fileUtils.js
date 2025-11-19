@@ -39,7 +39,6 @@ export const cleanupOldFiles = (directory, maxAgeMs) => {
     if (now - stats.mtime.getTime() > maxAgeMs) {
       fs.unlinkSync(filePath)
       deletedCount++
-      console.log(`🗑️ Auto-deleted old file: ${file}`)
     }
   }
   

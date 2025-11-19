@@ -40,7 +40,9 @@ const initialState: VideoEditorState = {
   isFullscreen: false,
   showQualityModal: false,
   showLargeFileConfirmDialog: false,
-  largeFileSize: 0
+  largeFileSize: 0,
+  zoomLevel: 1,
+  handleZoomChange: () => {}
 }
 
 export const useVideoEditorMediator = (onRestrictionError?: (error: string) => Promise<string | null>): VideoEditorMediator => {
@@ -54,6 +56,7 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
   const volumeRef = useRef(1)
   const isMutedRef = useRef(false)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const zoomLevelRef = useRef(1)
 
   // Optimized state updater using transitions for non-urgent updates
   const updateState = useCallback((updates: Partial<VideoEditorState>) => {
@@ -76,8 +79,6 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
   }, [])
 
   const resetAllVideoState = useCallback(() => {
-    console.log('🧹 Cleaning up all video state and data')
-    
     updateState({
       ...initialState,
       // Preserve UI state that shouldn't be reset
@@ -93,8 +94,6 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
       clearTimeout(clickTimeoutRef.current)
       clickTimeoutRef.current = null
     }
-    
-    console.log('✅ Video state cleanup complete')
   }, [state.isFullscreen, updateState])
 
   const downloadVideo = useCallback((blob: Blob, fileName: string) => {
@@ -164,7 +163,9 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
     downloadVideo
   })
 
-  const uiOps = createUIManager(state, updateState)
+  const uiOps = createUIManager(state, updateState, {
+    zoomLevelRef
+  })
 
   return {
     state,
@@ -176,6 +177,7 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
     updateState,
     playerRef,
     containerRef,
-    volumeControlRef
+    volumeControlRef,
+    zoomLevelRef
   }
 } 

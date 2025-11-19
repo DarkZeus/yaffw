@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { UrlInputSectionProps } from '../../../types/bulk-download-components.types'
+import { extractUrlsFromText } from '../../../utils/bulk-download.utils'
 import { Button } from '../../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card'
 import { Input } from '../../ui/input'
@@ -16,13 +17,40 @@ export function UrlInputSection({
   failedCount
 }: UrlInputSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [isDragActive, setIsDragActive] = useState(false)
 
   const handleAddUrl = () => {
     onAddUrl(currentUrl)
   }
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragActive(false)
+    const text = e.dataTransfer.getData('text')
+    if (text) {
+      const urls = extractUrlsFromText(text)
+      if (urls.length > 0) {
+        urls.forEach(onAddUrl)
+      }
+    }
+}
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setIsDragActive(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragActive(false)
+  }
+
   return (
-    <Card>
+    <Card
+      className={`${isDragActive && 'border-2 border-dashed border-blue-400'}`}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Plus className="h-5 w-5" />
@@ -50,7 +78,9 @@ export function UrlInputSection({
             Add URL
           </Button>
         </div>
-        
+        {isDragActive && (
+          <div className="text-blue-600 text-xs text-center">Drop URLs here to add</div>
+        )}
         {totalUrls > 0 && (
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span>{totalUrls} URLs added</span>

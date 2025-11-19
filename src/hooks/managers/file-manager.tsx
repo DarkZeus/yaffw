@@ -13,7 +13,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
 
   // Background commit function for local files
   const startBackgroundCommit = async (videoFile: File, localVideo: LocalVideoFile) => {
-    console.log('🚀 Starting background commit to server...')
     setState({ 
       isCommittingToServer: true, 
       commitProgress: 0,
@@ -25,7 +24,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
     let uploadSpeed = 0
     let lastProgress = 0
     
-    console.log('🚀 Background commit progress tracking initialized')
     
     try {
       // Start with initial progress toast
@@ -38,7 +36,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       )
 
       const serverResult = await commitFileToServer(localVideo, (progress) => {
-        console.log(`📊 Progress callback: ${progress.toFixed(1)}%`)
         setState({ commitProgress: progress })
         
         // Calculate upload speed (throttle calculation to avoid spam)
@@ -50,14 +47,12 @@ export const createFileManager: FileManager = (state, setState, utils) => {
           const bytesUploaded = (progressDelta / 100) * fileSizeBytes
           uploadSpeed = (bytesUploaded / (1024 * 1024)) / timeDelta // MB/s
           
-          console.log(`⚡ Speed calculated: ${uploadSpeed.toFixed(1)} MB/s (${progressDelta.toFixed(1)}% in ${timeDelta.toFixed(1)}s)`)
           
           lastUpdateTime = now
           lastProgress = progress
         }
         
         // Update progress toast (update immediately, don't throttle)
-        console.log(`🔄 Updating toast: ${progress.toFixed(1)}% (speed: ${uploadSpeed.toFixed(1)} MB/s)`)
         toast(
           <ProgressToast 
             progress={progress} 
@@ -71,7 +66,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         )
       })
       
-      console.log('✅ Background commit completed successfully')
       
       // Update current video with server file path and any improved data
       startTransition(() => {
@@ -82,7 +76,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
             // Use server waveform if available and better than current
             waveformImagePath: serverResult.waveformImagePath || localVideo.waveformImagePath,
             waveformImageDimensions: serverResult.waveformImageDimensions || localVideo.waveformImageDimensions,
-            waveformData: serverResult.waveformData || localVideo.waveformData,
             hasAudio: serverResult.hasAudio ?? localVideo.hasAudio
           } : null,
           isCommittingToServer: false,
@@ -110,7 +103,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       }, 3000)
       
     } catch (error) {
-      console.error('❌ Background commit failed:', error)
       setState({ 
         isCommittingToServer: false,
         commitProgress: 0,
@@ -155,13 +147,12 @@ export const createFileManager: FileManager = (state, setState, utils) => {
                 ...localVideoRef,
                 waveformImagePath: serverWaveform.waveformImagePath,
                 waveformImageDimensions: serverWaveform.waveformImageDimensions,
-                waveformData: serverWaveform.waveformData || localVideoRef.waveformData
               }
             })
           })
         }
       }).catch(err => {
-        console.warn('Server waveform generation failed:', err)
+        console.error('Server waveform generation failed:', err)
       })
       
       // Extract detailed metadata for analytics
@@ -206,7 +197,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
 
     const toastId = 'url-download-progress' // Fixed ID for consistent updates
     
-    console.log('🌐 Starting URL download with progress tracking')
 
     try {
       // Start with initial progress toast
@@ -218,13 +208,10 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         }
       )
 
-      console.log('🌐 Starting download from URL:', url)
       
       // Check if this is a Twitter URL and use appropriate download function
       const isTwitterUrl = url.includes('twitter.com') || url.includes('x.com') || url.includes('vxtwitter.com')
       
-      console.log('🔍 FILE MANAGER DEBUG: URL:', url)
-      console.log('🔍 FILE MANAGER DEBUG: isTwitterUrl:', isTwitterUrl)
       
       let response
       if (isTwitterUrl) {
@@ -248,7 +235,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       } else {
         // Download video from URL with progress tracking
         response = await downloadVideoFromUrl(url, (progress, message, speed) => {
-          console.log(`📊 Progress update: ${progress}% - ${message}`)
           setState({ uploadProgress: progress })
           
           // Update progress toast with real progress - using consistent ID
@@ -305,13 +291,11 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         })
 
         // Process the video locally for immediate preview
-        console.log('🔄 Processing downloaded video locally...')
         const localVideo = await processVideoLocally(videoFile)
         
         // Create enhanced local video with server data
         const enhancedLocalVideo: LocalVideoFile = {
           ...localVideo,
-          waveformData: response.waveformData || localVideo.waveformData,
           waveformImagePath: response.waveformImagePath,
           waveformImageDimensions: response.waveformImageDimensions,
           serverFilePath: response.filePath,
@@ -321,8 +305,7 @@ export const createFileManager: FileManager = (state, setState, utils) => {
         // Set the processed video data with server enhancements
         startTransition(() => {
           setState({
-            currentVideo: enhancedLocalVideo,
-            trimEnd: enhancedLocalVideo.duration
+            currentVideo: enhancedLocalVideo
           })
         })
         
@@ -367,10 +350,6 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       }
       
     } catch (error) {
-      console.error('❌ URL download failed:', error)
-      console.log('🔍 FILE MANAGER DEBUG: Error caught in onUrlDownload:', error)
-      console.log('🔍 FILE MANAGER DEBUG: Error type:', typeof error)
-      console.log('🔍 FILE MANAGER DEBUG: Error message:', error instanceof Error ? error.message : String(error))
       
       // Show error toast
       toast.error("Download failed", {
@@ -398,16 +377,13 @@ export const createFileManager: FileManager = (state, setState, utils) => {
       // If we have a server file, delete it
       if (state.currentVideo.serverFilePath) {
         await yaffwApi.deleteVideo(state.currentVideo.serverFilePath)
-        console.log('🗑️ Server file deleted successfully')
       }
       
       // Reset state
       resetAllVideoState()
       
-      console.log('✅ Successfully cleaned up and reset for new video')
       
     } catch (error) {
-      console.error('❌ Cleanup failed:', error)
       showError('Cleanup failed', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setState({ isDeleting: false })

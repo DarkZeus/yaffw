@@ -18,7 +18,6 @@ const cleanupUploadsPlugin = () => ({
         files.forEach(file => {
           rmSync(resolve(uploadsPath, file), { recursive: true, force: true })
         })
-        console.log('✨ Uploads folder contents cleaned up')
       } catch (error) {
         console.warn('⚠️ Could not cleanup uploads folder:', error)
       }

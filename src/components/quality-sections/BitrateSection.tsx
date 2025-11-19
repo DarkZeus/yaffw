@@ -8,7 +8,7 @@ export function BitrateSection({ settings, videoMetadata, onSettingsChange }: Se
     onSettingsChange({
       section: 'bitrate',
       field: 'bitrate',
-      value
+      value: value[0]
     })
   }
 
@@ -26,7 +26,7 @@ export function BitrateSection({ settings, videoMetadata, onSettingsChange }: Se
       <div className="space-y-4">
         <div className="px-3">
           <Slider
-            value={settings.bitrate}
+            value={[settings.bitrate]}
             onValueChange={handleBitrateSliderChange}
             max={100}
             min={1}

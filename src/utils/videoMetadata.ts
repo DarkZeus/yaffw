@@ -32,7 +32,7 @@ const detectVideoAudio = (video: ExtendedHTMLVideoElement): boolean => {
   return false
 }
 
-export async function extractVideoMetadata(file: File): Promise<VideoMetadata> {
+async function extractVideoMetadata(file: File): Promise<VideoMetadata> {
   return new Promise((resolve) => {
     const video = document.createElement('video')
     const audio = document.createElement('audio')

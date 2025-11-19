@@ -23,6 +23,7 @@ export type UrlListSectionProps = {
   onSelectUrl: (id: string, selected: boolean) => void
   onSelectAll: (selected: boolean) => void
   onRemoveUrl: (id: string) => void
+  onResetUrls: () => void,
   onStartDownloads: (urlIds: string[]) => void
   onCancelDownloads: () => void
   onShowThumbnail: (thumbnailUrl: string, title?: string) => void

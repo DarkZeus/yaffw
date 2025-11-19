@@ -1,5 +1,17 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
-import { createSSEProgressTracker } from './sseClient'
+import axios, {type AxiosInstance, type AxiosRequestConfig, type AxiosResponse} from 'axios'
+import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  Conversion,
+  Input,
+  MovOutputFormat,
+  Mp4OutputFormat,
+  Output,
+  WebMOutputFormat
+} from 'mediabunny'
+import {STANDARD_RESOLUTIONS} from '../constants/quality-modal.constants'
+import {createSSEProgressTracker} from './sseClient'
 
 // Base API configuration
 const API_BASE_URL = 'http://localhost:3001/api'
@@ -22,7 +34,6 @@ export type CleanupResponse = {
 export type WaveformResponse = {
   waveformImagePath?: string
   waveformImageDimensions?: { width: number; height: number }
-  waveformData?: Array<{ time: number; amplitude: number }>
 }
 
 // Create axios instance with common configuration
@@ -64,6 +75,14 @@ type QualitySettings = {
   useGpuAcceleration?: boolean
   gpuVendor?: string
 }
+
+// Utility to get file extension from codec
+export const getFileExtensionFromCodec = (codec: string): string => {
+  if (codec.includes('_webm')) return '.webm'
+  if (codec.includes('_mov')) return '.mov'
+  return '.mp4' // Default for h264_mp4, h265_mp4, av1
+}
+
 
 // API client methods
 export const apiClient = {
@@ -181,27 +200,126 @@ export const apiClient = {
 
 // Specialized API methods for common YAFFW operations
 export const yaffwApi = {
-  // Video operations
+  // Video operations - client-side trimming using Mediabunny
   trimVideo: async (payload: {
-    filePath: string
+    file: File
     start: number
     end: number
     fileName?: string
     qualitySettings?: QualitySettings
   }) => {
-    // Map to server-expected parameter names and add fileName
-    const serverPayload = {
-      filePath: payload.filePath,
-      startTime: payload.start,
-      endTime: payload.end,
-      fileName: payload.fileName || 'video.mp4' // Default filename if not provided
+    const input = new Input({
+      source: new BlobSource(payload.file),
+      formats: ALL_FORMATS
+    })
+    
+    const bufferTarget = new BufferTarget()
+    
+    // Map codec to output format and container
+    const getOutputFormat = () => {
+      if (!payload.qualitySettings?.codec) return new Mp4OutputFormat()
+      
+      const codec = payload.qualitySettings.codec
+      if (codec.includes('_webm')) return new WebMOutputFormat()
+      if (codec.includes('_mov')) return new MovOutputFormat()
+      return new Mp4OutputFormat()
     }
     
-    // Server returns streaming video file, not JSON
-    return apiInstance.post('/trim-video', serverPayload, {
-      timeout: 5 * 60 * 1000, // 5 minutes for video processing
-      responseType: 'blob', // Handle as blob response
+    // Get MIME type based on codec
+    const getMimeType = () => {
+      if (!payload.qualitySettings?.codec) return 'video/mp4'
+      
+      const codec = payload.qualitySettings.codec
+      if (codec.includes('_webm')) return 'video/webm'
+      if (codec.includes('_mov')) return 'video/quicktime'
+      return 'video/mp4'
+    }
+    
+    const output = new Output({
+      format: getOutputFormat(),
+      target: bufferTarget
     })
+    
+    // Build video track configuration
+    const videoConfig: Record<string, unknown> = {}
+    
+    // Apply resolution if specified and not 'original'
+    if (payload.qualitySettings?.resolution && payload.qualitySettings.resolution !== 'original') {
+      const resolutionOption = STANDARD_RESOLUTIONS.find(r => r.value === payload.qualitySettings.resolution)
+      if (resolutionOption && resolutionOption.width > 0) {
+        videoConfig.width = resolutionOption.width
+        videoConfig.height = resolutionOption.height
+        videoConfig.fit = 'contain'
+      }
+    }
+    
+    // Apply codec if specified (or default when bitrate is set)
+    const codecMap: Record<string, string> = {
+      'h264_mp4': 'avc',
+      'h265_mp4': 'hevc',
+      'vp8_webm': 'vp8',
+      'vp9_webm': 'vp9',
+      'h264_mov': 'avc',
+      'h265_mov': 'hevc',
+      'prores_mov': 'prores',
+      'av1': 'av1'
+    }
+    
+    if (payload.qualitySettings?.codec) {
+      const mappedCodec = codecMap[payload.qualitySettings.codec]
+      if (mappedCodec) {
+        videoConfig.codec = mappedCodec
+      }
+    } else if (payload.qualitySettings?.bitrate) {
+      videoConfig.codec = 'avc'
+    }
+    
+    // Apply bitrate if specified - convert Mbps to bits per second (bps)
+    if (payload.qualitySettings?.bitrate) {
+      const BITRATE_MULTIPLIER = 2.2
+      videoConfig.bitrate = (payload.qualitySettings.bitrate / BITRATE_MULTIPLIER) * 1_000_000
+      videoConfig.bitrateMode = 'constant'
+    }
+    
+    // GPU acceleration via hardwareAcceleration hint
+    if (payload.qualitySettings?.useGpuAcceleration) {
+      videoConfig.hardwareAcceleration = 'prefer-hardware'
+    }
+    
+    // Force transcoding when quality settings are applied
+    if (Object.keys(videoConfig).length > 0) {
+      videoConfig.forceTranscode = true
+    }
+    
+
+    const conversionConfig: any = {
+      input,
+      output,
+      trim: {
+        start: payload.start,
+        end: payload.end
+      }
+    }
+    
+    if (Object.keys(videoConfig).length > 0) {
+      conversionConfig.video = videoConfig
+    }
+    
+    // Explicitly pass through audio without modification
+    conversionConfig.audio = {}
+    
+    const conversion = await Conversion.init(conversionConfig)
+    
+    await conversion.execute()
+    
+    const buffer = bufferTarget.buffer
+    const blob = new Blob([buffer], { type: getMimeType() })
+    
+    return {
+      status: 200,
+      statusText: 'OK',
+      data: blob
+    }
   },
 
   deleteVideo: async (filePath: string): Promise<DeleteVideoResponse> => {

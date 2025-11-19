@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DEFAULT_BULK_DOWNLOAD_SETTINGS } from '../../constants/bulk-download.constants'
+import { useCookie } from '../../providers/CookieProvider'
 import type { BulkDownloadState, BulkDownloadUrl } from '../../types/bulk-download.types'
 import { createNewUrl, extractUrlsFromText, isValidUrl, startBulkDownload } from '../../utils/bulk-download.utils'
+import { hasRestrictionError } from '../../utils/cookie.utils'
 import { 
   createValidatingUrl, 
   extractBatchMetadata,
@@ -18,6 +20,7 @@ import { UrlInputSection, UrlListSection } from './sections'
 type BulkDownloadAction =
   | { type: 'ADD_URL'; payload: BulkDownloadUrl }
   | { type: 'REMOVE_URL'; payload: { id: string } }
+  | { type: 'RESET_URLS'; payload?: null }
   | { type: 'UPDATE_URL'; payload: { id: string; updates: Partial<BulkDownloadUrl> } }
   | { type: 'SELECT_URL'; payload: { id: string; selected: boolean } }
   | { type: 'SELECT_ALL'; payload: { selected: boolean } }
@@ -47,6 +50,12 @@ function bulkDownloadReducer(state: BulkDownloadState, action: BulkDownloadActio
       return {
         ...state,
         urls: state.urls.filter(u => u.id !== action.payload.id)
+      }
+
+    case 'RESET_URLS':
+      return {
+        ...state,
+        urls: [],
       }
     
     case 'UPDATE_URL':
@@ -125,8 +134,8 @@ export function BulkDownloadComponent() {
   const [restrictionError, setRestrictionError] = useState('')
   const [cookieUploadResolver, setCookieUploadResolver] = useState<((value: string | null) => void) | null>(null)
   
-  // Store the current cookie session ID for use in downloads
-  const [currentCookieSessionId, setCurrentCookieSessionId] = useState<string | null>(null)
+  // Use cookie provider
+  const { state: cookieState, getCurrentSession, setCurrentSession } = useCookie()
 
   // Active downloads tracking
   const activeDownloads = useRef<Map<string, () => void>>(new Map())
@@ -147,7 +156,8 @@ export function BulkDownloadComponent() {
     try {
       // Use bulk download for all URLs (including Twitter) with optional cookies
       // This ensures all downloads go to the user's folder instead of the server
-      await startBulkDownload(urlObj.url, urlObj.title, currentCookieSessionId || undefined)
+      const currentSession = getCurrentSession()
+      await startBulkDownload(urlObj.url, urlObj.title, currentSession?.sessionId)
       
       // Handle successful download
       updateUrl(urlObj.id, { 
@@ -170,7 +180,7 @@ export function BulkDownloadComponent() {
     if (activeDownloads.current.size === 0) {
       dispatch({ type: 'SET_DOWNLOADING', payload: false })
     }
-  }, [updateUrl, currentCookieSessionId])
+  }, [updateUrl, getCurrentSession])
 
   // URL management functions
   const addUrl = useCallback(async (url: string) => {
@@ -192,16 +202,45 @@ export function BulkDownloadComponent() {
                            (error as Error & { isRestrictionError?: boolean }).isRestrictionError
       
       if (isRestriction) {
-        // For restriction errors, show the cookie dialog
-        setRestrictionError(errorMessage)
-        setShowCookieManagement(true)
+        // Check if we have an available cookie session first
+        const currentSession = getCurrentSession()
         
-        // Set URL to pending with restriction info
-        updateUrl(validatingUrl.id, { 
-          status: 'pending', 
-          title: `🔒 Restricted Content - ${url}`,
-          error: undefined 
-        })
+        if (currentSession) {
+          // Try to retry with existing cookie
+          try {
+            updateUrl(validatingUrl.id, { 
+              status: 'validating', 
+              title: '🔄 Retrying with existing cookie...',
+              error: undefined 
+            })
+            
+            const metadata = await extractVideoMetadata(url, currentSession.sessionId)
+            const updatedUrl = updateUrlWithMetadata(validatingUrl, metadata)
+            dispatch({ type: 'UPDATE_URL', payload: { id: validatingUrl.id, updates: updatedUrl } })
+            
+            toast.success(`Successfully accessed restricted content using existing cookie: ${currentSession.originalName}`)
+          } catch (retryError) {
+            // Still failed even with existing cookie, show dialog
+            setRestrictionError(errorMessage)
+            setShowCookieManagement(true)
+            
+            updateUrl(validatingUrl.id, { 
+              status: 'pending', 
+              title: `🔒 Restricted Content - ${url}`,
+              error: undefined 
+            })
+          }
+        } else {
+          // No existing cookie, show the cookie dialog
+          setRestrictionError(errorMessage)
+          setShowCookieManagement(true)
+          
+          updateUrl(validatingUrl.id, { 
+            status: 'pending', 
+            title: `🔒 Restricted Content - ${url}`,
+            error: undefined 
+          })
+        }
       } else {
         // For other errors, set to pending with warning
         updateUrl(validatingUrl.id, { 
@@ -211,11 +250,13 @@ export function BulkDownloadComponent() {
         })
       }
     }
-  }, [updateUrl])
+  }, [updateUrl, getCurrentSession])
 
   const removeUrl = useCallback((id: string) => {
     dispatch({ type: 'REMOVE_URL', payload: { id } })
   }, [])
+
+  const resetUrls = useCallback(() => dispatch({ type: 'RESET_URLS' }), [])
 
   const selectUrl = useCallback((id: string, selected: boolean) => {
     dispatch({ type: 'SELECT_URL', payload: { id, selected } })
@@ -278,9 +319,9 @@ export function BulkDownloadComponent() {
     cookieSessionId: string
   ) => {
     // Store the cookie session ID for future downloads
-    setCurrentCookieSessionId(cookieSessionId)
+    setCurrentSession(cookieSessionId)
     
-    console.log(`🔄 Batch retrying metadata extraction for ${originalUrls.length} URLs with cookies...`)
+    
     
     try {
       // Update all URLs to show we're retrying with cookies
@@ -302,7 +343,7 @@ export function BulkDownloadComponent() {
         if (result.metadata) {
           const updatedUrl = updateUrlWithMetadata(validatingUrl, result.metadata)
           dispatch({ type: 'UPDATE_URL', payload: { id: validatingUrl.id, updates: updatedUrl } })
-          console.log('✅ Batch metadata retry successful for:', result.metadata.title)
+          
         } else if (result.error) {
           // Still failed even with cookies
           updateUrl(validatingUrl.id, { 
@@ -310,11 +351,11 @@ export function BulkDownloadComponent() {
             title: `❌ Failed even with cookies - ${result.url}`,
             error: undefined 
           })
-          console.log('❌ Batch metadata retry failed for:', result.url, result.error)
+          
         }
       }
     } catch (error) {
-      console.error('Batch metadata retry with cookies failed:', error)
+      
       
       // Reset URLs back to error state if batch retry completely fails
       for (let i = 0; i < validatingUrls.length; i++) {
@@ -327,7 +368,7 @@ export function BulkDownloadComponent() {
         })
       }
     }
-  }, [updateUrl])
+  }, [updateUrl, setCurrentSession])
 
   const confirmSmartPaste = useCallback(async () => {
     const urlsToAdd = Array.from(selectedUrls)
@@ -366,23 +407,81 @@ export function BulkDownloadComponent() {
         }
       }
       
-      // If there are restriction errors, show cookie dialog
+      // If there are restriction errors, try with existing cookie first
       if (batchResult.hasRestrictionErrors) {
-        setRestrictionError(`Found ${batchResult.restrictionErrors.length} restricted videos that may need authentication`)
-        setShowCookieManagement(true)
-        setCookieUploadResolver((cookieSessionId: string | null) => {
-          if (cookieSessionId) {
-            // Retry metadata extraction for failed URLs with cookies
-            retryMetadataWithCookies(validatingUrls, urlsToAdd, cookieSessionId)
+        const currentSession = getCurrentSession()
+        
+        if (currentSession) {
+                      // Try to retry with existing cookie
+            
+            toast.info(`Using existing cookie: ${currentSession.originalName}`)
+            try {
+              const retryResult = await extractBatchMetadata(urlsToAdd, currentSession.sessionId)
+            
+            // Update URLs with new metadata results
+            for (let i = 0; i < retryResult.results.length; i++) {
+              const result = retryResult.results[i]
+              const validatingUrl = validatingUrls[i]
+              
+              if (result.metadata) {
+                const updatedUrl = updateUrlWithMetadata(validatingUrl, result.metadata)
+                dispatch({ type: 'UPDATE_URL', payload: { id: validatingUrl.id, updates: updatedUrl } })
+                
+                toast.success(`Batch access with cookie: ${currentSession.originalName}`)
+              } else if (result.error) {
+                // Still failed even with existing cookie
+                updateUrl(validatingUrl.id, { 
+                  status: 'pending', 
+                  title: `❌ Failed even with existing cookie - ${result.url}`,
+                  error: undefined 
+                })
+                
+              }
+            }
+            
+            // If there are still restriction errors after using existing cookie, show dialog
+            if (retryResult.hasRestrictionErrors) {
+              setRestrictionError(`Found ${retryResult.restrictionErrors.length} restricted videos that need authentication`)
+              setShowCookieManagement(true)
+              setCookieUploadResolver((cookieSessionId: string | null) => {
+                if (cookieSessionId) {
+                  // Retry metadata extraction for failed URLs with new cookies
+                  retryMetadataWithCookies(validatingUrls, urlsToAdd, cookieSessionId)
+                }
+                return Promise.resolve(cookieSessionId)
+              })
+            }
+          } catch (retryError) {
+            
+            // Show dialog for manual cookie upload
+            setRestrictionError(`Found ${batchResult.restrictionErrors.length} restricted videos that need authentication`)
+            setShowCookieManagement(true)
+            setCookieUploadResolver((cookieSessionId: string | null) => {
+              if (cookieSessionId) {
+                // Retry metadata extraction for failed URLs with cookies
+                retryMetadataWithCookies(validatingUrls, urlsToAdd, cookieSessionId)
+              }
+              return Promise.resolve(cookieSessionId)
+            })
           }
-          return Promise.resolve(cookieSessionId)
-        })
+        } else {
+          // No existing cookie, show the cookie dialog
+          setRestrictionError(`Found ${batchResult.restrictionErrors.length} restricted videos that may need authentication`)
+          setShowCookieManagement(true)
+          setCookieUploadResolver((cookieSessionId: string | null) => {
+            if (cookieSessionId) {
+              // Retry metadata extraction for failed URLs with cookies
+              retryMetadataWithCookies(validatingUrls, urlsToAdd, cookieSessionId)
+            }
+            return Promise.resolve(cookieSessionId)
+          })
+        }
       }
       
     } catch (error) {
-      console.error('Batch metadata extraction failed:', error)
+      
     }
-     }, [selectedUrls, updateUrl, retryMetadataWithCookies])
+     }, [selectedUrls, updateUrl, retryMetadataWithCookies, getCurrentSession])
 
   // Thumbnail modal
   const showThumbnail = useCallback((thumbnailUrl: string, title?: string) => {
@@ -404,7 +503,7 @@ export function BulkDownloadComponent() {
 
   const handleCookieUpload = useCallback(async (sessionId: string) => {
     // Store the cookie session ID for use in downloads
-    setCurrentCookieSessionId(sessionId)
+    setCurrentSession(sessionId)
     
     if (cookieUploadResolver) {
       cookieUploadResolver(sessionId)
@@ -412,13 +511,10 @@ export function BulkDownloadComponent() {
     
     // Retry metadata extraction for ALL URLs that have restriction/failure errors
     const urlsToRetry = state.urls.filter(url => 
-      url.title?.includes('🔒 Restricted Content') || 
-      url.title?.includes('⚠️ Metadata extraction failed') ||
-      url.title?.includes('❌ Failed even with cookies') ||
-      url.status === 'validating'
+      hasRestrictionError(url.title) || url.status === 'validating'
     )
     
-    console.log(`🔄 Retrying metadata extraction for ${urlsToRetry.length} URLs with cookies...`)
+  
     
     for (const url of urlsToRetry) {
       try {
@@ -433,7 +529,7 @@ export function BulkDownloadComponent() {
         const updatedUrl = updateUrlWithMetadata(url, metadata)
         dispatch({ type: 'UPDATE_URL', payload: { id: url.id, updates: updatedUrl } })
         
-        console.log('✅ Metadata retry successful for:', metadata.title)
+        
       } catch (error) {
         // Still failed even with cookies
         updateUrl(url.id, { 
@@ -442,14 +538,14 @@ export function BulkDownloadComponent() {
           error: undefined 
         })
         
-        console.log('❌ Metadata retry failed for:', url.url, error)
+        
       }
     }
     
     setShowCookieManagement(false)
     setCookieUploadResolver(null)
     setRestrictionError('')
-  }, [cookieUploadResolver, state.urls, updateUrl])
+  }, [cookieUploadResolver, state.urls, updateUrl, setCurrentSession])
 
   // Derived state
   const selectedForDownload = state.urls.filter(u => u.selected)
@@ -470,7 +566,7 @@ export function BulkDownloadComponent() {
   }, [])
 
   return (
-    <div className="container mx-auto p-6 h-[calc(100dvh-1rem)] flex flex-col gap-6">
+    <div className="container mx-auto p-6 h-full flex flex-col gap-6">
       {/* Header */}
       <div className="space-y-2 flex-shrink-0">
         <h1 className="text-3xl font-bold">Bulk Download</h1>
@@ -517,6 +613,7 @@ export function BulkDownloadComponent() {
           onSelectUrl={selectUrl}
           onSelectAll={selectAll}
           onRemoveUrl={removeUrl}
+          onResetUrls={resetUrls}
           onStartDownloads={startDownloads}
           onCancelDownloads={cancelDownloads}
           onShowThumbnail={showThumbnail}

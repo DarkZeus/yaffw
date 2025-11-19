@@ -1,6 +1,6 @@
 import { Download, Loader2 } from 'lucide-react'
 
-import type { ExportOperations, ProcessingState } from '../../types/video-editor-mediator.types'
+import type { ExportOperations, ProcessingState, UIOperations } from '../../types/video-editor-mediator.types'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -9,9 +9,10 @@ type ExportControlsProps = {
   processingState: Pick<ProcessingState, 'isProcessing' | 'isUploading' | 'isCommittingToServer'>
   hasCurrentVideo: boolean
   exportOps: ExportOperations
+  uiOps: Pick<UIOperations, 'handleOpenQualityModal'>
 }
 
-export const ExportControls = ({ processingState, hasCurrentVideo, exportOps }: ExportControlsProps) => {
+export const ExportControls = ({ processingState, hasCurrentVideo, exportOps, uiOps }: ExportControlsProps) => {
   const { isProcessing, isUploading, isCommittingToServer } = processingState
 
   const isDisabled = isProcessing || isUploading || isCommittingToServer || !hasCurrentVideo
@@ -80,7 +81,7 @@ export const ExportControls = ({ processingState, hasCurrentVideo, exportOps }: 
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              onClick={exportOps.handleTrimVideo}
+              onClick={uiOps.handleOpenQualityModal}
               disabled={isDisabled}
               className="w-full h-12"
             >
