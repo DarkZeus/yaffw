@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
-import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
+import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js'
 
 type UseWavesurferOptions = {
   containerRef: React.RefObject<HTMLDivElement>
   timelineContainerRef: React.RefObject<HTMLDivElement>
-  audioFile: File | null
+  audioFile: File | Blob | AudioBuffer | null
   trimStart: number
   trimEnd: number
   onReady?: () => void
@@ -36,7 +36,7 @@ export const useWavesurfer = ({
 }: UseWavesurferOptions) => {
   const wavesurferRef = useRef<WaveSurfer | null>(null)
   const regionsPluginRef = useRef<RegionsPlugin | null>(null)
-  const trimRegionRef = useRef<any>(null)
+  const trimRegionRef = useRef<Region | null>(null)
   const [isReady, setIsReady] = useState(false)
   const onReadyRef = useRef(onReady)
   const onSeekRef = useRef(onSeek)
@@ -76,10 +76,10 @@ export const useWavesurfer = ({
       waveColor,
       progressColor,
       height,
-      normalize: true,
       cursorWidth: 1,
       cursorColor: '#ef4444',
       interact: true,
+      dragToSeek: true,
       plugins: [regions, timeline],
     })
 
@@ -87,7 +87,6 @@ export const useWavesurfer = ({
 
     // Setup event listeners
     ws.on('ready', () => {
-      console.log('Wavesurfer ready!')
       setIsReady(true)
       onReadyRef.current?.()
     })
@@ -127,9 +126,14 @@ export const useWavesurfer = ({
     setIsReady(false) // Reset ready state while loading
     
     try {
-      console.log('Loading audio file into wavesurfer:', audioFile.name)
-      // Wavesurfer can load directly from File/Blob and extract audio
-      wavesurferRef.current.loadBlob(audioFile)
+      if (audioFile instanceof AudioBuffer) {
+        // Convert AudioBuffer to WAV Blob
+        const blob = audioBufferToWavBlob(audioFile)
+        wavesurferRef.current.loadBlob(blob)
+      } else {
+        // Wavesurfer can load directly from File/Blob and extract audio
+        wavesurferRef.current.loadBlob(audioFile)
+      }
     } catch (error) {
       console.error('Failed to load audio file into wavesurfer:', error)
     }
@@ -161,6 +165,55 @@ export const useWavesurfer = ({
   return {
     wavesurfer: wavesurferRef.current,
     isReady,
+  }
+}
+
+/**
+ * Convert AudioBuffer to WAV Blob for WaveSurfer
+ */
+function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
+  const numberOfChannels = audioBuffer.numberOfChannels
+  const sampleRate = audioBuffer.sampleRate
+  const length = audioBuffer.length * numberOfChannels * 2
+  const buffer = new ArrayBuffer(44 + length)
+  const view = new DataView(buffer)
+  
+  // Write WAV header
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, 36 + length, true)
+  writeString(view, 8, 'WAVE')
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true) // fmt chunk size
+  view.setUint16(20, 1, true) // PCM format
+  view.setUint16(22, numberOfChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * numberOfChannels * 2, true) // byte rate
+  view.setUint16(32, numberOfChannels * 2, true) // block align
+  view.setUint16(34, 16, true) // bits per sample
+  writeString(view, 36, 'data')
+  view.setUint32(40, length, true)
+  
+  // Write interleaved audio data
+  const channels: Float32Array[] = []
+  for (let i = 0; i < numberOfChannels; i++) {
+    channels.push(audioBuffer.getChannelData(i))
+  }
+  
+  let offset = 44
+  for (let i = 0; i < audioBuffer.length; i++) {
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const sample = Math.max(-1, Math.min(1, channels[channel][i]))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+      offset += 2
+    }
+  }
+  
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+function writeString(view: DataView, offset: number, string: string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i))
   }
 }
 

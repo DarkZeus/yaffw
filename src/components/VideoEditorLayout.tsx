@@ -1,5 +1,5 @@
 import { Scissors } from 'lucide-react'
-import { useCallback, useDeferredValue, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useVideoEditorMediator } from '../hooks/useVideoEditorMediator'
@@ -46,9 +46,6 @@ export function VideoEditorLayout() {
 
   const mediator = useVideoEditorMediator(handleRestrictionError)
   const { state, videoOps, fileOps, trimOps, exportOps, uiOps, playerRef, containerRef, volumeControlRef } = mediator
-
-  // Performance optimization - defer non-urgent updates
-  const deferredCurrentTime = useDeferredValue(state.currentTime)
 
   // Enhanced keyboard shortcuts with mediator operations
   const { shortcuts } = useKeyboardShortcuts({
@@ -192,7 +189,6 @@ export function VideoEditorLayout() {
                     handleZoomChange: uiOps.handleZoomChange
                   }}
                   currentVideo={state.currentVideo}
-                  deferredCurrentTime={deferredCurrentTime}
                   videoOps={videoOps}
                   trimOps={trimOps}
                   playerRef={playerRef}

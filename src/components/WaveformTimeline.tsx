@@ -3,7 +3,7 @@ import type ReactPlayer from 'react-player'
 import { useWavesurfer } from '../hooks/useWavesurfer'
 
 type WaveformTimelineProps = {
-  videoFile: File | null
+  videoFile: File | Blob | AudioBuffer | null
   hasAudio: boolean
   duration: number
   currentTime: number

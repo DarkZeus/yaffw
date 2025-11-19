@@ -2,18 +2,16 @@
 import type ReactPlayer from 'react-player'
 import type { TrimOperations, TrimState, UIState, VideoOperations, VideoState } from '../../types/video-editor-mediator.types'
 import type { LocalVideoFile } from '../../utils/localFileProcessor'
-import { WaveformTimeline } from '../WaveformTimeline'
+import { MultiTrackWaveform } from '../MultiTrackWaveform'
 import { Badge } from '../ui/badge'
-import { ScrollArea, ScrollBar } from '../ui/scroll-area'
+import { ScrollArea } from '../ui/scroll-area'
 import { VideoControlBar } from './VideoControlBar'
-import { ZoomControls } from './ZoomControls'
 
 type TimelineSectionProps = {
   videoState: Pick<VideoState, 'currentTime' | 'duration' | 'isPlaying' | 'playbackSpeed'>
   trimState: TrimState
   uiState: UIState
   currentVideo: LocalVideoFile
-  deferredCurrentTime: number
   videoOps: VideoOperations
   trimOps: TrimOperations
   playerRef: React.RefObject<ReactPlayer | null>
@@ -24,14 +22,13 @@ export const TimelineSection = ({
   trimState, 
   uiState,
   currentVideo, 
-  deferredCurrentTime, 
   videoOps, 
   trimOps,
   playerRef
 }: TimelineSectionProps) => {
   const { currentTime, duration, isPlaying, playbackSpeed } = videoState
   const { trimStart, trimEnd } = trimState
-  const { isFullscreen, zoomLevel, handleZoomChange } = uiState
+  const { isFullscreen } = uiState
 
   return (
     <ScrollArea className="h-full">
@@ -72,10 +69,11 @@ export const TimelineSection = ({
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
-          <WaveformTimeline
+        {/* Multi-Track Waveform Timeline */}
+        <div className="px-6 py-4">
+          <MultiTrackWaveform
             videoFile={currentVideo?.file || null}
-            hasAudio={currentVideo?.hasAudio ?? false}
+            hasAudio={true}
             duration={duration}
             currentTime={currentTime}
             trimStart={trimStart}
