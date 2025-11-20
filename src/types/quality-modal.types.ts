@@ -11,6 +11,13 @@ export type QualityModalProps = {
   }
 }
 
+export type AudioTrackControl = {
+  volume: number
+  muted: boolean
+  solo: boolean
+  mono: boolean
+}
+
 export type ExportSettings = {
   resolution: string
   bitrate: number
@@ -22,6 +29,7 @@ export type ExportSettings = {
   useFrameInterpolation?: boolean
   frameInterpolationModel?: string
   targetFps?: number
+  audioTrackControls?: Map<number, AudioTrackControl>
 }
 
 export type StandardResolution = {
@@ -57,6 +65,7 @@ export type QualitySettings = {
   useFrameInterpolation: boolean
   frameInterpolationModel: string
   targetFps: number
+  audioTrackControls?: Map<number, AudioTrackControl>
 }
 
 export type CodecInfo = {

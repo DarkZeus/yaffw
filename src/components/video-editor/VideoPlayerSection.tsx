@@ -98,6 +98,7 @@ export const VideoPlayerSection = forwardRef<HTMLDivElement, VideoPlayerSectionP
             onProgress={videoOps.handleProgress}
             onDuration={videoOps.handleDuration}
             controls={false}
+            muted={true}
           />
           
           {/* Video Controls Overlay */}

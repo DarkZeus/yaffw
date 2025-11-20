@@ -166,5 +166,6 @@ export type ExportManager = (
   utils: {
     showError: (message: string, details?: string) => void
     downloadVideo: (blob: Blob, fileName: string) => void
+    audioTrackControlsRef: React.RefObject<Map<number, { volume: number; muted: boolean; solo: boolean }>>
   }
 ) => ExportOperations 

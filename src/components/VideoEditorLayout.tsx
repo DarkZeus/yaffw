@@ -45,7 +45,7 @@ export function VideoEditorLayout() {
   }, [cookieUploadResolver])
 
   const mediator = useVideoEditorMediator(handleRestrictionError)
-  const { state, videoOps, fileOps, trimOps, exportOps, uiOps, playerRef, containerRef, volumeControlRef } = mediator
+  const { state, videoOps, fileOps, trimOps, exportOps, uiOps, playerRef, containerRef, volumeControlRef, audioTrackControlsRef } = mediator
 
   // Enhanced keyboard shortcuts with mediator operations
   const { shortcuts } = useKeyboardShortcuts({
@@ -192,6 +192,7 @@ export function VideoEditorLayout() {
                   videoOps={videoOps}
                   trimOps={trimOps}
                   playerRef={playerRef}
+                  audioTrackControlsRef={audioTrackControlsRef}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>

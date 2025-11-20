@@ -4,7 +4,7 @@ import type { ExportManager, QualitySettings } from '../../types/video-editor-me
 import { yaffwApi, getFileExtensionFromCodec } from '../../utils/apiClient'
 
 export const createExportManager: ExportManager = (state, setState, utils) => {
-  const { showError, downloadVideo } = utils
+  const { showError, downloadVideo, audioTrackControlsRef } = utils
 
   // Wait for background commit to complete
   const waitForBackgroundCommit = async (): Promise<void> => {
@@ -50,12 +50,15 @@ export const createExportManager: ExportManager = (state, setState, utils) => {
     setState({ isProcessing: true })
     
     try {
-      // Client-side trimming using Mediabunny
+      // Client-side trimming using Mediabunny with audio track controls
       const response = await yaffwApi.trimVideo({
         file: currentVideo.file,
         start: trimStart,
         end: trimEnd,
-        fileName: currentVideo.file.name
+        fileName: currentVideo.file.name,
+        qualitySettings: {
+          audioTrackControls: audioTrackControlsRef.current
+        } as Partial<QualitySettings>
       })
       
       if (response.status !== 200) {
@@ -92,7 +95,10 @@ export const createExportManager: ExportManager = (state, setState, utils) => {
         start: trimStart,
         end: trimEnd,
         fileName: currentVideo.file.name,
-        qualitySettings
+        qualitySettings: {
+          ...qualitySettings,
+          audioTrackControls: audioTrackControlsRef.current
+        }
       })
       
       if (response.status !== 200) {

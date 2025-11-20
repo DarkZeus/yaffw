@@ -15,6 +15,7 @@ type TimelineSectionProps = {
   videoOps: VideoOperations
   trimOps: TrimOperations
   playerRef: React.RefObject<ReactPlayer | null>
+  audioTrackControlsRef?: React.RefObject<Map<number, { volume: number; muted: boolean; solo: boolean }>>
 }
 
 export const TimelineSection = ({ 
@@ -24,7 +25,8 @@ export const TimelineSection = ({
   currentVideo, 
   videoOps, 
   trimOps,
-  playerRef
+  playerRef,
+  audioTrackControlsRef
 }: TimelineSectionProps) => {
   const { currentTime, duration, isPlaying, playbackSpeed } = videoState
   const { trimStart, trimEnd } = trimState
@@ -81,6 +83,8 @@ export const TimelineSection = ({
             onSeek={videoOps.handleSeek}
             onTrimChange={trimOps.handleTrimChange}
             playerRef={playerRef}
+            isPlaying={isPlaying}
+            audioTrackControlsRef={audioTrackControlsRef}
           />
         </div>
       </div>

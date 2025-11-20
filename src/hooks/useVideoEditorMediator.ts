@@ -57,6 +57,7 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
   const isMutedRef = useRef(false)
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const zoomLevelRef = useRef(1)
+  const audioTrackControlsRef = useRef<Map<number, { volume: number; muted: boolean; solo: boolean }>>(new Map())
 
   // Optimized state updater using transitions for non-urgent updates
   const updateState = useCallback((updates: Partial<VideoEditorState>) => {
@@ -160,7 +161,8 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
 
   const exportOps = createExportManager(state, updateState, {
     showError,
-    downloadVideo
+    downloadVideo,
+    audioTrackControlsRef
   })
 
   const uiOps = createUIManager(state, updateState, {
@@ -178,6 +180,7 @@ export const useVideoEditorMediator = (onRestrictionError?: (error: string) => P
     playerRef,
     containerRef,
     volumeControlRef,
-    zoomLevelRef
+    zoomLevelRef,
+    audioTrackControlsRef
   }
 } 
