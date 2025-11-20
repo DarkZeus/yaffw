@@ -14,36 +14,81 @@ type UseSyncedAudioTracksProps = {
   playerRef: React.RefObject<ReactPlayer | null>
   isPlaying: boolean
   currentTime: number
+  playbackSpeed: number
+}
+
+type TrackPlaybackState = {
+  stereoBuffer: AudioBuffer
+  monoBuffer?: AudioBuffer
+  source: AudioBufferSourceNode | null
+  gainNode: GainNode
+  startTime: number // when playback started
+  startOffset: number // offset into the buffer
 }
 
 export const useSyncedAudioTracks = ({
   audioTracks,
   playerRef,
   isPlaying,
-  currentTime
+  currentTime,
+  playbackSpeed
 }: UseSyncedAudioTracksProps) => {
-  const audioElementsRef = useRef<(HTMLAudioElement | null)[]>([])
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const playbackStatesRef = useRef<Map<number, TrackPlaybackState>>(new Map())
   const [trackControls, setTrackControls] = useState<Map<number, AudioTrackControls>>(new Map())
   const lastSeekTimeRef = useRef<number>(currentTime)
+  const isPlayingRef = useRef(isPlaying)
+  const playbackSpeedRef = useRef(playbackSpeed)
 
-  // Initialize audio elements and controls
+  // Helper: Convert AudioBuffer to mono
+  const convertToMono = (buffer: AudioBuffer): AudioBuffer => {
+    if (buffer.numberOfChannels === 1) return buffer
+    
+    const ctx = audioContextRef.current || new AudioContext()
+    const monoBuffer = ctx.createBuffer(1, buffer.length, buffer.sampleRate)
+    const monoData = monoBuffer.getChannelData(0)
+    
+    // Average all channels
+    for (let i = 0; i < buffer.length; i++) {
+      let sum = 0
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        sum += buffer.getChannelData(ch)[i]
+      }
+      monoData[i] = sum / buffer.numberOfChannels
+    }
+    
+    return monoBuffer
+  }
+
+  // Initialize audio context and playback states
   useEffect(() => {
-    audioElementsRef.current = audioTracks.map((track, idx) => {
-      if (!track.audioBlob) return null
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext()
+    }
+    
+    const ctx = audioContextRef.current
+    const newStates = new Map<number, TrackPlaybackState>()
+    
+    // Create playback state for each track
+    audioTracks.forEach(track => {
+      if (!track.audioBuffer) return
       
-      const audio = new Audio()
-      audio.src = URL.createObjectURL(track.audioBlob)
-      audio.preload = 'auto'
+      const gainNode = ctx.createGain()
+      gainNode.connect(ctx.destination)
       
-      // Apply existing controls or defaults
-      const controls = trackControls.get(track.index) || { volume: 1, muted: false, solo: false, mono: false }
-      audio.volume = controls.volume
-      audio.muted = controls.muted
-      
-      return audio
+      newStates.set(track.index, {
+        stereoBuffer: track.audioBuffer,
+        monoBuffer: undefined,
+        source: null,
+        gainNode,
+        startTime: 0,
+        startOffset: 0
+      })
     })
-
-    // Initialize controls for new tracks
+    
+    playbackStatesRef.current = newStates
+    
+    // Initialize controls
     const newControls = new Map(trackControls)
     audioTracks.forEach(track => {
       if (!newControls.has(track.index)) {
@@ -51,69 +96,169 @@ export const useSyncedAudioTracks = ({
       }
     })
     setTrackControls(newControls)
-
+    
     return () => {
-      audioElementsRef.current.forEach(audio => {
-        if (audio) {
-          audio.pause()
-          URL.revokeObjectURL(audio.src)
+      // Stop all sources
+      playbackStatesRef.current.forEach(state => {
+        if (state.source) {
+          state.source.stop()
+          state.source.disconnect()
         }
       })
-      audioElementsRef.current = []
+      playbackStatesRef.current.clear()
     }
   }, [audioTracks])
 
+  // Helper: Start playback for a track
+  const startTrackPlayback = (trackIndex: number, offset: number) => {
+    const state = playbackStatesRef.current.get(trackIndex)
+    const controls = trackControls.get(trackIndex)
+    if (!state || !audioContextRef.current) return
+    
+    // Stop existing source
+    if (state.source) {
+      state.source.stop()
+      state.source.disconnect()
+    }
+    
+    // Determine which buffer to use
+    const controls_current = controls || { volume: 1, muted: false, solo: false, mono: false }
+    let bufferToPlay = state.stereoBuffer
+    
+    if (controls_current.mono) {
+      // Create mono buffer if not cached
+      if (!state.monoBuffer) {
+        state.monoBuffer = convertToMono(state.stereoBuffer)
+      }
+      bufferToPlay = state.monoBuffer
+    }
+    
+    // Create new source
+    const source = audioContextRef.current.createBufferSource()
+    source.buffer = bufferToPlay
+    source.playbackRate.value = playbackSpeedRef.current
+    source.connect(state.gainNode)
+    
+    // Start playback from offset
+    const when = audioContextRef.current.currentTime
+    source.start(when, offset)
+    
+    state.source = source
+    state.startTime = when
+    state.startOffset = offset
+  }
+  
+  // Helper: Stop playback for a track
+  const stopTrackPlayback = (trackIndex: number) => {
+    const state = playbackStatesRef.current.get(trackIndex)
+    if (!state || !state.source) return
+    
+    state.source.stop()
+    state.source.disconnect()
+    state.source = null
+  }
+
   // Sync play/pause
   useEffect(() => {
-    audioElementsRef.current.forEach(audio => {
-      if (!audio) return
-      
-      if (isPlaying) {
-        audio.play().catch(err => console.warn('Audio play failed:', err))
-      } else {
-        audio.pause()
-      }
-    })
+    isPlayingRef.current = isPlaying
+    
+    if (isPlaying) {
+      // Start all tracks
+      playbackStatesRef.current.forEach((state, trackIndex) => {
+        startTrackPlayback(trackIndex, currentTime)
+      })
+    } else {
+      // Stop all tracks
+      playbackStatesRef.current.forEach((state, trackIndex) => {
+        stopTrackPlayback(trackIndex)
+      })
+    }
   }, [isPlaying])
 
-  // Sync seek (with threshold to avoid excessive seeks)
+  // Sync seek
   useEffect(() => {
     const timeDiff = Math.abs(currentTime - lastSeekTimeRef.current)
     
     // Only seek if diff > 0.1s to avoid micro-adjustments
     if (timeDiff > 0.1) {
-      audioElementsRef.current.forEach(audio => {
-        if (audio) {
-          audio.currentTime = currentTime
-        }
-      })
       lastSeekTimeRef.current = currentTime
+      
+      // Restart playback from new position if playing
+      if (isPlayingRef.current) {
+        playbackStatesRef.current.forEach((state, trackIndex) => {
+          stopTrackPlayback(trackIndex)
+          startTrackPlayback(trackIndex, currentTime)
+        })
+      }
     }
   }, [currentTime])
 
-  // Update volume/mute/solo
+  // Update volume/mute/solo/mono
   useEffect(() => {
     const hasSolo = Array.from(trackControls.values()).some(ctrl => ctrl.solo)
     
-    audioElementsRef.current.forEach((audio, idx) => {
-      if (!audio) return
-      
-      const trackIndex = audioTracks[idx]?.index
-      if (trackIndex === undefined) return
-      
+    playbackStatesRef.current.forEach((state, trackIndex) => {
       const controls = trackControls.get(trackIndex)
       if (!controls) return
 
-      // If any track is solo'd, mute non-solo tracks
+      // Calculate effective gain
+      let effectiveGain = controls.volume
+      
+      // Apply mute/solo logic
       if (hasSolo) {
-        audio.muted = !controls.solo || controls.muted
-      } else {
-        audio.muted = controls.muted
+        if (!controls.solo || controls.muted) {
+          effectiveGain = 0
+        }
+      } else if (controls.muted) {
+        effectiveGain = 0
       }
       
-      audio.volume = controls.volume
+      state.gainNode.gain.value = effectiveGain
     })
-  }, [trackControls, audioTracks])
+  }, [trackControls])
+  
+  // Handle mono toggle - restart playback with correct buffer
+  const prevControlsRef = useRef(trackControls)
+  useEffect(() => {
+    const prev = prevControlsRef.current
+    prevControlsRef.current = trackControls
+    
+    // Check if any mono state changed
+    playbackStatesRef.current.forEach((state, trackIndex) => {
+      const oldControls = prev.get(trackIndex)
+      const newControls = trackControls.get(trackIndex)
+      
+      if (oldControls?.mono !== newControls?.mono && isPlayingRef.current && audioContextRef.current) {
+        // Calculate current playback position
+        const elapsed = audioContextRef.current.currentTime - state.startTime
+        const currentOffset = state.startOffset + elapsed * playbackSpeedRef.current
+        
+        // Restart with new buffer
+        stopTrackPlayback(trackIndex)
+        startTrackPlayback(trackIndex, currentOffset)
+      }
+    })
+  }, [trackControls])
+
+  // Handle playback speed changes
+  useEffect(() => {
+    playbackSpeedRef.current = playbackSpeed
+    
+    // If playing, restart all tracks with new playback rate
+    if (isPlayingRef.current && audioContextRef.current) {
+      playbackStatesRef.current.forEach((state, trackIndex) => {
+        if (state.source) {
+          // Calculate current position accounting for old playback rate
+          const elapsed = audioContextRef.current!.currentTime - state.startTime
+          const currentOffset = state.startOffset + elapsed * state.source.playbackRate.value
+          
+          // Restart with new rate
+          stopTrackPlayback(trackIndex)
+          startTrackPlayback(trackIndex, currentOffset)
+        }
+      })
+    }
+  }, [playbackSpeed])
 
   const setTrackVolume = (trackIndex: number, volume: number) => {
     setTrackControls(prev => {

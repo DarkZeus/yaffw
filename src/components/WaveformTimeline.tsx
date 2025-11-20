@@ -35,9 +35,9 @@ export const WaveformTimeline = ({
     trimEnd,
     onSeek,
     onTrimChange,
-    waveColor: '#6366f1',
+    waveColor: '#08b7c4',
     progressColor: '#06b6d4',
-    height: 100,
+    height: 75,
   })
 
   // Sync wavesurfer playhead with video currentTime
@@ -54,7 +54,7 @@ export const WaveformTimeline = ({
       {/* Waveform Container */}
       <div 
         ref={containerRef}
-        className="relative w-full h-24 bg-gray-900 rounded-lg overflow-hidden"
+        className="relative w-full h-[75px] bg-gray-900 rounded-lg overflow-hidden"
       />
 
       {/* Loading State */}

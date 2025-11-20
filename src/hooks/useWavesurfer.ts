@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import WaveSurfer from 'wavesurfer.js'
 import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.esm.js'
-import TimelinePlugin from 'wavesurfer.js/dist/plugins/timeline.esm.js'
 
 type UseWavesurferOptions = {
   containerRef: React.RefObject<HTMLDivElement>
@@ -52,21 +51,6 @@ export const useWavesurfer = ({
   // Initialize wavesurfer instance once with plugins
   useEffect(() => {
     if (!containerRef.current || !timelineContainerRef.current) return
-
-    // Create Timeline plugin
-    const timeline = TimelinePlugin.create({
-      container: timelineContainerRef.current,
-      height: 20,
-      insertPosition: 'beforebegin',
-      timeInterval: 1,
-      primaryLabelInterval: 5,
-      secondaryLabelInterval: 1,
-      style: {
-        fontSize: '10px',
-        color: '#9ca3af',
-      },
-    })
-
     // Create Regions plugin
     const regions = RegionsPlugin.create()
     regionsPluginRef.current = regions
@@ -80,7 +64,7 @@ export const useWavesurfer = ({
       cursorColor: '#ef4444',
       interact: true,
       dragToSeek: true,
-      plugins: [regions, timeline],
+      plugins: [regions],
     })
 
     wavesurferRef.current = ws

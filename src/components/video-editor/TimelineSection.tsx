@@ -84,6 +84,7 @@ export const TimelineSection = ({
             onTrimChange={trimOps.handleTrimChange}
             playerRef={playerRef}
             isPlaying={isPlaying}
+            playbackSpeed={playbackSpeed}
             audioTrackControlsRef={audioTrackControlsRef}
           />
         </div>
