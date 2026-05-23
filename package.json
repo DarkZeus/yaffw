@@ -6,7 +6,7 @@
     "dev": "concurrently \"pnpm run server:watch\" \"pnpm run frontend\" --names \"SERVER,FRONTEND\" --prefix-colors \"blue,green\"",
     "frontend": "vite --port 3000",
     "start": "vite --port 3000",
-    "build": "vite build && tsc",
+    "build": "vite build && npm run typecheck",
     "typecheck": "tsc --project tsconfig.editor-next.json",
     "serve": "vite preview",
     "server": "node server.js",
