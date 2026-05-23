@@ -57,6 +57,7 @@ export function NativePreviewPlayer({
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const playheadRef = useRef<MediaTimeUs>(0);
+	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
 	const [playbackRate, setPlaybackRate] = useState(1);
@@ -185,7 +186,7 @@ export function NativePreviewPlayer({
 		void videoRef.current?.requestFullscreen?.();
 	}, []);
 
-	const handleNativeTimeUpdate = useCallback(() => {
+	const syncPlayheadWithNativeVideo = useCallback(() => {
 		const video = videoRef.current;
 
 		if (!video) {
@@ -194,6 +195,40 @@ export function NativePreviewPlayer({
 
 		setPlayheadUs(secondsToMicroseconds(video.currentTime));
 	}, [setPlayheadUs]);
+
+	useEffect(() => {
+		if (!isPlaying) {
+			if (playheadAnimationFrameRef.current !== null) {
+				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				playheadAnimationFrameRef.current = null;
+			}
+			return;
+		}
+
+		let cancelled = false;
+
+		function syncOnAnimationFrame() {
+			if (cancelled) {
+				return;
+			}
+
+			syncPlayheadWithNativeVideo();
+			playheadAnimationFrameRef.current =
+				requestPreviewFrame(syncOnAnimationFrame);
+		}
+
+		playheadAnimationFrameRef.current =
+			requestPreviewFrame(syncOnAnimationFrame);
+
+		return () => {
+			cancelled = true;
+
+			if (playheadAnimationFrameRef.current !== null) {
+				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				playheadAnimationFrameRef.current = null;
+			}
+		};
+	}, [isPlaying, syncPlayheadWithNativeVideo]);
 
 	const handleEnded = useCallback(() => {
 		setIsPlaying(false);
@@ -263,8 +298,8 @@ export function NativePreviewPlayer({
 					onEnded={handleEnded}
 					onPause={() => setIsPlaying(false)}
 					onPlay={() => setIsPlaying(true)}
-					onSeeked={handleNativeTimeUpdate}
-					onTimeUpdate={handleNativeTimeUpdate}
+					onSeeked={syncPlayheadWithNativeVideo}
+					onTimeUpdate={syncPlayheadWithNativeVideo}
 					preload="metadata"
 					ref={videoRef}
 					src={previewUrl || undefined}
@@ -281,6 +316,7 @@ export function NativePreviewPlayer({
 				onSelectionResetRequested={onSelectionResetRequested}
 				onSelectionStartCommitRequested={onSelectionStartRequested}
 				playheadUs={playheadUs}
+				playheadUpdatesAreLive={isPlaying}
 				selection={selection}
 				source={source}
 			/>
@@ -541,6 +577,23 @@ function clampMediaTime(
 	maxUs: MediaTimeUs,
 ): MediaTimeUs {
 	return Math.min(Math.max(valueUs, minUs), maxUs);
+}
+
+function requestPreviewFrame(callback: FrameRequestCallback): number {
+	if (typeof window.requestAnimationFrame === "function") {
+		return window.requestAnimationFrame(callback);
+	}
+
+	return window.setTimeout(() => callback(window.performance.now()), 16);
+}
+
+function cancelPreviewFrame(frameId: number) {
+	if (typeof window.cancelAnimationFrame === "function") {
+		window.cancelAnimationFrame(frameId);
+		return;
+	}
+
+	window.clearTimeout(frameId);
 }
 
 function formatMediaTime(timeUs: number): string {

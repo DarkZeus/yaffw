@@ -31,6 +31,7 @@ type SelectionTimelineProps = {
 	onSelectionResetRequested: () => void;
 	onSelectionStartCommitRequested: (playheadUs: MediaTimeUs) => void;
 	playheadUs: MediaTimeUs;
+	playheadUpdatesAreLive?: boolean;
 	selection: Selection;
 	source: Blob;
 	waveformLaneLoader?: WaveformLaneLoader;
@@ -103,6 +104,7 @@ export function SelectionTimeline({
 	onSelectionResetRequested,
 	onSelectionStartCommitRequested,
 	playheadUs,
+	playheadUpdatesAreLive = false,
 	selection,
 	source,
 	waveformLaneLoader = loadBrowserWaveformLane,
@@ -382,7 +384,7 @@ export function SelectionTimeline({
 			? "transition-[left,width] duration-200 ease-out motion-reduce:transition-none"
 			: "transition-none";
 	const playheadMotionClassName =
-		dragState === null
+		dragState === null && !playheadUpdatesAreLive
 			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
 

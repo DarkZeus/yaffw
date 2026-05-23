@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -102,6 +103,40 @@ describe("NativePreviewPlayer", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 		expect(video.muted).toBe(true);
+	});
+
+	it("samples the native video clock on animation frames while playing", async () => {
+		const frameCallbacks: FrameRequestCallback[] = [];
+		const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+			frameCallbacks.push(callback);
+			return frameCallbacks.length;
+		});
+		const cancelAnimationFrame = vi.fn();
+		vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+		vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+		renderPlayer();
+
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.getByLabelText("Playhead handle").className).toContain(
+			"transition-none",
+		);
+
+		video.currentTime = 1.25;
+		act(() => {
+			frameCallbacks.shift()?.(16);
+		});
+
+		expect(screen.getByText("00:00:01.250")).toBeTruthy();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
 	});
 
 	it("requests fullscreen when the native video API is available", () => {
