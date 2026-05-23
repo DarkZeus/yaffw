@@ -6,6 +6,7 @@ import {
 	FileVideo,
 	HardDrive,
 	Monitor,
+	PackageCheck,
 	Ratio,
 	Volume2,
 	VolumeX,
@@ -21,6 +22,7 @@ import {
 	useState,
 } from "react";
 
+import { planDefaultExportCapability } from "@/editor-core/export-capability";
 import {
 	type LocalMediaAssetInspector,
 	analyzeLocalMediaAssetDraft,
@@ -86,6 +88,7 @@ export function EditorNextRoute({
 		const result = await analyzeLocalMediaAssetDraft(draft, {
 			createAssetId,
 			inspect: inspectLocalAsset,
+			runtime,
 		});
 
 		if (result.status === "ready") {
@@ -310,14 +313,98 @@ function EditorSessionShell({
 
 			<aside className="flex flex-col gap-4">
 				{session.status === "ready" ? (
-					<MediaAnalyticsPanel
-						asset={session.asset}
-						selection={session.selection}
-					/>
+					<>
+						<ExportReviewPanel
+							asset={session.asset}
+							runtime={session.runtime}
+							selection={session.selection}
+						/>
+						<MediaAnalyticsPanel
+							asset={session.asset}
+							selection={session.selection}
+						/>
+					</>
 				) : null}
 				<RuntimeChecksPanel session={session} />
 			</aside>
 		</section>
+	);
+}
+
+function ExportReviewPanel({
+	asset,
+	runtime,
+	selection,
+}: {
+	asset: ReadyMediaAsset;
+	runtime: RuntimeSupport;
+	selection: Selection;
+}) {
+	const review = planDefaultExportCapability({
+		asset,
+		runtime,
+		selection,
+	});
+
+	return (
+		<section
+			aria-label="Export review"
+			className="flex flex-col gap-4 rounded-md border bg-card p-4"
+		>
+			<div className="flex items-center justify-between gap-3">
+				<h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+					<PackageCheck aria-hidden="true" className="size-4" />
+					Export review
+				</h2>
+				<Badge variant={review.supported ? "secondary" : "destructive"}>
+					{review.supported ? "Ready" : "Blocked"}
+				</Badge>
+			</div>
+
+			<div className="grid gap-2">
+				<ExportReviewRow
+					label="Planned output"
+					value={review.plannedOutput.label}
+				/>
+				{review.supported ? (
+					<>
+						<ExportReviewRow label="Method" value={review.method.label} />
+						<ExportReviewRow
+							label="Expected precision"
+							value={review.precision.label}
+						/>
+					</>
+				) : null}
+			</div>
+
+			<p className="text-sm leading-6 text-muted-foreground">{review.reason}</p>
+			{review.supported ? null : (
+				<p className="text-xs leading-5 text-muted-foreground">
+					{review.technicalDetails}
+				</p>
+			)}
+		</section>
+	);
+}
+
+function ExportReviewRow({
+	label,
+	value,
+}: {
+	label: string;
+	value: string;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-3 text-sm">
+			<span className="text-muted-foreground">{label}</span>
+			<Badge
+				className="max-w-52 truncate font-mono"
+				title={value}
+				variant="outline"
+			>
+				{value}
+			</Badge>
+		</div>
 	);
 }
 

@@ -6,6 +6,7 @@ import {
 } from "./local-file-analysis";
 import { createLocalMediaAssetDraft } from "./local-file-import";
 import type { LocalFileSource, MediaAssetDraft } from "./model";
+import { evaluateRuntimeSupport } from "./runtime-capabilities";
 
 describe("local media asset analysis", () => {
 	it("turns a supported local video with audio into a ready media asset", async () => {
@@ -52,6 +53,7 @@ describe("local media asset analysis", () => {
 					},
 				],
 			}),
+			runtime: supportedRuntime,
 		});
 
 		expect(result.status).toBe("ready");
@@ -89,6 +91,7 @@ describe("local media asset analysis", () => {
 					...supportedInspection,
 					audioTracks: [],
 				}),
+				runtime: supportedRuntime,
 			},
 		);
 
@@ -114,6 +117,7 @@ describe("local media asset analysis", () => {
 			{
 				createAssetId: () => "asset-generic-video",
 				inspect: async () => supportedInspection,
+				runtime: supportedRuntime,
 			},
 		);
 
@@ -140,6 +144,7 @@ describe("local media asset analysis", () => {
 					],
 					videoTracks: [],
 				}),
+				runtime: supportedRuntime,
 			},
 		);
 
@@ -163,6 +168,7 @@ describe("local media asset analysis", () => {
 				inspect: async () => {
 					throw new Error("Mediabunny could not parse the container.");
 				},
+				runtime: supportedRuntime,
 			},
 		);
 
@@ -187,6 +193,7 @@ describe("local media asset analysis", () => {
 					...supportedInspection,
 					defaultProfileExportable: false,
 				}),
+				runtime: supportedRuntime,
 			},
 		);
 
@@ -229,6 +236,14 @@ const supportedInspection = {
 		},
 	],
 } satisfies LocalMediaAssetInspection;
+
+const supportedRuntime = evaluateRuntimeSupport({
+	fileApi: true,
+	mediaSource: true,
+	objectUrl: true,
+	videoDecoder: true,
+	videoEncoder: true,
+});
 
 function draftFor(
 	source: Pick<LocalFileSource, "name" | "type">,

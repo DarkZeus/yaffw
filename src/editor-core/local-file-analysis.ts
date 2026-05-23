@@ -1,3 +1,4 @@
+import { planDefaultExportCapability } from "./export-capability";
 import { isPlausibleVideoDraft } from "./local-file-import";
 import {
 	type AudioMediaTrack,
@@ -9,6 +10,7 @@ import {
 	type UnsupportedMediaFailure,
 	type VideoMediaTrack,
 } from "./model";
+import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type VideoTrackInspection = {
 	codec?: string;
@@ -54,6 +56,7 @@ export type LocalMediaAssetInspector = (
 type LocalMediaAssetAnalysisOptions = {
 	createAssetId: () => string;
 	inspect: LocalMediaAssetInspector;
+	runtime: RuntimeSupport;
 };
 
 export async function analyzeLocalMediaAssetDraft(
@@ -86,28 +89,53 @@ export async function analyzeLocalMediaAssetDraft(
 		return unsupported(basicFailure.message, basicFailure.technicalDetails);
 	}
 
+	const frameTiming = inspection.frameTiming ?? estimatedFrameTiming();
+	const tracks = {
+		audio: inspection.audioTracks.map(toAudioTrack),
+		video: inspection.videoTracks.map(toVideoTrack),
+	};
+	const selection = {
+		endUs: inspection.durationUs,
+		startUs: 0,
+	};
+	const exportCapability = planDefaultExportCapability({
+		asset: {
+			durationUs: inspection.durationUs,
+			exportCapability: {
+				profile: DEFAULT_OUTPUT_PROFILE,
+				supported: inspection.defaultProfileExportable,
+			},
+			frameTiming,
+			tracks,
+		},
+		defaultProfileExportable: inspection.defaultProfileExportable,
+		runtime: options.runtime,
+		selection,
+	});
+
+	if (!exportCapability.supported) {
+		return unsupported(
+			exportCapability.reason,
+			exportCapability.technicalDetails,
+		);
+	}
+
 	const asset: ReadyMediaAsset = {
 		durationUs: inspection.durationUs,
 		exportCapability: {
 			profile: DEFAULT_OUTPUT_PROFILE,
 			supported: true,
 		},
-		frameTiming: inspection.frameTiming ?? estimatedFrameTiming(),
+		frameTiming,
 		id: options.createAssetId(),
 		label: draft.label,
 		provenance: draft.provenance,
-		tracks: {
-			audio: inspection.audioTracks.map(toAudioTrack),
-			video: inspection.videoTracks.map(toVideoTrack),
-		},
+		tracks,
 	};
 
 	return {
 		asset,
-		selection: {
-			endUs: asset.durationUs,
-			startUs: 0,
-		},
+		selection,
 		status: "ready",
 	};
 }
@@ -148,15 +176,6 @@ function validateInspection(
 			message: "This file cannot be previewed in this runtime.",
 			technicalDetails:
 				"The analyzed video track is not decodable by the current browser media APIs.",
-		};
-	}
-
-	if (!inspection.defaultProfileExportable) {
-		return {
-			message:
-				"This file cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
-			technicalDetails:
-				"The current runtime cannot encode the default output profile for this media asset.",
 		};
 	}
 

@@ -108,12 +108,22 @@ describe("EditorNextRoute", () => {
 		expect(screen.getByText("Stereo")).toBeTruthy();
 		expect(screen.getByText("48 kHz")).toBeTruthy();
 		expect(screen.getByText("Coverage")).toBeTruthy();
+		expect(screen.getByLabelText("Export review")).toBeTruthy();
+		expect(screen.getByText("Planned output")).toBeTruthy();
+		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
+		expect(screen.getByText("Fast export")).toBeTruthy();
+		expect(screen.getByText("Expected precision")).toBeTruthy();
+		expect(screen.getByText("Full asset")).toBeTruthy();
+		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 
 		await waitFor(() => {
 			expect(screen.getByText("00:00:10.000 - 00:00:12.000")).toBeTruthy();
+		});
+		await waitFor(() => {
+			expect(screen.getByText("Best-effort export")).toBeTruthy();
 		});
 	});
 
