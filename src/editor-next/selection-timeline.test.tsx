@@ -78,6 +78,9 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByLabelText("Playhead handle").className).not.toContain(
 			"ease-out",
 		);
+		expect(
+			screen.getByRole("button", { name: "Keep playhead centered" }),
+		).toBeTruthy();
 		expect(screen.getByLabelText("Move selection range").className).toContain(
 			"bg-transparent",
 		);
@@ -91,6 +94,33 @@ describe("SelectionTimeline", () => {
 		expect(screen.queryByText("Mute")).toBeNull();
 		expect(screen.queryByText("Solo")).toBeNull();
 		expect(screen.queryByText("Mono")).toBeNull();
+	});
+
+	it("centers the playhead in the horizontal scroll container when follow is enabled", async () => {
+		renderTimeline({
+			playheadUs: 6_000_000,
+		});
+
+		const scrollContainer = screen.getByTestId("selection-timeline-scroll");
+		const scrollTo = mockTimelineScroll(scrollContainer, {
+			clientWidth: 600,
+			scrollWidth: 1200,
+		});
+		const followButton = screen.getByRole("button", {
+			name: "Keep playhead centered",
+		});
+
+		expect(followButton.getAttribute("aria-pressed")).toBe("false");
+
+		fireEvent.click(followButton);
+
+		expect(followButton.getAttribute("aria-pressed")).toBe("true");
+		await waitFor(() => {
+			expect(scrollTo).toHaveBeenCalledWith({
+				behavior: "smooth",
+				left: 300,
+			});
+		});
 	});
 
 	it("seeks from waveform clicks, commits range drags as deltas, and zooms with horizontal width", () => {
@@ -279,6 +309,36 @@ function mockTimelineGeometry() {
 			};
 		},
 	);
+}
+
+function mockTimelineScroll(
+	element: HTMLElement,
+	{
+		clientWidth,
+		scrollWidth,
+	}: {
+		clientWidth: number;
+		scrollWidth: number;
+	},
+) {
+	const scrollTo = vi.fn((options: ScrollToOptions) => {
+		element.scrollLeft = Number(options.left ?? 0);
+	});
+
+	Object.defineProperty(element, "clientWidth", {
+		configurable: true,
+		value: clientWidth,
+	});
+	Object.defineProperty(element, "scrollWidth", {
+		configurable: true,
+		value: scrollWidth,
+	});
+	Object.defineProperty(element, "scrollTo", {
+		configurable: true,
+		value: scrollTo,
+	});
+
+	return scrollTo;
 }
 
 function createAudioBufferLike(

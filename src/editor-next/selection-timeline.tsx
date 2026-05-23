@@ -1,8 +1,9 @@
-import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { LocateFixed, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { ALL_FORMATS, AudioBufferSink, BlobSource, Input } from "mediabunny";
 import {
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
@@ -110,6 +111,7 @@ export function SelectionTimeline({
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
 	const trackRef = useRef<HTMLDivElement | null>(null);
+	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const dragAnimationFrameRef = useRef<number | null>(null);
 	const latestDragClientXRef = useRef<number | null>(null);
 	const [dragState, setDragState] = useState<DragState | null>(null);
@@ -117,6 +119,7 @@ export function SelectionTimeline({
 		null,
 	);
 	const [draftSelection, setDraftSelection] = useState<Selection | null>(null);
+	const [playheadFollowEnabled, setPlayheadFollowEnabled] = useState(false);
 	const [zoom, setZoom] = useState(1);
 	const laneStates = useWaveformLaneStates({
 		asset,
@@ -387,6 +390,62 @@ export function SelectionTimeline({
 		dragState === null && !playheadUpdatesAreLive
 			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
+	const centerPlayheadInScrollContainer = useCallback(
+		(behavior: ScrollBehavior) => {
+			const scrollContainer = scrollContainerRef.current;
+			const track = trackRef.current;
+
+			if (!scrollContainer || !track) {
+				return;
+			}
+
+			const maxScrollLeft =
+				scrollContainer.scrollWidth - scrollContainer.clientWidth;
+
+			if (maxScrollLeft <= 0) {
+				return;
+			}
+
+			const trackWidth =
+				track.getBoundingClientRect().width ||
+				scrollContainer.clientWidth * zoom ||
+				scrollContainer.scrollWidth;
+			const playheadCenterX = (playheadPercent / 100) * trackWidth;
+			const nextScrollLeft = clamp(
+				playheadCenterX - scrollContainer.clientWidth / 2,
+				0,
+				maxScrollLeft,
+			);
+
+			if (Math.abs(scrollContainer.scrollLeft - nextScrollLeft) < 0.5) {
+				return;
+			}
+
+			if (typeof scrollContainer.scrollTo === "function") {
+				scrollContainer.scrollTo({
+					behavior,
+					left: nextScrollLeft,
+				});
+				return;
+			}
+
+			scrollContainer.scrollLeft = nextScrollLeft;
+		},
+		[playheadPercent, zoom],
+	);
+
+	useEffect(() => {
+		if (!playheadFollowEnabled || dragState !== null) {
+			return;
+		}
+
+		centerPlayheadInScrollContainer(playheadUpdatesAreLive ? "auto" : "smooth");
+	}, [
+		centerPlayheadInScrollContainer,
+		dragState,
+		playheadFollowEnabled,
+		playheadUpdatesAreLive,
+	]);
 
 	return (
 		<section
@@ -470,10 +529,29 @@ export function SelectionTimeline({
 					>
 						<ZoomIn data-icon="inline-start" />
 					</Button>
+					<Button
+						aria-label="Keep playhead centered"
+						aria-pressed={playheadFollowEnabled}
+						onClick={() =>
+							setPlayheadFollowEnabled(
+								(currentFollowEnabled) => !currentFollowEnabled,
+							)
+						}
+						size="icon"
+						title="Keep playhead centered"
+						type="button"
+						variant={playheadFollowEnabled ? "secondary" : "outline"}
+					>
+						<LocateFixed data-icon="inline-start" />
+					</Button>
 				</div>
 			</div>
 
-			<div className="overflow-x-auto rounded-md border border-slate-700 bg-slate-900 text-slate-100 shadow-lg">
+			<div
+				className="overflow-x-auto rounded-md border border-slate-700 bg-slate-900 text-slate-100 shadow-lg"
+				data-testid="selection-timeline-scroll"
+				ref={scrollContainerRef}
+			>
 				<div
 					className="relative"
 					data-testid="selection-timeline-track"
