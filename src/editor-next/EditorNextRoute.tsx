@@ -1,5 +1,11 @@
 import { AlertTriangle, CheckCircle2, FileVideo } from "lucide-react";
-import { type ChangeEvent, type DragEvent, useMemo, useReducer } from "react";
+import {
+	type ChangeEvent,
+	type DragEvent,
+	useMemo,
+	useReducer,
+	useState,
+} from "react";
 
 import {
 	type LocalMediaAssetInspector,
@@ -16,6 +22,7 @@ import {
 	editorSessionReducer,
 } from "@/editor-core/session";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
+import { NativePreviewPlayer } from "./native-preview-player";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -43,11 +50,14 @@ export function EditorNextRoute({
 		runtime,
 		createInitialEditorSession,
 	);
+	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
 
 	async function importLocalFile(file: File) {
 		if (!session.importEnabled) {
 			return;
 		}
+
+		setPreviewSource(null);
 
 		const draft = createLocalMediaAssetDraft(file, {
 			createDraftId,
@@ -64,6 +74,7 @@ export function EditorNextRoute({
 		});
 
 		if (result.status === "ready") {
+			setPreviewSource(file);
 			dispatch({
 				asset: result.asset,
 				selection: result.selection,
@@ -72,6 +83,7 @@ export function EditorNextRoute({
 			return;
 		}
 
+		setPreviewSource(null);
 		dispatch({
 			message: result.failure.message,
 			technicalDetails: result.failure.technicalDetails,
@@ -137,6 +149,19 @@ export function EditorNextRoute({
 					<EditorSessionShell
 						onLocalFileDropped={handleLocalFileDropped}
 						onLocalFileSelected={handleLocalFileSelected}
+						onSelectionEndRequested={(playheadUs) =>
+							dispatch({
+								playheadUs,
+								type: "selection.end.setFromPlayhead",
+							})
+						}
+						onSelectionStartRequested={(playheadUs) =>
+							dispatch({
+								playheadUs,
+								type: "selection.start.setFromPlayhead",
+							})
+						}
+						previewSource={previewSource}
 						session={session}
 					/>
 				)}
@@ -171,12 +196,18 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 type EditorSessionShellProps = {
 	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
 	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
+	onSelectionEndRequested: (playheadUs: number) => void;
+	onSelectionStartRequested: (playheadUs: number) => void;
+	previewSource: Blob | null;
 	session: Exclude<EditorSessionState, { status: "unsupported-runtime" }>;
 };
 
 function EditorSessionShell({
 	onLocalFileDropped,
 	onLocalFileSelected,
+	onSelectionEndRequested,
+	onSelectionStartRequested,
+	previewSource,
 	session,
 }: EditorSessionShellProps) {
 	return (
@@ -233,6 +264,16 @@ function EditorSessionShell({
 						<SessionStatusLine session={session} />
 					</div>
 				</div>
+
+				{session.status === "ready" && previewSource ? (
+					<NativePreviewPlayer
+						asset={session.asset}
+						onSelectionEndRequested={onSelectionEndRequested}
+						onSelectionStartRequested={onSelectionStartRequested}
+						selection={session.selection}
+						source={previewSource}
+					/>
+				) : null}
 			</div>
 
 			<aside className="flex flex-col gap-3 rounded-md border bg-card p-4">
@@ -290,7 +331,10 @@ function SessionStatusLine({
 					</div>
 					<div>
 						<dt className="font-medium text-foreground">Selection</dt>
-						<dd>{formatMediaTime(session.selection.endUs)}</dd>
+						<dd>
+							{formatMediaTime(session.selection.startUs)} -{" "}
+							{formatMediaTime(session.selection.endUs)}
+						</dd>
 					</div>
 					<div>
 						<dt className="font-medium text-foreground">Duration</dt>

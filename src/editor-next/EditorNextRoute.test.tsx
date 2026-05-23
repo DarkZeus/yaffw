@@ -7,15 +7,31 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { EditorNextRoute } from "./EditorNextRoute";
 
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
+
+beforeEach(() => {
+	Object.defineProperty(URL, "createObjectURL", {
+		configurable: true,
+		value: vi.fn(() => "blob:editor-next-preview"),
+	});
+	Object.defineProperty(URL, "revokeObjectURL", {
+		configurable: true,
+		value: vi.fn(),
+	});
+});
+
 afterEach(() => {
 	cleanup();
+	restoreObjectUrl("createObjectURL", originalCreateObjectURL);
+	restoreObjectUrl("revokeObjectURL", originalRevokeObjectURL);
 });
 
 describe("EditorNextRoute", () => {
@@ -77,9 +93,17 @@ describe("EditorNextRoute", () => {
 		});
 
 		expect(screen.getByText("picked.mp4")).toBeTruthy();
+		expect(screen.getByLabelText("Preview for picked.mp4")).toBeTruthy();
 		expect(screen.getByText("Duration: 00:00:12.000")).toBeTruthy();
 		expect(screen.getByText("Video tracks: 1")).toBeTruthy();
 		expect(screen.getByText("Audio tracks: 1")).toBeTruthy();
+
+		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
+		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
+
+		await waitFor(() => {
+			expect(screen.getByText("00:00:10.000 - 00:00:12.000")).toBeTruthy();
+		});
 	});
 
 	it("imports a local file from drag and drop into the ready editor state", async () => {
@@ -174,3 +198,18 @@ const supportedInspection = {
 		},
 	],
 } satisfies LocalMediaAssetInspection;
+
+function restoreObjectUrl(
+	key: "createObjectURL" | "revokeObjectURL",
+	value: typeof URL.createObjectURL | typeof URL.revokeObjectURL | undefined,
+) {
+	if (value) {
+		Object.defineProperty(URL, key, {
+			configurable: true,
+			value,
+		});
+		return;
+	}
+
+	delete URL[key];
+}

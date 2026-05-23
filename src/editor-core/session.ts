@@ -1,5 +1,14 @@
-import type { MediaAssetDraft, ReadyMediaAsset, Selection } from "./model";
+import type {
+	MediaAssetDraft,
+	MediaTimeUs,
+	ReadyMediaAsset,
+	Selection,
+} from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
+import {
+	setSelectionEndFromPlayhead,
+	setSelectionStartFromPlayhead,
+} from "./selection";
 
 type BaseSessionState = {
 	runtime: RuntimeSupport;
@@ -69,6 +78,14 @@ export type EditorSessionAction =
 			type: "session.failed";
 	  }
 	| {
+			playheadUs: MediaTimeUs;
+			type: "selection.start.setFromPlayhead";
+	  }
+	| {
+			playheadUs: MediaTimeUs;
+			type: "selection.end.setFromPlayhead";
+	  }
+	| {
 			type: "session.closed";
 	  };
 
@@ -132,6 +149,38 @@ export function editorSessionReducer(
 				runtime: state.runtime,
 				status: "failure",
 				technicalDetails: action.technicalDetails,
+			};
+		case "selection.start.setFromPlayhead":
+			if (state.status !== "ready") {
+				return state;
+			}
+
+			return {
+				...state,
+				selection: setSelectionStartFromPlayhead(
+					state.selection,
+					action.playheadUs,
+					{
+						durationUs: state.asset.durationUs,
+						frameTiming: state.asset.frameTiming,
+					},
+				),
+			};
+		case "selection.end.setFromPlayhead":
+			if (state.status !== "ready") {
+				return state;
+			}
+
+			return {
+				...state,
+				selection: setSelectionEndFromPlayhead(
+					state.selection,
+					action.playheadUs,
+					{
+						durationUs: state.asset.durationUs,
+						frameTiming: state.asset.frameTiming,
+					},
+				),
 			};
 		case "session.closed":
 			return {

@@ -122,6 +122,67 @@ describe("editor-next session runtime gate", () => {
 		expect(closed.status).toBe("closed");
 		expect(closed.importEnabled).toBe(false);
 	});
+
+	it("sets selection boundaries from explicit playhead events without storing playhead state", () => {
+		const runtime = evaluateRuntimeSupport({
+			fileApi: true,
+			mediaSource: true,
+			objectUrl: true,
+			videoDecoder: true,
+			videoEncoder: true,
+		});
+		const ready = editorSessionReducer(
+			editorSessionReducer(createInitialEditorSession(runtime), {
+				draft: localDraft,
+				type: "import.started",
+			}),
+			{
+				asset: readyAsset,
+				selection: {
+					endUs: 800_000,
+					startUs: 200_000,
+				},
+				type: "asset.ready",
+			},
+		);
+
+		expect(ready.status).toBe("ready");
+		if (ready.status !== "ready") {
+			throw new Error(`Expected ready, got ${ready.status}`);
+		}
+
+		const startFromPlayhead = editorSessionReducer(ready, {
+			playheadUs: 790_000,
+			type: "selection.start.setFromPlayhead",
+		});
+
+		expect(startFromPlayhead.status).toBe("ready");
+		if (startFromPlayhead.status !== "ready") {
+			throw new Error(`Expected ready, got ${startFromPlayhead.status}`);
+		}
+
+		expect(startFromPlayhead.selection).toEqual({
+			endUs: 823_333,
+			startUs: 790_000,
+		});
+		expect("playheadUs" in startFromPlayhead).toBe(false);
+
+		const endFromPlayhead = editorSessionReducer(startFromPlayhead, {
+			playheadUs: 0,
+			type: "selection.end.setFromPlayhead",
+		});
+
+		expect(endFromPlayhead.status).toBe("ready");
+		if (endFromPlayhead.status !== "ready") {
+			throw new Error(`Expected ready, got ${endFromPlayhead.status}`);
+		}
+
+		expect(endFromPlayhead.selection).toEqual({
+			endUs: 33_333,
+			startUs: 0,
+		});
+		expect("playheadUs" in endFromPlayhead).toBe(false);
+	});
 });
 
 const localDraft = {
