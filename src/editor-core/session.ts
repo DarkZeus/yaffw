@@ -6,6 +6,8 @@ import type {
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
 import {
+	moveSelectionRangeByDelta,
+	resetSelection,
 	setSelectionEndFromPlayhead,
 	setSelectionStartFromPlayhead,
 } from "./selection";
@@ -84,6 +86,13 @@ export type EditorSessionAction =
 	| {
 			playheadUs: MediaTimeUs;
 			type: "selection.end.setFromPlayhead";
+	  }
+	| {
+			deltaUs: MediaTimeUs;
+			type: "selection.range.moved";
+	  }
+	| {
+			type: "selection.reset";
 	  }
 	| {
 			type: "session.closed";
@@ -181,6 +190,30 @@ export function editorSessionReducer(
 						frameTiming: state.asset.frameTiming,
 					},
 				),
+			};
+		case "selection.range.moved":
+			if (state.status !== "ready") {
+				return state;
+			}
+
+			return {
+				...state,
+				selection: moveSelectionRangeByDelta(state.selection, action.deltaUs, {
+					durationUs: state.asset.durationUs,
+					frameTiming: state.asset.frameTiming,
+				}),
+			};
+		case "selection.reset":
+			if (state.status !== "ready") {
+				return state;
+			}
+
+			return {
+				...state,
+				selection: resetSelection({
+					durationUs: state.asset.durationUs,
+					frameTiming: state.asset.frameTiming,
+				}),
 			};
 		case "session.closed":
 			return {

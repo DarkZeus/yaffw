@@ -106,6 +106,52 @@ describe("EditorNextRoute", () => {
 		});
 	});
 
+	it("renders a shared selection timeline with progressive waveform lanes and commits handle drags through the session", async () => {
+		mockTimelineGeometry();
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-timeline"}
+				createDraftId={() => "draft-timeline"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "timeline.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
+		});
+
+		expect(screen.getByText("Voice")).toBeTruthy();
+		expect(screen.getByText("eng")).toBeTruthy();
+		expect(screen.getByText("Selection duration")).toBeTruthy();
+		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
+
+		fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
+			clientX: 0,
+		});
+		fireEvent.mouseMove(window, { clientX: 600 });
+		fireEvent.mouseUp(window, { clientX: 600 });
+
+		await waitFor(() => {
+			expect(screen.getByText("00:00:06.000 - 00:00:12.000")).toBeTruthy();
+		});
+		expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
+
+		fireEvent.click(screen.getByRole("button", { name: "Reset selection" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("00:00:00.000 - 00:00:12.000")).toBeTruthy();
+		});
+		expect(screen.getByText("Playhead")).toBeTruthy();
+		expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
+	});
+
 	it("imports a local file from drag and drop into the ready editor state", async () => {
 		render(
 			<EditorNextRoute
@@ -212,4 +258,39 @@ function restoreObjectUrl(
 	}
 
 	delete URL[key];
+}
+
+function mockTimelineGeometry() {
+	vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+		function getBoundingClientRect(this: HTMLElement) {
+			if (
+				this instanceof HTMLElement &&
+				this.dataset.testid === "selection-timeline-track"
+			) {
+				return {
+					bottom: 80,
+					height: 80,
+					left: 0,
+					right: 1200,
+					toJSON: () => ({}),
+					top: 0,
+					width: 1200,
+					x: 0,
+					y: 0,
+				};
+			}
+
+			return {
+				bottom: 0,
+				height: 0,
+				left: 0,
+				right: 0,
+				toJSON: () => ({}),
+				top: 0,
+				width: 0,
+				x: 0,
+				y: 0,
+			};
+		},
+	);
 }

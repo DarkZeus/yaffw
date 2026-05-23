@@ -155,6 +155,17 @@ export function EditorNextRoute({
 								type: "selection.end.setFromPlayhead",
 							})
 						}
+						onSelectionRangeMoveRequested={(deltaUs) =>
+							dispatch({
+								deltaUs,
+								type: "selection.range.moved",
+							})
+						}
+						onSelectionResetRequested={() =>
+							dispatch({
+								type: "selection.reset",
+							})
+						}
 						onSelectionStartRequested={(playheadUs) =>
 							dispatch({
 								playheadUs,
@@ -197,6 +208,8 @@ type EditorSessionShellProps = {
 	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
 	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
 	onSelectionEndRequested: (playheadUs: number) => void;
+	onSelectionRangeMoveRequested: (deltaUs: number) => void;
+	onSelectionResetRequested: () => void;
 	onSelectionStartRequested: (playheadUs: number) => void;
 	previewSource: Blob | null;
 	session: Exclude<EditorSessionState, { status: "unsupported-runtime" }>;
@@ -206,6 +219,8 @@ function EditorSessionShell({
 	onLocalFileDropped,
 	onLocalFileSelected,
 	onSelectionEndRequested,
+	onSelectionRangeMoveRequested,
+	onSelectionResetRequested,
 	onSelectionStartRequested,
 	previewSource,
 	session,
@@ -269,6 +284,8 @@ function EditorSessionShell({
 					<NativePreviewPlayer
 						asset={session.asset}
 						onSelectionEndRequested={onSelectionEndRequested}
+						onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+						onSelectionResetRequested={onSelectionResetRequested}
 						onSelectionStartRequested={onSelectionStartRequested}
 						selection={session.selection}
 						source={previewSource}

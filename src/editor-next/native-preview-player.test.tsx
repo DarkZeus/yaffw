@@ -199,6 +199,8 @@ function renderPlayer(
 		<NativePreviewPlayer
 			asset={readyAsset}
 			onSelectionEndRequested={() => {}}
+			onSelectionRangeMoveRequested={() => {}}
+			onSelectionResetRequested={() => {}}
 			onSelectionStartRequested={() => {}}
 			selection={selection}
 			source={previewSource}

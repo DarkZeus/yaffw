@@ -51,6 +51,36 @@ export function setSelectionEndFromPlayhead(
 	};
 }
 
+export function moveSelectionRangeByDelta(
+	selection: Selection,
+	deltaUs: MediaTimeUs,
+	context: SelectionCommandContext,
+): Selection {
+	const minimumDurationUs = minimumSelectionDurationUs(context);
+	const selectionDurationUs = clampMediaTime(
+		selection.endUs - selection.startUs,
+		minimumDurationUs,
+		context.durationUs,
+	);
+	const startUs = clampMediaTime(
+		Math.round(selection.startUs + deltaUs),
+		0,
+		context.durationUs - selectionDurationUs,
+	);
+
+	return {
+		endUs: startUs + selectionDurationUs,
+		startUs,
+	};
+}
+
+export function resetSelection(context: SelectionCommandContext): Selection {
+	return {
+		endUs: context.durationUs,
+		startUs: 0,
+	};
+}
+
 function minimumSelectionDurationUs({
 	durationUs,
 	frameTiming,

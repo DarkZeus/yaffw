@@ -25,10 +25,13 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import { SelectionTimeline } from "./selection-timeline";
 
 type NativePreviewPlayerProps = {
 	asset: ReadyMediaAsset;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
+	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
+	onSelectionResetRequested: () => void;
 	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
 	selection: Selection;
 	shortcutsDisabled?: boolean;
@@ -45,6 +48,8 @@ const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 export function NativePreviewPlayer({
 	asset,
 	onSelectionEndRequested,
+	onSelectionRangeMoveRequested,
+	onSelectionResetRequested,
 	onSelectionStartRequested,
 	selection,
 	shortcutsDisabled = false,
@@ -267,6 +272,18 @@ export function NativePreviewPlayer({
 					<track kind="captions" />
 				</video>
 			</div>
+
+			<SelectionTimeline
+				asset={asset}
+				onPlayheadSeekRequested={seekToUs}
+				onSelectionEndCommitRequested={onSelectionEndRequested}
+				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+				onSelectionResetRequested={onSelectionResetRequested}
+				onSelectionStartCommitRequested={onSelectionStartRequested}
+				playheadUs={playheadUs}
+				selection={selection}
+				source={source}
+			/>
 
 			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
 				<div className="flex flex-col gap-3">

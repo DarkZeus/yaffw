@@ -183,6 +183,64 @@ describe("editor-next session runtime gate", () => {
 		});
 		expect("playheadUs" in endFromPlayhead).toBe(false);
 	});
+
+	it("moves and resets the committed selection without introducing preview state", () => {
+		const runtime = evaluateRuntimeSupport({
+			fileApi: true,
+			mediaSource: true,
+			objectUrl: true,
+			videoDecoder: true,
+			videoEncoder: true,
+		});
+		const ready = editorSessionReducer(
+			editorSessionReducer(createInitialEditorSession(runtime), {
+				draft: localDraft,
+				type: "import.started",
+			}),
+			{
+				asset: readyAsset,
+				selection: {
+					endUs: 600_000,
+					startUs: 200_000,
+				},
+				type: "asset.ready",
+			},
+		);
+
+		expect(ready.status).toBe("ready");
+		if (ready.status !== "ready") {
+			throw new Error(`Expected ready, got ${ready.status}`);
+		}
+
+		const moved = editorSessionReducer(ready, {
+			deltaUs: 700_000,
+			type: "selection.range.moved",
+		});
+
+		expect(moved.status).toBe("ready");
+		if (moved.status !== "ready") {
+			throw new Error(`Expected ready, got ${moved.status}`);
+		}
+
+		expect(moved.selection).toEqual({
+			endUs: 1_000_000,
+			startUs: 600_000,
+		});
+		expect("playheadUs" in moved).toBe(false);
+
+		const reset = editorSessionReducer(moved, { type: "selection.reset" });
+
+		expect(reset.status).toBe("ready");
+		if (reset.status !== "ready") {
+			throw new Error(`Expected ready, got ${reset.status}`);
+		}
+
+		expect(reset.selection).toEqual({
+			endUs: 1_000_000,
+			startUs: 0,
+		});
+		expect("playheadUs" in reset).toBe(false);
+	});
 });
 
 const localDraft = {
