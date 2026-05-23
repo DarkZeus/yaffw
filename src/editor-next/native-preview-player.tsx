@@ -34,6 +34,7 @@ type NativePreviewPlayerProps = {
 	onSelectionResetRequested: () => void;
 	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
 	selection: Selection;
+	selectionEditingDisabled?: boolean;
 	shortcutsDisabled?: boolean;
 	source: Blob;
 };
@@ -52,6 +53,7 @@ export function NativePreviewPlayer({
 	onSelectionResetRequested,
 	onSelectionStartRequested,
 	selection,
+	selectionEditingDisabled = false,
 	shortcutsDisabled = false,
 	source,
 }: NativePreviewPlayerProps) {
@@ -318,6 +320,7 @@ export function NativePreviewPlayer({
 				playheadUs={playheadUs}
 				playheadUpdatesAreLive={isPlaying}
 				selection={selection}
+				selectionEditingDisabled={selectionEditingDisabled}
 				source={source}
 			/>
 

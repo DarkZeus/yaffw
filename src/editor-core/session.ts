@@ -1,10 +1,16 @@
 import type {
+	ExportProgress,
+	GeneratedMedia,
 	MediaAssetDraft,
 	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
+import {
+	planDefaultExportCapability,
+	type ExportCapabilityReview,
+} from "./export-capability";
 import {
 	moveSelectionRangeByDelta,
 	resetSelection,
@@ -33,8 +39,47 @@ export type LoadingSession = {
 	status: "loading";
 } & BaseSessionState;
 
+export type ExportJobSnapshot = {
+	asset: ReadyMediaAsset;
+	review: Extract<ExportCapabilityReview, { supported: true }>;
+	selection: Selection;
+};
+
+export type ExportJob = {
+	cancelSupported: boolean;
+	id: string;
+	progress: ExportProgress;
+	snapshot: ExportJobSnapshot;
+};
+
+export type ExportSessionState =
+	| {
+			status: "reviewing";
+	  }
+	| {
+			job: ExportJob;
+			status: "running";
+	  }
+	| {
+			delivered: boolean;
+			generatedMedia: GeneratedMedia;
+			job: ExportJob;
+			status: "succeeded";
+	  }
+	| {
+			job: ExportJob;
+			message: string;
+			status: "failed";
+			technicalDetails?: string;
+	  }
+	| {
+			job: ExportJob;
+			status: "cancelled";
+	  };
+
 export type ReadySession = {
 	asset: ReadyMediaAsset;
+	export: ExportSessionState;
 	importEnabled: false;
 	selection: Selection;
 	status: "ready";
@@ -95,6 +140,35 @@ export type EditorSessionAction =
 			type: "selection.reset";
 	  }
 	| {
+			cancelSupported: boolean;
+			jobId: string;
+			type: "export.started";
+	  }
+	| {
+			jobId: string;
+			progress: ExportProgress;
+			type: "export.progressed";
+	  }
+	| {
+			generatedMedia: GeneratedMedia;
+			jobId: string;
+			type: "export.succeeded";
+	  }
+	| {
+			jobId: string;
+			message: string;
+			technicalDetails?: string;
+			type: "export.failed";
+	  }
+	| {
+			jobId: string;
+			type: "export.cancelled";
+	  }
+	| {
+			generatedMediaId: string;
+			type: "generated-media.delivered";
+	  }
+	| {
 			type: "session.closed";
 	  };
 
@@ -142,6 +216,9 @@ export function editorSessionReducer(
 
 			return {
 				asset: action.asset,
+				export: {
+					status: "reviewing",
+				},
 				importEnabled: false,
 				selection: action.selection,
 				runtime: state.runtime,
@@ -160,12 +237,13 @@ export function editorSessionReducer(
 				technicalDetails: action.technicalDetails,
 			};
 		case "selection.start.setFromPlayhead":
-			if (state.status !== "ready") {
+			if (!canChangeEditingDecisions(state)) {
 				return state;
 			}
 
 			return {
 				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
 				selection: setSelectionStartFromPlayhead(
 					state.selection,
 					action.playheadUs,
@@ -176,12 +254,13 @@ export function editorSessionReducer(
 				),
 			};
 		case "selection.end.setFromPlayhead":
-			if (state.status !== "ready") {
+			if (!canChangeEditingDecisions(state)) {
 				return state;
 			}
 
 			return {
 				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
 				selection: setSelectionEndFromPlayhead(
 					state.selection,
 					action.playheadUs,
@@ -192,34 +271,193 @@ export function editorSessionReducer(
 				),
 			};
 		case "selection.range.moved":
-			if (state.status !== "ready") {
+			if (!canChangeEditingDecisions(state)) {
 				return state;
 			}
 
 			return {
 				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
 				selection: moveSelectionRangeByDelta(state.selection, action.deltaUs, {
 					durationUs: state.asset.durationUs,
 					frameTiming: state.asset.frameTiming,
 				}),
 			};
 		case "selection.reset":
-			if (state.status !== "ready") {
+			if (!canChangeEditingDecisions(state)) {
 				return state;
 			}
 
 			return {
 				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
 				selection: resetSelection({
 					durationUs: state.asset.durationUs,
 					frameTiming: state.asset.frameTiming,
 				}),
 			};
+		case "export.started": {
+			if (state.status !== "ready" || state.export.status === "running") {
+				return state;
+			}
+
+			const review = planDefaultExportCapability({
+				asset: state.asset,
+				runtime: state.runtime,
+				selection: state.selection,
+			});
+
+			if (!review.supported) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					job: {
+						cancelSupported: action.cancelSupported,
+						id: action.jobId,
+						progress: {
+							phase: "preparing",
+						},
+						snapshot: {
+							asset: state.asset,
+							review,
+							selection: { ...state.selection },
+						},
+					},
+					status: "running",
+				},
+			};
+		}
+		case "export.progressed": {
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "running" ||
+				state.export.job.id !== action.jobId
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					...state.export,
+					job: {
+						...state.export.job,
+						progress: action.progress,
+					},
+				},
+			};
+		}
+		case "export.succeeded": {
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "running" ||
+				state.export.job.id !== action.jobId
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					delivered: false,
+					generatedMedia: action.generatedMedia,
+					job: {
+						...state.export.job,
+						progress: {
+							phase: "finalizing",
+						},
+					},
+					status: "succeeded",
+				},
+			};
+		}
+		case "export.failed": {
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "running" ||
+				state.export.job.id !== action.jobId
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					job: state.export.job,
+					message: action.message,
+					status: "failed",
+					technicalDetails: action.technicalDetails,
+				},
+			};
+		}
+		case "export.cancelled": {
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "running" ||
+				state.export.job.id !== action.jobId ||
+				!state.export.job.cancelSupported
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					job: state.export.job,
+					status: "cancelled",
+				},
+			};
+		}
+		case "generated-media.delivered":
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "succeeded" ||
+				state.export.generatedMedia.id !== action.generatedMediaId
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					...state.export,
+					delivered: true,
+				},
+			};
 		case "session.closed":
+			if (!canCloseEditorSession(state)) {
+				return state;
+			}
+
 			return {
 				importEnabled: false,
 				runtime: state.runtime,
 				status: "closed",
 			};
 	}
+}
+
+export function canChangeEditingDecisions(
+	state: EditorSessionState,
+): state is ReadySession {
+	return state.status === "ready" && state.export.status !== "running";
+}
+
+export function canCloseEditorSession(state: EditorSessionState): boolean {
+	return state.status === "ready" && state.export.status !== "running";
+}
+
+function resetExportReviewAfterEditingDecision(
+	exportState: ExportSessionState,
+): ExportSessionState {
+	if (exportState.status === "running" || exportState.status === "reviewing") {
+		return exportState;
+	}
+
+	return {
+		status: "reviewing",
+	};
 }

@@ -1,11 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import type { MediaAssetDraft, ReadyMediaAsset, Selection } from "./model";
+import type {
+	GeneratedMedia,
+	MediaAssetDraft,
+	ReadyMediaAsset,
+	Selection,
+} from "./model";
+import { DEFAULT_OUTPUT_PROFILE } from "./model";
 import {
 	evaluateRuntimeSupport,
 	readRuntimeCapabilities,
 } from "./runtime-capabilities";
-import { createInitialEditorSession, editorSessionReducer } from "./session";
+import {
+	canChangeEditingDecisions,
+	canCloseEditorSession,
+	createInitialEditorSession,
+	editorSessionReducer,
+} from "./session";
 
 describe("editor-next session runtime gate", () => {
 	it("reads WebCodecs and browser media API basics from a runtime object", () => {
@@ -241,6 +252,184 @@ describe("editor-next session runtime gate", () => {
 		});
 		expect("playheadUs" in reset).toBe(false);
 	});
+
+	it("starts a default export job from a valid review and captures a start-time snapshot", () => {
+		const ready = createReadySession({
+			endUs: 800_000,
+			startUs: 200_000,
+		});
+
+		const exporting = editorSessionReducer(ready, {
+			cancelSupported: true,
+			jobId: "export-1",
+			type: "export.started",
+		});
+
+		expect(exporting.status).toBe("ready");
+		if (exporting.status !== "ready") {
+			throw new Error(`Expected ready, got ${exporting.status}`);
+		}
+
+		expect(exporting.export.status).toBe("running");
+		if (exporting.export.status !== "running") {
+			throw new Error(`Expected running, got ${exporting.export.status}`);
+		}
+
+		expect(exporting.export.job.id).toBe("export-1");
+		expect(exporting.export.job.cancelSupported).toBe(true);
+		expect(exporting.export.job.snapshot.asset).toBe(readyAsset);
+		expect(exporting.export.job.snapshot.selection).toEqual({
+			endUs: 800_000,
+			startUs: 200_000,
+		});
+		expect(exporting.export.job.snapshot.review.supported).toBe(true);
+		expect(canChangeEditingDecisions(exporting)).toBe(false);
+		expect(canCloseEditorSession(exporting)).toBe(false);
+
+		const ignoredSelectionEdit = editorSessionReducer(exporting, {
+			playheadUs: 400_000,
+			type: "selection.start.setFromPlayhead",
+		});
+
+		expect(ignoredSelectionEdit).toBe(exporting);
+	});
+
+	it("tracks export progress and successful generated media without automatic delivery", () => {
+		const exporting = startExport(createReadySession());
+
+		const progressed = editorSessionReducer(exporting, {
+			jobId: "export-1",
+			progress: {
+				completedRatio: 0.5,
+				phase: "encoding",
+			},
+			type: "export.progressed",
+		});
+
+		expect(progressed.status).toBe("ready");
+		if (progressed.status !== "ready") {
+			throw new Error(`Expected ready, got ${progressed.status}`);
+		}
+		expect(progressed.export.status).toBe("running");
+		if (progressed.export.status !== "running") {
+			throw new Error(`Expected running, got ${progressed.export.status}`);
+		}
+
+		expect(progressed.export.job.progress).toEqual({
+			completedRatio: 0.5,
+			phase: "encoding",
+		});
+
+		const succeeded = editorSessionReducer(progressed, {
+			generatedMedia,
+			jobId: "export-1",
+			type: "export.succeeded",
+		});
+
+		expect(succeeded.status).toBe("ready");
+		if (succeeded.status !== "ready") {
+			throw new Error(`Expected ready, got ${succeeded.status}`);
+		}
+		expect(succeeded.export.status).toBe("succeeded");
+		if (succeeded.export.status !== "succeeded") {
+			throw new Error(`Expected succeeded, got ${succeeded.export.status}`);
+		}
+
+		expect(succeeded.export.generatedMedia).toBe(generatedMedia);
+		expect(succeeded.export.delivered).toBe(false);
+
+		const delivered = editorSessionReducer(succeeded, {
+			generatedMediaId: generatedMedia.id,
+			type: "generated-media.delivered",
+		});
+
+		expect(delivered.status).toBe("ready");
+		if (delivered.status !== "ready") {
+			throw new Error(`Expected ready, got ${delivered.status}`);
+		}
+		expect(delivered.export.status).toBe("succeeded");
+		if (delivered.export.status !== "succeeded") {
+			throw new Error(`Expected succeeded, got ${delivered.export.status}`);
+		}
+		expect(delivered.export.delivered).toBe(true);
+	});
+
+	it("keeps the active media asset and editing decisions after export failure or cancellation", () => {
+		const ready = createReadySession({
+			endUs: 900_000,
+			startUs: 300_000,
+		});
+		const exporting = startExport(ready);
+
+		const failed = editorSessionReducer(exporting, {
+			jobId: "export-1",
+			message: "Default export failed.",
+			technicalDetails: "Encoder rejected the source video.",
+			type: "export.failed",
+		});
+
+		expect(failed.status).toBe("ready");
+		if (failed.status !== "ready") {
+			throw new Error(`Expected ready, got ${failed.status}`);
+		}
+		expect(failed.asset).toBe(readyAsset);
+		expect(failed.selection).toEqual({
+			endUs: 900_000,
+			startUs: 300_000,
+		});
+		expect(failed.export.status).toBe("failed");
+		if (failed.export.status !== "failed") {
+			throw new Error(`Expected failed, got ${failed.export.status}`);
+		}
+		expect(failed.export.message).toBe("Default export failed.");
+		expect(failed.export.technicalDetails).toBe(
+			"Encoder rejected the source video.",
+		);
+
+		const cancelled = editorSessionReducer(exporting, {
+			jobId: "export-1",
+			type: "export.cancelled",
+		});
+
+		expect(cancelled.status).toBe("ready");
+		if (cancelled.status !== "ready") {
+			throw new Error(`Expected ready, got ${cancelled.status}`);
+		}
+		expect(cancelled.asset).toBe(readyAsset);
+		expect(cancelled.selection).toEqual({
+			endUs: 900_000,
+			startUs: 300_000,
+		});
+		expect(cancelled.export.status).toBe("cancelled");
+	});
+
+	it("does not start export from an invalid review and ignores unsupported cancellation", () => {
+		const invalidReviewReady = createReadySession({
+			endUs: 1_500_000,
+			startUs: 100_000,
+		});
+
+		const ignoredStart = editorSessionReducer(invalidReviewReady, {
+			cancelSupported: true,
+			jobId: "export-invalid",
+			type: "export.started",
+		});
+
+		expect(ignoredStart).toBe(invalidReviewReady);
+
+		const exporting = editorSessionReducer(createReadySession(), {
+			cancelSupported: false,
+			jobId: "export-uncancellable",
+			type: "export.started",
+		});
+
+		const ignoredCancellation = editorSessionReducer(exporting, {
+			jobId: "export-uncancellable",
+			type: "export.cancelled",
+		});
+
+		expect(ignoredCancellation).toBe(exporting);
+	});
 });
 
 const localDraft = {
@@ -292,3 +481,63 @@ const defaultSelection = {
 	endUs: 1_000_000,
 	startUs: 0,
 } satisfies Selection;
+
+const generatedMedia = {
+	assetId: "asset-1",
+	createdAtMs: 1_717_171_717,
+	fileName: "clip-export.mp4",
+	id: "generated-1",
+	mimeType: "video/mp4",
+	profile: DEFAULT_OUTPUT_PROFILE,
+	selection: {
+		endUs: 1_000_000,
+		startUs: 0,
+	},
+	sizeBytes: 2_048,
+} satisfies GeneratedMedia;
+
+function createReadySession(selection: Selection = defaultSelection) {
+	const ready = editorSessionReducer(
+		editorSessionReducer(createInitialEditorSession(supportedRuntime), {
+			draft: localDraft,
+			type: "import.started",
+		}),
+		{
+			asset: readyAsset,
+			selection,
+			type: "asset.ready",
+		},
+	);
+
+	if (ready.status !== "ready") {
+		throw new Error(`Expected ready, got ${ready.status}`);
+	}
+
+	return ready;
+}
+
+function startExport(ready: ReturnType<typeof createReadySession>) {
+	const exporting = editorSessionReducer(ready, {
+		cancelSupported: true,
+		jobId: "export-1",
+		type: "export.started",
+	});
+
+	if (exporting.status !== "ready") {
+		throw new Error(`Expected ready, got ${exporting.status}`);
+	}
+
+	if (exporting.export.status !== "running") {
+		throw new Error(`Expected running, got ${exporting.export.status}`);
+	}
+
+	return exporting;
+}
+
+const supportedRuntime = evaluateRuntimeSupport({
+	fileApi: true,
+	mediaSource: true,
+	objectUrl: true,
+	videoDecoder: true,
+	videoEncoder: true,
+});

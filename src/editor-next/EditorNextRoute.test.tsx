@@ -10,6 +10,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
+import type { ExportProgress } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { EditorNextRoute } from "./EditorNextRoute";
@@ -116,6 +117,7 @@ describe("EditorNextRoute", () => {
 		expect(screen.getByText("Full asset")).toBeTruthy();
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
+		fireEvent.blur(screen.getByLabelText("Local video file"));
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 
@@ -124,6 +126,156 @@ describe("EditorNextRoute", () => {
 		});
 		await waitFor(() => {
 			expect(screen.getByText("Best-effort export")).toBeTruthy();
+		});
+	});
+
+	it("runs default export from the review and requires explicit generated-media delivery", async () => {
+		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
+		const progressEvents: ExportProgress[] = [];
+		const exportStarted = createDeferred<{ blob: Blob }>();
+		const exportRun = vi.fn(({ onProgress }) => {
+			const emitProgress = (progress: ExportProgress) => {
+				progressEvents.push(progress);
+				onProgress(progress);
+			};
+
+			emitProgress({
+				phase: "preparing",
+			});
+			emitProgress({
+				completedRatio: 0.4,
+				phase: "encoding",
+			});
+
+			return exportStarted.promise;
+		});
+		const deliverGeneratedMedia = vi.fn();
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-exported"}
+				createDraftId={() => "draft-exported"}
+				createExportJobId={() => "export-route"}
+				createGeneratedMediaId={() => "generated-route"}
+				defaultExportRunner={{
+					cancelSupported: true,
+					run: exportRun,
+				}}
+				deliverGeneratedMedia={deliverGeneratedMedia}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+				now={() => 1_717_171_717}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "picked.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Export review")).toBeTruthy();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+
+		await waitFor(() => {
+			expect(exportRun).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.getByRole("button", { name: "Cancel export" })).toBeTruthy();
+
+		exportStarted.resolve({
+			blob: generatedBlob,
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Export complete")).toBeTruthy();
+		});
+
+		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
+		expect(screen.getByText("picked-export.mp4")).toBeTruthy();
+		expect(screen.getAllByLabelText(/^Preview for/)).toHaveLength(1);
+		expect(
+			screen.queryByRole("button", { name: /use generated/i }),
+		).toBeNull();
+		expect(progressEvents[0]).toEqual({
+			phase: "preparing",
+		});
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Download generated media" }),
+		);
+
+		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
+			blob: generatedBlob,
+			generatedMedia: {
+				assetId: "asset-exported",
+				createdAtMs: 1_717_171_717,
+				fileName: "picked-export.mp4",
+				id: "generated-route",
+				mimeType: "video/mp4",
+				profile: {
+					audioCodec: "aac",
+					container: "mp4",
+					videoCodec: "h264",
+				},
+				selection: {
+					endUs: 12_000_000,
+					startUs: 0,
+				},
+				sizeBytes: generatedBlob.size,
+			},
+		});
+		await waitFor(() => {
+			expect(screen.getByText("Delivered")).toBeTruthy();
+		});
+	});
+
+	it("hides cancellation when the active export runner cannot stop safely", async () => {
+		const exportStarted = createDeferred<{ blob: Blob }>();
+		const exportRun = vi.fn(() => exportStarted.promise);
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-uncancellable"}
+				createDraftId={() => "draft-uncancellable"}
+				createExportJobId={() => "export-uncancellable"}
+				createGeneratedMediaId={() => "generated-uncancellable"}
+				defaultExportRunner={{
+					cancelSupported: false,
+					run: exportRun,
+				}}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "uncancellable.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Start default export" }))
+				.toBeTruthy();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+
+		await waitFor(() => {
+			expect(exportRun).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.queryByRole("button", { name: "Cancel export" })).toBeNull();
+		expect(screen.getByText("Cancellation unavailable")).toBeTruthy();
+
+		exportStarted.resolve({
+			blob: new Blob(["export"], { type: "video/mp4" }),
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Export complete")).toBeTruthy();
 		});
 	});
 
@@ -316,4 +468,19 @@ function mockTimelineGeometry() {
 			};
 		},
 	);
+}
+
+function createDeferred<T>() {
+	let resolve!: (value: T) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((promiseResolve, promiseReject) => {
+		resolve = promiseResolve;
+		reject = promiseReject;
+	});
+
+	return {
+		promise,
+		reject,
+		resolve,
+	};
 }

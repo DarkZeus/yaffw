@@ -83,6 +83,29 @@ export type ExportCapability =
 			technicalDetails?: string;
 	  };
 
+export type ExportProgressPhase =
+	| "encoding"
+	| "finalizing"
+	| "muxing"
+	| "preparing";
+
+export type ExportProgress = {
+	completedRatio?: number;
+	message?: string;
+	phase: ExportProgressPhase;
+};
+
+export type GeneratedMedia = {
+	assetId: string;
+	createdAtMs: number;
+	fileName: string;
+	id: string;
+	mimeType: string;
+	profile: DefaultOutputProfile;
+	selection: Selection;
+	sizeBytes: number;
+};
+
 export type ReadyMediaAsset = {
 	durationUs: MediaTimeUs;
 	exportCapability: ExportCapability;

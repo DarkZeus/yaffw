@@ -3,11 +3,14 @@ import {
 	BarChart3,
 	CheckCircle2,
 	Clock,
+	Download,
 	FileVideo,
 	HardDrive,
 	Monitor,
 	PackageCheck,
+	PlayCircle,
 	Ratio,
+	Square,
 	Volume2,
 	VolumeX,
 } from "lucide-react";
@@ -19,6 +22,7 @@ import {
 	cloneElement,
 	useMemo,
 	useReducer,
+	useRef,
 	useState,
 } from "react";
 
@@ -28,35 +32,62 @@ import {
 	analyzeLocalMediaAssetDraft,
 } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
-import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
+import type {
+	ExportProgress,
+	GeneratedMedia,
+	ReadyMediaAsset,
+	Selection,
+} from "@/editor-core/model";
 import {
 	type RuntimeSupport,
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
 import {
 	type EditorSessionState,
+	type ExportSessionState,
 	createInitialEditorSession,
 	editorSessionReducer,
 } from "@/editor-core/session";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
+import {
+	browserDefaultExportRunner,
+	type DefaultExportRunner,
+	isDefaultExportCancelledError,
+} from "./default-export-runner";
+import {
+	deliverBrowserGeneratedMedia,
+	type GeneratedMediaDeliveryRequest,
+} from "./generated-media-delivery";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 
 type EditorNextRouteProps = {
 	createAssetId?: () => string;
 	createDraftId?: () => string;
+	createExportJobId?: () => string;
+	createGeneratedMediaId?: () => string;
+	defaultExportRunner?: DefaultExportRunner;
+	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
 	initialRuntime?: RuntimeSupport;
 	inspectLocalAsset?: LocalMediaAssetInspector;
+	now?: () => number;
 };
 
 export function EditorNextRoute({
 	createAssetId = () => createBrowserId("asset"),
 	createDraftId = () => createBrowserId("draft"),
+	createExportJobId = () => createBrowserId("export"),
+	createGeneratedMediaId = () => createBrowserId("generated"),
+	defaultExportRunner = browserDefaultExportRunner,
+	deliverGeneratedMedia = deliverBrowserGeneratedMedia,
 	initialRuntime,
 	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
+	now = () => Date.now(),
 }: EditorNextRouteProps) {
 	const runtime = useMemo(
 		() => initialRuntime ?? detectRuntimeSupport(),
@@ -67,6 +98,10 @@ export function EditorNextRoute({
 		runtime,
 		createInitialEditorSession,
 	);
+	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
+	const [generatedMediaBlobs, setGeneratedMediaBlobs] = useState<
+		Record<string, Blob>
+	>({});
 	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
 
 	async function importLocalFile(file: File) {
@@ -74,6 +109,9 @@ export function EditorNextRoute({
 			return;
 		}
 
+		activeExportAbortControllerRef.current?.abort();
+		activeExportAbortControllerRef.current = null;
+		setGeneratedMediaBlobs({});
 		setPreviewSource(null);
 
 		const draft = createLocalMediaAssetDraft(file, {
@@ -131,6 +169,127 @@ export function EditorNextRoute({
 		void importLocalFile(file);
 	}
 
+	async function startDefaultExport() {
+		if (session.status !== "ready" || !previewSource) {
+			return;
+		}
+
+		const review = planDefaultExportCapability({
+			asset: session.asset,
+			runtime: session.runtime,
+			selection: session.selection,
+		});
+
+		if (!review.supported || session.export.status === "running") {
+			return;
+		}
+
+		const jobId = createExportJobId();
+		const abortController = new AbortController();
+		activeExportAbortControllerRef.current = abortController;
+
+		dispatch({
+			cancelSupported: defaultExportRunner.cancelSupported,
+			jobId,
+			type: "export.started",
+		});
+
+		try {
+			const result = await defaultExportRunner.run({
+				asset: session.asset,
+				onProgress: (progress) => {
+					dispatch({
+						jobId,
+						progress,
+						type: "export.progressed",
+					});
+				},
+				selection: session.selection,
+				signal: abortController.signal,
+				source: previewSource,
+			});
+
+			if (abortController.signal.aborted) {
+				dispatch({
+					jobId,
+					type: "export.cancelled",
+				});
+				return;
+			}
+
+			const generatedMedia = createGeneratedMedia({
+				asset: session.asset,
+				blob: result.blob,
+				fileName: result.fileName,
+				generatedMediaId: createGeneratedMediaId(),
+				mimeType: result.mimeType,
+				now,
+				selection: session.selection,
+			});
+
+			setGeneratedMediaBlobs((currentBlobs) => ({
+				...currentBlobs,
+				[generatedMedia.id]: result.blob,
+			}));
+			dispatch({
+				generatedMedia,
+				jobId,
+				type: "export.succeeded",
+			});
+		} catch (error) {
+			if (
+				abortController.signal.aborted ||
+				isDefaultExportCancelledError(error)
+			) {
+				dispatch({
+					jobId,
+					type: "export.cancelled",
+				});
+				return;
+			}
+
+			dispatch({
+				jobId,
+				message: "Default export failed.",
+				technicalDetails: errorToMessage(error),
+				type: "export.failed",
+			});
+		} finally {
+			if (activeExportAbortControllerRef.current === abortController) {
+				activeExportAbortControllerRef.current = null;
+			}
+		}
+	}
+
+	function cancelDefaultExport() {
+		if (
+			session.status !== "ready" ||
+			session.export.status !== "running" ||
+			!session.export.job.cancelSupported
+		) {
+			return;
+		}
+
+		activeExportAbortControllerRef.current?.abort();
+	}
+
+	function downloadGeneratedMedia(generatedMedia: GeneratedMedia) {
+		const blob = generatedMediaBlobs[generatedMedia.id];
+
+		if (!blob) {
+			return;
+		}
+
+		deliverGeneratedMedia({
+			blob,
+			generatedMedia,
+		});
+		dispatch({
+			generatedMediaId: generatedMedia.id,
+			type: "generated-media.delivered",
+		});
+	}
+
 	return (
 		<main className="min-h-screen bg-background text-foreground">
 			<div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -165,6 +324,11 @@ export function EditorNextRoute({
 					<UnsupportedRuntimeState session={session} />
 				) : (
 					<EditorSessionShell
+						onDefaultExportCancelRequested={cancelDefaultExport}
+						onDefaultExportStartRequested={() => {
+							void startDefaultExport();
+						}}
+						onGeneratedMediaDownloadRequested={downloadGeneratedMedia}
 						onLocalFileDropped={handleLocalFileDropped}
 						onLocalFileSelected={handleLocalFileSelected}
 						onSelectionEndRequested={(playheadUs) =>
@@ -223,6 +387,9 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 }
 
 type EditorSessionShellProps = {
+	onDefaultExportCancelRequested: () => void;
+	onDefaultExportStartRequested: () => void;
+	onGeneratedMediaDownloadRequested: (generatedMedia: GeneratedMedia) => void;
 	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
 	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
 	onSelectionEndRequested: (playheadUs: number) => void;
@@ -234,6 +401,9 @@ type EditorSessionShellProps = {
 };
 
 function EditorSessionShell({
+	onDefaultExportCancelRequested,
+	onDefaultExportStartRequested,
+	onGeneratedMediaDownloadRequested,
 	onLocalFileDropped,
 	onLocalFileSelected,
 	onSelectionEndRequested,
@@ -243,6 +413,9 @@ function EditorSessionShell({
 	previewSource,
 	session,
 }: EditorSessionShellProps) {
+	const selectionEditingDisabled =
+		session.status === "ready" && session.export.status === "running";
+
 	return (
 		<section
 			aria-labelledby="editor-next-import-title"
@@ -306,6 +479,8 @@ function EditorSessionShell({
 						onSelectionResetRequested={onSelectionResetRequested}
 						onSelectionStartRequested={onSelectionStartRequested}
 						selection={session.selection}
+						selectionEditingDisabled={selectionEditingDisabled}
+						shortcutsDisabled={selectionEditingDisabled}
 						source={previewSource}
 					/>
 				) : null}
@@ -316,6 +491,10 @@ function EditorSessionShell({
 					<>
 						<ExportReviewPanel
 							asset={session.asset}
+							exportState={session.export}
+							onCancelExport={onDefaultExportCancelRequested}
+							onDownloadGeneratedMedia={onGeneratedMediaDownloadRequested}
+							onStartExport={onDefaultExportStartRequested}
 							runtime={session.runtime}
 							selection={session.selection}
 						/>
@@ -333,10 +512,18 @@ function EditorSessionShell({
 
 function ExportReviewPanel({
 	asset,
+	exportState,
+	onCancelExport,
+	onDownloadGeneratedMedia,
+	onStartExport,
 	runtime,
 	selection,
 }: {
 	asset: ReadyMediaAsset;
+	exportState: ExportSessionState;
+	onCancelExport: () => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onStartExport: () => void;
 	runtime: RuntimeSupport;
 	selection: Selection;
 }) {
@@ -383,7 +570,133 @@ function ExportReviewPanel({
 					{review.technicalDetails}
 				</p>
 			)}
+			<ExportJobStatus exportState={exportState} />
+			<ExportReviewActions
+				exportState={exportState}
+				onCancelExport={onCancelExport}
+				onDownloadGeneratedMedia={onDownloadGeneratedMedia}
+				onStartExport={onStartExport}
+				reviewSupported={review.supported}
+			/>
 		</section>
+	);
+}
+
+function ExportJobStatus({
+	exportState,
+}: {
+	exportState: ExportSessionState;
+}) {
+	if (exportState.status === "running") {
+		const progressValue = progressPercent(exportState.job.progress);
+
+		return (
+			<div className="grid gap-2 rounded-md border bg-background p-3">
+				<div className="flex items-center justify-between gap-3 text-sm">
+					<span className="font-medium">
+						{formatExportProgressPhase(exportState.job.progress.phase)}
+					</span>
+					<Badge variant="outline">{exportState.job.id}</Badge>
+				</div>
+				<Progress aria-label="Export progress" value={progressValue} />
+				{exportState.job.cancelSupported ? null : (
+					<p className="text-xs text-muted-foreground">
+						Cancellation unavailable
+					</p>
+				)}
+			</div>
+		);
+	}
+
+	if (exportState.status === "succeeded") {
+		return (
+			<div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
+				<div className="flex items-center justify-between gap-3">
+					<span className="font-medium">Export complete</span>
+					<Badge variant={exportState.delivered ? "secondary" : "outline"}>
+						{exportState.delivered ? "Delivered" : "Ready to download"}
+					</Badge>
+				</div>
+				<p className="font-mono text-xs text-muted-foreground">
+					{exportState.generatedMedia.fileName}
+				</p>
+			</div>
+		);
+	}
+
+	if (exportState.status === "failed") {
+		return (
+			<div className="grid gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
+				<span className="font-medium text-destructive">
+					{exportState.message}
+				</span>
+				{exportState.technicalDetails ? (
+					<p className="text-xs text-muted-foreground">
+						{exportState.technicalDetails}
+					</p>
+				) : null}
+			</div>
+		);
+	}
+
+	if (exportState.status === "cancelled") {
+		return (
+			<div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
+				Export cancelled.
+			</div>
+		);
+	}
+
+	return null;
+}
+
+function ExportReviewActions({
+	exportState,
+	onCancelExport,
+	onDownloadGeneratedMedia,
+	onStartExport,
+	reviewSupported,
+}: {
+	exportState: ExportSessionState;
+	onCancelExport: () => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onStartExport: () => void;
+	reviewSupported: boolean;
+}) {
+	if (exportState.status === "running") {
+		if (!exportState.job.cancelSupported) {
+			return null;
+		}
+
+		return (
+			<Button onClick={onCancelExport} type="button" variant="outline">
+				<Square data-icon="inline-start" />
+				Cancel export
+			</Button>
+		);
+	}
+
+	if (exportState.status === "succeeded") {
+		return (
+			<Button
+				onClick={() => onDownloadGeneratedMedia(exportState.generatedMedia)}
+				type="button"
+			>
+				<Download data-icon="inline-start" />
+				Download generated media
+			</Button>
+		);
+	}
+
+	return (
+		<Button
+			disabled={!reviewSupported}
+			onClick={onStartExport}
+			type="button"
+		>
+			<PlayCircle data-icon="inline-start" />
+			Start default export
+		</Button>
 	);
 }
 
@@ -937,6 +1250,71 @@ function formatMediaTime(timeUs: number): string {
 		3,
 		"0",
 	)}`;
+}
+
+function createGeneratedMedia({
+	asset,
+	blob,
+	fileName,
+	generatedMediaId,
+	mimeType,
+	now,
+	selection,
+}: {
+	asset: ReadyMediaAsset;
+	blob: Blob;
+	fileName?: string;
+	generatedMediaId: string;
+	mimeType?: string;
+	now: () => number;
+	selection: Selection;
+}): GeneratedMedia {
+	return {
+		assetId: asset.id,
+		createdAtMs: now(),
+		fileName:
+			fileName ?? createGeneratedMediaFileName(asset.provenance.fileName),
+		id: generatedMediaId,
+		mimeType: mimeType ?? (blob.type || "video/mp4"),
+		profile: asset.exportCapability.profile,
+		selection: { ...selection },
+		sizeBytes: blob.size,
+	};
+}
+
+function createGeneratedMediaFileName(fileName: string): string {
+	const extensionStart = fileName.lastIndexOf(".");
+
+	if (extensionStart <= 0) {
+		return `${fileName}-export.mp4`;
+	}
+
+	return `${fileName.slice(0, extensionStart)}-export.mp4`;
+}
+
+function progressPercent(progress: ExportProgress): number {
+	return Math.round(Math.max(0.05, progress.completedRatio ?? 0.05) * 100);
+}
+
+function formatExportProgressPhase(phase: ExportProgress["phase"]): string {
+	switch (phase) {
+		case "encoding":
+			return "Encoding";
+		case "finalizing":
+			return "Finalizing";
+		case "muxing":
+			return "Muxing";
+		case "preparing":
+			return "Preparing";
+	}
+}
+
+function errorToMessage(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return String(error);
 }
 
 function createBrowserId(prefix: string): string {

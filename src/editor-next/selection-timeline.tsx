@@ -34,6 +34,7 @@ type SelectionTimelineProps = {
 	playheadUs: MediaTimeUs;
 	playheadUpdatesAreLive?: boolean;
 	selection: Selection;
+	selectionEditingDisabled?: boolean;
 	source: Blob;
 	waveformLaneLoader?: WaveformLaneLoader;
 };
@@ -107,6 +108,7 @@ export function SelectionTimeline({
 	playheadUs,
 	playheadUpdatesAreLive = false,
 	selection,
+	selectionEditingDisabled = false,
 	source,
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
@@ -319,6 +321,9 @@ export function SelectionTimeline({
 	) {
 		event.preventDefault();
 		event.stopPropagation();
+		if (selectionEditingDisabled) {
+			return;
+		}
 		setDraftSelection(selection);
 		setDragState({
 			initialSelection: selection,
@@ -348,6 +353,9 @@ export function SelectionTimeline({
 	) {
 		event.preventDefault();
 		event.stopPropagation();
+		if (selectionEditingDisabled) {
+			return;
+		}
 		setDraftSelection(selection);
 		setDragState({
 			initialSelection: selection,
@@ -483,6 +491,7 @@ export function SelectionTimeline({
 				<div className="flex flex-wrap items-center gap-2">
 					<Button
 						aria-label="Reset selection"
+						disabled={selectionEditingDisabled}
 						onClick={onSelectionResetRequested}
 						size="icon"
 						type="button"
@@ -618,6 +627,7 @@ export function SelectionTimeline({
 						<button
 							aria-label="Move selection range"
 							className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+							disabled={selectionEditingDisabled}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginRangeDrag(event);
@@ -633,6 +643,7 @@ export function SelectionTimeline({
 						<button
 							aria-label="Selection start handle"
 							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+							disabled={selectionEditingDisabled}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginHandleDrag(event, "start");
@@ -650,6 +661,7 @@ export function SelectionTimeline({
 						<button
 							aria-label="Selection end handle"
 							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+							disabled={selectionEditingDisabled}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginHandleDrag(event, "end");
