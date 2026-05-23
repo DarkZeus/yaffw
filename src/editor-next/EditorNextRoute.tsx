@@ -1,7 +1,21 @@
-import { AlertTriangle, CheckCircle2, FileVideo } from "lucide-react";
+import {
+	AlertTriangle,
+	BarChart3,
+	CheckCircle2,
+	Clock,
+	FileVideo,
+	HardDrive,
+	Monitor,
+	Ratio,
+	Volume2,
+	VolumeX,
+} from "lucide-react";
 import {
 	type ChangeEvent,
 	type DragEvent,
+	type ReactElement,
+	type ReactNode,
+	cloneElement,
 	useMemo,
 	useReducer,
 	useState,
@@ -12,6 +26,7 @@ import {
 	analyzeLocalMediaAssetDraft,
 } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
+import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 import {
 	type RuntimeSupport,
 	detectRuntimeSupport,
@@ -228,7 +243,7 @@ function EditorSessionShell({
 	return (
 		<section
 			aria-labelledby="editor-next-import-title"
-			className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]"
+			className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
 		>
 			<div className="flex min-h-[28rem] flex-col gap-6 rounded-md border bg-card p-5">
 				<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -293,23 +308,244 @@ function EditorSessionShell({
 				) : null}
 			</div>
 
-			<aside className="flex flex-col gap-3 rounded-md border bg-card p-4">
-				<h2 className="text-sm font-semibold tracking-tight">Runtime checks</h2>
-				<ul className="flex flex-col gap-3 text-sm text-muted-foreground">
-					{runtimeCheckRows(session.runtime).map((row) => (
-						<li
-							className="flex items-center justify-between gap-3"
-							key={row.label}
-						>
-							<span>{row.label}</span>
-							<Badge variant={row.available ? "secondary" : "destructive"}>
-								{row.available ? "Ready" : "Missing"}
-							</Badge>
-						</li>
-					))}
-				</ul>
+			<aside className="flex flex-col gap-4">
+				{session.status === "ready" ? (
+					<MediaAnalyticsPanel
+						asset={session.asset}
+						selection={session.selection}
+					/>
+				) : null}
+				<RuntimeChecksPanel session={session} />
 			</aside>
 		</section>
+	);
+}
+
+function RuntimeChecksPanel({
+	session,
+}: Pick<EditorSessionShellProps, "session">) {
+	return (
+		<section className="flex flex-col gap-3 rounded-md border bg-card p-4">
+			<h2 className="text-sm font-semibold tracking-tight">Runtime checks</h2>
+			<ul className="flex flex-col gap-3 text-sm text-muted-foreground">
+				{runtimeCheckRows(session.runtime).map((row) => (
+					<li
+						className="flex items-center justify-between gap-3"
+						key={row.label}
+					>
+						<span>{row.label}</span>
+						<Badge variant={row.available ? "secondary" : "destructive"}>
+							{row.available ? "Ready" : "Missing"}
+						</Badge>
+					</li>
+				))}
+			</ul>
+		</section>
+	);
+}
+
+function MediaAnalyticsPanel({
+	asset,
+	selection,
+}: {
+	asset: ReadyMediaAsset;
+	selection: Selection;
+}) {
+	const primaryVideoTrack = asset.tracks.video[0];
+	const primaryAudioTrack = asset.tracks.audio[0];
+	const estimatedBitrate = estimateBitrateBitsPerSecond(asset);
+	const selectionDurationUs = selection.endUs - selection.startUs;
+	const coverage = asset.durationUs
+		? Math.round((selectionDurationUs / asset.durationUs) * 100)
+		: 0;
+
+	return (
+		<section
+			aria-label="Media analytics"
+			className="flex flex-col gap-4 rounded-md border bg-card p-4"
+		>
+			<div className="flex items-center justify-between gap-3">
+				<h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+					<BarChart3 aria-hidden="true" className="size-4" />
+					Media analytics
+				</h2>
+				<Badge variant="secondary">{asset.tracks.video.length} video</Badge>
+			</div>
+
+			<AnalyticsSection icon={<FileVideo />} title="File info">
+				<AnalyticsRow label="Name" value={asset.provenance.fileName} />
+				<AnalyticsRow
+					label="Size"
+					value={formatFileSize(asset.provenance.sizeBytes)}
+				/>
+				<AnalyticsRow
+					label="Type"
+					value={formatContainerType(asset.provenance)}
+				/>
+				<AnalyticsRow
+					icon={<Clock />}
+					label="Duration"
+					value={formatMediaTime(asset.durationUs)}
+				/>
+			</AnalyticsSection>
+
+			<AnalyticsSection icon={<Monitor />} title="Video track">
+				<AnalyticsRow
+					label="Resolution"
+					value={
+						primaryVideoTrack?.width && primaryVideoTrack.height
+							? `${primaryVideoTrack.width}x${primaryVideoTrack.height}`
+							: "Unknown"
+					}
+				/>
+				<AnalyticsRow
+					label="Class"
+					value={resolutionCategory(
+						primaryVideoTrack?.width,
+						primaryVideoTrack?.height,
+					)}
+				/>
+				<AnalyticsRow
+					icon={<Ratio />}
+					label="Aspect"
+					value={formatAspectRatio(
+						primaryVideoTrack?.width,
+						primaryVideoTrack?.height,
+					)}
+				/>
+				<AnalyticsRow
+					label="Frame rate"
+					value={
+						asset.frameTiming.source === "known"
+							? `${formatNumber(asset.frameTiming.fps)} fps`
+							: `${formatNumber(asset.frameTiming.fps)} fps est.`
+					}
+				/>
+				<AnalyticsRow
+					label="Codec"
+					value={primaryVideoTrack?.codec ?? "Unknown"}
+				/>
+				<AnalyticsRow
+					icon={<HardDrive />}
+					label="Bitrate"
+					value={formatBitrate(estimatedBitrate)}
+				/>
+				<AnalyticsQualityBadge bitrate={estimatedBitrate} />
+			</AnalyticsSection>
+
+			<AnalyticsSection
+				icon={primaryAudioTrack ? <Volume2 /> : <VolumeX />}
+				title="Audio track"
+			>
+				<AnalyticsRow
+					label="Status"
+					value={primaryAudioTrack ? "Present" : "None"}
+				/>
+				{primaryAudioTrack ? (
+					<>
+						<AnalyticsRow
+							label="Channels"
+							value={formatChannels(primaryAudioTrack.channels)}
+						/>
+						<AnalyticsRow
+							label="Sample rate"
+							value={formatSampleRate(primaryAudioTrack.sampleRate)}
+						/>
+						<AnalyticsRow
+							label="Codec"
+							value={primaryAudioTrack.codec ?? "Unknown"}
+						/>
+						<AnalyticsRow
+							label="Language"
+							value={primaryAudioTrack.language ?? "und"}
+						/>
+					</>
+				) : null}
+			</AnalyticsSection>
+
+			<AnalyticsSection icon={<Clock />} title="Selection">
+				<AnalyticsRow
+					label="Start"
+					value={formatMediaTime(selection.startUs)}
+				/>
+				<AnalyticsRow label="End" value={formatMediaTime(selection.endUs)} />
+				<AnalyticsRow
+					label="Duration"
+					value={formatMediaTime(selectionDurationUs)}
+				/>
+				<AnalyticsRow label="Coverage" value={`${coverage}%`} />
+			</AnalyticsSection>
+		</section>
+	);
+}
+
+function AnalyticsSection({
+	children,
+	icon,
+	title,
+}: {
+	children: ReactNode;
+	icon: AnalyticsIconElement;
+	title: string;
+}) {
+	return (
+		<section className="grid gap-3 border-t pt-3">
+			<h3 className="flex items-center gap-2 text-sm font-semibold">
+				{cloneElement(icon, {
+					"aria-hidden": true,
+					className: "size-4",
+				})}
+				{title}
+			</h3>
+			<div className="grid gap-2">{children}</div>
+		</section>
+	);
+}
+
+function AnalyticsRow({
+	icon,
+	label,
+	value,
+}: {
+	icon?: AnalyticsIconElement;
+	label: string;
+	value: string;
+}) {
+	return (
+		<div className="flex items-center justify-between gap-3 text-sm">
+			<span className="flex items-center gap-1.5 text-muted-foreground">
+				{icon
+					? cloneElement(icon, {
+							"aria-hidden": true,
+							className: "size-3",
+						})
+					: null}
+				{label}
+			</span>
+			<Badge
+				className="max-w-40 truncate font-mono"
+				title={value}
+				variant="outline"
+			>
+				{value}
+			</Badge>
+		</div>
+	);
+}
+
+type AnalyticsIconElement = ReactElement<{
+	"aria-hidden"?: boolean;
+	className?: string;
+}>;
+
+function AnalyticsQualityBadge({ bitrate }: { bitrate: number | null }) {
+	const quality = videoBitrateQuality(bitrate);
+
+	return (
+		<div className="flex items-center justify-between gap-3 text-sm">
+			<span className="text-muted-foreground">Quality</span>
+			<Badge variant={quality.variant}>{quality.label}</Badge>
+		</div>
 	);
 }
 
@@ -424,6 +660,178 @@ function formatSessionStatus(
 		case "ready":
 			return "Ready";
 	}
+}
+
+function estimateBitrateBitsPerSecond(asset: ReadyMediaAsset): number | null {
+	const durationSeconds = asset.durationUs / 1_000_000;
+
+	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+		return null;
+	}
+
+	return Math.round((asset.provenance.sizeBytes * 8) / durationSeconds);
+}
+
+function formatFileSize(bytes: number): string {
+	if (bytes <= 0) {
+		return "0 B";
+	}
+
+	const units = ["B", "KB", "MB", "GB", "TB"];
+	const unitIndex = Math.min(
+		units.length - 1,
+		Math.floor(Math.log(bytes) / Math.log(1024)),
+	);
+	const value = bytes / 1024 ** unitIndex;
+
+	return `${formatNumber(value)} ${units[unitIndex]}`;
+}
+
+function formatBitrate(bitsPerSecond: number | null): string {
+	if (!bitsPerSecond || bitsPerSecond <= 0) {
+		return "Unknown";
+	}
+
+	if (bitsPerSecond >= 1_000_000) {
+		return `${formatNumber(bitsPerSecond / 1_000_000)} Mbps`;
+	}
+
+	if (bitsPerSecond >= 1_000) {
+		return `${formatNumber(bitsPerSecond / 1_000)} Kbps`;
+	}
+
+	return `${bitsPerSecond} bps`;
+}
+
+function formatContainerType(
+	provenance: ReadyMediaAsset["provenance"],
+): string {
+	const mimeSubtype = provenance.mimeType?.split("/")[1];
+
+	if (mimeSubtype) {
+		return mimeSubtype.toUpperCase();
+	}
+
+	const extension = provenance.fileName.split(".").pop();
+
+	return extension ? extension.toUpperCase() : "Unknown";
+}
+
+function resolutionCategory(width?: number, height?: number): string {
+	if (!width || !height) {
+		return "Unknown";
+	}
+
+	if (width >= 3840 && height >= 2160) {
+		return "4K UHD";
+	}
+
+	if (width >= 2560 && height >= 1440) {
+		return "2K QHD";
+	}
+
+	if (width >= 1920 && height >= 1080) {
+		return "Full HD";
+	}
+
+	if (width >= 1280 && height >= 720) {
+		return "HD";
+	}
+
+	if (width >= 854 && height >= 480) {
+		return "SD";
+	}
+
+	return "Low resolution";
+}
+
+function formatAspectRatio(width?: number, height?: number): string {
+	if (!width || !height) {
+		return "Unknown";
+	}
+
+	const divisor = greatestCommonDivisor(width, height);
+
+	return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+}
+
+function formatChannels(channels?: number): string {
+	if (!channels) {
+		return "Unknown";
+	}
+
+	if (channels === 1) {
+		return "Mono";
+	}
+
+	if (channels === 2) {
+		return "Stereo";
+	}
+
+	if (channels === 6) {
+		return "5.1";
+	}
+
+	if (channels === 8) {
+		return "7.1";
+	}
+
+	return `${channels}ch`;
+}
+
+function formatSampleRate(sampleRate?: number): string {
+	if (!sampleRate) {
+		return "Unknown";
+	}
+
+	return `${formatNumber(sampleRate / 1_000)} kHz`;
+}
+
+function videoBitrateQuality(bitrate: number | null): {
+	label: string;
+	variant: "default" | "destructive" | "outline" | "secondary";
+} {
+	if (!bitrate) {
+		return { label: "Unknown", variant: "secondary" };
+	}
+
+	if (bitrate >= 10_000_000) {
+		return { label: "Excellent", variant: "default" };
+	}
+
+	if (bitrate >= 5_000_000) {
+		return { label: "High", variant: "default" };
+	}
+
+	if (bitrate >= 2_000_000) {
+		return { label: "Medium", variant: "outline" };
+	}
+
+	if (bitrate >= 1_000_000) {
+		return { label: "Low", variant: "outline" };
+	}
+
+	return { label: "Very low", variant: "destructive" };
+}
+
+function formatNumber(value: number): string {
+	return new Intl.NumberFormat("en-US", {
+		maximumFractionDigits: value >= 10 ? 1 : 2,
+		minimumFractionDigits: 0,
+	}).format(value);
+}
+
+function greatestCommonDivisor(left: number, right: number): number {
+	let a = Math.abs(left);
+	let b = Math.abs(right);
+
+	while (b !== 0) {
+		const remainder = a % b;
+		a = b;
+		b = remainder;
+	}
+
+	return a || 1;
 }
 
 function formatMediaTime(timeUs: number): string {

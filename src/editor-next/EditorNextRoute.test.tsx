@@ -92,11 +92,22 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByText("Ready media asset")).toBeTruthy();
 		});
 
-		expect(screen.getByText("picked.mp4")).toBeTruthy();
+		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.getByLabelText("Preview for picked.mp4")).toBeTruthy();
 		expect(screen.getByText("Duration: 00:00:12.000")).toBeTruthy();
 		expect(screen.getByText("Video tracks: 1")).toBeTruthy();
 		expect(screen.getByText("Audio tracks: 1")).toBeTruthy();
+		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
+		expect(screen.getByText("File info")).toBeTruthy();
+		expect(screen.getByText("Video track")).toBeTruthy();
+		expect(screen.getByText("Audio track")).toBeTruthy();
+		expect(screen.getByText("1920x1080")).toBeTruthy();
+		expect(screen.getByText("Full HD")).toBeTruthy();
+		expect(screen.getByText("16:9")).toBeTruthy();
+		expect(screen.getByText("30 fps")).toBeTruthy();
+		expect(screen.getByText("Stereo")).toBeTruthy();
+		expect(screen.getByText("48 kHz")).toBeTruthy();
+		expect(screen.getByText("Coverage")).toBeTruthy();
 
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
@@ -128,7 +139,7 @@ describe("EditorNextRoute", () => {
 		});
 
 		expect(screen.getByText("Voice")).toBeTruthy();
-		expect(screen.getByText("eng")).toBeTruthy();
+		expect(screen.getAllByText("eng").length).toBeGreaterThan(0);
 		expect(screen.getByText("Selection duration")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
@@ -175,8 +186,10 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByText("Ready media asset")).toBeTruthy();
 		});
 
-		expect(screen.getByText("dropped.webm")).toBeTruthy();
+		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
 		expect(screen.getByText("Audio tracks: 0")).toBeTruthy();
+		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
+		expect(screen.getByText("None")).toBeTruthy();
 	});
 
 	it("shows unsupported-media failures with technical details on demand", async () => {
