@@ -433,9 +433,9 @@ export function editorSessionReducer(
 			}
 
 			return {
-				importEnabled: false,
+				importEnabled: true,
 				runtime: state.runtime,
-				status: "closed",
+				status: "empty",
 			};
 	}
 }
@@ -448,6 +448,12 @@ export function canChangeEditingDecisions(
 
 export function canCloseEditorSession(state: EditorSessionState): boolean {
 	return state.status === "ready" && state.export.status !== "running";
+}
+
+export function shouldProtectEditorBeforeUnload(
+	state: EditorSessionState,
+): boolean {
+	return state.status === "ready";
 }
 
 function resetExportReviewAfterEditingDecision(

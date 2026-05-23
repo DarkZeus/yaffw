@@ -16,6 +16,7 @@ import {
 	canCloseEditorSession,
 	createInitialEditorSession,
 	editorSessionReducer,
+	shouldProtectEditorBeforeUnload,
 } from "./session";
 
 describe("editor-next session runtime gate", () => {
@@ -62,7 +63,7 @@ describe("editor-next session runtime gate", () => {
 		expect(session.message).toContain("WebCodecs");
 	});
 
-	it("moves a supported session through loading, ready asset, failure, and closed states", () => {
+	it("moves a supported session through loading, ready asset, failure, and confirmed close back to empty", () => {
 		const runtime = evaluateRuntimeSupport({
 			fileApi: true,
 			mediaSource: true,
@@ -130,8 +131,8 @@ describe("editor-next session runtime gate", () => {
 
 		const closed = editorSessionReducer(ready, { type: "session.closed" });
 
-		expect(closed.status).toBe("closed");
-		expect(closed.importEnabled).toBe(false);
+		expect(closed.status).toBe("empty");
+		expect(closed.importEnabled).toBe(true);
 	});
 
 	it("sets selection boundaries from explicit playhead events without storing playhead state", () => {
@@ -429,6 +430,33 @@ describe("editor-next session runtime gate", () => {
 		});
 
 		expect(ignoredCancellation).toBe(exporting);
+	});
+
+	it("derives close availability and unload protection from session-local work", () => {
+		const empty = createInitialEditorSession(supportedRuntime);
+		const ready = createReadySession();
+		const exporting = startExport(ready);
+		const succeeded = editorSessionReducer(exporting, {
+			generatedMedia,
+			jobId: "export-1",
+			type: "export.succeeded",
+		});
+		const closed = editorSessionReducer(succeeded, { type: "session.closed" });
+
+		expect(canCloseEditorSession(empty)).toBe(false);
+		expect(shouldProtectEditorBeforeUnload(empty)).toBe(false);
+
+		expect(canCloseEditorSession(ready)).toBe(true);
+		expect(shouldProtectEditorBeforeUnload(ready)).toBe(true);
+
+		expect(canCloseEditorSession(exporting)).toBe(false);
+		expect(shouldProtectEditorBeforeUnload(exporting)).toBe(true);
+
+		expect(canCloseEditorSession(succeeded)).toBe(true);
+		expect(shouldProtectEditorBeforeUnload(succeeded)).toBe(true);
+
+		expect(closed.status).toBe("empty");
+		expect(shouldProtectEditorBeforeUnload(closed)).toBe(false);
 	});
 });
 

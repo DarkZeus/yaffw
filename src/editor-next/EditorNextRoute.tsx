@@ -13,6 +13,7 @@ import {
 	Square,
 	Volume2,
 	VolumeX,
+	X,
 } from "lucide-react";
 import {
 	type ChangeEvent,
@@ -20,6 +21,7 @@ import {
 	type ReactElement,
 	type ReactNode,
 	cloneElement,
+	useEffect,
 	useMemo,
 	useReducer,
 	useRef,
@@ -45,8 +47,10 @@ import {
 import {
 	type EditorSessionState,
 	type ExportSessionState,
+	canCloseEditorSession,
 	createInitialEditorSession,
 	editorSessionReducer,
+	shouldProtectEditorBeforeUnload,
 } from "@/editor-core/session";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
 import {
@@ -103,16 +107,32 @@ export function EditorNextRoute({
 		Record<string, Blob>
 	>({});
 	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
+	const [localFileInputKey, setLocalFileInputKey] = useState(0);
+	const protectBeforeUnload = shouldProtectEditorBeforeUnload(session);
+
+	useEffect(() => {
+		if (!protectBeforeUnload) {
+			return;
+		}
+
+		function handleBeforeUnload(event: BeforeUnloadEvent) {
+			event.preventDefault();
+			event.returnValue = "";
+		}
+
+		window.addEventListener("beforeunload", handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener("beforeunload", handleBeforeUnload);
+		};
+	}, [protectBeforeUnload]);
 
 	async function importLocalFile(file: File) {
 		if (!session.importEnabled) {
 			return;
 		}
 
-		activeExportAbortControllerRef.current?.abort();
-		activeExportAbortControllerRef.current = null;
-		setGeneratedMediaBlobs({});
-		setPreviewSource(null);
+		clearSessionLocalResources();
 
 		const draft = createLocalMediaAssetDraft(file, {
 			createDraftId,
@@ -145,6 +165,13 @@ export function EditorNextRoute({
 			technicalDetails: result.failure.technicalDetails,
 			type: "session.failed",
 		});
+	}
+
+	function clearSessionLocalResources() {
+		activeExportAbortControllerRef.current?.abort();
+		activeExportAbortControllerRef.current = null;
+		setGeneratedMediaBlobs({});
+		setPreviewSource(null);
 	}
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -290,6 +317,26 @@ export function EditorNextRoute({
 		});
 	}
 
+	function requestCloseFile() {
+		if (!canCloseEditorSession(session)) {
+			return;
+		}
+
+		const confirmed = window.confirm(
+			"Close this media asset? This clears the current selection, preview state, waveform state, and generated media result.",
+		);
+
+		if (!confirmed) {
+			return;
+		}
+
+		clearSessionLocalResources();
+		setLocalFileInputKey((currentKey) => currentKey + 1);
+		dispatch({
+			type: "session.closed",
+		});
+	}
+
 	return (
 		<main className="min-h-screen bg-background text-foreground">
 			<div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -328,7 +375,9 @@ export function EditorNextRoute({
 						onDefaultExportStartRequested={() => {
 							void startDefaultExport();
 						}}
+						onCloseFileRequested={requestCloseFile}
 						onGeneratedMediaDownloadRequested={downloadGeneratedMedia}
+						localFileInputKey={localFileInputKey}
 						onLocalFileDropped={handleLocalFileDropped}
 						onLocalFileSelected={handleLocalFileSelected}
 						onSelectionEndRequested={(playheadUs) =>
@@ -387,6 +436,8 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 }
 
 type EditorSessionShellProps = {
+	localFileInputKey: number;
+	onCloseFileRequested: () => void;
 	onDefaultExportCancelRequested: () => void;
 	onDefaultExportStartRequested: () => void;
 	onGeneratedMediaDownloadRequested: (generatedMedia: GeneratedMedia) => void;
@@ -401,6 +452,8 @@ type EditorSessionShellProps = {
 };
 
 function EditorSessionShell({
+	localFileInputKey,
+	onCloseFileRequested,
 	onDefaultExportCancelRequested,
 	onDefaultExportStartRequested,
 	onGeneratedMediaDownloadRequested,
@@ -415,6 +468,8 @@ function EditorSessionShell({
 }: EditorSessionShellProps) {
 	const selectionEditingDisabled =
 		session.status === "ready" && session.export.status === "running";
+	const closeFileVisible = session.status === "ready";
+	const closeFileDisabled = !canCloseEditorSession(session);
 
 	return (
 		<section
@@ -440,9 +495,23 @@ function EditorSessionShell({
 							</p>
 						</div>
 					</div>
-					<Badge variant="secondary">
-						{formatSessionStatus(session.status)}
-					</Badge>
+					<div className="flex items-center gap-2">
+						{closeFileVisible ? (
+							<Button
+								disabled={closeFileDisabled}
+								onClick={onCloseFileRequested}
+								size="sm"
+								type="button"
+								variant="outline"
+							>
+								<X data-icon="inline-start" />
+								Close file
+							</Button>
+						) : null}
+						<Badge variant="secondary">
+							{formatSessionStatus(session.status)}
+						</Badge>
+					</div>
 				</div>
 
 				<div className="grid flex-1 place-items-center rounded-md border border-dashed bg-background/60 p-6">
@@ -463,6 +532,7 @@ function EditorSessionShell({
 								accept="video/*"
 								disabled={!session.importEnabled}
 								id="editor-next-local-file"
+								key={localFileInputKey}
 								onChange={onLocalFileSelected}
 								type="file"
 							/>

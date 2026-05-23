@@ -31,6 +31,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	restoreObjectUrl("createObjectURL", originalCreateObjectURL);
 	restoreObjectUrl("revokeObjectURL", originalRevokeObjectURL);
 });
@@ -230,6 +231,205 @@ describe("EditorNextRoute", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Delivered")).toBeTruthy();
 		});
+	});
+
+	it("asks for confirmation before close and leaves the loaded session unchanged when cancelled", async () => {
+		const confirmClose = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-close-cancelled"}
+				createDraftId={() => "draft-close-cancelled"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "close-cancelled.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Ready media asset")).toBeTruthy();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+
+		expect(confirmClose).toHaveBeenCalledTimes(1);
+		expect(screen.getByText("Ready media asset")).toBeTruthy();
+		expect(screen.getByLabelText("Preview for close-cancelled.mp4")).toBeTruthy();
+		expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+	});
+
+	it("closes a confirmed ready session, disposing preview resources and generated media", async () => {
+		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
+		const deliverGeneratedMedia = vi.fn();
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-close-confirmed"}
+				createDraftId={() => "draft-close-confirmed"}
+				createExportJobId={() => "export-close-confirmed"}
+				createGeneratedMediaId={() => "generated-close-confirmed"}
+				defaultExportRunner={{
+					cancelSupported: true,
+					run: vi.fn(() => Promise.resolve({ blob: generatedBlob })),
+				}}
+				deliverGeneratedMedia={deliverGeneratedMedia}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "close-confirmed.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Start default export" }))
+				.toBeTruthy();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Export complete")).toBeTruthy();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+		});
+
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:editor-next-preview");
+		expect(screen.queryByLabelText("Preview for close-confirmed.mp4")).toBeNull();
+		expect(screen.queryByLabelText("Selection timeline")).toBeNull();
+		expect(screen.queryByLabelText("Export review")).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Download generated media" }),
+		).toBeNull();
+		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
+	});
+
+	it("disables close while an export job is running", async () => {
+		const exportStarted = createDeferred<{ blob: Blob }>();
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-close-disabled"}
+				createDraftId={() => "draft-close-disabled"}
+				createExportJobId={() => "export-close-disabled"}
+				defaultExportRunner={{
+					cancelSupported: true,
+					run: vi.fn(() => exportStarted.promise),
+				}}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "close-disabled.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Close file" })).toBeTruthy();
+		});
+
+		expect(
+			(screen.getByRole("button", { name: "Close file" }) as HTMLButtonElement)
+				.disabled,
+		).toBe(false);
+
+		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+
+		await waitFor(() => {
+			expect(
+				(screen.getByRole("button", { name: "Close file" }) as HTMLButtonElement)
+					.disabled,
+			).toBe(true);
+		});
+
+		exportStarted.resolve({
+			blob: new Blob(["export"], { type: "video/mp4" }),
+		});
+	});
+
+	it("protects beforeunload only while session-local editor work exists", async () => {
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-beforeunload"}
+				createDraftId={() => "draft-beforeunload"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		expect(dispatchBeforeUnload()).toBe(false);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "beforeunload.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Ready media asset")).toBeTruthy();
+		});
+
+		expect(dispatchBeforeUnload()).toBe(true);
+
+		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+		});
+
+		expect(dispatchBeforeUnload()).toBe(false);
+	});
+
+	it("does not persist active session state across a route remount", async () => {
+		const { unmount } = render(
+			<EditorNextRoute
+				createAssetId={() => "asset-remount"}
+				createDraftId={() => "draft-remount"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "remount.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Ready media asset")).toBeTruthy();
+		});
+
+		unmount();
+
+		render(
+			<EditorNextRoute
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+		expect(screen.queryByText("Ready media asset")).toBeNull();
+		expect(screen.queryByLabelText("Preview for remount.mp4")).toBeNull();
 	});
 
 	it("hides cancellation when the active export runner cannot stop safely", async () => {
@@ -468,6 +668,16 @@ function mockTimelineGeometry() {
 			};
 		},
 	);
+}
+
+function dispatchBeforeUnload() {
+	const event = new Event("beforeunload", {
+		cancelable: true,
+	}) as BeforeUnloadEvent;
+
+	window.dispatchEvent(event);
+
+	return event.defaultPrevented;
 }
 
 function createDeferred<T>() {
