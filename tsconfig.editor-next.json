@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/components/app-sidebar.tsx",
+    "src/components/ui/**/*.tsx",
+    "src/editor-core/**/*.ts",
+    "src/editor-next/**/*.ts",
+    "src/editor-next/**/*.tsx",
+    "src/lib/**/*.ts"
+  ]
+}

@@ -1,4 +1,10 @@
-import { ChevronLeft, ChevronRight, Download, Video } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clapperboard,
+  Download,
+  Video,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +25,11 @@ const items = [
     title: "Media Editor",
     url: "/",
     icon: Video,
+  },
+  {
+    title: "Editor Next",
+    url: "/editor-next",
+    icon: Clapperboard,
   },
   {
     title: "Bulk Download",
