@@ -66,8 +66,17 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByTestId("selection-range-outline").className).toContain(
 			"transition-[left,width]",
 		);
+		expect(screen.getByTestId("selection-range-outline").className).toContain(
+			"ease-out",
+		);
 		expect(screen.getByLabelText("Playhead handle").className).toContain(
-			"transition-[left,width]",
+			"transition-[left]",
+		);
+		expect(screen.getByLabelText("Playhead handle").className).toContain(
+			"ease-linear",
+		);
+		expect(screen.getByLabelText("Playhead handle").className).not.toContain(
+			"ease-out",
 		);
 		expect(screen.getByLabelText("Move selection range").className).toContain(
 			"bg-transparent",

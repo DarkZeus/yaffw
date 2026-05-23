@@ -377,9 +377,13 @@ export function SelectionTimeline({
 		draftPlayheadUs ?? playheadUs,
 		asset.durationUs,
 	);
-	const timelineChromeMotionClassName =
+	const selectionMotionClassName =
 		dragState === null
 			? "transition-[left,width] duration-200 ease-out motion-reduce:transition-none"
+			: "transition-none";
+	const playheadMotionClassName =
+		dragState === null
+			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
 
 	return (
@@ -524,7 +528,7 @@ export function SelectionTimeline({
 
 						<div
 							aria-hidden="true"
-							className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-emerald-400 bg-transparent ${timelineChromeMotionClassName}`}
+							className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-emerald-400 bg-transparent ${selectionMotionClassName}`}
 							data-testid="selection-range-outline"
 							style={{
 								left: `${selectionStartPercent}%`,
@@ -533,7 +537,7 @@ export function SelectionTimeline({
 						/>
 						<button
 							aria-label="Move selection range"
-							className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${timelineChromeMotionClassName}`}
+							className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginRangeDrag(event);
@@ -548,7 +552,7 @@ export function SelectionTimeline({
 						/>
 						<button
 							aria-label="Selection start handle"
-							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${timelineChromeMotionClassName}`}
+							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginHandleDrag(event, "start");
@@ -565,7 +569,7 @@ export function SelectionTimeline({
 						</button>
 						<button
 							aria-label="Selection end handle"
-							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${timelineChromeMotionClassName}`}
+							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginHandleDrag(event, "end");
@@ -582,7 +586,7 @@ export function SelectionTimeline({
 						</button>
 						<button
 							aria-label="Playhead handle"
-							className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${timelineChromeMotionClassName}`}
+							className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
 							onMouseDown={(event) => {
 								if (shouldUseMouseFallback()) {
 									beginPlayheadDrag(event);
