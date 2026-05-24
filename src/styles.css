@@ -78,13 +78,10 @@ code {
 	--workbench-destructive: var(--destructive);
 	--workbench-waveform: var(--chart-2);
 	--workbench-waveform-guide: var(--muted-foreground);
-	--shadow-workbench-panel: 0 18px 60px
-		color-mix(in oklch, var(--workbench) 68%, transparent);
 	--shadow-workbench-selection-start: 4px 0 8px
 		color-mix(in oklch, var(--workbench-selected) 55%, transparent);
 	--shadow-workbench-selection-end: -4px 0 8px
 		color-mix(in oklch, var(--workbench-selected) 55%, transparent);
-	--shadow-workbench-playhead: 0 0 0 1px var(--workbench-viewer);
 }
 
 .dark {

@@ -574,7 +574,7 @@ export function SelectionTimeline({
 			</div>
 
 			<div
-				className="overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground shadow-[var(--shadow-workbench-panel)]"
+				className="overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground"
 				data-testid="selection-timeline-scroll"
 				ref={scrollContainerRef}
 			>
@@ -705,7 +705,7 @@ export function SelectionTimeline({
 							style={{ left: `${playheadPercent}%` }}
 							type="button"
 						>
-							<span className="relative block w-0.5 bg-workbench-playhead shadow-[var(--shadow-workbench-playhead)]">
+							<span className="relative block w-0.5 bg-workbench-playhead">
 								<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
 							</span>
 						</button>

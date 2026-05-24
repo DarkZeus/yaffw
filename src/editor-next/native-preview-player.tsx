@@ -298,7 +298,7 @@ export function NativePreviewPlayer({
 					aria-label="Native preview player"
 					className="grid min-h-full gap-3"
 				>
-					<div className="overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer shadow-[var(--shadow-workbench-panel)]">
+					<div className="overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer">
 						<video
 							aria-label={`Preview for ${asset.label}`}
 							className="aspect-video max-h-[42vh] w-full bg-workbench-viewer object-contain"
