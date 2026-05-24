@@ -330,6 +330,14 @@ describe("EditorNextRoute", () => {
 
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 		expect(screen.getByText("picked-export.mp4")).toBeTruthy();
+		expect(
+			within(screen.getByLabelText("Generated media status")).getByRole(
+				"button",
+				{
+					name: "Download generated media",
+				},
+			),
+		).toBeTruthy();
 		expect(screen.getAllByLabelText(/^Preview for/)).toHaveLength(1);
 		expect(screen.queryByRole("button", { name: /use generated/i })).toBeNull();
 		expect(progressEvents[0]).toEqual({

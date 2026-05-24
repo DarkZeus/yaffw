@@ -938,6 +938,8 @@ function ExportReviewPanel({
 		runtime,
 		selection,
 	});
+	const deliveryAction =
+		viewModel.action.kind === "download" ? viewModel.action : undefined;
 
 	return (
 		<section
@@ -989,21 +991,31 @@ function ExportReviewPanel({
 						{viewModel.review.technicalDetails}
 					</p>
 				)}
-				<ExportJobStatus status={viewModel.status} />
-				<ExportReviewActions
-					action={viewModel.action}
-					onCancelExport={onCancelExport}
+				<ExportJobStatus
+					deliveryAction={deliveryAction}
 					onDownloadGeneratedMedia={onDownloadGeneratedMedia}
-					onStartExport={onStartExport}
+					status={viewModel.status}
 				/>
+				{deliveryAction ? null : (
+					<ExportReviewActions
+						action={viewModel.action}
+						onCancelExport={onCancelExport}
+						onDownloadGeneratedMedia={onDownloadGeneratedMedia}
+						onStartExport={onStartExport}
+					/>
+				)}
 			</div>
 		</section>
 	);
 }
 
 function ExportJobStatus({
+	deliveryAction,
+	onDownloadGeneratedMedia,
 	status,
 }: {
+	deliveryAction?: Extract<ExportInspectorActionViewModel, { kind: "download" }>;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 	status: ExportInspectorStatusViewModel;
 }) {
 	if (status.kind === "running") {
@@ -1027,13 +1039,29 @@ function ExportJobStatus({
 
 	if (status.kind === "succeeded") {
 		return (
-			<div className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm">
+			<div
+				aria-label="Generated media status"
+				className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm"
+			>
 				<div className="flex min-w-0 items-center justify-between gap-3">
 					<span className="min-w-0 font-medium">{status.title}</span>
 					<Badge className="shrink-0" variant="outline">
 						{status.deliveryState}
 					</Badge>
 				</div>
+				{deliveryAction ? (
+					<Button
+						className="w-full"
+						onClick={() =>
+							onDownloadGeneratedMedia(deliveryAction.generatedMedia)
+						}
+						size="sm"
+						type="button"
+					>
+						<Download data-icon="inline-start" />
+						{deliveryAction.label}
+					</Button>
+				) : null}
 				<p className="min-w-0 break-all rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground">
 					{status.fileName}
 				</p>
