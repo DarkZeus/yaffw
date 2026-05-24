@@ -341,6 +341,12 @@ describe("EditorNextRoute", () => {
 		expect(screen.getByLabelText("Generated media filename").className).toContain(
 			"whitespace-normal",
 		);
+		expect(screen.getByLabelText("Export review").className).toContain(
+			"overflow-visible",
+		);
+		expect(screen.getByLabelText("Generated media status").className).toContain(
+			"overflow-visible",
+		);
 		expect(screen.getByLabelText("Generated media filename").className).toContain(
 			"[overflow-wrap:anywhere]",
 		);
@@ -560,7 +566,9 @@ describe("EditorNextRoute", () => {
 			).toBeTruthy();
 		});
 
-		expect(dispatchBeforeUnload()).toBe(true);
+		await waitFor(() => {
+			expect(dispatchBeforeUnload()).toBe(true);
+		});
 
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 

@@ -944,7 +944,7 @@ function ExportReviewPanel({
 	return (
 		<section
 			aria-label="Export review"
-			className="overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
+			className="overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
 		>
 			<div className="flex items-start justify-between gap-3 border-b border-workbench-border bg-background/55 px-4 py-3">
 				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
@@ -1041,7 +1041,7 @@ function ExportJobStatus({
 		return (
 			<div
 				aria-label="Generated media status"
-				className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm"
+				className="grid min-w-0 auto-rows-max gap-3 overflow-visible rounded-md border bg-background p-3 text-sm"
 			>
 				<div className="flex min-w-0 items-center justify-between gap-3">
 					<span className="min-w-0 font-medium">{status.title}</span>
@@ -1064,7 +1064,7 @@ function ExportJobStatus({
 				) : null}
 				<p
 					aria-label="Generated media filename"
-					className="min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+					className="block max-w-full min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
 				>
 					{status.fileName}
 				</p>
