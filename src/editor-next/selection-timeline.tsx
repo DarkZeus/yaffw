@@ -557,7 +557,7 @@ export function SelectionTimeline({
 			</div>
 
 			<div
-				className="overflow-x-auto rounded-md border border-slate-700 bg-slate-900 text-slate-100 shadow-lg"
+				className="overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground shadow-[var(--shadow-workbench-panel)]"
 				data-testid="selection-timeline-scroll"
 				ref={scrollContainerRef}
 			>
@@ -571,7 +571,7 @@ export function SelectionTimeline({
 				>
 					<button
 						aria-label="Seek timeline ruler"
-						className="relative block h-12 w-full cursor-crosshair border-0 border-b border-slate-700 bg-slate-900 p-0 text-left"
+						className="relative block h-12 w-full cursor-crosshair border-0 border-b border-workbench-border bg-workbench-ruler p-0 text-left"
 						onMouseDown={(event) => {
 							if (shouldUseMouseFallback()) {
 								seekFromLanePointer(event);
@@ -586,8 +586,8 @@ export function SelectionTimeline({
 								key={marker.timeUs}
 								style={{ left: `${marker.percent}%` }}
 							>
-								<div className="h-4 w-px bg-slate-600" />
-								<span className="font-mono text-[11px] text-slate-400">
+								<div className="h-4 w-px bg-workbench-border-strong" />
+								<span className="font-mono text-[11px] text-muted-foreground">
 									{formatMediaTime(marker.timeUs)}
 								</span>
 							</div>
@@ -609,7 +609,7 @@ export function SelectionTimeline({
 									/>
 								))
 							) : (
-								<div className="grid min-h-24 place-items-center border-b border-slate-700 px-4 text-sm text-slate-400">
+								<div className="grid min-h-24 place-items-center border-b border-workbench-border px-4 text-sm text-muted-foreground">
 									No audio tracks available for waveform lanes.
 								</div>
 							)}
@@ -617,7 +617,7 @@ export function SelectionTimeline({
 
 						<div
 							aria-hidden="true"
-							className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-emerald-400 bg-transparent ${selectionMotionClassName}`}
+							className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
 							data-testid="selection-range-outline"
 							style={{
 								left: `${selectionStartPercent}%`,
@@ -654,7 +654,7 @@ export function SelectionTimeline({
 							type="button"
 						>
 							<span
-								className="block h-full w-0.5 bg-emerald-400 shadow-[4px_0_8px_rgb(52_211_153_/_0.55)]"
+								className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
 								data-testid="selection-start-handle-rail"
 							/>
 						</button>
@@ -672,7 +672,7 @@ export function SelectionTimeline({
 							type="button"
 						>
 							<span
-								className="block h-full w-0.5 bg-emerald-400 shadow-[-4px_0_8px_rgb(52_211_153_/_0.55)]"
+								className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
 								data-testid="selection-end-handle-rail"
 							/>
 						</button>
@@ -688,8 +688,8 @@ export function SelectionTimeline({
 							style={{ left: `${playheadPercent}%` }}
 							type="button"
 						>
-							<span className="relative block w-0.5 bg-red-500 shadow-[0_0_0_1px_rgb(15_23_42)]">
-								<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-red-500" />
+							<span className="relative block w-0.5 bg-workbench-playhead shadow-[var(--shadow-workbench-playhead)]">
+								<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
 							</span>
 						</button>
 					</div>
@@ -788,23 +788,23 @@ function WaveformLane({
 	const language = lane.track.language ?? "und";
 
 	return (
-		<div className="relative border-b border-slate-700 bg-slate-800">
+		<div className="relative border-b border-workbench-border bg-workbench-lane">
 			<div
-				className="pointer-events-none relative z-30 flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-700 bg-slate-900/90 px-3 py-2 backdrop-blur"
+				className="pointer-events-none relative z-30 flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
-				<span className="truncate text-sm font-medium text-slate-100">
+				<span className="truncate text-sm font-medium text-workbench-lane-foreground">
 					{label}
 				</span>
 				{language !== "und" ? (
 					<Badge
-						className="border-slate-600 font-mono text-slate-300"
+						className="border-workbench-border-strong font-mono text-muted-foreground"
 						variant="outline"
 					>
 						{language}
 					</Badge>
 				) : null}
-				<div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+				<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
 					<span>
 						{lane.track.channels ? `${lane.track.channels}ch` : "Audio"}
 					</span>
@@ -814,7 +814,7 @@ function WaveformLane({
 			</div>
 			<button
 				aria-label={`Seek ${label} waveform lane`}
-				className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-slate-800 text-left"
+				className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
 				onMouseDown={(event) => {
 					if (typeof window.PointerEvent === "undefined") {
 						onPointerDown(event);
@@ -823,17 +823,17 @@ function WaveformLane({
 				onPointerDown={onPointerDown}
 				type="button"
 			>
-				<div className="absolute inset-x-0 top-1/2 h-px bg-slate-700" />
+				<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
 				{lane.status === "ready" ? (
 					<WaveformCanvas label={label} samples={lane.samples} />
 				) : null}
 				{lane.status === "loading" ? (
-					<div className="absolute inset-0 grid place-items-center text-xs text-slate-400">
+					<div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
 						Loading waveform
 					</div>
 				) : null}
 				{lane.status === "unavailable" ? (
-					<div className="absolute inset-0 grid place-items-center px-4 text-xs text-slate-400">
+					<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
 						Waveform unavailable
 					</div>
 				) : null}
@@ -845,7 +845,10 @@ function WaveformLane({
 function LaneStatus({ lane }: { lane: WaveformLaneState }) {
 	if (lane.status === "ready") {
 		return (
-			<Badge className="bg-cyan-500/15 text-cyan-200" variant="secondary">
+			<Badge
+				className="bg-workbench-progress/15 text-workbench-progress"
+				variant="secondary"
+			>
 				Waveform ready
 			</Badge>
 		);
@@ -854,7 +857,7 @@ function LaneStatus({ lane }: { lane: WaveformLaneState }) {
 	if (lane.status === "unavailable") {
 		return (
 			<Badge
-				className="border-slate-600 text-slate-300"
+				className="border-workbench-border-strong text-muted-foreground"
 				title={lane.reason}
 				variant="outline"
 			>
@@ -864,7 +867,10 @@ function LaneStatus({ lane }: { lane: WaveformLaneState }) {
 	}
 
 	return (
-		<Badge className="border-slate-600 text-slate-300" variant="outline">
+		<Badge
+			className="border-workbench-border-strong text-muted-foreground"
+			variant="outline"
+		>
 			Loading
 		</Badge>
 	);
@@ -904,9 +910,17 @@ function WaveformCanvas({
 			currentCanvas.width = width;
 			currentCanvas.height = height;
 			context.clearRect(0, 0, width, height);
-			context.fillStyle = "rgba(8, 183, 196, 0.18)";
+			context.fillStyle = canvasTokenColor(
+				currentCanvas,
+				"--workbench-waveform-guide",
+				"CanvasText",
+			);
 			context.fillRect(0, centerY - 1, width, 2);
-			context.fillStyle = "rgba(6, 182, 212, 0.92)";
+			context.fillStyle = canvasTokenColor(
+				currentCanvas,
+				"--workbench-waveform",
+				"CanvasText",
+			);
 
 			for (let x = 0; x < width; x += 1) {
 				const sampleIndex = Math.min(
@@ -952,6 +966,16 @@ function WaveformCanvas({
 			data-sample-count={samples.length}
 			ref={canvasRef}
 		/>
+	);
+}
+
+function canvasTokenColor(
+	element: HTMLElement,
+	tokenName: string,
+	fallback: string,
+) {
+	return (
+		getComputedStyle(element).getPropertyValue(tokenName).trim() || fallback
 	);
 }
 

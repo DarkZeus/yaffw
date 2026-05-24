@@ -293,10 +293,10 @@ export function NativePreviewPlayer({
 			aria-label="Native preview player"
 			className="flex flex-col gap-4 border-t pt-5"
 		>
-			<div className="overflow-hidden rounded-md border bg-background">
+			<div className="overflow-hidden rounded-md border bg-workbench-viewer">
 				<video
 					aria-label={`Preview for ${asset.label}`}
-					className="aspect-video w-full bg-foreground object-contain"
+					className="aspect-video w-full bg-workbench-viewer object-contain"
 					onEnded={handleEnded}
 					onPause={() => setIsPlaying(false)}
 					onPlay={() => setIsPlaying(true)}
@@ -553,7 +553,7 @@ export function isPreviewShortcutSuppressed({
 	const target =
 		event.target instanceof Element ? event.target : document.activeElement;
 
-	if (target && isEditableTarget(target)) {
+	if (target?.isConnected && isEditableTarget(target)) {
 		return true;
 	}
 

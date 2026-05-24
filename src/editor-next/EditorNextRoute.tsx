@@ -181,6 +181,7 @@ export function EditorNextRoute({
 			return;
 		}
 
+		event.currentTarget.blur();
 		void importLocalFile(file);
 	}
 
@@ -338,7 +339,7 @@ export function EditorNextRoute({
 	}
 
 	return (
-		<main className="min-h-screen bg-background text-foreground">
+		<main className="workbench dark min-h-screen bg-workbench text-foreground">
 			<div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
 				<header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between">
 					<div className="flex flex-col gap-2">
