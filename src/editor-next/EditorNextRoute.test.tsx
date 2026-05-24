@@ -51,6 +51,12 @@ describe("EditorNextRoute", () => {
 		);
 
 		expect(screen.getByText("Editor-next")).toBeTruthy();
+		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
+		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench media asset region")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench preview region")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench inspector region")).toBeTruthy();
+		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByLabelText("Local video file")).toBeTruthy();
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
@@ -71,7 +77,46 @@ describe("EditorNextRoute", () => {
 		const alert = screen.getByRole("alert");
 
 		expect(alert.textContent).toContain("WebCodecs");
+		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
+		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench media asset region")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench preview region")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench inspector region")).toBeTruthy();
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
+	});
+
+	it("renders importing and analyzing inside the workbench preview region", async () => {
+		const inspection = createDeferred<LocalMediaAssetInspection>();
+
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-loading"}
+				createDraftId={() => "draft-loading"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={() => inspection.promise}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "loading.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByText("Analyzing media asset draft")).toBeTruthy();
+		});
+		expect(
+			screen.getByText("Preparing media asset draft loading.mp4."),
+		).toBeTruthy();
+		expect(
+			(screen.getByLabelText("Local video file") as HTMLInputElement).disabled,
+		).toBe(true);
+
+		inspection.resolve(supportedInspection);
+		await waitFor(() => {
+			expect(screen.getByLabelText("Preview for loading.mp4")).toBeTruthy();
+		});
 	});
 
 	it("imports a local file from the file picker into the ready editor state", async () => {
@@ -91,14 +136,15 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Ready media asset")).toBeTruthy();
+			expect(screen.getByLabelText("Preview for picked.mp4")).toBeTruthy();
 		});
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
-		expect(screen.getByLabelText("Preview for picked.mp4")).toBeTruthy();
-		expect(screen.getByText("Duration: 00:00:12.000")).toBeTruthy();
-		expect(screen.getByText("Video tracks: 1")).toBeTruthy();
-		expect(screen.getByText("Audio tracks: 1")).toBeTruthy();
+		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByText("Ready media asset")).toBeNull();
+		expect(
+			screen.getByText("Loaded for preview, selection, and export."),
+		).toBeTruthy();
 		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
 		expect(screen.getByText("File info")).toBeTruthy();
 		expect(screen.getByText("Video track")).toBeTruthy();
@@ -118,13 +164,13 @@ describe("EditorNextRoute", () => {
 		expect(screen.getByText("Full asset")).toBeTruthy();
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
-		fireEvent.blur(screen.getByLabelText("Local video file"));
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 
 		await waitFor(() => {
-			expect(screen.getByText("00:00:10.000 - 00:00:12.000")).toBeTruthy();
+			expect(screen.getAllByText("00:00:10.000").length).toBeGreaterThan(0);
 		});
+		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 		await waitFor(() => {
 			expect(screen.getByText("Best-effort export")).toBeTruthy();
 		});
@@ -179,7 +225,9 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Export review")).toBeTruthy();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start default export" }),
+		);
 
 		await waitFor(() => {
 			expect(exportRun).toHaveBeenCalledTimes(1);
@@ -197,9 +245,7 @@ describe("EditorNextRoute", () => {
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 		expect(screen.getByText("picked-export.mp4")).toBeTruthy();
 		expect(screen.getAllByLabelText(/^Preview for/)).toHaveLength(1);
-		expect(
-			screen.queryByRole("button", { name: /use generated/i }),
-		).toBeNull();
+		expect(screen.queryByRole("button", { name: /use generated/i })).toBeNull();
 		expect(progressEvents[0]).toEqual({
 			phase: "preparing",
 		});
@@ -247,19 +293,25 @@ describe("EditorNextRoute", () => {
 
 		fireEvent.change(screen.getByLabelText("Local video file"), {
 			target: {
-				files: [new File(["video"], "close-cancelled.mp4", { type: "video/mp4" })],
+				files: [
+					new File(["video"], "close-cancelled.mp4", { type: "video/mp4" }),
+				],
 			},
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Ready media asset")).toBeTruthy();
+			expect(
+				screen.getByLabelText("Preview for close-cancelled.mp4"),
+			).toBeTruthy();
 		});
 
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		expect(confirmClose).toHaveBeenCalledTimes(1);
-		expect(screen.getByText("Ready media asset")).toBeTruthy();
-		expect(screen.getByLabelText("Preview for close-cancelled.mp4")).toBeTruthy();
+		expect(
+			screen.getByLabelText("Preview for close-cancelled.mp4"),
+		).toBeTruthy();
+		expect(screen.queryByLabelText("Local video file")).toBeNull();
 		expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 	});
 
@@ -286,16 +338,21 @@ describe("EditorNextRoute", () => {
 
 		fireEvent.change(screen.getByLabelText("Local video file"), {
 			target: {
-				files: [new File(["video"], "close-confirmed.mp4", { type: "video/mp4" })],
+				files: [
+					new File(["video"], "close-confirmed.mp4", { type: "video/mp4" }),
+				],
 			},
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Start default export" }))
-				.toBeTruthy();
+			expect(
+				screen.getByRole("button", { name: "Start default export" }),
+			).toBeTruthy();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start default export" }),
+		);
 
 		await waitFor(() => {
 			expect(screen.getByText("Export complete")).toBeTruthy();
@@ -307,8 +364,12 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
 		});
 
-		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:editor-next-preview");
-		expect(screen.queryByLabelText("Preview for close-confirmed.mp4")).toBeNull();
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
+			"blob:editor-next-preview",
+		);
+		expect(
+			screen.queryByLabelText("Preview for close-confirmed.mp4"),
+		).toBeNull();
 		expect(screen.queryByLabelText("Selection timeline")).toBeNull();
 		expect(screen.queryByLabelText("Export review")).toBeNull();
 		expect(
@@ -336,7 +397,9 @@ describe("EditorNextRoute", () => {
 
 		fireEvent.change(screen.getByLabelText("Local video file"), {
 			target: {
-				files: [new File(["video"], "close-disabled.mp4", { type: "video/mp4" })],
+				files: [
+					new File(["video"], "close-disabled.mp4", { type: "video/mp4" }),
+				],
 			},
 		});
 
@@ -349,12 +412,17 @@ describe("EditorNextRoute", () => {
 				.disabled,
 		).toBe(false);
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start default export" }),
+		);
 
 		await waitFor(() => {
 			expect(
-				(screen.getByRole("button", { name: "Close file" }) as HTMLButtonElement)
-					.disabled,
+				(
+					screen.getByRole("button", {
+						name: "Close file",
+					}) as HTMLButtonElement
+				).disabled,
 			).toBe(true);
 		});
 
@@ -384,7 +452,9 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Ready media asset")).toBeTruthy();
+			expect(
+				screen.getByLabelText("Preview for beforeunload.mp4"),
+			).toBeTruthy();
 		});
 
 		expect(dispatchBeforeUnload()).toBe(true);
@@ -415,7 +485,7 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Ready media asset")).toBeTruthy();
+			expect(screen.getByLabelText("Preview for remount.mp4")).toBeTruthy();
 		});
 
 		unmount();
@@ -453,16 +523,21 @@ describe("EditorNextRoute", () => {
 
 		fireEvent.change(screen.getByLabelText("Local video file"), {
 			target: {
-				files: [new File(["video"], "uncancellable.mp4", { type: "video/mp4" })],
+				files: [
+					new File(["video"], "uncancellable.mp4", { type: "video/mp4" }),
+				],
 			},
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Start default export" }))
-				.toBeTruthy();
+			expect(
+				screen.getByRole("button", { name: "Start default export" }),
+			).toBeTruthy();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start default export" }),
+		);
 
 		await waitFor(() => {
 			expect(exportRun).toHaveBeenCalledTimes(1);
@@ -512,14 +587,14 @@ describe("EditorNextRoute", () => {
 		fireEvent.mouseUp(window, { clientX: 600 });
 
 		await waitFor(() => {
-			expect(screen.getByText("00:00:06.000 - 00:00:12.000")).toBeTruthy();
+			expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
 		});
-		expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
 		fireEvent.click(screen.getByRole("button", { name: "Reset selection" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("00:00:00.000 - 00:00:12.000")).toBeTruthy();
+			expect(screen.getAllByText("00:00:00.000").length).toBeGreaterThan(0);
 		});
 		expect(screen.getByText("Playhead")).toBeTruthy();
 		expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
@@ -545,11 +620,11 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Ready media asset")).toBeTruthy();
+			expect(screen.getByLabelText("Preview for dropped.webm")).toBeTruthy();
 		});
 
 		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
-		expect(screen.getByText("Audio tracks: 0")).toBeTruthy();
+		expect(screen.queryByLabelText("Local video file")).toBeNull();
 		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
 		expect(screen.getByText("None")).toBeTruthy();
 	});
@@ -578,6 +653,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByRole("alert").textContent).toContain("Audio-only");
 		});
 
+		expect(screen.getByText("Media asset analysis failed")).toBeTruthy();
 		expect(screen.getByText("Technical details")).toBeTruthy();
 	});
 });

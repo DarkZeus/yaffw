@@ -339,77 +339,176 @@ export function EditorNextRoute({
 	}
 
 	return (
+		<EditorWorkbenchFrame runtime={runtime} status={session.status}>
+			{session.status === "unsupported-runtime" ? (
+				<UnsupportedRuntimeState session={session} />
+			) : (
+				<EditorSessionShell
+					onDefaultExportCancelRequested={cancelDefaultExport}
+					onDefaultExportStartRequested={() => {
+						void startDefaultExport();
+					}}
+					onCloseFileRequested={requestCloseFile}
+					onGeneratedMediaDownloadRequested={downloadGeneratedMedia}
+					localFileInputKey={localFileInputKey}
+					onLocalFileDropped={handleLocalFileDropped}
+					onLocalFileSelected={handleLocalFileSelected}
+					onSelectionEndRequested={(playheadUs) =>
+						dispatch({
+							playheadUs,
+							type: "selection.end.setFromPlayhead",
+						})
+					}
+					onSelectionRangeMoveRequested={(deltaUs) =>
+						dispatch({
+							deltaUs,
+							type: "selection.range.moved",
+						})
+					}
+					onSelectionResetRequested={() =>
+						dispatch({
+							type: "selection.reset",
+						})
+					}
+					onSelectionStartRequested={(playheadUs) =>
+						dispatch({
+							playheadUs,
+							type: "selection.start.setFromPlayhead",
+						})
+					}
+					previewSource={previewSource}
+					session={session}
+				/>
+			)}
+		</EditorWorkbenchFrame>
+	);
+}
+
+type EditorWorkbenchFrameProps = {
+	children: ReactNode;
+	runtime: RuntimeSupport;
+	status: EditorSessionState["status"];
+};
+
+function EditorWorkbenchFrame({
+	children,
+	runtime,
+	status,
+}: EditorWorkbenchFrameProps) {
+	return (
 		<main className="workbench dark min-h-screen bg-workbench text-foreground">
-			<div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-				<header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between">
-					<div className="flex flex-col gap-2">
-						<Badge variant="outline" className="w-fit">
-							First slice
-						</Badge>
-						<div className="flex flex-col gap-1">
-							<h1 className="text-3xl font-semibold tracking-tight">
+			<div className="grid min-h-screen grid-rows-[3rem_minmax(0,1fr)] overflow-hidden">
+				<header
+					aria-label="Editor workbench top bar"
+					className="flex min-w-0 items-center justify-between gap-3 border-b border-workbench-border-strong bg-workbench px-3"
+				>
+					<div className="flex min-w-0 items-center gap-3">
+						<div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-workbench-border-strong bg-workbench-viewer">
+							<FileVideo aria-hidden="true" className="size-4" />
+						</div>
+						<div className="min-w-0">
+							<h1 className="truncate text-sm font-semibold tracking-tight">
 								Editor-next
 							</h1>
-							<p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-								A separate local-first editor surface for one active media
-								asset.
+							<p className="truncate text-xs text-muted-foreground">
+								Single-asset editor workbench
 							</p>
 						</div>
 					</div>
-					<div className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
-						{runtime.supported ? (
-							<CheckCircle2 aria-hidden="true" className="text-chart-2" />
-						) : (
-							<AlertTriangle aria-hidden="true" className="text-destructive" />
-						)}
-						<span className="font-medium">
-							{runtime.supported ? "Runtime ready" : "Runtime blocked"}
-						</span>
+					<div className="flex min-w-0 items-center gap-2">
+						<Badge className="hidden sm:inline-flex" variant="outline">
+							First slice
+						</Badge>
+						<div className="flex min-w-0 items-center gap-2 rounded-md border border-workbench-border bg-workbench-inspector px-2.5 py-1.5 text-xs">
+							{runtime.supported ? (
+								<CheckCircle2
+									aria-hidden="true"
+									className="size-4 shrink-0 text-chart-2"
+								/>
+							) : (
+								<AlertTriangle
+									aria-hidden="true"
+									className="size-4 shrink-0 text-destructive"
+								/>
+							)}
+							<span className="truncate font-medium">
+								{runtime.supported ? "Runtime ready" : "Runtime blocked"}
+							</span>
+						</div>
 					</div>
 				</header>
-
-				{session.status === "unsupported-runtime" ? (
-					<UnsupportedRuntimeState session={session} />
-				) : (
-					<EditorSessionShell
-						onDefaultExportCancelRequested={cancelDefaultExport}
-						onDefaultExportStartRequested={() => {
-							void startDefaultExport();
-						}}
-						onCloseFileRequested={requestCloseFile}
-						onGeneratedMediaDownloadRequested={downloadGeneratedMedia}
-						localFileInputKey={localFileInputKey}
-						onLocalFileDropped={handleLocalFileDropped}
-						onLocalFileSelected={handleLocalFileSelected}
-						onSelectionEndRequested={(playheadUs) =>
-							dispatch({
-								playheadUs,
-								type: "selection.end.setFromPlayhead",
-							})
-						}
-						onSelectionRangeMoveRequested={(deltaUs) =>
-							dispatch({
-								deltaUs,
-								type: "selection.range.moved",
-							})
-						}
-						onSelectionResetRequested={() =>
-							dispatch({
-								type: "selection.reset",
-							})
-						}
-						onSelectionStartRequested={(playheadUs) =>
-							dispatch({
-								playheadUs,
-								type: "selection.start.setFromPlayhead",
-							})
-						}
-						previewSource={previewSource}
-						session={session}
-					/>
-				)}
+				<div className="grid min-h-0 grid-cols-[3.25rem_minmax(0,1fr)]">
+					<EditorWorkbenchRail status={status} />
+					<div className="min-w-0 overflow-auto bg-workbench p-3 md:p-4">
+						{children}
+					</div>
+				</div>
 			</div>
 		</main>
+	);
+}
+
+function EditorWorkbenchRail({
+	status,
+}: { status: EditorSessionState["status"] }) {
+	return (
+		<nav
+			aria-label="Editor workbench rail"
+			className="flex min-h-0 flex-col items-center gap-2 border-r border-workbench-border-strong bg-workbench-rail px-2 py-3"
+		>
+			<WorkbenchRailItem
+				active={status !== "unsupported-runtime"}
+				icon={<FileVideo />}
+				label="Media asset"
+			/>
+			<WorkbenchRailItem
+				active={status === "ready"}
+				icon={<PlayCircle />}
+				label="Preview"
+			/>
+			<WorkbenchRailItem
+				active={status === "ready"}
+				icon={<BarChart3 />}
+				label="Selection"
+			/>
+			<WorkbenchRailItem
+				active={status === "ready"}
+				icon={<PackageCheck />}
+				label="Export"
+			/>
+			<WorkbenchRailItem
+				active={status === "unsupported-runtime"}
+				icon={<Monitor />}
+				label="Runtime"
+			/>
+		</nav>
+	);
+}
+
+function WorkbenchRailItem({
+	active,
+	icon,
+	label,
+}: {
+	active: boolean;
+	icon: AnalyticsIconElement;
+	label: string;
+}) {
+	return (
+		<div
+			aria-label={label}
+			className={`flex size-9 items-center justify-center rounded-md border text-muted-foreground ${
+				active
+					? "border-workbench-border-strong bg-workbench-hover text-foreground"
+					: "border-transparent bg-transparent"
+			}`}
+			title={label}
+		>
+			{cloneElement(icon, {
+				"aria-hidden": true,
+				className: "size-4",
+			})}
+		</div>
 	);
 }
 
@@ -421,17 +520,50 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 	const missing = session.runtime.supported ? [] : session.runtime.missing;
 
 	return (
-		<section className="grid min-h-[26rem] content-center">
-			<Alert variant="destructive" className="max-w-3xl">
-				<AlertTriangle aria-hidden="true" />
-				<AlertTitle>Unsupported runtime</AlertTitle>
-				<AlertDescription>
-					<p>{session.message}</p>
-					{missing.length > 0 ? (
-						<p>Missing capability keys: {missing.join(", ")}</p>
-					) : null}
-				</AlertDescription>
-			</Alert>
+		<section
+			aria-label="Editor workbench session"
+			className="grid min-h-[calc(100vh-5rem)] gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"
+		>
+			<div className="grid min-h-0 gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
+				<section
+					aria-label="Workbench media asset region"
+					className="flex min-h-[18rem] flex-col gap-4 rounded-md border border-workbench-border bg-workbench-inspector p-4"
+				>
+					<WorkbenchRegionHeader
+						icon={<FileVideo />}
+						kicker="Media asset"
+						title="Import unavailable"
+					/>
+					<p className="text-sm leading-6 text-muted-foreground">
+						Editor-next requires a supported runtime before a local media asset
+						can be imported.
+					</p>
+					<Badge className="w-fit" variant="destructive">
+						Runtime blocked
+					</Badge>
+				</section>
+				<section
+					aria-label="Workbench preview region"
+					className="grid min-h-[28rem] place-items-center rounded-md border border-workbench-border bg-workbench-viewer p-6"
+				>
+					<Alert variant="destructive" className="max-w-3xl">
+						<AlertTriangle aria-hidden="true" />
+						<AlertTitle>Unsupported runtime</AlertTitle>
+						<AlertDescription>
+							<p>{session.message}</p>
+							{missing.length > 0 ? (
+								<p>Missing capability keys: {missing.join(", ")}</p>
+							) : null}
+						</AlertDescription>
+					</Alert>
+				</section>
+			</div>
+			<aside
+				aria-label="Workbench inspector region"
+				className="flex min-w-0 flex-col gap-4"
+			>
+				<RuntimeChecksPanel session={session} />
+			</aside>
 		</section>
 	);
 }
@@ -474,90 +606,81 @@ function EditorSessionShell({
 
 	return (
 		<section
-			aria-labelledby="editor-next-import-title"
-			className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]"
+			aria-label="Editor workbench session"
+			className="grid min-h-[calc(100vh-5rem)] gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"
 		>
-			<div className="flex min-h-[28rem] flex-col gap-6 rounded-md border bg-card p-5">
-				<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-					<div className="flex items-start gap-3">
-						<div className="flex size-11 items-center justify-center rounded-md border bg-muted">
-							<FileVideo aria-hidden="true" />
-						</div>
-						<div className="flex flex-col gap-1">
-							<h2
-								id="editor-next-import-title"
-								className="text-xl font-semibold tracking-tight"
-							>
-								Local media asset
-							</h2>
-							<p className="max-w-xl text-sm leading-6 text-muted-foreground">
-								Ready to accept one local media asset for the first-slice
-								workflow.
-							</p>
+			<div className="grid min-h-0 gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
+				<section
+					aria-label="Workbench media asset region"
+					className="flex min-h-[18rem] flex-col gap-4 rounded-md border border-workbench-border bg-workbench-inspector p-4"
+				>
+					<div className="flex items-start justify-between gap-3">
+						<WorkbenchRegionHeader
+							icon={<FileVideo />}
+							kicker="Media asset"
+							title="Local media asset"
+						/>
+						<div className="flex shrink-0 flex-col items-end gap-2">
+							<Badge variant="secondary">
+								{formatSessionStatus(session.status)}
+							</Badge>
+							{closeFileVisible ? (
+								<Button
+									disabled={closeFileDisabled}
+									onClick={onCloseFileRequested}
+									size="sm"
+									type="button"
+									variant="outline"
+								>
+									<X data-icon="inline-start" />
+									Close file
+								</Button>
+							) : null}
 						</div>
 					</div>
-					<div className="flex items-center gap-2">
-						{closeFileVisible ? (
-							<Button
-								disabled={closeFileDisabled}
-								onClick={onCloseFileRequested}
-								size="sm"
-								type="button"
-								variant="outline"
-							>
-								<X data-icon="inline-start" />
-								Close file
-							</Button>
-						) : null}
-						<Badge variant="secondary">
-							{formatSessionStatus(session.status)}
-						</Badge>
-					</div>
-				</div>
+					{session.status === "ready" ? (
+						<ActiveMediaAssetSummary session={session} />
+					) : (
+						<p className="text-sm leading-6 text-muted-foreground">
+							Ready to accept one local media asset for the first-slice
+							workflow.
+						</p>
+					)}
+				</section>
 
-				<div className="grid flex-1 place-items-center rounded-md border border-dashed bg-background/60 p-6">
-					<div
-						className="flex w-full max-w-lg flex-col gap-4"
-						data-testid="editor-next-drop-zone"
-						onDragOver={(event) => event.preventDefault()}
-						onDrop={onLocalFileDropped}
-					>
-						<label
-							className="text-sm font-medium"
-							htmlFor="editor-next-local-file"
-						>
-							Local video file
-						</label>
-						<div className="flex flex-col gap-3">
-							<Input
-								accept="video/*"
-								disabled={!session.importEnabled}
-								id="editor-next-local-file"
-								key={localFileInputKey}
-								onChange={onLocalFileSelected}
-								type="file"
-							/>
-						</div>
-						<SessionStatusLine session={session} />
-					</div>
-				</div>
+				<section
+					aria-label="Workbench preview region"
+					className="min-h-[28rem] rounded-md border border-workbench-border bg-workbench-viewer p-4"
+				>
+					{session.status !== "ready" ? (
+						<NonReadyImportSurface
+							localFileInputKey={localFileInputKey}
+							onLocalFileDropped={onLocalFileDropped}
+							onLocalFileSelected={onLocalFileSelected}
+							session={session}
+						/>
+					) : null}
 
-				{session.status === "ready" && previewSource ? (
-					<NativePreviewPlayer
-						asset={session.asset}
-						onSelectionEndRequested={onSelectionEndRequested}
-						onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
-						onSelectionResetRequested={onSelectionResetRequested}
-						onSelectionStartRequested={onSelectionStartRequested}
-						selection={session.selection}
-						selectionEditingDisabled={selectionEditingDisabled}
-						shortcutsDisabled={selectionEditingDisabled}
-						source={previewSource}
-					/>
-				) : null}
+					{session.status === "ready" && previewSource ? (
+						<NativePreviewPlayer
+							asset={session.asset}
+							onSelectionEndRequested={onSelectionEndRequested}
+							onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+							onSelectionResetRequested={onSelectionResetRequested}
+							onSelectionStartRequested={onSelectionStartRequested}
+							selection={session.selection}
+							selectionEditingDisabled={selectionEditingDisabled}
+							shortcutsDisabled={selectionEditingDisabled}
+							source={previewSource}
+						/>
+					) : null}
+				</section>
 			</div>
 
-			<aside className="flex flex-col gap-4">
+			<aside
+				aria-label="Workbench inspector region"
+				className="flex min-w-0 flex-col gap-4"
+			>
 				{session.status === "ready" ? (
 					<>
 						<ExportReviewPanel
@@ -579,6 +702,162 @@ function EditorSessionShell({
 			</aside>
 		</section>
 	);
+}
+
+function WorkbenchRegionHeader({
+	icon,
+	kicker,
+	title,
+}: {
+	icon: AnalyticsIconElement;
+	kicker: string;
+	title: string;
+}) {
+	return (
+		<div className="flex min-w-0 items-start gap-3">
+			<div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-workbench-border bg-background">
+				{cloneElement(icon, {
+					"aria-hidden": true,
+					className: "size-4",
+				})}
+			</div>
+			<div className="min-w-0">
+				<p className="text-xs font-medium uppercase text-muted-foreground">
+					{kicker}
+				</p>
+				<h2
+					className="break-words text-base font-semibold leading-tight tracking-tight"
+					id="editor-next-import-title"
+				>
+					{title}
+				</h2>
+			</div>
+		</div>
+	);
+}
+
+function ActiveMediaAssetSummary({
+	session,
+}: {
+	session: Extract<EditorSessionState, { status: "ready" }>;
+}) {
+	return (
+		<div className="grid gap-3 text-sm">
+			<p className="leading-6 text-muted-foreground">
+				Loaded for preview, selection, and export.
+			</p>
+			<dl className="grid gap-2">
+				<WorkbenchFact label="Asset" value={session.asset.label} />
+				<WorkbenchFact
+					label="Selection"
+					value={`${formatMediaTime(session.selection.startUs)} - ${formatMediaTime(
+						session.selection.endUs,
+					)}`}
+				/>
+				<WorkbenchFact
+					label="Duration"
+					value={formatMediaTime(session.asset.durationUs)}
+				/>
+				<WorkbenchFact
+					label="Tracks"
+					value={`${session.asset.tracks.video.length} video / ${session.asset.tracks.audio.length} audio`}
+				/>
+			</dl>
+		</div>
+	);
+}
+
+function NonReadyImportSurface({
+	localFileInputKey,
+	onLocalFileDropped,
+	onLocalFileSelected,
+	session,
+}: {
+	localFileInputKey: number;
+	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
+	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
+	session: Exclude<EditorSessionShellProps["session"], { status: "ready" }>;
+}) {
+	const copy = workbenchNonReadyStateCopy(session);
+
+	return (
+		<div
+			className="grid min-h-full place-items-center rounded-md border border-dashed border-workbench-border-strong bg-background/55 p-6"
+			data-testid="editor-next-drop-zone"
+			onDragOver={(event) => event.preventDefault()}
+			onDrop={onLocalFileDropped}
+		>
+			<div className="flex w-full max-w-xl flex-col gap-5">
+				<div className="grid gap-2">
+					<h3 className="text-xl font-semibold tracking-tight">{copy.title}</h3>
+					<p className="text-sm leading-6 text-muted-foreground">
+						{copy.description}
+					</p>
+				</div>
+				<div className="grid gap-2">
+					<label
+						className="text-sm font-medium"
+						htmlFor="editor-next-local-file"
+					>
+						Local video file
+					</label>
+					<Input
+						accept="video/*"
+						disabled={!session.importEnabled}
+						id="editor-next-local-file"
+						key={localFileInputKey}
+						onChange={onLocalFileSelected}
+						type="file"
+					/>
+				</div>
+				<SessionStatusLine session={session} />
+			</div>
+		</div>
+	);
+}
+
+function WorkbenchFact({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="grid gap-1 rounded-md border border-workbench-border bg-background/70 px-3 py-2">
+			<dt className="text-xs font-medium uppercase text-muted-foreground">
+				{label}
+			</dt>
+			<dd className="min-w-0 break-words font-mono text-xs leading-5">
+				{value}
+			</dd>
+		</div>
+	);
+}
+
+function workbenchNonReadyStateCopy(
+	session: Exclude<EditorSessionShellProps["session"], { status: "ready" }>,
+) {
+	switch (session.status) {
+		case "closed":
+			return {
+				description:
+					"The previous session was closed. Reopen the route to start another editing session.",
+				title: "Session closed",
+			};
+		case "empty":
+			return {
+				description:
+					"Choose or drop one local video file to create a media asset draft.",
+				title: "No media asset loaded",
+			};
+		case "failure":
+			return {
+				description:
+					"Choose another local video file after reviewing the analysis details below.",
+				title: "Media asset analysis failed",
+			};
+		case "loading":
+			return {
+				description:
+					"Analysis is running; import controls stay disabled until the asset is ready.",
+				title: "Analyzing media asset draft",
+			};
+	}
 }
 
 function ExportReviewPanel({
@@ -607,48 +886,57 @@ function ExportReviewPanel({
 	return (
 		<section
 			aria-label="Export review"
-			className="flex flex-col gap-4 rounded-md border bg-card p-4"
+			className="overflow-hidden rounded-md border bg-card shadow-sm"
 		>
-			<div className="flex items-center justify-between gap-3">
-				<h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-					<PackageCheck aria-hidden="true" className="size-4" />
+			<div className="flex items-start justify-between gap-3 border-b bg-muted/25 px-4 py-3">
+				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
+					<span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
+						<PackageCheck aria-hidden="true" className="size-4" />
+					</span>
 					Export review
 				</h2>
-				<Badge variant={review.supported ? "secondary" : "destructive"}>
+				<Badge
+					className="shrink-0"
+					variant={review.supported ? "secondary" : "destructive"}
+				>
 					{review.supported ? "Ready" : "Blocked"}
 				</Badge>
 			</div>
 
-			<div className="grid gap-2">
-				<ExportReviewRow
-					label="Planned output"
-					value={review.plannedOutput.label}
-				/>
-				{review.supported ? (
-					<>
-						<ExportReviewRow label="Method" value={review.method.label} />
-						<ExportReviewRow
-							label="Expected precision"
-							value={review.precision.label}
-						/>
-					</>
-				) : null}
-			</div>
+			<div className="flex flex-col gap-4 p-4">
+				<div className="grid gap-2">
+					<ExportReviewRow
+						label="Planned output"
+						value={review.plannedOutput.label}
+					/>
+					{review.supported ? (
+						<>
+							<ExportReviewRow label="Method" value={review.method.label} />
+							<ExportReviewRow
+								label="Expected precision"
+								value={review.precision.label}
+							/>
+						</>
+					) : null}
+				</div>
 
-			<p className="text-sm leading-6 text-muted-foreground">{review.reason}</p>
-			{review.supported ? null : (
-				<p className="text-xs leading-5 text-muted-foreground">
-					{review.technicalDetails}
+				<p className="rounded-md border-l-2 border-primary/60 bg-background/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
+					{review.reason}
 				</p>
-			)}
-			<ExportJobStatus exportState={exportState} />
-			<ExportReviewActions
-				exportState={exportState}
-				onCancelExport={onCancelExport}
-				onDownloadGeneratedMedia={onDownloadGeneratedMedia}
-				onStartExport={onStartExport}
-				reviewSupported={review.supported}
-			/>
+				{review.supported ? null : (
+					<p className="rounded-md bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
+						{review.technicalDetails}
+					</p>
+				)}
+				<ExportJobStatus exportState={exportState} />
+				<ExportReviewActions
+					exportState={exportState}
+					onCancelExport={onCancelExport}
+					onDownloadGeneratedMedia={onDownloadGeneratedMedia}
+					onStartExport={onStartExport}
+					reviewSupported={review.supported}
+				/>
+			</div>
 		</section>
 	);
 }
@@ -662,12 +950,14 @@ function ExportJobStatus({
 		const progressValue = progressPercent(exportState.job.progress);
 
 		return (
-			<div className="grid gap-2 rounded-md border bg-background p-3">
-				<div className="flex items-center justify-between gap-3 text-sm">
+			<div className="grid min-w-0 gap-2 rounded-md border bg-background p-3">
+				<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
 					<span className="font-medium">
 						{formatExportProgressPhase(exportState.job.progress.phase)}
 					</span>
-					<Badge variant="outline">{exportState.job.id}</Badge>
+					<Badge className="max-w-32 truncate" variant="outline">
+						{exportState.job.id}
+					</Badge>
 				</div>
 				<Progress aria-label="Export progress" value={progressValue} />
 				{exportState.job.cancelSupported ? null : (
@@ -681,14 +971,17 @@ function ExportJobStatus({
 
 	if (exportState.status === "succeeded") {
 		return (
-			<div className="grid gap-2 rounded-md border bg-background p-3 text-sm">
-				<div className="flex items-center justify-between gap-3">
-					<span className="font-medium">Export complete</span>
-					<Badge variant={exportState.delivered ? "secondary" : "outline"}>
+			<div className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm">
+				<div className="flex min-w-0 items-center justify-between gap-3">
+					<span className="min-w-0 font-medium">Export complete</span>
+					<Badge
+						className="shrink-0"
+						variant={exportState.delivered ? "secondary" : "outline"}
+					>
 						{exportState.delivered ? "Delivered" : "Ready to download"}
 					</Badge>
 				</div>
-				<p className="font-mono text-xs text-muted-foreground">
+				<p className="min-w-0 break-all rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground">
 					{exportState.generatedMedia.fileName}
 				</p>
 			</div>
@@ -697,12 +990,12 @@ function ExportJobStatus({
 
 	if (exportState.status === "failed") {
 		return (
-			<div className="grid gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
+			<div className="grid min-w-0 gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
 				<span className="font-medium text-destructive">
 					{exportState.message}
 				</span>
 				{exportState.technicalDetails ? (
-					<p className="text-xs text-muted-foreground">
+					<p className="break-words text-xs text-muted-foreground">
 						{exportState.technicalDetails}
 					</p>
 				) : null}
@@ -740,7 +1033,12 @@ function ExportReviewActions({
 		}
 
 		return (
-			<Button onClick={onCancelExport} type="button" variant="outline">
+			<Button
+				className="w-full"
+				onClick={onCancelExport}
+				type="button"
+				variant="outline"
+			>
 				<Square data-icon="inline-start" />
 				Cancel export
 			</Button>
@@ -750,6 +1048,7 @@ function ExportReviewActions({
 	if (exportState.status === "succeeded") {
 		return (
 			<Button
+				className="w-full"
 				onClick={() => onDownloadGeneratedMedia(exportState.generatedMedia)}
 				type="button"
 			>
@@ -761,6 +1060,7 @@ function ExportReviewActions({
 
 	return (
 		<Button
+			className="w-full"
 			disabled={!reviewSupported}
 			onClick={onStartExport}
 			type="button"
@@ -779,22 +1079,22 @@ function ExportReviewRow({
 	value: string;
 }) {
 	return (
-		<div className="flex items-center justify-between gap-3 text-sm">
-			<span className="text-muted-foreground">{label}</span>
-			<Badge
-				className="max-w-52 truncate font-mono"
-				title={value}
-				variant="outline"
-			>
+		<div className="grid min-w-0 gap-1 rounded-md border bg-background/70 px-3 py-2.5 text-sm">
+			<span className="text-xs font-medium uppercase text-muted-foreground">
+				{label}
+			</span>
+			<span className="min-w-0 break-words font-mono leading-5 text-foreground">
 				{value}
-			</Badge>
+			</span>
 		</div>
 	);
 }
 
 function RuntimeChecksPanel({
 	session,
-}: Pick<EditorSessionShellProps, "session">) {
+}: {
+	session: EditorSessionState;
+}) {
 	return (
 		<section className="flex flex-col gap-3 rounded-md border bg-card p-4">
 			<h2 className="text-sm font-semibold tracking-tight">Runtime checks</h2>

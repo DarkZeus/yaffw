@@ -50,7 +50,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Runtime blocked")).toBeTruthy();
+		expect(screen.getAllByText("Runtime blocked").length).toBeGreaterThan(0);
 		expect(screen.getByRole("alert").textContent).toContain("WebCodecs");
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 	});
