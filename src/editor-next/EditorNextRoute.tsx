@@ -31,7 +31,6 @@ import {
 } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
-	ExportProgress,
 	GeneratedMedia,
 	ReadyMediaAsset,
 	Selection,
@@ -58,6 +57,11 @@ import {
 	deliverBrowserGeneratedMedia,
 	type GeneratedMediaDeliveryRequest,
 } from "./generated-media-delivery";
+import {
+	createExportInspectorViewModel,
+	type ExportInspectorActionViewModel,
+	type ExportInspectorStatusViewModel,
+} from "./export-inspector-presenter";
 import {
 	createMediaAssetContextViewModel,
 	type MediaAssetContextFact,
@@ -928,8 +932,9 @@ function ExportReviewPanel({
 	runtime: RuntimeSupport;
 	selection: Selection;
 }) {
-	const review = planDefaultExportCapability({
+	const viewModel = createExportInspectorViewModel({
 		asset,
+		exportState,
 		runtime,
 		selection,
 	});
@@ -937,9 +942,9 @@ function ExportReviewPanel({
 	return (
 		<section
 			aria-label="Export review"
-			className="overflow-hidden rounded-md border bg-card shadow-sm"
+			className="overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
 		>
-			<div className="flex items-start justify-between gap-3 border-b bg-muted/25 px-4 py-3">
+			<div className="flex items-start justify-between gap-3 border-b border-workbench-border bg-background/55 px-4 py-3">
 				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
 					<span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
 						<PackageCheck aria-hidden="true" className="size-4" />
@@ -948,44 +953,48 @@ function ExportReviewPanel({
 				</h2>
 				<Badge
 					className="shrink-0"
-					variant={review.supported ? "secondary" : "destructive"}
+					variant={
+						viewModel.badge.tone === "ready" ? "secondary" : "destructive"
+					}
 				>
-					{review.supported ? "Ready" : "Blocked"}
+					{viewModel.badge.label}
 				</Badge>
 			</div>
 
 			<div className="flex flex-col gap-4 p-4">
 				<div className="grid gap-2">
 					<ExportReviewRow
-						label="Planned output"
-						value={review.plannedOutput.label}
+						label={viewModel.review.plannedOutput.label}
+						value={viewModel.review.plannedOutput.value}
 					/>
-					{review.supported ? (
+					{viewModel.review.supported ? (
 						<>
-							<ExportReviewRow label="Method" value={review.method.label} />
 							<ExportReviewRow
-								label="Expected precision"
-								value={review.precision.label}
+								label={viewModel.review.method.label}
+								value={viewModel.review.method.value}
+							/>
+							<ExportReviewRow
+								label={viewModel.review.precision.label}
+								value={viewModel.review.precision.value}
 							/>
 						</>
 					) : null}
 				</div>
 
 				<p className="rounded-md border-l-2 border-primary/60 bg-background/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
-					{review.reason}
+					{viewModel.review.reason}
 				</p>
-				{review.supported ? null : (
+				{viewModel.review.supported ? null : (
 					<p className="rounded-md bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
-						{review.technicalDetails}
+						{viewModel.review.technicalDetails}
 					</p>
 				)}
-				<ExportJobStatus exportState={exportState} />
+				<ExportJobStatus status={viewModel.status} />
 				<ExportReviewActions
-					exportState={exportState}
+					action={viewModel.action}
 					onCancelExport={onCancelExport}
 					onDownloadGeneratedMedia={onDownloadGeneratedMedia}
 					onStartExport={onStartExport}
-					reviewSupported={review.supported}
 				/>
 			</div>
 		</section>
@@ -993,71 +1002,62 @@ function ExportReviewPanel({
 }
 
 function ExportJobStatus({
-	exportState,
+	status,
 }: {
-	exportState: ExportSessionState;
+	status: ExportInspectorStatusViewModel;
 }) {
-	if (exportState.status === "running") {
-		const progressValue = progressPercent(exportState.job.progress);
-
+	if (status.kind === "running") {
 		return (
 			<div className="grid min-w-0 gap-2 rounded-md border bg-background p-3">
 				<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
-					<span className="font-medium">
-						{formatExportProgressPhase(exportState.job.progress.phase)}
-					</span>
+					<span className="font-medium">{status.title}</span>
 					<Badge className="max-w-32 truncate" variant="outline">
-						{exportState.job.id}
+						{status.jobId}
 					</Badge>
 				</div>
-				<Progress aria-label="Export progress" value={progressValue} />
-				{exportState.job.cancelSupported ? null : (
+				<Progress aria-label="Export progress" value={status.progressPercent} />
+				{status.cancelUnavailableMessage ? (
 					<p className="text-xs text-muted-foreground">
-						Cancellation unavailable
-					</p>
-				)}
-			</div>
-		);
-	}
-
-	if (exportState.status === "succeeded") {
-		return (
-			<div className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm">
-				<div className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 font-medium">Export complete</span>
-					<Badge
-						className="shrink-0"
-						variant={exportState.delivered ? "secondary" : "outline"}
-					>
-						{exportState.delivered ? "Delivered" : "Ready to download"}
-					</Badge>
-				</div>
-				<p className="min-w-0 break-all rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground">
-					{exportState.generatedMedia.fileName}
-				</p>
-			</div>
-		);
-	}
-
-	if (exportState.status === "failed") {
-		return (
-			<div className="grid min-w-0 gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
-				<span className="font-medium text-destructive">
-					{exportState.message}
-				</span>
-				{exportState.technicalDetails ? (
-					<p className="break-words text-xs text-muted-foreground">
-						{exportState.technicalDetails}
+						{status.cancelUnavailableMessage}
 					</p>
 				) : null}
 			</div>
 		);
 	}
 
-	if (exportState.status === "cancelled") {
+	if (status.kind === "succeeded") {
+		return (
+			<div className="grid min-w-0 gap-3 rounded-md border bg-background p-3 text-sm">
+				<div className="flex min-w-0 items-center justify-between gap-3">
+					<span className="min-w-0 font-medium">{status.title}</span>
+					<Badge className="shrink-0" variant="outline">
+						{status.deliveryState}
+					</Badge>
+				</div>
+				<p className="min-w-0 break-all rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground">
+					{status.fileName}
+				</p>
+			</div>
+		);
+	}
+
+	if (status.kind === "failed") {
+		return (
+			<div className="grid min-w-0 gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
+				<span className="font-medium text-destructive">{status.message}</span>
+				{status.technicalDetails ? (
+					<p className="break-words text-xs text-muted-foreground">
+						{status.technicalDetails}
+					</p>
+				) : null}
+			</div>
+		);
+	}
+
+	if (status.kind === "cancelled") {
 		return (
 			<div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
-				Export cancelled.
+				{status.message}
 			</div>
 		);
 	}
@@ -1066,23 +1066,17 @@ function ExportJobStatus({
 }
 
 function ExportReviewActions({
-	exportState,
+	action,
 	onCancelExport,
 	onDownloadGeneratedMedia,
 	onStartExport,
-	reviewSupported,
 }: {
-	exportState: ExportSessionState;
+	action: ExportInspectorActionViewModel;
 	onCancelExport: () => void;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 	onStartExport: () => void;
-	reviewSupported: boolean;
 }) {
-	if (exportState.status === "running") {
-		if (!exportState.job.cancelSupported) {
-			return null;
-		}
-
+	if (action.kind === "cancel") {
 		return (
 			<Button
 				className="w-full"
@@ -1096,11 +1090,11 @@ function ExportReviewActions({
 		);
 	}
 
-	if (exportState.status === "succeeded") {
+	if (action.kind === "download") {
 		return (
 			<Button
 				className="w-full"
-				onClick={() => onDownloadGeneratedMedia(exportState.generatedMedia)}
+				onClick={() => onDownloadGeneratedMedia(action.generatedMedia)}
 				type="button"
 			>
 				<Download data-icon="inline-start" />
@@ -1109,15 +1103,19 @@ function ExportReviewActions({
 		);
 	}
 
+	if (action.kind === "none") {
+		return null;
+	}
+
 	return (
 		<Button
 			className="w-full"
-			disabled={!reviewSupported}
+			disabled={action.disabled}
 			onClick={onStartExport}
 			type="button"
 		>
 			<PlayCircle data-icon="inline-start" />
-			Start default export
+			{action.label}
 		</Button>
 	);
 }
@@ -1340,23 +1338,6 @@ function createGeneratedMediaFileName(fileName: string): string {
 	}
 
 	return `${fileName.slice(0, extensionStart)}-export.mp4`;
-}
-
-function progressPercent(progress: ExportProgress): number {
-	return Math.round(Math.max(0.05, progress.completedRatio ?? 0.05) * 100);
-}
-
-function formatExportProgressPhase(phase: ExportProgress["phase"]): string {
-	switch (phase) {
-		case "encoding":
-			return "Encoding";
-		case "finalizing":
-			return "Finalizing";
-		case "muxing":
-			return "Muxing";
-		case "preparing":
-			return "Preparing";
-	}
 }
 
 function errorToMessage(error: unknown): string {
