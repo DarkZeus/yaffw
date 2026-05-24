@@ -94,6 +94,23 @@ type WaveformLaneState = {
 	  }
 );
 
+type WaveformLaneIdentityInput = {
+	status: WaveformLaneState["status"];
+	track: AudioMediaTrack;
+	trackIndex: number;
+};
+
+type WaveformLaneIdentityStatusTone = "pending" | "ready" | "unavailable";
+
+type WaveformLaneIdentityViewModel = {
+	metadata: string[];
+	status: {
+		label: string;
+		tone: WaveformLaneIdentityStatusTone;
+	};
+	title: string;
+};
+
 const WAVEFORM_SAMPLE_COUNT = 8192;
 const MINIMUM_ZOOM = 1;
 const MAXIMUM_ZOOM = 4;
@@ -784,36 +801,34 @@ function WaveformLane({
 	) => void;
 	trackIndex: number;
 }) {
-	const label = lane.track.label ?? `Audio ${trackIndex + 1}`;
-	const language = lane.track.language ?? "und";
+	const identity = createWaveformLaneIdentityViewModel({
+		status: lane.status,
+		track: lane.track,
+		trackIndex,
+	});
 
 	return (
 		<div className="relative border-b border-workbench-border bg-workbench-lane">
 			<div
-				className="pointer-events-none relative z-30 flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
+				className="pointer-events-none relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
-				<span className="truncate text-sm font-medium text-workbench-lane-foreground">
-					{label}
+				<span className="mr-1 truncate text-sm font-medium text-workbench-lane-foreground">
+					{identity.title}
 				</span>
-				{language !== "und" ? (
+				{identity.metadata.map((metadata) => (
 					<Badge
+						key={metadata}
 						className="border-workbench-border-strong font-mono text-muted-foreground"
 						variant="outline"
 					>
-						{language}
+						{metadata}
 					</Badge>
-				) : null}
-				<div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-					<span>
-						{lane.track.channels ? `${lane.track.channels}ch` : "Audio"}
-					</span>
-					{lane.track.codec ? <span>{lane.track.codec}</span> : null}
-				</div>
-				<LaneStatus lane={lane} />
+				))}
+				<LaneStatus lane={lane} status={identity.status} />
 			</div>
 			<button
-				aria-label={`Seek ${label} waveform lane`}
+				aria-label={`Seek ${identity.title} waveform lane`}
 				className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
 				onMouseDown={(event) => {
 					if (typeof window.PointerEvent === "undefined") {
@@ -825,7 +840,7 @@ function WaveformLane({
 			>
 				<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
 				{lane.status === "ready" ? (
-					<WaveformCanvas label={label} samples={lane.samples} />
+					<WaveformCanvas label={identity.title} samples={lane.samples} />
 				) : null}
 				{lane.status === "loading" ? (
 					<div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
@@ -842,14 +857,20 @@ function WaveformLane({
 	);
 }
 
-function LaneStatus({ lane }: { lane: WaveformLaneState }) {
-	if (lane.status === "ready") {
+function LaneStatus({
+	lane,
+	status,
+}: {
+	lane: WaveformLaneState;
+	status: WaveformLaneIdentityViewModel["status"];
+}) {
+	if (status.tone === "ready") {
 		return (
 			<Badge
 				className="bg-workbench-progress/15 text-workbench-progress"
 				variant="secondary"
 			>
-				Waveform ready
+				{status.label}
 			</Badge>
 		);
 	}
@@ -861,7 +882,7 @@ function LaneStatus({ lane }: { lane: WaveformLaneState }) {
 				title={lane.reason}
 				variant="outline"
 			>
-				Unavailable
+				{status.label}
 			</Badge>
 		);
 	}
@@ -871,9 +892,77 @@ function LaneStatus({ lane }: { lane: WaveformLaneState }) {
 			className="border-workbench-border-strong text-muted-foreground"
 			variant="outline"
 		>
-			Loading
+			{status.label}
 		</Badge>
 	);
+}
+
+export function createWaveformLaneIdentityViewModel({
+	status,
+	track,
+	trackIndex,
+}: WaveformLaneIdentityInput): WaveformLaneIdentityViewModel {
+	const title = track.label?.trim() || `Unnamed audio lane ${trackIndex + 1}`;
+
+	return {
+		metadata: [
+			formatTrackLanguage(track.language),
+			formatTrackCodec(track.codec),
+			formatTrackChannels(track.channels),
+		],
+		status: formatWaveformLaneStatus(status),
+		title,
+	};
+}
+
+function formatTrackLanguage(language: string | undefined) {
+	const normalizedLanguage = language?.trim();
+
+	if (!normalizedLanguage || normalizedLanguage.toLowerCase() === "und") {
+		return "Language unknown";
+	}
+
+	return `Language ${normalizedLanguage}`;
+}
+
+function formatTrackCodec(codec: string | undefined) {
+	const normalizedCodec = codec?.trim();
+
+	if (!normalizedCodec) {
+		return "Codec unknown";
+	}
+
+	return normalizedCodec.toUpperCase();
+}
+
+function formatTrackChannels(channels: number | undefined) {
+	if (!channels || channels <= 0) {
+		return "Channels unknown";
+	}
+
+	return channels === 1 ? "1 channel" : `${channels} channels`;
+}
+
+function formatWaveformLaneStatus(
+	status: WaveformLaneState["status"],
+): WaveformLaneIdentityViewModel["status"] {
+	switch (status) {
+		case "loading":
+			return {
+				label: "Loading waveform",
+				tone: "pending",
+			};
+		case "ready":
+			return {
+				label: "Waveform ready",
+				tone: "ready",
+			};
+		case "unavailable":
+			return {
+				label: "Waveform unavailable",
+				tone: "unavailable",
+			};
+	}
 }
 
 function WaveformCanvas({

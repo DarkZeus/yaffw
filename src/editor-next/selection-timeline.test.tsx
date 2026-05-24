@@ -14,6 +14,7 @@ import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 import {
 	SelectionTimeline,
 	addAudioBufferToBuckets,
+	createWaveformLaneIdentityViewModel,
 } from "./selection-timeline";
 
 beforeEach(() => {
@@ -26,6 +27,71 @@ afterEach(() => {
 });
 
 describe("SelectionTimeline", () => {
+	it("formats waveform lane identity from media-track facts and lane status", () => {
+		expect(
+			createWaveformLaneIdentityViewModel({
+				status: "ready",
+				track: {
+					channels: 2,
+					codec: "aac",
+					id: "audio-voice",
+					kind: "audio",
+					label: "Voice",
+					language: "eng",
+					sampleRate: 48_000,
+				},
+				trackIndex: 0,
+			}),
+		).toEqual({
+			metadata: ["Language eng", "AAC", "2 channels"],
+			status: {
+				label: "Waveform ready",
+				tone: "ready",
+			},
+			title: "Voice",
+		});
+
+		expect(
+			createWaveformLaneIdentityViewModel({
+				status: "loading",
+				track: {
+					id: "audio-unnamed",
+					kind: "audio",
+					language: "und",
+				},
+				trackIndex: 1,
+			}),
+		).toEqual({
+			metadata: ["Language unknown", "Codec unknown", "Channels unknown"],
+			status: {
+				label: "Loading waveform",
+				tone: "pending",
+			},
+			title: "Unnamed audio lane 2",
+		});
+
+		expect(
+			createWaveformLaneIdentityViewModel({
+				status: "unavailable",
+				track: {
+					channels: 1,
+					codec: "opus",
+					id: "audio-desktop",
+					kind: "audio",
+					label: "Desktop",
+				},
+				trackIndex: 2,
+			}),
+		).toEqual({
+			metadata: ["Language unknown", "OPUS", "1 channel"],
+			status: {
+				label: "Waveform unavailable",
+				tone: "unavailable",
+			},
+			title: "Desktop",
+		});
+	});
+
 	it("loads every audio lane progressively, exposes unavailable lanes, and avoids mix controls", async () => {
 		renderTimeline({
 			waveformLaneLoader: async ({ trackIndex }) =>
@@ -43,12 +109,16 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		expect(screen.getByText("Voice")).toBeTruthy();
 		expect(screen.getByText("Game audio")).toBeTruthy();
-		expect(screen.getByText("eng")).toBeTruthy();
-		expect(screen.getByText("spa")).toBeTruthy();
+		expect(screen.getByText("Language eng")).toBeTruthy();
+		expect(screen.getByText("Language spa")).toBeTruthy();
+		expect(screen.getAllByText("AAC").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("2 channels").length).toBeGreaterThan(0);
 
 		await waitFor(() => {
 			expect(screen.getByText("Waveform ready")).toBeTruthy();
-			expect(screen.getByText("Unavailable")).toBeTruthy();
+			expect(
+				screen.getAllByText("Waveform unavailable").length,
+			).toBeGreaterThan(0);
 		});
 		expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
 		expect(screen.getByLabelText("Move selection range").parentElement).toBe(

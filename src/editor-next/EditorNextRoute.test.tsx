@@ -151,9 +151,7 @@ describe("EditorNextRoute", () => {
 		expect(within(mediaAssetContext).getByText("Asset identity")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("asset-picked")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Source file")).toBeTruthy();
-		expect(within(mediaAssetContext).getAllByText("picked.mp4").length).toBe(
-			2,
-		);
+		expect(within(mediaAssetContext).getAllByText("picked.mp4").length).toBe(2);
 		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Type")).toBeTruthy();
@@ -165,10 +163,12 @@ describe("EditorNextRoute", () => {
 		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Stereo")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("48 kHz")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Runtime readiness")).toBeTruthy();
-		expect(within(mediaAssetContext).getAllByText("Ready").length).toBeGreaterThan(
-			0,
-		);
+		expect(
+			within(mediaAssetContext).getByText("Runtime readiness"),
+		).toBeTruthy();
+		expect(
+			within(mediaAssetContext).getAllByText("Ready").length,
+		).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Media analytics")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		expect(screen.getByText("Planned output")).toBeTruthy();
@@ -661,8 +661,17 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		});
 
+		const selectionRegion = screen.getByLabelText("Workbench selection region");
+		const centerRegion = screen.getByLabelText("Workbench center region");
+
+		expect(
+			within(selectionRegion).getByLabelText("Selection timeline"),
+		).toBeTruthy();
+		expect(
+			within(centerRegion).queryByLabelText("Selection timeline"),
+		).toBeNull();
 		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
-		expect(screen.getAllByText("eng").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("Language eng").length).toBeGreaterThan(0);
 		expect(screen.getByText("Selection duration")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
