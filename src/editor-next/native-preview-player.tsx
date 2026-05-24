@@ -291,12 +291,12 @@ export function NativePreviewPlayer({
 	return (
 		<section
 			aria-label="Native preview player"
-			className="flex flex-col gap-4 border-t pt-5"
+			className="grid min-h-full gap-3"
 		>
-			<div className="overflow-hidden rounded-md border bg-workbench-viewer">
+			<div className="overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer shadow-[var(--shadow-workbench-panel)]">
 				<video
 					aria-label={`Preview for ${asset.label}`}
-					className="aspect-video w-full bg-workbench-viewer object-contain"
+					className="aspect-video max-h-[48vh] w-full bg-workbench-viewer object-contain"
 					onEnded={handleEnded}
 					onPause={() => setIsPlaying(false)}
 					onPlay={() => setIsPlaying(true)}
@@ -310,21 +310,10 @@ export function NativePreviewPlayer({
 				</video>
 			</div>
 
-			<SelectionTimeline
-				asset={asset}
-				onPlayheadSeekRequested={seekToUs}
-				onSelectionEndCommitRequested={onSelectionEndRequested}
-				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
-				onSelectionResetRequested={onSelectionResetRequested}
-				onSelectionStartCommitRequested={onSelectionStartRequested}
-				playheadUs={playheadUs}
-				playheadUpdatesAreLive={isPlaying}
-				selection={selection}
-				selectionEditingDisabled={selectionEditingDisabled}
-				source={source}
-			/>
-
-			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+			<div
+				aria-label="Preview transport controls"
+				className="grid gap-3 rounded-md border border-workbench-border bg-workbench-inspector/80 p-2.5 xl:grid-cols-[minmax(0,1fr)_14rem]"
+			>
 				<div className="flex flex-col gap-3">
 					<div className="flex flex-wrap items-center gap-2">
 						<Button
@@ -389,12 +378,12 @@ export function NativePreviewPlayer({
 						</Button>
 					</div>
 
-					<div className="grid gap-3 md:grid-cols-[10rem_minmax(10rem,1fr)_auto] md:items-end">
+					<div className="grid grid-cols-[7rem_minmax(0,1fr)_auto] items-end gap-2">
 						<label className="flex flex-col gap-2 text-sm font-medium">
 							Playback speed
 							<select
 								aria-label="Playback speed"
-								className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+								className="h-8 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
 								onChange={updatePlaybackRate}
 								value={String(playbackRate)}
 							>
@@ -435,7 +424,7 @@ export function NativePreviewPlayer({
 					</div>
 				</div>
 
-				<dl className="grid content-start gap-2 rounded-md border bg-muted/40 p-3 text-sm">
+				<dl className="grid content-start gap-1.5 rounded-md border border-workbench-border bg-background/70 p-2.5 text-xs">
 					<PreviewFact label="Playhead" value={formatMediaTime(playheadUs)} />
 					<PreviewFact
 						label="Selection start"
@@ -453,6 +442,20 @@ export function NativePreviewPlayer({
 					/>
 				</dl>
 			</div>
+
+			<SelectionTimeline
+				asset={asset}
+				onPlayheadSeekRequested={seekToUs}
+				onSelectionEndCommitRequested={onSelectionEndRequested}
+				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+				onSelectionResetRequested={onSelectionResetRequested}
+				onSelectionStartCommitRequested={onSelectionStartRequested}
+				playheadUs={playheadUs}
+				playheadUpdatesAreLive={isPlaying}
+				selection={selection}
+				selectionEditingDisabled={selectionEditingDisabled}
+				source={source}
+			/>
 		</section>
 	);
 }
@@ -481,9 +484,11 @@ function PreviewIconButton({
 
 function PreviewFact({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2">
+		<div className="grid grid-cols-[6.25rem_minmax(0,1fr)] gap-2">
 			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="font-mono tabular-nums">{value}</dd>
+			<dd className="min-w-0 whitespace-nowrap font-mono tabular-nums">
+				{value}
+			</dd>
 		</div>
 	);
 }

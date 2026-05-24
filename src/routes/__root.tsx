@@ -1,5 +1,5 @@
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.tsx'
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import { Outlet, createRootRouteWithContext, useLocation } from '@tanstack/react-router'
 import { ThemeProvider } from 'next-themes'
 
 import { Toaster } from '../components/ui/sonner'
@@ -13,19 +13,32 @@ type MyRouterContext = {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  component: () => (
+  component: RootComponent,
+})
+
+function RootComponent() {
+  const pathname = useLocation({
+    select: (location) => location.pathname,
+  })
+  const editorWorkbenchRoute = pathname.startsWith('/editor-next')
+
+  return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <CookieProvider>
-        <SidebarProvider defaultOpen={false}>
-          <AppSidebar />
-          <SidebarInset>
+        {editorWorkbenchRoute ? (
+          <Outlet />
+        ) : (
+          <SidebarProvider defaultOpen={false}>
+            <AppSidebar />
+            <SidebarInset>
               <Outlet />
-          </SidebarInset>
-        </SidebarProvider>
+            </SidebarInset>
+          </SidebarProvider>
+        )}
         <Toaster expand={true} />
         {/* <TanStackRouterDevtools /> */}
         {/* <TanStackQueryLayout /> */}
       </CookieProvider>
     </ThemeProvider>
   )
-})
+}

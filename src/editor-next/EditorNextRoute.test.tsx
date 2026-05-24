@@ -190,6 +190,78 @@ describe("EditorNextRoute", () => {
 		});
 	});
 
+	it("keeps the native preview and transport controls in the center workbench region", async () => {
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-center-preview"}
+				createDraftId={() => "draft-center-preview"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [
+					new File(["video"], "center-preview.mp4", { type: "video/mp4" }),
+				],
+			},
+		});
+
+		await waitFor(() => {
+			expect(
+				screen.getByLabelText("Preview for center-preview.mp4"),
+			).toBeTruthy();
+		});
+
+		const centerRegion = screen.getByLabelText("Workbench center region");
+		const transportControls = within(centerRegion).getByLabelText(
+			"Preview transport controls",
+		);
+
+		expect(
+			within(centerRegion).getByLabelText("Preview for center-preview.mp4"),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByRole("button", { name: "Play" }),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByRole("button", {
+				name: "Seek backward 10 seconds",
+			}),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByRole("button", {
+				name: "Step forward one frame",
+			}),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByLabelText("Playback speed"),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByLabelText("Preview volume"),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByRole("button", {
+				name: "Open fullscreen preview",
+			}),
+		).toBeTruthy();
+
+		fireEvent.click(
+			within(transportControls).getByRole("button", {
+				name: "Seek forward 10 seconds",
+			}),
+		);
+
+		await waitFor(() => {
+			expect(
+				within(centerRegion).getAllByText("00:00:10.000").length,
+			).toBeGreaterThan(0);
+		});
+		expect(screen.getByLabelText("Export review")).toBeTruthy();
+		expect(within(centerRegion).queryByLabelText("Export review")).toBeNull();
+	});
+
 	it("runs default export from the review and requires explicit generated-media delivery", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
 		const progressEvents: ExportProgress[] = [];

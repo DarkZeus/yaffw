@@ -560,7 +560,7 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 			</div>
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col gap-4"
+				className="flex min-w-0 flex-col gap-3"
 			>
 				<RuntimeChecksPanel session={session} />
 			</aside>
@@ -606,12 +606,12 @@ function EditorSessionShell({
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"
+			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:grid-cols-[minmax(0,1fr)_17.5rem]"
 		>
-			<div className="grid min-h-0 gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
+			<div className="grid min-h-0 gap-3 lg:grid-cols-[18.5rem_minmax(30rem,1fr)]">
 				<section
 					aria-label="Workbench media asset region"
-					className="flex min-h-[18rem] flex-col gap-4 rounded-md border border-workbench-border bg-workbench-inspector p-4"
+					className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:max-h-[calc(100vh-6rem)]"
 				>
 					{session.status === "ready" ? (
 						<ActiveMediaAssetContext
@@ -640,37 +640,39 @@ function EditorSessionShell({
 				</section>
 
 				<section
-					aria-label="Workbench preview region"
-					className="min-h-[28rem] rounded-md border border-workbench-border bg-workbench-viewer p-4"
+					aria-label="Workbench center region"
+					className="min-h-[28rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3"
 				>
-					{session.status !== "ready" ? (
-						<NonReadyImportSurface
-							localFileInputKey={localFileInputKey}
-							onLocalFileDropped={onLocalFileDropped}
-							onLocalFileSelected={onLocalFileSelected}
-							session={session}
-						/>
-					) : null}
+					<div aria-label="Workbench preview region" className="min-h-full">
+						{session.status !== "ready" ? (
+							<NonReadyImportSurface
+								localFileInputKey={localFileInputKey}
+								onLocalFileDropped={onLocalFileDropped}
+								onLocalFileSelected={onLocalFileSelected}
+								session={session}
+							/>
+						) : null}
 
-					{session.status === "ready" && previewSource ? (
-						<NativePreviewPlayer
-							asset={session.asset}
-							onSelectionEndRequested={onSelectionEndRequested}
-							onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
-							onSelectionResetRequested={onSelectionResetRequested}
-							onSelectionStartRequested={onSelectionStartRequested}
-							selection={session.selection}
-							selectionEditingDisabled={selectionEditingDisabled}
-							shortcutsDisabled={selectionEditingDisabled}
-							source={previewSource}
-						/>
-					) : null}
+						{session.status === "ready" && previewSource ? (
+							<NativePreviewPlayer
+								asset={session.asset}
+								onSelectionEndRequested={onSelectionEndRequested}
+								onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+								onSelectionResetRequested={onSelectionResetRequested}
+								onSelectionStartRequested={onSelectionStartRequested}
+								selection={session.selection}
+								selectionEditingDisabled={selectionEditingDisabled}
+								shortcutsDisabled={selectionEditingDisabled}
+								source={previewSource}
+							/>
+						) : null}
+					</div>
 				</section>
 			</div>
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col gap-4"
+				className="flex min-w-0 flex-col gap-3 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
 			>
 				{session.status === "ready" ? (
 					<ExportReviewPanel
