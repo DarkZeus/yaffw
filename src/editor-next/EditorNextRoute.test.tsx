@@ -338,6 +338,15 @@ describe("EditorNextRoute", () => {
 				},
 			),
 		).toBeTruthy();
+		expect(screen.getByLabelText("Generated media filename").className).toContain(
+			"whitespace-normal",
+		);
+		expect(screen.getByLabelText("Generated media filename").className).toContain(
+			"[overflow-wrap:anywhere]",
+		);
+		expect(
+			screen.getByLabelText("Generated media filename").className,
+		).not.toContain("break-all");
 		expect(screen.getAllByLabelText(/^Preview for/)).toHaveLength(1);
 		expect(screen.queryByRole("button", { name: /use generated/i })).toBeNull();
 		expect(progressEvents[0]).toEqual({

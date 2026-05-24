@@ -1062,7 +1062,10 @@ function ExportJobStatus({
 						{deliveryAction.label}
 					</Button>
 				) : null}
-				<p className="min-w-0 break-all rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground">
+				<p
+					aria-label="Generated media filename"
+					className="min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+				>
 					{status.fileName}
 				</p>
 			</div>
