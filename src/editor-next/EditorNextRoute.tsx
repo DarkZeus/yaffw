@@ -2,17 +2,13 @@ import {
 	AlertTriangle,
 	BarChart3,
 	CheckCircle2,
-	Clock,
 	Download,
 	FileVideo,
-	HardDrive,
 	Monitor,
 	PackageCheck,
 	PlayCircle,
-	Ratio,
 	Square,
 	Volume2,
-	VolumeX,
 	X,
 } from "lucide-react";
 import {
@@ -62,6 +58,10 @@ import {
 	deliverBrowserGeneratedMedia,
 	type GeneratedMediaDeliveryRequest,
 } from "./generated-media-delivery";
+import {
+	createMediaAssetContextViewModel,
+	type MediaAssetContextFact,
+} from "./media-asset-context-presenter";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -601,7 +601,6 @@ function EditorSessionShell({
 }: EditorSessionShellProps) {
 	const selectionEditingDisabled =
 		session.status === "ready" && session.export.status === "running";
-	const closeFileVisible = session.status === "ready";
 	const closeFileDisabled = !canCloseEditorSession(session);
 
 	return (
@@ -614,37 +613,29 @@ function EditorSessionShell({
 					aria-label="Workbench media asset region"
 					className="flex min-h-[18rem] flex-col gap-4 rounded-md border border-workbench-border bg-workbench-inspector p-4"
 				>
-					<div className="flex items-start justify-between gap-3">
-						<WorkbenchRegionHeader
-							icon={<FileVideo />}
-							kicker="Media asset"
-							title="Local media asset"
-						/>
-						<div className="flex shrink-0 flex-col items-end gap-2">
-							<Badge variant="secondary">
-								{formatSessionStatus(session.status)}
-							</Badge>
-							{closeFileVisible ? (
-								<Button
-									disabled={closeFileDisabled}
-									onClick={onCloseFileRequested}
-									size="sm"
-									type="button"
-									variant="outline"
-								>
-									<X data-icon="inline-start" />
-									Close file
-								</Button>
-							) : null}
-						</div>
-					</div>
 					{session.status === "ready" ? (
-						<ActiveMediaAssetSummary session={session} />
+						<ActiveMediaAssetContext
+							closeFileDisabled={closeFileDisabled}
+							onCloseFileRequested={onCloseFileRequested}
+							session={session}
+						/>
 					) : (
-						<p className="text-sm leading-6 text-muted-foreground">
-							Ready to accept one local media asset for the first-slice
-							workflow.
-						</p>
+						<>
+							<div className="flex items-start justify-between gap-3">
+								<WorkbenchRegionHeader
+									icon={<FileVideo />}
+									kicker="Media asset"
+									title="Local media asset"
+								/>
+								<Badge className="shrink-0" variant="secondary">
+									{formatSessionStatus(session.status)}
+								</Badge>
+							</div>
+							<p className="text-sm leading-6 text-muted-foreground">
+								Ready to accept one local media asset for the first-slice
+								workflow.
+							</p>
+						</>
 					)}
 				</section>
 
@@ -682,21 +673,15 @@ function EditorSessionShell({
 				className="flex min-w-0 flex-col gap-4"
 			>
 				{session.status === "ready" ? (
-					<>
-						<ExportReviewPanel
-							asset={session.asset}
-							exportState={session.export}
-							onCancelExport={onDefaultExportCancelRequested}
-							onDownloadGeneratedMedia={onGeneratedMediaDownloadRequested}
-							onStartExport={onDefaultExportStartRequested}
-							runtime={session.runtime}
-							selection={session.selection}
-						/>
-						<MediaAnalyticsPanel
-							asset={session.asset}
-							selection={session.selection}
-						/>
-					</>
+					<ExportReviewPanel
+						asset={session.asset}
+						exportState={session.export}
+						onCancelExport={onDefaultExportCancelRequested}
+						onDownloadGeneratedMedia={onGeneratedMediaDownloadRequested}
+						onStartExport={onDefaultExportStartRequested}
+						runtime={session.runtime}
+						selection={session.selection}
+					/>
 				) : null}
 				<RuntimeChecksPanel session={session} />
 			</aside>
@@ -726,7 +711,7 @@ function WorkbenchRegionHeader({
 					{kicker}
 				</p>
 				<h2
-					className="break-words text-base font-semibold leading-tight tracking-tight"
+					className="break-words text-base font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]"
 					id="editor-next-import-title"
 				>
 					{title}
@@ -736,34 +721,98 @@ function WorkbenchRegionHeader({
 	);
 }
 
-function ActiveMediaAssetSummary({
+function ActiveMediaAssetContext({
+	closeFileDisabled,
+	onCloseFileRequested,
 	session,
 }: {
+	closeFileDisabled: boolean;
+	onCloseFileRequested: () => void;
 	session: Extract<EditorSessionState, { status: "ready" }>;
 }) {
+	const viewModel = createMediaAssetContextViewModel({
+		asset: session.asset,
+		closeDisabled: closeFileDisabled,
+		runtime: session.runtime,
+	});
+
 	return (
-		<div className="grid gap-3 text-sm">
-			<p className="leading-6 text-muted-foreground">
-				Loaded for preview, selection, and export.
+		<section aria-label="Media asset context" className="grid min-w-0 gap-4">
+			<div className="flex items-start justify-between gap-3">
+				<WorkbenchRegionHeader
+					icon={<FileVideo />}
+					kicker="Ready media asset"
+					title={viewModel.identity.name}
+				/>
+				<div className="flex shrink-0 flex-col items-end gap-2">
+					<Badge variant="secondary">Ready</Badge>
+					<Button
+						disabled={viewModel.closeFile.disabled}
+						onClick={onCloseFileRequested}
+						size="sm"
+						type="button"
+						variant="outline"
+					>
+						<X data-icon="inline-start" />
+						{viewModel.closeFile.label}
+					</Button>
+				</div>
+			</div>
+			<p className="text-sm leading-6 text-muted-foreground">
+				{viewModel.identity.summary}
 			</p>
+			<MediaAssetContextSection
+				facts={viewModel.provenanceFacts}
+				icon={<FileVideo />}
+				title="Asset provenance"
+			/>
+			<MediaAssetContextSection
+				facts={viewModel.videoFacts}
+				icon={<Monitor />}
+				title="Video facts"
+			/>
+			<MediaAssetContextSection
+				facts={viewModel.audioFacts}
+				icon={<Volume2 />}
+				title="Audio facts"
+			/>
+			<MediaAssetContextSection
+				facts={viewModel.runtimeFacts}
+				icon={<CheckCircle2 />}
+				title="Runtime readiness"
+			/>
+		</section>
+	);
+}
+
+function MediaAssetContextSection({
+	facts,
+	icon,
+	title,
+}: {
+	facts: MediaAssetContextFact[];
+	icon: AnalyticsIconElement;
+	title: string;
+}) {
+	return (
+		<section className="grid min-w-0 gap-2 border-t border-workbench-border pt-3">
+			<h3 className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+				{cloneElement(icon, {
+					"aria-hidden": true,
+					className: "size-3.5",
+				})}
+				{title}
+			</h3>
 			<dl className="grid gap-2">
-				<WorkbenchFact label="Asset" value={session.asset.label} />
-				<WorkbenchFact
-					label="Selection"
-					value={`${formatMediaTime(session.selection.startUs)} - ${formatMediaTime(
-						session.selection.endUs,
-					)}`}
-				/>
-				<WorkbenchFact
-					label="Duration"
-					value={formatMediaTime(session.asset.durationUs)}
-				/>
-				<WorkbenchFact
-					label="Tracks"
-					value={`${session.asset.tracks.video.length} video / ${session.asset.tracks.audio.length} audio`}
-				/>
+				{facts.map((fact) => (
+					<WorkbenchFact
+						key={`${title}-${fact.label}`}
+						label={fact.label}
+						value={fact.value}
+					/>
+				))}
 			</dl>
-		</div>
+		</section>
 	);
 }
 
@@ -818,11 +867,11 @@ function NonReadyImportSurface({
 
 function WorkbenchFact({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="grid gap-1 rounded-md border border-workbench-border bg-background/70 px-3 py-2">
+		<div className="grid min-w-0 gap-1 overflow-hidden rounded-md border border-workbench-border bg-background/70 px-3 py-2">
 			<dt className="text-xs font-medium uppercase text-muted-foreground">
 				{label}
 			</dt>
-			<dd className="min-w-0 break-words font-mono text-xs leading-5">
+			<dd className="min-w-0 whitespace-normal break-words font-mono text-xs leading-5 [overflow-wrap:anywhere]">
 				{value}
 			</dd>
 		</div>
@@ -1115,210 +1164,10 @@ function RuntimeChecksPanel({
 	);
 }
 
-function MediaAnalyticsPanel({
-	asset,
-	selection,
-}: {
-	asset: ReadyMediaAsset;
-	selection: Selection;
-}) {
-	const primaryVideoTrack = asset.tracks.video[0];
-	const primaryAudioTrack = asset.tracks.audio[0];
-	const estimatedBitrate = estimateBitrateBitsPerSecond(asset);
-	const selectionDurationUs = selection.endUs - selection.startUs;
-	const coverage = asset.durationUs
-		? Math.round((selectionDurationUs / asset.durationUs) * 100)
-		: 0;
-
-	return (
-		<section
-			aria-label="Media analytics"
-			className="flex flex-col gap-4 rounded-md border bg-card p-4"
-		>
-			<div className="flex items-center justify-between gap-3">
-				<h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-					<BarChart3 aria-hidden="true" className="size-4" />
-					Media analytics
-				</h2>
-				<Badge variant="secondary">{asset.tracks.video.length} video</Badge>
-			</div>
-
-			<AnalyticsSection icon={<FileVideo />} title="File info">
-				<AnalyticsRow label="Name" value={asset.provenance.fileName} />
-				<AnalyticsRow
-					label="Size"
-					value={formatFileSize(asset.provenance.sizeBytes)}
-				/>
-				<AnalyticsRow
-					label="Type"
-					value={formatContainerType(asset.provenance)}
-				/>
-				<AnalyticsRow
-					icon={<Clock />}
-					label="Duration"
-					value={formatMediaTime(asset.durationUs)}
-				/>
-			</AnalyticsSection>
-
-			<AnalyticsSection icon={<Monitor />} title="Video track">
-				<AnalyticsRow
-					label="Resolution"
-					value={
-						primaryVideoTrack?.width && primaryVideoTrack.height
-							? `${primaryVideoTrack.width}x${primaryVideoTrack.height}`
-							: "Unknown"
-					}
-				/>
-				<AnalyticsRow
-					label="Class"
-					value={resolutionCategory(
-						primaryVideoTrack?.width,
-						primaryVideoTrack?.height,
-					)}
-				/>
-				<AnalyticsRow
-					icon={<Ratio />}
-					label="Aspect"
-					value={formatAspectRatio(
-						primaryVideoTrack?.width,
-						primaryVideoTrack?.height,
-					)}
-				/>
-				<AnalyticsRow
-					label="Frame rate"
-					value={
-						asset.frameTiming.source === "known"
-							? `${formatNumber(asset.frameTiming.fps)} fps`
-							: `${formatNumber(asset.frameTiming.fps)} fps est.`
-					}
-				/>
-				<AnalyticsRow
-					label="Codec"
-					value={primaryVideoTrack?.codec ?? "Unknown"}
-				/>
-				<AnalyticsRow
-					icon={<HardDrive />}
-					label="Bitrate"
-					value={formatBitrate(estimatedBitrate)}
-				/>
-				<AnalyticsQualityBadge bitrate={estimatedBitrate} />
-			</AnalyticsSection>
-
-			<AnalyticsSection
-				icon={primaryAudioTrack ? <Volume2 /> : <VolumeX />}
-				title="Audio track"
-			>
-				<AnalyticsRow
-					label="Status"
-					value={primaryAudioTrack ? "Present" : "None"}
-				/>
-				{primaryAudioTrack ? (
-					<>
-						<AnalyticsRow
-							label="Channels"
-							value={formatChannels(primaryAudioTrack.channels)}
-						/>
-						<AnalyticsRow
-							label="Sample rate"
-							value={formatSampleRate(primaryAudioTrack.sampleRate)}
-						/>
-						<AnalyticsRow
-							label="Codec"
-							value={primaryAudioTrack.codec ?? "Unknown"}
-						/>
-						<AnalyticsRow
-							label="Language"
-							value={primaryAudioTrack.language ?? "und"}
-						/>
-					</>
-				) : null}
-			</AnalyticsSection>
-
-			<AnalyticsSection icon={<Clock />} title="Selection">
-				<AnalyticsRow
-					label="Start"
-					value={formatMediaTime(selection.startUs)}
-				/>
-				<AnalyticsRow label="End" value={formatMediaTime(selection.endUs)} />
-				<AnalyticsRow
-					label="Duration"
-					value={formatMediaTime(selectionDurationUs)}
-				/>
-				<AnalyticsRow label="Coverage" value={`${coverage}%`} />
-			</AnalyticsSection>
-		</section>
-	);
-}
-
-function AnalyticsSection({
-	children,
-	icon,
-	title,
-}: {
-	children: ReactNode;
-	icon: AnalyticsIconElement;
-	title: string;
-}) {
-	return (
-		<section className="grid gap-3 border-t pt-3">
-			<h3 className="flex items-center gap-2 text-sm font-semibold">
-				{cloneElement(icon, {
-					"aria-hidden": true,
-					className: "size-4",
-				})}
-				{title}
-			</h3>
-			<div className="grid gap-2">{children}</div>
-		</section>
-	);
-}
-
-function AnalyticsRow({
-	icon,
-	label,
-	value,
-}: {
-	icon?: AnalyticsIconElement;
-	label: string;
-	value: string;
-}) {
-	return (
-		<div className="flex items-center justify-between gap-3 text-sm">
-			<span className="flex items-center gap-1.5 text-muted-foreground">
-				{icon
-					? cloneElement(icon, {
-							"aria-hidden": true,
-							className: "size-3",
-						})
-					: null}
-				{label}
-			</span>
-			<Badge
-				className="max-w-40 truncate font-mono"
-				title={value}
-				variant="outline"
-			>
-				{value}
-			</Badge>
-		</div>
-	);
-}
-
 type AnalyticsIconElement = ReactElement<{
 	"aria-hidden"?: boolean;
 	className?: string;
 }>;
-
-function AnalyticsQualityBadge({ bitrate }: { bitrate: number | null }) {
-	const quality = videoBitrateQuality(bitrate);
-
-	return (
-		<div className="flex items-center justify-between gap-3 text-sm">
-			<span className="text-muted-foreground">Quality</span>
-			<Badge variant={quality.variant}>{quality.label}</Badge>
-		</div>
-	);
-}
 
 function runtimeCheckRows(runtime: EditorSessionState["runtime"]) {
 	return [
@@ -1431,178 +1280,6 @@ function formatSessionStatus(
 		case "ready":
 			return "Ready";
 	}
-}
-
-function estimateBitrateBitsPerSecond(asset: ReadyMediaAsset): number | null {
-	const durationSeconds = asset.durationUs / 1_000_000;
-
-	if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
-		return null;
-	}
-
-	return Math.round((asset.provenance.sizeBytes * 8) / durationSeconds);
-}
-
-function formatFileSize(bytes: number): string {
-	if (bytes <= 0) {
-		return "0 B";
-	}
-
-	const units = ["B", "KB", "MB", "GB", "TB"];
-	const unitIndex = Math.min(
-		units.length - 1,
-		Math.floor(Math.log(bytes) / Math.log(1024)),
-	);
-	const value = bytes / 1024 ** unitIndex;
-
-	return `${formatNumber(value)} ${units[unitIndex]}`;
-}
-
-function formatBitrate(bitsPerSecond: number | null): string {
-	if (!bitsPerSecond || bitsPerSecond <= 0) {
-		return "Unknown";
-	}
-
-	if (bitsPerSecond >= 1_000_000) {
-		return `${formatNumber(bitsPerSecond / 1_000_000)} Mbps`;
-	}
-
-	if (bitsPerSecond >= 1_000) {
-		return `${formatNumber(bitsPerSecond / 1_000)} Kbps`;
-	}
-
-	return `${bitsPerSecond} bps`;
-}
-
-function formatContainerType(
-	provenance: ReadyMediaAsset["provenance"],
-): string {
-	const mimeSubtype = provenance.mimeType?.split("/")[1];
-
-	if (mimeSubtype) {
-		return mimeSubtype.toUpperCase();
-	}
-
-	const extension = provenance.fileName.split(".").pop();
-
-	return extension ? extension.toUpperCase() : "Unknown";
-}
-
-function resolutionCategory(width?: number, height?: number): string {
-	if (!width || !height) {
-		return "Unknown";
-	}
-
-	if (width >= 3840 && height >= 2160) {
-		return "4K UHD";
-	}
-
-	if (width >= 2560 && height >= 1440) {
-		return "2K QHD";
-	}
-
-	if (width >= 1920 && height >= 1080) {
-		return "Full HD";
-	}
-
-	if (width >= 1280 && height >= 720) {
-		return "HD";
-	}
-
-	if (width >= 854 && height >= 480) {
-		return "SD";
-	}
-
-	return "Low resolution";
-}
-
-function formatAspectRatio(width?: number, height?: number): string {
-	if (!width || !height) {
-		return "Unknown";
-	}
-
-	const divisor = greatestCommonDivisor(width, height);
-
-	return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
-}
-
-function formatChannels(channels?: number): string {
-	if (!channels) {
-		return "Unknown";
-	}
-
-	if (channels === 1) {
-		return "Mono";
-	}
-
-	if (channels === 2) {
-		return "Stereo";
-	}
-
-	if (channels === 6) {
-		return "5.1";
-	}
-
-	if (channels === 8) {
-		return "7.1";
-	}
-
-	return `${channels}ch`;
-}
-
-function formatSampleRate(sampleRate?: number): string {
-	if (!sampleRate) {
-		return "Unknown";
-	}
-
-	return `${formatNumber(sampleRate / 1_000)} kHz`;
-}
-
-function videoBitrateQuality(bitrate: number | null): {
-	label: string;
-	variant: "default" | "destructive" | "outline" | "secondary";
-} {
-	if (!bitrate) {
-		return { label: "Unknown", variant: "secondary" };
-	}
-
-	if (bitrate >= 10_000_000) {
-		return { label: "Excellent", variant: "default" };
-	}
-
-	if (bitrate >= 5_000_000) {
-		return { label: "High", variant: "default" };
-	}
-
-	if (bitrate >= 2_000_000) {
-		return { label: "Medium", variant: "outline" };
-	}
-
-	if (bitrate >= 1_000_000) {
-		return { label: "Low", variant: "outline" };
-	}
-
-	return { label: "Very low", variant: "destructive" };
-}
-
-function formatNumber(value: number): string {
-	return new Intl.NumberFormat("en-US", {
-		maximumFractionDigits: value >= 10 ? 1 : 2,
-		minimumFractionDigits: 0,
-	}).format(value);
-}
-
-function greatestCommonDivisor(left: number, right: number): number {
-	let a = Math.abs(left);
-	let b = Math.abs(right);
-
-	while (b !== 0) {
-		const remainder = a % b;
-		a = b;
-		b = remainder;
-	}
-
-	return a || 1;
 }
 
 function formatMediaTime(timeUs: number): string {

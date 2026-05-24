@@ -6,6 +6,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,21 +142,34 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
-		expect(screen.queryByText("Ready media asset")).toBeNull();
+		const mediaAssetContext = screen.getByLabelText("Media asset context");
 		expect(
-			screen.getByText("Loaded for preview, selection, and export."),
+			within(mediaAssetContext).getByText(
+				"Loaded for preview, selection, and export.",
+			),
 		).toBeTruthy();
-		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
-		expect(screen.getByText("File info")).toBeTruthy();
-		expect(screen.getByText("Video track")).toBeTruthy();
-		expect(screen.getByText("Audio track")).toBeTruthy();
-		expect(screen.getByText("1920x1080")).toBeTruthy();
-		expect(screen.getByText("Full HD")).toBeTruthy();
-		expect(screen.getByText("16:9")).toBeTruthy();
-		expect(screen.getByText("30 fps")).toBeTruthy();
-		expect(screen.getByText("Stereo")).toBeTruthy();
-		expect(screen.getByText("48 kHz")).toBeTruthy();
-		expect(screen.getByText("Coverage")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Asset identity")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("asset-picked")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Source file")).toBeTruthy();
+		expect(within(mediaAssetContext).getAllByText("picked.mp4").length).toBe(
+			2,
+		);
+		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Type")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("MP4")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Video facts")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("1920x1080")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("16:9")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("30 fps known")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Stereo")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("48 kHz")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Runtime readiness")).toBeTruthy();
+		expect(within(mediaAssetContext).getAllByText("Ready").length).toBeGreaterThan(
+			0,
+		);
+		expect(screen.queryByLabelText("Media analytics")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		expect(screen.getByText("Planned output")).toBeTruthy();
 		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
@@ -575,7 +589,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		});
 
-		expect(screen.getByText("Voice")).toBeTruthy();
+		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("eng").length).toBeGreaterThan(0);
 		expect(screen.getByText("Selection duration")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
@@ -625,8 +639,9 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
-		expect(screen.getByLabelText("Media analytics")).toBeTruthy();
-		expect(screen.getByText("None")).toBeTruthy();
+		const mediaAssetContext = screen.getByLabelText("Media asset context");
+		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("None")).toBeTruthy();
 	});
 
 	it("shows unsupported-media failures with technical details on demand", async () => {
