@@ -317,7 +317,7 @@ export function NativePreviewPlayer({
 
 					<div
 						aria-label="Preview transport controls"
-						className="grid gap-3 rounded-md border border-workbench-border bg-workbench-inspector/80 p-2.5 xl:grid-cols-[minmax(0,1fr)_14rem]"
+						className="grid gap-3 rounded-md border border-workbench-border bg-workbench-inspector/80 p-2.5 lg:grid-cols-[minmax(0,1fr)_16rem]"
 					>
 						<div className="flex flex-col gap-3">
 							<div className="flex flex-wrap items-center gap-2">

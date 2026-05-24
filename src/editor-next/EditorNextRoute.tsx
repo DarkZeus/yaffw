@@ -615,7 +615,7 @@ function EditorSessionShell({
 			<div className="grid min-h-0 gap-3 lg:grid-cols-[18.5rem_minmax(30rem,1fr)] lg:grid-rows-[minmax(0,auto)_auto]">
 				<section
 					aria-label="Workbench media asset region"
-					className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 lg:row-span-2 xl:max-h-[calc(100vh-6rem)]"
+					className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 lg:row-span-2 lg:max-h-[calc(100vh-6rem)]"
 				>
 					{session.status === "ready" ? (
 						<ActiveMediaAssetContext

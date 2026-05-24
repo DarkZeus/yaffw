@@ -218,10 +218,16 @@ describe("EditorNextRoute", () => {
 		const transportControls = within(centerRegion).getByLabelText(
 			"Preview transport controls",
 		);
+		const mediaAssetRegion = screen.getByLabelText(
+			"Workbench media asset region",
+		);
 
 		expect(
 			within(centerRegion).getByLabelText("Preview for center-preview.mp4"),
 		).toBeTruthy();
+		expect(mediaAssetRegion.className).toContain("lg:max-h");
+		expect(transportControls.className).toContain("lg:grid-cols");
+		expect(transportControls.className).toContain("16rem");
 		expect(
 			within(transportControls).getByRole("button", { name: "Play" }),
 		).toBeTruthy();
