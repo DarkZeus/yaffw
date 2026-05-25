@@ -456,7 +456,7 @@ function EditorWorkbenchRail({
 	status,
 }: { status: EditorSessionState["status"] }) {
 	return (
-		<nav
+		<aside
 			aria-label="Editor workbench rail"
 			className="flex min-h-0 flex-col items-center gap-2 border-r border-workbench-border-strong bg-workbench-rail px-2 py-3"
 		>
@@ -485,7 +485,7 @@ function EditorWorkbenchRail({
 				icon={<Monitor />}
 				label="Runtime"
 			/>
-		</nav>
+		</aside>
 	);
 }
 
@@ -526,48 +526,30 @@ function UnsupportedRuntimeState({ session }: UnsupportedRuntimeStateProps) {
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"
+			className="grid min-h-[calc(100vh-5rem)]"
 		>
-			<div className="grid min-h-0 gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-				<section
-					aria-label="Workbench media asset region"
-					className="flex min-h-[18rem] flex-col gap-4 rounded-md border border-workbench-border bg-workbench-inspector p-4"
-				>
-					<WorkbenchRegionHeader
-						icon={<FileVideo />}
-						kicker="Media asset"
-						title="Import unavailable"
-					/>
-					<p className="text-sm leading-6 text-muted-foreground">
-						Editor-next requires a supported runtime before a local media asset
-						can be imported.
-					</p>
-					<Badge className="w-fit" variant="destructive">
-						Runtime blocked
-					</Badge>
-				</section>
-				<section
-					aria-label="Workbench preview region"
-					className="grid min-h-[28rem] place-items-center rounded-md border border-workbench-border bg-workbench-viewer p-6"
-				>
+			<section
+				aria-label="Workbench center region"
+				className="grid min-h-[28rem] place-items-center rounded-md border border-workbench-border bg-workbench-viewer p-6"
+			>
+				<div className="grid w-full max-w-3xl gap-4">
 					<Alert variant="destructive" className="max-w-3xl">
 						<AlertTriangle aria-hidden="true" />
 						<AlertTitle>Unsupported runtime</AlertTitle>
 						<AlertDescription>
 							<p>{session.message}</p>
+							<p>
+								Editor-next requires a supported runtime before a local media
+								asset can be imported.
+							</p>
 							{missing.length > 0 ? (
 								<p>Missing capability keys: {missing.join(", ")}</p>
 							) : null}
 						</AlertDescription>
 					</Alert>
-				</section>
-			</div>
-			<aside
-				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col gap-3"
-			>
-				<RuntimeChecksPanel session={session} />
-			</aside>
+					<RuntimeChecksPanel session={session} />
+				</div>
+			</section>
 		</section>
 	);
 }
@@ -603,8 +585,31 @@ function EditorSessionShell({
 	previewSource,
 	session,
 }: EditorSessionShellProps) {
+	if (session.status !== "ready") {
+		return (
+			<section
+				aria-label="Editor workbench session"
+				className="grid min-h-[calc(100vh-5rem)]"
+			>
+				<section
+					aria-label="Workbench center region"
+					className="min-h-[28rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3"
+				>
+					<div aria-label="Workbench preview region" className="min-h-full">
+						<NonReadyImportSurface
+							localFileInputKey={localFileInputKey}
+							onLocalFileDropped={onLocalFileDropped}
+							onLocalFileSelected={onLocalFileSelected}
+							session={session}
+						/>
+					</div>
+				</section>
+			</section>
+		);
+	}
+
 	const selectionEditingDisabled =
-		session.status === "ready" && session.export.status === "running";
+		session.export.status === "running";
 	const closeFileDisabled = !canCloseEditorSession(session);
 
 	return (
@@ -617,49 +622,14 @@ function EditorSessionShell({
 					aria-label="Workbench media asset region"
 					className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 lg:row-span-2 lg:max-h-[calc(100vh-6rem)]"
 				>
-					{session.status === "ready" ? (
-						<ActiveMediaAssetContext
-							closeFileDisabled={closeFileDisabled}
-							onCloseFileRequested={onCloseFileRequested}
-							session={session}
-						/>
-					) : (
-						<>
-							<div className="flex items-start justify-between gap-3">
-								<WorkbenchRegionHeader
-									icon={<FileVideo />}
-									kicker="Media asset"
-									title="Local media asset"
-								/>
-								<Badge className="shrink-0" variant="secondary">
-									{formatSessionStatus(session.status)}
-								</Badge>
-							</div>
-							<p className="text-sm leading-6 text-muted-foreground">
-								Ready to accept one local media asset for the first-slice
-								workflow.
-							</p>
-						</>
-					)}
+					<ActiveMediaAssetContext
+						closeFileDisabled={closeFileDisabled}
+						onCloseFileRequested={onCloseFileRequested}
+						session={session}
+					/>
 				</section>
 
-				{session.status !== "ready" ? (
-					<section
-						aria-label="Workbench center region"
-						className="min-h-[28rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3"
-					>
-						<div aria-label="Workbench preview region" className="min-h-full">
-							<NonReadyImportSurface
-								localFileInputKey={localFileInputKey}
-								onLocalFileDropped={onLocalFileDropped}
-								onLocalFileSelected={onLocalFileSelected}
-								session={session}
-							/>
-						</div>
-					</section>
-				) : null}
-
-				{session.status === "ready" && previewSource ? (
+				{previewSource ? (
 					<NativePreviewPlayer
 						asset={session.asset}
 						onSelectionEndRequested={onSelectionEndRequested}
@@ -678,17 +648,15 @@ function EditorSessionShell({
 				aria-label="Workbench inspector region"
 				className="flex min-w-0 flex-col gap-3 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
 			>
-				{session.status === "ready" ? (
-					<ExportReviewPanel
-						asset={session.asset}
-						exportState={session.export}
-						onCancelExport={onDefaultExportCancelRequested}
-						onDownloadGeneratedMedia={onGeneratedMediaDownloadRequested}
-						onStartExport={onDefaultExportStartRequested}
-						runtime={session.runtime}
-						selection={session.selection}
-					/>
-				) : null}
+				<ExportReviewPanel
+					asset={session.asset}
+					exportState={session.export}
+					onCancelExport={onDefaultExportCancelRequested}
+					onDownloadGeneratedMedia={onGeneratedMediaDownloadRequested}
+					onStartExport={onDefaultExportStartRequested}
+					runtime={session.runtime}
+					selection={session.selection}
+				/>
 				<RuntimeChecksPanel session={session} />
 			</aside>
 		</section>
@@ -1294,23 +1262,6 @@ function SessionStatusLine({
 			Waiting for a media asset draft.
 		</p>
 	);
-}
-
-function formatSessionStatus(
-	status: EditorSessionShellProps["session"]["status"],
-) {
-	switch (status) {
-		case "closed":
-			return "Closed";
-		case "empty":
-			return "Empty";
-		case "failure":
-			return "Failure";
-		case "loading":
-			return "Loading";
-		case "ready":
-			return "Ready";
-	}
 }
 
 function formatMediaTime(timeUs: number): string {

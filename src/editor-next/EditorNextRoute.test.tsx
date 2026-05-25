@@ -53,12 +53,19 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getByText("Editor-next")).toBeTruthy();
 		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
-		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench media asset region")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench preview region")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench inspector region")).toBeTruthy();
+		const rail = screen.getByLabelText("Editor workbench rail");
+		expect(rail).toBeTruthy();
+		expect(rail.tagName).toBe("ASIDE");
+		expect(within(rail).queryAllByRole("button")).toHaveLength(0);
+		expect(within(rail).queryAllByRole("link")).toHaveLength(0);
+		expect(
+			screen.queryByRole("navigation", { name: "Editor workbench rail" }),
+		).toBeNull();
+		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByLabelText("Local video file")).toBeTruthy();
+		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
+		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
@@ -80,9 +87,9 @@ describe("EditorNextRoute", () => {
 		expect(alert.textContent).toContain("WebCodecs");
 		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
 		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench media asset region")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench preview region")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench inspector region")).toBeTruthy();
+		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
+		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
+		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 	});
 
@@ -113,6 +120,8 @@ describe("EditorNextRoute", () => {
 		expect(
 			(screen.getByLabelText("Local video file") as HTMLInputElement).disabled,
 		).toBe(true);
+		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
+		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 
 		inspection.resolve(supportedInspection);
 		await waitFor(() => {
