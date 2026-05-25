@@ -199,7 +199,7 @@ describe("EditorNextRoute", () => {
 		});
 	});
 
-	it("keeps the native preview and transport controls in the center workbench region", async () => {
+	it("places preview, transport, and selection in the resolved ready workbench layout", async () => {
 		render(
 			<EditorNextRoute
 				createAssetId={() => "asset-center-preview"}
@@ -223,20 +223,47 @@ describe("EditorNextRoute", () => {
 			).toBeTruthy();
 		});
 
+		expect(
+			screen.getByLabelText("Editor workbench rail").parentElement?.className,
+		).toContain("grid-cols-[4rem_minmax(0,1fr)]");
+		const readyWorkbench = screen.getByLabelText("Editor workbench session");
+		expect(readyWorkbench.className).toContain("xl:h-[calc(100vh-5rem)]");
+		expect(readyWorkbench.className).toContain(
+			"xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem]",
+		);
+		expect(readyWorkbench.className).toContain(
+			"xl:grid-rows-[minmax(0,1fr)_2.5rem_38%]",
+		);
 		const centerRegion = screen.getByLabelText("Workbench center region");
-		const transportControls = within(centerRegion).getByLabelText(
+		const transportRegion = screen.getByLabelText("Workbench transport region");
+		const transportControls = within(transportRegion).getByLabelText(
 			"Preview transport controls",
 		);
 		const mediaAssetRegion = screen.getByLabelText(
 			"Workbench media asset region",
 		);
+		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
+		const selectionRegion = screen.getByLabelText("Workbench selection region");
 
 		expect(
 			within(centerRegion).getByLabelText("Preview for center-preview.mp4"),
 		).toBeTruthy();
-		expect(mediaAssetRegion.className).toContain("lg:max-h");
-		expect(transportControls.className).toContain("lg:grid-cols");
-		expect(transportControls.className).toContain("16rem");
+		expect(
+			within(centerRegion).queryByLabelText("Preview transport controls"),
+		).toBeNull();
+		expect(mediaAssetRegion.className).toContain("xl:col-start-1");
+		expect(mediaAssetRegion.className).toContain("xl:row-start-1");
+		expect(centerRegion.className).toContain("xl:col-start-2");
+		expect(centerRegion.className).toContain("xl:row-start-1");
+		expect(inspectorRegion.className).toContain("xl:col-start-3");
+		expect(inspectorRegion.className).toContain("xl:row-start-1");
+		expect(transportRegion.className).toContain("xl:col-span-3");
+		expect(transportRegion.className).toContain("xl:row-start-2");
+		expect(selectionRegion.className).toContain("xl:col-span-3");
+		expect(selectionRegion.className).toContain("xl:row-start-3");
+		expect(
+			within(selectionRegion).getByLabelText("Selection timeline"),
+		).toBeTruthy();
 		expect(
 			within(transportControls).getByRole("button", { name: "Play" }),
 		).toBeTruthy();
@@ -270,7 +297,7 @@ describe("EditorNextRoute", () => {
 
 		await waitFor(() => {
 			expect(
-				within(centerRegion).getAllByText("00:00:10.000").length,
+				within(transportRegion).getAllByText("00:00:10.000").length,
 			).toBeGreaterThan(0);
 		});
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
@@ -353,18 +380,18 @@ describe("EditorNextRoute", () => {
 				},
 			),
 		).toBeTruthy();
-		expect(screen.getByLabelText("Generated media filename").className).toContain(
-			"whitespace-normal",
-		);
+		expect(
+			screen.getByLabelText("Generated media filename").className,
+		).toContain("whitespace-normal");
 		expect(screen.getByLabelText("Export review").className).toContain(
 			"overflow-visible",
 		);
 		expect(screen.getByLabelText("Generated media status").className).toContain(
 			"overflow-visible",
 		);
-		expect(screen.getByLabelText("Generated media filename").className).toContain(
-			"[overflow-wrap:anywhere]",
-		);
+		expect(
+			screen.getByLabelText("Generated media filename").className,
+		).toContain("[overflow-wrap:anywhere]");
 		expect(
 			screen.getByLabelText("Generated media filename").className,
 		).not.toContain("break-all");

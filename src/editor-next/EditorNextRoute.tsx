@@ -441,9 +441,13 @@ function EditorWorkbenchFrame({
 						</div>
 					</div>
 				</header>
-				<div className="grid min-h-0 grid-cols-[3.25rem_minmax(0,1fr)]">
+				<div className="grid min-h-0 grid-cols-[4rem_minmax(0,1fr)]">
 					<EditorWorkbenchRail status={status} />
-					<div className="min-w-0 overflow-auto bg-workbench p-3 md:p-4">
+					<div
+						className={`min-w-0 overflow-auto bg-workbench p-3 md:p-4 ${
+							status === "ready" ? "xl:overflow-hidden" : ""
+						}`}
+					>
 						{children}
 					</div>
 				</div>
@@ -608,45 +612,42 @@ function EditorSessionShell({
 		);
 	}
 
-	const selectionEditingDisabled =
-		session.export.status === "running";
+	const selectionEditingDisabled = session.export.status === "running";
 	const closeFileDisabled = !canCloseEditorSession(session);
 
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:grid-cols-[minmax(0,1fr)_17.5rem]"
+			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_2.5rem_38%] xl:overflow-hidden"
 		>
-			<div className="grid min-h-0 gap-3 lg:grid-cols-[18.5rem_minmax(30rem,1fr)] lg:grid-rows-[minmax(0,auto)_auto]">
-				<section
-					aria-label="Workbench media asset region"
-					className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 lg:row-span-2 lg:max-h-[calc(100vh-6rem)]"
-				>
-					<ActiveMediaAssetContext
-						closeFileDisabled={closeFileDisabled}
-						onCloseFileRequested={onCloseFileRequested}
-						session={session}
-					/>
-				</section>
+			<section
+				aria-label="Workbench media asset region"
+				className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
+			>
+				<ActiveMediaAssetContext
+					closeFileDisabled={closeFileDisabled}
+					onCloseFileRequested={onCloseFileRequested}
+					session={session}
+				/>
+			</section>
 
-				{previewSource ? (
-					<NativePreviewPlayer
-						asset={session.asset}
-						onSelectionEndRequested={onSelectionEndRequested}
-						onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
-						onSelectionResetRequested={onSelectionResetRequested}
-						onSelectionStartRequested={onSelectionStartRequested}
-						selection={session.selection}
-						selectionEditingDisabled={selectionEditingDisabled}
-						shortcutsDisabled={selectionEditingDisabled}
-						source={previewSource}
-					/>
-				) : null}
-			</div>
+			{previewSource ? (
+				<NativePreviewPlayer
+					asset={session.asset}
+					onSelectionEndRequested={onSelectionEndRequested}
+					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+					onSelectionResetRequested={onSelectionResetRequested}
+					onSelectionStartRequested={onSelectionStartRequested}
+					selection={session.selection}
+					selectionEditingDisabled={selectionEditingDisabled}
+					shortcutsDisabled={selectionEditingDisabled}
+					source={previewSource}
+				/>
+			) : null}
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col gap-3 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
+				className="flex min-w-0 flex-col gap-3 xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
 			>
 				<ExportReviewPanel
 					asset={session.asset}
@@ -982,7 +983,10 @@ function ExportJobStatus({
 	onDownloadGeneratedMedia,
 	status,
 }: {
-	deliveryAction?: Extract<ExportInspectorActionViewModel, { kind: "download" }>;
+	deliveryAction?: Extract<
+		ExportInspectorActionViewModel,
+		{ kind: "download" }
+	>;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 	status: ExportInspectorStatusViewModel;
 }) {

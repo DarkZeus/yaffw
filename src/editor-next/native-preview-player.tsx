@@ -292,16 +292,16 @@ export function NativePreviewPlayer({
 		<>
 			<section
 				aria-label="Workbench center region"
-				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3"
+				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3 xl:col-start-2 xl:row-start-1 xl:min-h-0"
 			>
 				<section
 					aria-label="Native preview player"
-					className="grid min-h-full gap-3"
+					className="grid min-h-full place-items-center"
 				>
-					<div className="overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer">
+					<div className="w-full overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer">
 						<video
 							aria-label={`Preview for ${asset.label}`}
-							className="aspect-video max-h-[42vh] w-full bg-workbench-viewer object-contain"
+							className="aspect-video max-h-[42vh] w-full bg-workbench-viewer object-contain xl:max-h-full"
 							onEnded={handleEnded}
 							onPause={() => setIsPlaying(false)}
 							onPlay={() => setIsPlaying(true)}
@@ -314,150 +314,148 @@ export function NativePreviewPlayer({
 							<track kind="captions" />
 						</video>
 					</div>
-
-					<div
-						aria-label="Preview transport controls"
-						className="grid gap-3 rounded-md border border-workbench-border bg-workbench-inspector/80 p-2.5 lg:grid-cols-[minmax(0,1fr)_16rem]"
-					>
-						<div className="flex flex-col gap-3">
-							<div className="flex flex-wrap items-center gap-2">
-								<Button
-									aria-label={isPlaying ? "Pause" : "Play"}
-									onClick={() => {
-										void togglePlayback();
-									}}
-									size="icon"
-									type="button"
-								>
-									{isPlaying ? (
-										<Pause data-icon="inline-start" />
-									) : (
-										<Play data-icon="inline-start" />
-									)}
-								</Button>
-								<PreviewIconButton
-									label="Seek backward 10 seconds"
-									onClick={() => seekByUs(-10_000_000)}
-								>
-									<Rewind data-icon="inline-start" />
-								</PreviewIconButton>
-								<PreviewIconButton
-									label="Seek backward 1 second"
-									onClick={() => seekByUs(-1_000_000)}
-								>
-									<SkipBack data-icon="inline-start" />
-								</PreviewIconButton>
-								<PreviewIconButton
-									label="Step backward one frame"
-									onClick={() => stepFrame(-1)}
-								>
-									<SkipBack data-icon="inline-start" />
-								</PreviewIconButton>
-								<PreviewIconButton
-									label="Step forward one frame"
-									onClick={() => stepFrame(1)}
-								>
-									<SkipForward data-icon="inline-start" />
-								</PreviewIconButton>
-								<PreviewIconButton
-									label="Seek forward 1 second"
-									onClick={() => seekByUs(1_000_000)}
-								>
-									<SkipForward data-icon="inline-start" />
-								</PreviewIconButton>
-								<PreviewIconButton
-									label="Seek forward 10 seconds"
-									onClick={() => seekByUs(10_000_000)}
-								>
-									<FastForward data-icon="inline-start" />
-								</PreviewIconButton>
-								<Button
-									aria-label="Open fullscreen preview"
-									disabled={!canFullscreen}
-									onClick={requestFullscreen}
-									size="icon"
-									type="button"
-									variant="outline"
-								>
-									<Maximize2 data-icon="inline-start" />
-								</Button>
-							</div>
-
-							<div className="grid grid-cols-[7rem_minmax(0,1fr)_auto] items-end gap-2">
-								<label className="flex flex-col gap-2 text-sm font-medium">
-									Playback speed
-									<select
-										aria-label="Playback speed"
-										className="h-8 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-										onChange={updatePlaybackRate}
-										value={String(playbackRate)}
-									>
-										{playbackSpeeds.map((speed) => (
-											<option key={speed} value={speed}>
-												{speed}x
-											</option>
-										))}
-									</select>
-								</label>
-
-								<label className="flex flex-col gap-2 text-sm font-medium">
-									Preview volume
-									<input
-										aria-label="Preview volume"
-										className="h-9 accent-primary"
-										max="100"
-										min="0"
-										onChange={updateVolume}
-										type="range"
-										value={Math.round(volume * 100)}
-									/>
-								</label>
-
-								<Button
-									aria-label={
-										muted ? "Unmute preview audio" : "Mute preview audio"
-									}
-									onClick={toggleMuted}
-									size="icon"
-									type="button"
-									variant="outline"
-								>
-									{muted ? (
-										<VolumeX data-icon="inline-start" />
-									) : (
-										<Volume2 data-icon="inline-start" />
-									)}
-								</Button>
-							</div>
-						</div>
-
-						<dl className="grid content-start gap-1.5 rounded-md border border-workbench-border bg-background/70 p-2.5 text-xs">
-							<PreviewFact
-								label="Playhead"
-								value={formatMediaTime(playheadUs)}
-							/>
-							<PreviewFact
-								label="Selection start"
-								value={formatMediaTime(selection.startUs)}
-							/>
-							<PreviewFact
-								label="Selection end"
-								value={formatMediaTime(selection.endUs)}
-							/>
-							<PreviewFact
-								label="Frame step"
-								value={`${formatMediaTime(asset.frameTiming.frameDurationUs)} ${
-									asset.frameTiming.source
-								}`}
-							/>
-						</dl>
-					</div>
 				</section>
 			</section>
 
 			<section
+				aria-label="Workbench transport region"
+				className="min-h-10 rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden"
+			>
+				<div
+					aria-label="Preview transport controls"
+					className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 px-2 py-1 xl:h-full xl:flex-nowrap xl:overflow-x-auto xl:py-0"
+				>
+					<div className="flex shrink-0 items-center gap-1.5">
+						<Button
+							aria-label={isPlaying ? "Pause" : "Play"}
+							onClick={() => {
+								void togglePlayback();
+							}}
+							size="icon"
+							type="button"
+						>
+							{isPlaying ? (
+								<Pause data-icon="inline-start" />
+							) : (
+								<Play data-icon="inline-start" />
+							)}
+						</Button>
+						<PreviewIconButton
+							label="Seek backward 10 seconds"
+							onClick={() => seekByUs(-10_000_000)}
+						>
+							<Rewind data-icon="inline-start" />
+						</PreviewIconButton>
+						<PreviewIconButton
+							label="Seek backward 1 second"
+							onClick={() => seekByUs(-1_000_000)}
+						>
+							<SkipBack data-icon="inline-start" />
+						</PreviewIconButton>
+						<PreviewIconButton
+							label="Step backward one frame"
+							onClick={() => stepFrame(-1)}
+						>
+							<SkipBack data-icon="inline-start" />
+						</PreviewIconButton>
+						<PreviewIconButton
+							label="Step forward one frame"
+							onClick={() => stepFrame(1)}
+						>
+							<SkipForward data-icon="inline-start" />
+						</PreviewIconButton>
+						<PreviewIconButton
+							label="Seek forward 1 second"
+							onClick={() => seekByUs(1_000_000)}
+						>
+							<SkipForward data-icon="inline-start" />
+						</PreviewIconButton>
+						<PreviewIconButton
+							label="Seek forward 10 seconds"
+							onClick={() => seekByUs(10_000_000)}
+						>
+							<FastForward data-icon="inline-start" />
+						</PreviewIconButton>
+						<Button
+							aria-label="Open fullscreen preview"
+							disabled={!canFullscreen}
+							onClick={requestFullscreen}
+							size="icon"
+							type="button"
+							variant="outline"
+						>
+							<Maximize2 data-icon="inline-start" />
+						</Button>
+					</div>
+
+					<div className="grid min-w-64 flex-1 grid-cols-[7rem_minmax(8rem,1fr)_auto] items-center gap-2">
+						<label className="flex items-center gap-2 text-sm font-medium">
+							<span className="whitespace-nowrap">Playback speed</span>
+							<select
+								aria-label="Playback speed"
+								className="h-8 rounded-md border border-input bg-background px-2.5 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+								onChange={updatePlaybackRate}
+								value={String(playbackRate)}
+							>
+								{playbackSpeeds.map((speed) => (
+									<option key={speed} value={speed}>
+										{speed}x
+									</option>
+								))}
+							</select>
+						</label>
+
+						<label className="flex min-w-0 items-center gap-2 text-sm font-medium">
+							<span className="whitespace-nowrap">Preview volume</span>
+							<input
+								aria-label="Preview volume"
+								className="h-8 min-w-0 flex-1 accent-primary"
+								max="100"
+								min="0"
+								onChange={updateVolume}
+								type="range"
+								value={Math.round(volume * 100)}
+							/>
+						</label>
+
+						<Button
+							aria-label={muted ? "Unmute preview audio" : "Mute preview audio"}
+							onClick={toggleMuted}
+							size="icon"
+							type="button"
+							variant="outline"
+						>
+							{muted ? (
+								<VolumeX data-icon="inline-start" />
+							) : (
+								<Volume2 data-icon="inline-start" />
+							)}
+						</Button>
+					</div>
+
+					<dl className="flex shrink-0 items-center gap-3 rounded-md border border-workbench-border bg-background/70 px-2 py-1 text-xs">
+						<PreviewFact label="Playhead" value={formatMediaTime(playheadUs)} />
+						<PreviewFact
+							label="Selection start"
+							value={formatMediaTime(selection.startUs)}
+						/>
+						<PreviewFact
+							label="Selection end"
+							value={formatMediaTime(selection.endUs)}
+						/>
+						<PreviewFact
+							label="Frame step"
+							value={`${formatMediaTime(asset.frameTiming.frameDurationUs)} ${
+								asset.frameTiming.source
+							}`}
+						/>
+					</dl>
+				</div>
+			</section>
+
+			<section
 				aria-label="Workbench selection region"
-				className="min-h-[22rem]"
+				className="min-h-[22rem] xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto"
 			>
 				<SelectionTimeline
 					asset={asset}
