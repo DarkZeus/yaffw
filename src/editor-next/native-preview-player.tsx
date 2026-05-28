@@ -1,4 +1,5 @@
 import {
+	CircleDot,
 	FastForward,
 	Maximize2,
 	Pause,
@@ -292,42 +293,94 @@ export function NativePreviewPlayer({
 		<>
 			<section
 				aria-label="Workbench center region"
-				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3 xl:col-start-2 xl:row-start-1 xl:min-h-0"
+				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer xl:col-start-2 xl:row-start-1 xl:min-h-0"
 			>
 				<section
 					aria-label="Native preview player"
-					className="grid min-h-full place-items-center"
+					className="flex min-h-full flex-col bg-workbench-viewer"
 				>
-					<div className="w-full overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer">
-						<video
-							aria-label={`Preview for ${asset.label}`}
-							className="aspect-video max-h-[42vh] w-full bg-workbench-viewer object-contain xl:max-h-full"
-							onEnded={handleEnded}
-							onPause={() => setIsPlaying(false)}
-							onPlay={() => setIsPlaying(true)}
-							onSeeked={syncPlayheadWithNativeVideo}
-							onTimeUpdate={syncPlayheadWithNativeVideo}
-							preload="metadata"
-							ref={videoRef}
-							src={previewUrl || undefined}
+					<div
+						aria-label="Preview viewer header"
+						className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-workbench-border bg-workbench px-3 text-xs"
+					>
+						<div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+							<CircleDot
+								aria-hidden="true"
+								className={`size-3 shrink-0 ${
+									isPlaying ? "text-workbench-progress" : "text-workbench-playhead"
+								}`}
+							/>
+							<span className="font-medium text-foreground">Preview</span>
+							<span className="rounded border border-workbench-border bg-workbench-hover px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+								{playbackRate}x
+							</span>
+						</div>
+						<p className="min-w-0 truncate font-mono text-[11px] text-muted-foreground">
+							{asset.label}
+						</p>
+						<div className="flex shrink-0 items-center gap-2">
+							<span
+								aria-label="Preview playhead time"
+								className="rounded border border-workbench-border bg-background px-2 py-1 font-mono text-[11px] leading-none"
+							>
+								{formatMediaTime(playheadUs)}
+							</span>
+							<Button
+								aria-label="Open fullscreen preview"
+								disabled={!canFullscreen}
+								onClick={requestFullscreen}
+								size="icon"
+								type="button"
+								variant="outline"
+							>
+								<Maximize2 data-icon="inline-start" />
+							</Button>
+						</div>
+					</div>
+					<div
+						aria-label="Preview viewer surface"
+						className="grid min-h-0 flex-1 place-items-center overflow-hidden bg-workbench-viewer p-3 xl:p-4"
+						role="group"
+					>
+						<div
+							aria-label="Preview aperture"
+							className="relative aspect-video w-full max-w-5xl overflow-hidden rounded-sm border border-workbench-border-strong bg-workbench-viewer shadow-2xl"
+							role="group"
 						>
-							<track kind="captions" />
-						</video>
+							<video
+								aria-label={`Preview for ${asset.label}`}
+								className="h-full w-full bg-workbench-viewer object-contain"
+								onEnded={handleEnded}
+								onPause={() => setIsPlaying(false)}
+								onPlay={() => setIsPlaying(true)}
+								onSeeked={syncPlayheadWithNativeVideo}
+								onTimeUpdate={syncPlayheadWithNativeVideo}
+								preload="metadata"
+								ref={videoRef}
+								src={previewUrl || undefined}
+							>
+								<track kind="captions" />
+							</video>
+						</div>
 					</div>
 				</section>
 			</section>
 
 			<section
 				aria-label="Workbench transport region"
-				className="min-h-10 rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden"
+				className="min-h-[3.25rem] rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden"
 			>
 				<div
 					aria-label="Preview transport controls"
-					className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 px-2 py-1 xl:h-full xl:flex-nowrap xl:overflow-x-auto xl:py-0"
+					className="grid min-h-[3.25rem] min-w-0 gap-2 px-2 py-1.5 lg:grid-cols-[auto_minmax(18rem,1fr)_minmax(18rem,auto)] lg:items-center xl:h-full xl:overflow-hidden"
 				>
-					<div className="flex shrink-0 items-center gap-1.5">
+					<div
+						aria-label="Primary preview controls"
+						className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-workbench-border bg-background/55 p-1 lg:flex-nowrap"
+					>
 						<Button
 							aria-label={isPlaying ? "Pause" : "Play"}
+							className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
 							onClick={() => {
 								void togglePlayback();
 							}}
@@ -376,20 +429,34 @@ export function NativePreviewPlayer({
 						>
 							<FastForward data-icon="inline-start" />
 						</PreviewIconButton>
-						<Button
-							aria-label="Open fullscreen preview"
-							disabled={!canFullscreen}
-							onClick={requestFullscreen}
-							size="icon"
-							type="button"
-							variant="outline"
-						>
-							<Maximize2 data-icon="inline-start" />
-						</Button>
 					</div>
 
-					<div className="grid min-w-64 flex-1 grid-cols-[7rem_minmax(8rem,1fr)_auto] items-center gap-2">
-						<label className="flex items-center gap-2 text-sm font-medium">
+					<dl
+						aria-label="Preview media-time readouts"
+						className="grid min-w-0 grid-cols-2 gap-1 rounded-md border border-workbench-border bg-background/65 p-1 text-xs sm:grid-cols-4"
+					>
+						<PreviewFact label="Playhead" value={formatMediaTime(playheadUs)} />
+						<PreviewFact
+							label="Selection start"
+							value={formatMediaTime(selection.startUs)}
+						/>
+						<PreviewFact
+							label="Selection end"
+							value={formatMediaTime(selection.endUs)}
+						/>
+						<PreviewFact
+							label="Frame step"
+							value={`${formatMediaTime(asset.frameTiming.frameDurationUs)} ${
+								asset.frameTiming.source
+							}`}
+						/>
+					</dl>
+
+					<div
+						aria-label="Preview playback settings"
+						className="grid min-w-0 gap-2 rounded-md border border-workbench-border bg-background/55 p-1 sm:grid-cols-[auto_minmax(10rem,1fr)_auto]"
+					>
+						<label className="flex items-center gap-2 text-xs font-medium">
 							<span className="whitespace-nowrap">Playback speed</span>
 							<select
 								aria-label="Playback speed"
@@ -405,7 +472,7 @@ export function NativePreviewPlayer({
 							</select>
 						</label>
 
-						<label className="flex min-w-0 items-center gap-2 text-sm font-medium">
+						<label className="flex min-w-0 items-center gap-2 text-xs font-medium">
 							<span className="whitespace-nowrap">Preview volume</span>
 							<input
 								aria-label="Preview volume"
@@ -432,24 +499,6 @@ export function NativePreviewPlayer({
 							)}
 						</Button>
 					</div>
-
-					<dl className="flex shrink-0 items-center gap-3 rounded-md border border-workbench-border bg-background/70 px-2 py-1 text-xs">
-						<PreviewFact label="Playhead" value={formatMediaTime(playheadUs)} />
-						<PreviewFact
-							label="Selection start"
-							value={formatMediaTime(selection.startUs)}
-						/>
-						<PreviewFact
-							label="Selection end"
-							value={formatMediaTime(selection.endUs)}
-						/>
-						<PreviewFact
-							label="Frame step"
-							value={`${formatMediaTime(asset.frameTiming.frameDurationUs)} ${
-								asset.frameTiming.source
-							}`}
-						/>
-					</dl>
 				</div>
 			</section>
 
@@ -499,9 +548,11 @@ function PreviewIconButton({
 
 function PreviewFact({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="grid grid-cols-[6.25rem_minmax(0,1fr)] gap-2">
-			<dt className="text-muted-foreground">{label}</dt>
-			<dd className="min-w-0 whitespace-nowrap font-mono tabular-nums">
+		<div className="grid min-w-0 gap-0.5 rounded-sm bg-background/45 px-2 py-1">
+			<dt className="truncate text-[10px] uppercase leading-none text-muted-foreground">
+				{label}
+			</dt>
+			<dd className="min-w-0 truncate font-mono text-xs leading-tight tabular-nums">
 				{value}
 			</dd>
 		</div>

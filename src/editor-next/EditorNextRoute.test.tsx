@@ -272,7 +272,7 @@ describe("EditorNextRoute", () => {
 			"xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem]",
 		);
 		expect(readyWorkbench.className).toContain(
-			"xl:grid-rows-[minmax(0,1fr)_2.5rem_38%]",
+			"xl:grid-rows-[minmax(0,1fr)_3.25rem_38%]",
 		);
 		const centerRegion = screen.getByLabelText("Workbench center region");
 		const transportRegion = screen.getByLabelText("Workbench transport region");
@@ -287,6 +287,12 @@ describe("EditorNextRoute", () => {
 
 		expect(
 			within(centerRegion).getByLabelText("Preview for center-preview.mp4"),
+		).toBeTruthy();
+		expect(
+			within(centerRegion).getByLabelText("Preview viewer header"),
+		).toBeTruthy();
+		expect(
+			within(centerRegion).getByLabelText("Preview aperture"),
 		).toBeTruthy();
 		expect(
 			within(centerRegion).queryByLabelText("Preview transport controls"),
@@ -308,6 +314,9 @@ describe("EditorNextRoute", () => {
 			within(transportControls).getByRole("button", { name: "Play" }),
 		).toBeTruthy();
 		expect(
+			within(transportControls).getByLabelText("Primary preview controls"),
+		).toBeTruthy();
+		expect(
 			within(transportControls).getByRole("button", {
 				name: "Seek backward 10 seconds",
 			}),
@@ -324,7 +333,14 @@ describe("EditorNextRoute", () => {
 			within(transportControls).getByLabelText("Preview volume"),
 		).toBeTruthy();
 		expect(
-			within(transportControls).getByRole("button", {
+			within(transportControls).getByLabelText("Preview playback settings"),
+		).toBeTruthy();
+		expect(
+			within(transportControls).getByLabelText("Preview media-time readouts")
+				.className,
+		).toContain("sm:grid-cols-4");
+		expect(
+			within(centerRegion).getByRole("button", {
 				name: "Open fullscreen preview",
 			}),
 		).toBeTruthy();

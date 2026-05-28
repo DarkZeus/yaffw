@@ -7,6 +7,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,6 +60,51 @@ describe("NativePreviewPlayer", () => {
 		unmount();
 
 		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
+	});
+
+	it("renders preview and transport as separate workbench chrome regions", () => {
+		renderPlayer();
+
+		const centerRegion = screen.getByLabelText("Workbench center region");
+		const nativePreview = within(centerRegion).getByLabelText(
+			"Native preview player",
+		);
+		const viewerHeader =
+			within(nativePreview).getByLabelText("Preview viewer header");
+		const viewerSurface =
+			within(nativePreview).getByLabelText("Preview viewer surface");
+		const aperture = within(viewerSurface).getByLabelText("Preview aperture");
+		const transportRegion = screen.getByLabelText("Workbench transport region");
+		const transportControls = within(transportRegion).getByLabelText(
+			"Preview transport controls",
+		);
+		const primaryControls = within(transportControls).getByLabelText(
+			"Primary preview controls",
+		);
+		const mediaTimeReadouts = within(transportControls).getByLabelText(
+			"Preview media-time readouts",
+		);
+		const playbackSettings = within(transportControls).getByLabelText(
+			"Preview playback settings",
+		);
+
+		expect(centerRegion.className).toContain("bg-workbench-viewer");
+		expect(viewerHeader.className).toContain("border-workbench-border");
+		expect(viewerSurface.className).toContain("bg-workbench-viewer");
+		expect(aperture.className).toContain("border-workbench-border-strong");
+		expect(transportRegion.className).toContain("bg-workbench-transport");
+		expect(transportControls.className).toContain("grid");
+		expect(primaryControls.className).toContain("bg-background/55");
+		expect(mediaTimeReadouts.className).toContain("sm:grid-cols-4");
+		expect(playbackSettings.className).toContain("sm:grid-cols");
+		expect(
+			within(centerRegion).queryByLabelText("Preview transport controls"),
+		).toBeNull();
+		expect(
+			within(viewerHeader).getByRole("button", {
+				name: "Open fullscreen preview",
+			}),
+		).toBeTruthy();
 	});
 
 	it("drives play, pause, seek, speed, volume, mute, and frame-step through native video commands", async () => {
@@ -135,7 +181,10 @@ describe("NativePreviewPlayer", () => {
 			frameCallbacks.shift()?.(16);
 		});
 
-		expect(screen.getByText("00:00:01.250")).toBeTruthy();
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:01.250",
+		);
+		expect(screen.getAllByText("00:00:01.250").length).toBeGreaterThan(1);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
 	});
 

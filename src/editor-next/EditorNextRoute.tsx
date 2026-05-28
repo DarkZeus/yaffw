@@ -618,7 +618,7 @@ function EditorSessionShell({
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_2.5rem_38%] xl:overflow-hidden"
+			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_3.25rem_38%] xl:overflow-hidden"
 		>
 			<section
 				aria-label="Workbench media asset region"
