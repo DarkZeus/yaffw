@@ -106,7 +106,9 @@ describe("editor-next final first-slice smoke coverage", () => {
 			expect(screen.getByLabelText("Preview for final-smoke.mp4")).toBeTruthy();
 		});
 
-		expect(dispatchBeforeUnload()).toBe(true);
+		await waitFor(() => {
+			expect(dispatchBeforeUnload()).toBe(true);
+		});
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		expect(screen.getAllByText("Selection start").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Selection end").length).toBeGreaterThan(0);

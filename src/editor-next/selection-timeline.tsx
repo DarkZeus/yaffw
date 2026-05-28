@@ -475,7 +475,7 @@ export function SelectionTimeline({
 	return (
 		<section
 			aria-label="Selection timeline"
-			className="grid gap-4 rounded-md border bg-background p-4"
+			className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden rounded-md border bg-background p-4"
 		>
 			<div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
 				<div className="grid gap-2">
@@ -574,12 +574,12 @@ export function SelectionTimeline({
 			</div>
 
 			<div
-				className="overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground"
+				className="min-h-0 overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground"
 				data-testid="selection-timeline-scroll"
 				ref={scrollContainerRef}
 			>
 				<div
-					className="relative"
+					className="relative flex min-h-full flex-col"
 					data-testid="selection-timeline-track"
 					ref={trackRef}
 					style={{
@@ -612,7 +612,7 @@ export function SelectionTimeline({
 					</button>
 
 					<div
-						className="relative"
+						className="relative min-h-0 flex-1"
 						data-testid="selection-timeline-lane-surface"
 					>
 						<div className="relative max-h-72 overflow-y-auto">

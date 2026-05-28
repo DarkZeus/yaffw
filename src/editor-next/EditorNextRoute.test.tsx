@@ -415,10 +415,17 @@ describe("EditorNextRoute", () => {
 		expect(selectionRegion.className).toContain("overflow-x-hidden");
 		expect(selectionRegion.className).toContain("xl:overflow-y-auto");
 		expect(selectionRegion.className).toContain("overscroll-contain");
+		const selectionTimeline = within(selectionRegion).getByLabelText(
+			"Selection timeline",
+		);
+		expect(selectionTimeline.className).toContain("min-h-full");
+		expect(selectionTimeline.className).toContain(
+			"grid-rows-[auto_minmax(0,1fr)]",
+		);
 		expect(
 			within(selectionRegion).getByTestId("selection-timeline-scroll")
 				.className,
-		).toContain("overflow-x-auto");
+		).toContain("min-h-0");
 	});
 
 	it("runs default export from the review and requires explicit generated-media delivery", async () => {
