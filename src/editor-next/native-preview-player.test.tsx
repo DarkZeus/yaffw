@@ -90,6 +90,10 @@ describe("NativePreviewPlayer", () => {
 
 		expect(centerRegion.className).toContain("bg-workbench-viewer");
 		expect(viewerHeader.className).toContain("border-workbench-border");
+		expect(viewerHeader.textContent).not.toContain("clip.mp4");
+		expect(
+			within(viewerHeader).getByText("Program viewer").parentElement?.className,
+		).toContain("whitespace-nowrap");
 		expect(viewerSurface.className).toContain("bg-workbench-viewer");
 		expect(aperture.className).toContain("border-workbench-border-strong");
 		expect(transportRegion.className).toContain("bg-workbench-transport");

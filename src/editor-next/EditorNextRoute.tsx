@@ -7,7 +7,6 @@ import {
 	FileVideo,
 	Film,
 	Gauge,
-	Info,
 	Monitor,
 	PackageCheck,
 	PlayCircle,
@@ -512,10 +511,6 @@ function TopBarMediaAssetSummary({ asset }: { asset: ReadyMediaAsset | null }) {
 			aria-label="Top bar media asset summary"
 			className="hidden min-w-0 items-center justify-center gap-3 font-mono text-[11px] text-muted-foreground lg:flex"
 		>
-			<span className="max-w-[28rem] truncate">{asset.label}</span>
-			<span aria-hidden="true" className="text-workbench-border-strong">
-				|
-			</span>
 			<span className="whitespace-nowrap">{resolution}</span>
 			<span aria-hidden="true" className="text-workbench-border-strong">
 				|
@@ -829,6 +824,50 @@ function CompactTimeBox({ label, value }: { label: string; value: string }) {
 	);
 }
 
+type AnalyticsFactGroup = {
+	facts: MediaAssetContextFact[];
+	title: string;
+};
+
+function MediaAnalyticsSection({ groups }: { groups: AnalyticsFactGroup[] }) {
+	return (
+		<section aria-label="Media analytics" className="mt-3 space-y-2 pb-1">
+			<SectionLabel>Analytics</SectionLabel>
+			<div className="space-y-2">
+				{groups.map((group) => (
+					<section
+						aria-label={group.title}
+						className="rounded border border-workbench-border bg-workbench-lane/65 p-2"
+						key={group.title}
+					>
+						<h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+							{group.title}
+						</h3>
+						<dl className="grid gap-1 text-[10px] leading-4">
+							{group.facts.map((fact) => (
+								<div
+									className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-2"
+									key={`${group.title}-${fact.label}`}
+								>
+									<dt className="min-w-0 truncate text-muted-foreground/80">
+										{fact.label}
+									</dt>
+									<dd
+										className="min-w-0 break-words text-right font-mono text-foreground [overflow-wrap:anywhere]"
+										title={fact.value}
+									>
+										{fact.value}
+									</dd>
+								</div>
+							))}
+						</dl>
+					</section>
+				))}
+			</div>
+		</section>
+	);
+}
+
 function ActiveMediaAssetContext({
 	closeFileDisabled,
 	onCloseFileRequested,
@@ -843,11 +882,14 @@ function ActiveMediaAssetContext({
 		closeDisabled: closeFileDisabled,
 		selection: session.selection,
 	});
+	const sourceAnalyticsFacts = viewModel.provenanceFacts.filter(
+		(fact) => fact.label !== "Source file",
+	);
 
 	return (
 		<section
 			aria-label="Media asset context"
-			className="flex min-w-0 max-w-full flex-col overflow-hidden overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:min-h-full xl:rounded-none xl:border-0"
+			className="flex min-w-0 max-w-full flex-col overflow-hidden overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:h-full xl:min-h-0 xl:rounded-none xl:border-0"
 		>
 			<WorkbenchPanelHeader
 				icon={<FileVideo />}
@@ -867,7 +909,7 @@ function ActiveMediaAssetContext({
 					</Button>
 				}
 			/>
-			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2">
+			<div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
 				<SectionLabel>Source</SectionLabel>
 				<div
 					aria-label="Loaded media asset"
@@ -948,20 +990,26 @@ function ActiveMediaAssetContext({
 					/>
 				</div>
 
-				<div className="mt-auto pt-2">
-					<div className="flex min-w-0 items-center gap-2 rounded border border-workbench-border bg-workbench-lane p-1.5 text-[10px] leading-none text-muted-foreground">
-						<Info
-							aria-hidden="true"
-							className="size-3.5 shrink-0 text-workbench-selected"
-						/>
-						<span className="shrink-0 font-medium text-foreground">
-							Workbench intent
-						</span>
-						<span className="min-w-0 truncate">
-							One asset, one playhead, one exported selection.
-						</span>
-					</div>
-				</div>
+				<MediaAnalyticsSection
+					groups={[
+						{
+							facts: sourceAnalyticsFacts,
+							title: "Source context",
+						},
+						{
+							facts: viewModel.videoFacts,
+							title: "Video facts",
+						},
+						{
+							facts: viewModel.audioFacts,
+							title: "Audio facts",
+						},
+						{
+							facts: viewModel.selectionFacts,
+							title: "Selection facts",
+						},
+					]}
+				/>
 			</div>
 		</section>
 	);

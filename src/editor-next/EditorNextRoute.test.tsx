@@ -190,18 +190,48 @@ describe("EditorNextRoute", () => {
 		expect(within(mediaAssetContext).getByText("Source")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Selection")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Workbench intent")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
-		expect(within(mediaAssetContext).getAllByText("Duration").length).toBe(2);
-		expect(within(mediaAssetContext).getByText("Codec")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).queryByText("Workbench intent"),
+		).toBeNull();
+		const mediaAnalytics =
+			within(mediaAssetContext).getByLabelText("Media analytics");
+		expect(within(mediaAnalytics).getByText("Analytics")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Source context")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Video facts")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Audio facts")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Selection facts")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Asset identity")).toBeTruthy();
+		expect(within(mediaAnalytics).getByText("Asset coverage")).toBeTruthy();
+		expect(within(mediaAnalytics).queryByText("Source file")).toBeNull();
+		expect(
+			within(mediaAssetContext).getAllByText("Size").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			within(mediaAssetContext).getAllByText("5 B").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			within(mediaAssetContext).getAllByText("Duration").length,
+		).toBeGreaterThanOrEqual(2);
+		expect(
+			within(mediaAssetContext).getAllByText("Codec").length,
+		).toBeGreaterThanOrEqual(1);
 		expect(within(mediaAssetContext).getByText("AVC / AAC")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Frames")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("30 fps known")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Main")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).getAllByText("Frames").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			within(mediaAssetContext).getAllByText("30 fps known").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			within(mediaAssetContext).getAllByText("Main").length,
+		).toBeGreaterThanOrEqual(1);
 		expect(within(mediaAssetContext).getByText("1920 x 1080")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Voice")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("eng")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).getAllByText("Voice").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			within(mediaAssetContext).getAllByText("eng").length,
+		).toBeGreaterThanOrEqual(1);
 		expect(within(mediaAssetContext).getByText("Start")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("End")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Coverage")).toBeTruthy();
@@ -211,12 +241,13 @@ describe("EditorNextRoute", () => {
 		expect(
 			within(mediaAssetContext).getAllByText("00:00:12.000").length,
 		).toBeGreaterThan(0);
-		expect(within(mediaAssetContext).getByText("100%")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).getAllByText("100%").length,
+		).toBeGreaterThanOrEqual(1);
 		expect(
 			within(mediaAssetContext).queryByText("Runtime readiness"),
 		).toBeNull();
 		expect(within(mediaAssetContext).queryByText("Default export")).toBeNull();
-		expect(screen.queryByLabelText("Media analytics")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
 		const exportInspector =
@@ -242,10 +273,14 @@ describe("EditorNextRoute", () => {
 		});
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 		expect(
-			within(mediaAssetContext).getByText("00:00:10.000"),
-		).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("00:00:02.000")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("16.67%")).toBeTruthy();
+			within(mediaAssetContext).getAllByText("00:00:10.000").length,
+		).toBeGreaterThan(0);
+		expect(
+			within(mediaAssetContext).getAllByText("00:00:02.000").length,
+		).toBeGreaterThan(0);
+		expect(
+			within(mediaAssetContext).getAllByText("16.67%").length,
+		).toBeGreaterThan(0);
 		await waitFor(() => {
 			expect(screen.getByText("Best-effort export")).toBeTruthy();
 		});
@@ -278,7 +313,7 @@ describe("EditorNextRoute", () => {
 		const topBarAssetSummary = screen.getByLabelText(
 			"Top bar media asset summary",
 		);
-		expect(topBarAssetSummary.textContent).toContain("center-preview.mp4");
+		expect(topBarAssetSummary.textContent).not.toContain("center-preview.mp4");
 		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
 		expect(topBarAssetSummary.textContent).toContain("30 fps known");
 		expect(
