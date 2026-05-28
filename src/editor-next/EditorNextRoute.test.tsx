@@ -156,8 +156,11 @@ describe("EditorNextRoute", () => {
 		);
 		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
 		expect(mediaAssetRegion.className).toContain("min-w-0");
+		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
 		expect(mediaAssetContext.className).toContain("overflow-x-hidden");
+		expect(mediaAssetContext.className).toContain("rounded-md");
+		expect(mediaAssetContext.className).toContain("bg-workbench-inspector");
 		const loadedMediaAsset =
 			within(mediaAssetContext).getByLabelText("Loaded media asset");
 		expect(within(loadedMediaAsset).getByText("Media asset")).toBeTruthy();
@@ -400,7 +403,7 @@ describe("EditorNextRoute", () => {
 			"Workbench media asset region",
 		);
 		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
-		expect(mediaAssetRegion.className).toContain("overflow-y-auto");
+		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
 		expect(mediaAssetRegion.className).toContain("overscroll-contain");
 
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");

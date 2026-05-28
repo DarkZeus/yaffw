@@ -624,7 +624,7 @@ function EditorSessionShell({
 		>
 			<section
 				aria-label="Workbench media asset region"
-				className="flex min-h-0 min-w-0 max-w-full flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-contain rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
 			>
 				<ActiveMediaAssetContext
 					closeFileDisabled={closeFileDisabled}
@@ -715,7 +715,7 @@ function ActiveMediaAssetContext({
 	return (
 		<section
 			aria-label="Media asset context"
-			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden"
+			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector p-4"
 		>
 			<div className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden">
 				<WorkbenchRegionHeader
