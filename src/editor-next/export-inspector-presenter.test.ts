@@ -26,6 +26,17 @@ describe("export inspector presenter", () => {
 			label: "Ready",
 			tone: "ready",
 		});
+		expect(viewModel.capability).toEqual({
+			label: "Export capability",
+			tone: "ready",
+			value: "Ready",
+		});
+		expect(viewModel.runtimeChecks).toEqual([
+			{ available: true, label: "Video decoder", status: "Ready" },
+			{ available: true, label: "Video encoder", status: "Ready" },
+			{ available: true, label: "Media source", status: "Ready" },
+			{ available: true, label: "Local file APIs", status: "Ready" },
+		]);
 		expect(viewModel.review).toEqual({
 			method: { label: "Method", value: "Fast export" },
 			plannedOutput: {
@@ -68,6 +79,11 @@ describe("export inspector presenter", () => {
 		expect(viewModel.badge).toEqual({
 			label: "Blocked",
 			tone: "blocked",
+		});
+		expect(viewModel.capability).toEqual({
+			label: "Export capability",
+			tone: "blocked",
+			value: "Blocked",
 		});
 		expect(viewModel.review).toEqual({
 			plannedOutput: {

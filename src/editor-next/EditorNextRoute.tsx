@@ -60,6 +60,8 @@ import {
 import {
 	createExportInspectorViewModel,
 	type ExportInspectorActionViewModel,
+	type ExportInspectorCapabilityViewModel,
+	type ExportInspectorRuntimeCheckViewModel,
 	type ExportInspectorStatusViewModel,
 } from "./export-inspector-presenter";
 import {
@@ -647,9 +649,9 @@ function EditorSessionShell({
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col gap-3 xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
+				className="flex min-w-0 flex-col xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
 			>
-				<ExportReviewPanel
+				<ExportInspectorPanel
 					asset={session.asset}
 					exportState={session.export}
 					onCancelExport={onDefaultExportCancelRequested}
@@ -658,7 +660,6 @@ function EditorSessionShell({
 					runtime={session.runtime}
 					selection={session.selection}
 				/>
-				<RuntimeChecksPanel session={session} />
 			</aside>
 		</section>
 	);
@@ -895,7 +896,7 @@ function workbenchNonReadyStateCopy(
 	}
 }
 
-function ExportReviewPanel({
+function ExportInspectorPanel({
 	asset,
 	exportState,
 	onCancelExport,
@@ -923,15 +924,15 @@ function ExportReviewPanel({
 
 	return (
 		<section
-			aria-label="Export review"
-			className="overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
+			aria-label="Export inspector"
+			className="min-w-0 overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
 		>
 			<div className="flex items-start justify-between gap-3 border-b border-workbench-border bg-background/55 px-4 py-3">
 				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
 					<span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
 						<PackageCheck aria-hidden="true" className="size-4" />
 					</span>
-					Export review
+					Export inspector
 				</h2>
 				<Badge
 					className="shrink-0"
@@ -944,33 +945,45 @@ function ExportReviewPanel({
 			</div>
 
 			<div className="flex flex-col gap-4 p-4">
-				<div className="grid gap-2">
-					<ExportReviewRow
-						label={viewModel.review.plannedOutput.label}
-						value={viewModel.review.plannedOutput.value}
-					/>
-					{viewModel.review.supported ? (
-						<>
-							<ExportReviewRow
-								label={viewModel.review.method.label}
-								value={viewModel.review.method.value}
-							/>
-							<ExportReviewRow
-								label={viewModel.review.precision.label}
-								value={viewModel.review.precision.value}
-							/>
-						</>
-					) : null}
-				</div>
+				<section
+					aria-label="Export review"
+					className="grid gap-4 overflow-visible"
+				>
+					<h3 className="text-xs font-semibold uppercase text-muted-foreground">
+						Export review
+					</h3>
+					<div className="grid gap-2">
+						<ExportReviewRow
+							label={viewModel.review.plannedOutput.label}
+							value={viewModel.review.plannedOutput.value}
+						/>
+						{viewModel.review.supported ? (
+							<>
+								<ExportReviewRow
+									label={viewModel.review.method.label}
+									value={viewModel.review.method.value}
+								/>
+								<ExportReviewRow
+									label={viewModel.review.precision.label}
+									value={viewModel.review.precision.value}
+								/>
+							</>
+						) : null}
+					</div>
 
-				<p className="rounded-md border-l-2 border-primary/60 bg-background/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
-					{viewModel.review.reason}
-				</p>
-				{viewModel.review.supported ? null : (
-					<p className="rounded-md bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
-						{viewModel.review.technicalDetails}
+					<p className="rounded-md border-l-2 border-primary/60 bg-background/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
+						{viewModel.review.reason}
 					</p>
-				)}
+					{viewModel.review.supported ? null : (
+						<p className="rounded-md bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
+							{viewModel.review.technicalDetails}
+						</p>
+					)}
+				</section>
+				<RuntimeChecksSection
+					capability={viewModel.capability}
+					checks={viewModel.runtimeChecks}
+				/>
 				<ExportJobStatus
 					deliveryAction={deliveryAction}
 					onDownloadGeneratedMedia={onDownloadGeneratedMedia}
@@ -985,6 +998,39 @@ function ExportReviewPanel({
 					/>
 				)}
 			</div>
+		</section>
+	);
+}
+
+function RuntimeChecksSection({
+	capability,
+	checks,
+}: {
+	capability: ExportInspectorCapabilityViewModel;
+	checks: ExportInspectorRuntimeCheckViewModel[];
+}) {
+	return (
+		<section
+			aria-label="Runtime checks"
+			className="grid gap-3 border-t border-workbench-border pt-4"
+		>
+			<h3 className="text-xs font-semibold uppercase text-muted-foreground">
+				Runtime checks
+			</h3>
+			<ExportReviewRow label={capability.label} value={capability.value} />
+			<ul className="flex flex-col gap-3 text-sm text-muted-foreground">
+				{checks.map((row) => (
+					<li
+						className="flex min-w-0 items-center justify-between gap-3"
+						key={row.label}
+					>
+						<span className="min-w-0 truncate">{row.label}</span>
+						<Badge variant={row.available ? "secondary" : "destructive"}>
+							{row.status}
+						</Badge>
+					</li>
+				))}
+			</ul>
 		</section>
 	);
 }

@@ -79,13 +79,27 @@ export type ExportInspectorActionViewModel =
 			kind: "none";
 	  };
 
+export type ExportInspectorCapabilityViewModel = {
+	label: "Export capability";
+	tone: "blocked" | "ready";
+	value: "Blocked" | "Ready";
+};
+
+export type ExportInspectorRuntimeCheckViewModel = {
+	available: boolean;
+	label: string;
+	status: "Missing" | "Ready";
+};
+
 export type ExportInspectorViewModel = {
 	action: ExportInspectorActionViewModel;
 	badge: {
 		label: "Blocked" | "Ready";
 		tone: "blocked" | "ready";
 	};
+	capability: ExportInspectorCapabilityViewModel;
 	review: ExportInspectorReviewViewModel;
+	runtimeChecks: ExportInspectorRuntimeCheckViewModel[];
 	status: ExportInspectorStatusViewModel;
 };
 
@@ -114,9 +128,47 @@ export function createExportInspectorViewModel({
 			label: review.supported ? "Ready" : "Blocked",
 			tone: review.supported ? "ready" : "blocked",
 		},
+		capability: capabilityViewModel(review.supported),
 		review: reviewViewModel(review),
+		runtimeChecks: runtimeCheckViewModels(runtime),
 		status: statusForExportState(exportState),
 	};
+}
+
+function capabilityViewModel(
+	reviewSupported: boolean,
+): ExportInspectorCapabilityViewModel {
+	return {
+		label: "Export capability",
+		tone: reviewSupported ? "ready" : "blocked",
+		value: reviewSupported ? "Ready" : "Blocked",
+	};
+}
+
+function runtimeCheckViewModels(
+	runtime: RuntimeSupport,
+): ExportInspectorRuntimeCheckViewModel[] {
+	return [
+		{
+			available: runtime.capabilities.videoDecoder,
+			label: "Video decoder",
+		},
+		{
+			available: runtime.capabilities.videoEncoder,
+			label: "Video encoder",
+		},
+		{
+			available: runtime.capabilities.mediaSource,
+			label: "Media source",
+		},
+		{
+			available: runtime.capabilities.objectUrl && runtime.capabilities.fileApi,
+			label: "Local file APIs",
+		},
+	].map((row) => ({
+		...row,
+		status: row.available ? "Ready" : "Missing",
+	}));
 }
 
 function reviewViewModel(

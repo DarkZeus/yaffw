@@ -215,6 +215,14 @@ describe("EditorNextRoute", () => {
 		).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Media analytics")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
+		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
+		const exportInspector =
+			within(inspectorRegion).getByLabelText("Export inspector");
+		expect(within(exportInspector).getByText("Export review")).toBeTruthy();
+		expect(within(exportInspector).getByText("Runtime checks")).toBeTruthy();
+		expect(within(exportInspector).getByText("Export capability")).toBeTruthy();
+		expect(within(exportInspector).getByText("Video decoder")).toBeTruthy();
+		expect(within(exportInspector).getByText("Local file APIs")).toBeTruthy();
 		expect(screen.getByText("Planned output")).toBeTruthy();
 		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
 		expect(screen.getByText("Fast export")).toBeTruthy();
