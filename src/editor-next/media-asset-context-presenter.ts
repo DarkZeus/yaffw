@@ -1,9 +1,9 @@
 import type {
 	AudioMediaTrack,
 	ReadyMediaAsset,
+	Selection,
 	VideoMediaTrack,
 } from "@/editor-core/model";
-import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 export type MediaAssetContextFact = {
 	label: string;
@@ -22,20 +22,20 @@ export type MediaAssetContextViewModel = {
 		summary: string;
 	};
 	provenanceFacts: MediaAssetContextFact[];
-	runtimeFacts: MediaAssetContextFact[];
+	selectionFacts: MediaAssetContextFact[];
 	videoFacts: MediaAssetContextFact[];
 };
 
 type MediaAssetContextOptions = {
 	asset: ReadyMediaAsset;
 	closeDisabled: boolean;
-	runtime: RuntimeSupport;
+	selection: Selection;
 };
 
 export function createMediaAssetContextViewModel({
 	asset,
 	closeDisabled,
-	runtime,
+	selection,
 }: MediaAssetContextOptions): MediaAssetContextViewModel {
 	return {
 		audioFacts: audioFactsForAsset(asset.tracks.audio[0], asset),
@@ -55,7 +55,7 @@ export function createMediaAssetContextViewModel({
 			{ label: "Size", value: formatFileSize(asset.provenance.sizeBytes) },
 			{ label: "Type", value: formatContainerType(asset.provenance) },
 		],
-		runtimeFacts: runtimeFactsForAsset(runtime, asset),
+		selectionFacts: selectionFactsForAsset(selection, asset),
 		videoFacts: videoFactsForAsset(asset.tracks.video[0], asset),
 	};
 }
@@ -118,35 +118,19 @@ function audioFactsForAsset(
 	];
 }
 
-function runtimeFactsForAsset(
-	runtime: RuntimeSupport,
+function selectionFactsForAsset(
+	selection: Selection,
 	asset: ReadyMediaAsset,
 ): MediaAssetContextFact[] {
+	const durationUs = Math.max(0, selection.endUs - selection.startUs);
+	const coveragePercent =
+		asset.durationUs > 0 ? (durationUs / asset.durationUs) * 100 : 0;
+
 	return [
-		{ label: "Runtime", value: runtime.supported ? "Supported" : "Blocked" },
-		{
-			label: "Local file APIs",
-			value:
-				runtime.capabilities.fileApi && runtime.capabilities.objectUrl
-					? "Ready"
-					: "Missing",
-		},
-		{
-			label: "Media source",
-			value: runtime.capabilities.mediaSource ? "Ready" : "Missing",
-		},
-		{
-			label: "Video decoder",
-			value: runtime.capabilities.videoDecoder ? "Ready" : "Missing",
-		},
-		{
-			label: "Video encoder",
-			value: runtime.capabilities.videoEncoder ? "Ready" : "Missing",
-		},
-		{
-			label: "Default export",
-			value: asset.exportCapability.supported ? "Ready" : "Blocked",
-		},
+		{ label: "Selection start", value: formatMediaTime(selection.startUs) },
+		{ label: "Selection end", value: formatMediaTime(selection.endUs) },
+		{ label: "Selection duration", value: formatMediaTime(durationUs) },
+		{ label: "Asset coverage", value: `${formatNumber(coveragePercent)}%` },
 	];
 }
 

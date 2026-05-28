@@ -6,6 +6,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,7 +110,11 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		expect(screen.getAllByText("Selection start").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Selection end").length).toBeGreaterThan(0);
-		expect(screen.getByText("Selection duration")).toBeTruthy();
+		expect(
+			within(screen.getByLabelText("Workbench selection region")).getByText(
+				"Selection duration",
+			),
+		).toBeTruthy();
 		expect(screen.getByText("1 waveform lane")).toBeTruthy();
 		expect(screen.getByLabelText("Timeline zoom")).toBeTruthy();
 		expect(

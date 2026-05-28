@@ -159,8 +159,15 @@ describe("EditorNextRoute", () => {
 		).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Asset identity")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("asset-picked")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Source context")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Source file")).toBeTruthy();
 		expect(within(mediaAssetContext).getAllByText("picked.mp4").length).toBe(2);
+		const sourceFileFact = within(mediaAssetContext).getByText("Source file")
+			.parentElement;
+		expect(sourceFileFact?.textContent).toContain("picked.mp4");
+		expect(sourceFileFact?.querySelector("dd")?.className).toContain(
+			"[overflow-wrap:anywhere]",
+		);
 		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Type")).toBeTruthy();
@@ -172,9 +179,24 @@ describe("EditorNextRoute", () => {
 		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Stereo")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("48 kHz")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Selection context")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Selection start")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Selection end")).toBeTruthy();
 		expect(
-			within(mediaAssetContext).getByText("Runtime readiness"),
+			within(mediaAssetContext).getByText("Selection duration"),
 		).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Asset coverage")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).getAllByText("00:00:00.000").length,
+		).toBeGreaterThan(0);
+		expect(
+			within(mediaAssetContext).getAllByText("00:00:12.000").length,
+		).toBeGreaterThan(0);
+		expect(within(mediaAssetContext).getByText("100%")).toBeTruthy();
+		expect(
+			within(mediaAssetContext).queryByText("Runtime readiness"),
+		).toBeNull();
+		expect(within(mediaAssetContext).queryByText("Default export")).toBeNull();
 		expect(
 			within(mediaAssetContext).getAllByText("Ready").length,
 		).toBeGreaterThan(0);
@@ -194,6 +216,11 @@ describe("EditorNextRoute", () => {
 			expect(screen.getAllByText("00:00:10.000").length).toBeGreaterThan(0);
 		});
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
+		expect(
+			within(mediaAssetContext).getByText("00:00:10.000"),
+		).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("00:00:02.000")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("16.67%")).toBeTruthy();
 		await waitFor(() => {
 			expect(screen.getByText("Best-effort export")).toBeTruthy();
 		});
@@ -739,7 +766,7 @@ describe("EditorNextRoute", () => {
 		).toBeNull();
 		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Language eng").length).toBeGreaterThan(0);
-		expect(screen.getByText("Selection duration")).toBeTruthy();
+		expect(within(selectionRegion).getByText("Selection duration")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
 		fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {

@@ -708,7 +708,7 @@ function ActiveMediaAssetContext({
 	const viewModel = createMediaAssetContextViewModel({
 		asset: session.asset,
 		closeDisabled: closeFileDisabled,
-		runtime: session.runtime,
+		selection: session.selection,
 	});
 
 	return (
@@ -739,7 +739,7 @@ function ActiveMediaAssetContext({
 			<MediaAssetContextSection
 				facts={viewModel.provenanceFacts}
 				icon={<FileVideo />}
-				title="Asset provenance"
+				title="Source context"
 			/>
 			<MediaAssetContextSection
 				facts={viewModel.videoFacts}
@@ -752,9 +752,9 @@ function ActiveMediaAssetContext({
 				title="Audio facts"
 			/>
 			<MediaAssetContextSection
-				facts={viewModel.runtimeFacts}
-				icon={<CheckCircle2 />}
-				title="Runtime readiness"
+				facts={viewModel.selectionFacts}
+				icon={<BarChart3 />}
+				title="Selection context"
 			/>
 		</section>
 	);

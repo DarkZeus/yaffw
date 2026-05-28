@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_OUTPUT_PROFILE, type ReadyMediaAsset } from "@/editor-core/model";
-import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import {
+	DEFAULT_OUTPUT_PROFILE,
+	type ReadyMediaAsset,
+	type Selection,
+} from "@/editor-core/model";
 
 import { createMediaAssetContextViewModel } from "./media-asset-context-presenter";
 
 describe("media asset context presenter", () => {
-	it("derives ready media asset identity, provenance, media facts, and runtime readiness", () => {
+	it("derives ready media asset identity, provenance, media facts, and selection context", () => {
 		const viewModel = createMediaAssetContextViewModel({
 			asset: readyAsset,
 			closeDisabled: false,
-			runtime: supportedRuntime,
+			selection,
 		});
 
 		expect(viewModel.identity.name).toBe("recording.mp4");
@@ -45,13 +48,11 @@ describe("media asset context presenter", () => {
 			{ label: "Codec", value: "aac" },
 			{ label: "Language", value: "eng" },
 		]);
-		expect(viewModel.runtimeFacts).toEqual([
-			{ label: "Runtime", value: "Supported" },
-			{ label: "Local file APIs", value: "Ready" },
-			{ label: "Media source", value: "Ready" },
-			{ label: "Video decoder", value: "Ready" },
-			{ label: "Video encoder", value: "Ready" },
-			{ label: "Default export", value: "Ready" },
+		expect(viewModel.selectionFacts).toEqual([
+			{ label: "Selection start", value: "00:00:18.000" },
+			{ label: "Selection end", value: "00:00:54.250" },
+			{ label: "Selection duration", value: "00:00:36.250" },
+			{ label: "Asset coverage", value: "50%" },
 		]);
 	});
 
@@ -59,7 +60,7 @@ describe("media asset context presenter", () => {
 		const viewModel = createMediaAssetContextViewModel({
 			asset: readyAsset,
 			closeDisabled: true,
-			runtime: supportedRuntime,
+			selection,
 		});
 
 		expect(viewModel.closeFile).toEqual({
@@ -67,14 +68,6 @@ describe("media asset context presenter", () => {
 			label: "Close file",
 		});
 	});
-});
-
-const supportedRuntime = evaluateRuntimeSupport({
-	fileApi: true,
-	mediaSource: true,
-	objectUrl: true,
-	videoDecoder: true,
-	videoEncoder: true,
 });
 
 const readyAsset = {
@@ -119,3 +112,8 @@ const readyAsset = {
 		],
 	},
 } satisfies ReadyMediaAsset;
+
+const selection = {
+	endUs: 54_250_000,
+	startUs: 18_000_000,
+} satisfies Selection;
