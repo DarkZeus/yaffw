@@ -368,6 +368,56 @@ describe("EditorNextRoute", () => {
 		expect(within(centerRegion).queryByLabelText("Export review")).toBeNull();
 	});
 
+	it("keeps ready-state overflow inside the workbench regions", async () => {
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-overflow"}
+				createDraftId={() => "draft-overflow"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [new File(["video"], "overflow.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Preview for overflow.mp4")).toBeTruthy();
+		});
+
+		const page = screen.getByText("Editor-next").closest("main");
+		expect(page?.className).toContain("h-screen");
+		expect(page?.className).toContain("overflow-hidden");
+
+		const readyWorkbench = screen.getByLabelText("Editor workbench session");
+		expect(readyWorkbench.className).toContain("grid-cols-1");
+		expect(readyWorkbench.className).toContain("xl:overflow-hidden");
+
+		const mediaAssetRegion = screen.getByLabelText(
+			"Workbench media asset region",
+		);
+		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
+		expect(mediaAssetRegion.className).toContain("overflow-y-auto");
+		expect(mediaAssetRegion.className).toContain("overscroll-contain");
+
+		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
+		expect(inspectorRegion.className).toContain("overflow-x-hidden");
+		expect(inspectorRegion.className).toContain("xl:overflow-y-auto");
+		expect(inspectorRegion.className).toContain("overscroll-contain");
+
+		const selectionRegion = screen.getByLabelText("Workbench selection region");
+		expect(selectionRegion.className).toContain("overflow-x-hidden");
+		expect(selectionRegion.className).toContain("xl:overflow-y-auto");
+		expect(selectionRegion.className).toContain("overscroll-contain");
+		expect(
+			within(selectionRegion).getByTestId("selection-timeline-scroll")
+				.className,
+		).toContain("overflow-x-auto");
+	});
+
 	it("runs default export from the review and requires explicit generated-media delivery", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
 		const progressEvents: ExportProgress[] = [];

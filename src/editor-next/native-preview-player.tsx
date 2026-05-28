@@ -504,7 +504,7 @@ export function NativePreviewPlayer({
 
 			<section
 				aria-label="Workbench selection region"
-				className="min-h-[22rem] xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto"
+				className="min-h-[22rem] overflow-x-hidden overscroll-contain xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto"
 			>
 				<SelectionTimeline
 					asset={asset}

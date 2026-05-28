@@ -402,8 +402,8 @@ function EditorWorkbenchFrame({
 	status,
 }: EditorWorkbenchFrameProps) {
 	return (
-		<main className="workbench dark min-h-screen bg-workbench text-foreground">
-			<div className="grid min-h-screen grid-rows-[3rem_minmax(0,1fr)] overflow-hidden">
+		<main className="workbench dark h-screen min-h-screen overflow-hidden bg-workbench text-foreground">
+			<div className="grid h-full min-h-0 grid-rows-[3rem_minmax(0,1fr)] overflow-hidden">
 				<header
 					aria-label="Editor workbench top bar"
 					className="flex min-w-0 items-center justify-between gap-3 border-b border-workbench-border-strong bg-workbench px-3"
@@ -446,7 +446,7 @@ function EditorWorkbenchFrame({
 				<div className="grid min-h-0 grid-cols-[4rem_minmax(0,1fr)]">
 					<EditorWorkbenchRail status={status} />
 					<div
-						className={`min-w-0 overflow-auto bg-workbench p-3 md:p-4 ${
+						className={`min-h-0 min-w-0 overflow-auto overscroll-contain bg-workbench p-3 md:p-4 ${
 							status === "ready" ? "xl:overflow-hidden" : ""
 						}`}
 					>
@@ -620,11 +620,11 @@ function EditorSessionShell({
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_3.25rem_38%] xl:overflow-hidden"
+			className="grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_3.25rem_38%] xl:overflow-hidden"
 		>
 			<section
 				aria-label="Workbench media asset region"
-				className="flex min-h-0 min-w-0 max-w-full flex-col gap-4 overflow-x-hidden overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
+				className="flex min-h-0 min-w-0 max-w-full flex-col gap-4 overflow-x-hidden overflow-y-auto overscroll-contain rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
 			>
 				<ActiveMediaAssetContext
 					closeFileDisabled={closeFileDisabled}
@@ -649,7 +649,7 @@ function EditorSessionShell({
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
 			>
 				<ExportInspectorPanel
 					asset={session.asset}
