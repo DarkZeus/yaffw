@@ -94,9 +94,9 @@ describe("NativePreviewPlayer", () => {
 		expect(aperture.className).toContain("border-workbench-border-strong");
 		expect(transportRegion.className).toContain("bg-workbench-transport");
 		expect(transportControls.className).toContain("grid");
-		expect(primaryControls.className).toContain("bg-background/55");
-		expect(mediaTimeReadouts.className).toContain("sm:grid-cols-4");
-		expect(playbackSettings.className).toContain("sm:grid-cols");
+		expect(primaryControls.className).toContain("justify-center");
+		expect(mediaTimeReadouts.className).toContain("font-mono");
+		expect(playbackSettings.className).toContain("justify-end");
 		expect(
 			within(centerRegion).queryByLabelText("Preview transport controls"),
 		).toBeNull();

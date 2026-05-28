@@ -1,14 +1,19 @@
 import {
 	AlertTriangle,
+	AudioLines,
 	BarChart3,
-	CheckCircle2,
+	BadgeCheck,
 	Download,
 	FileVideo,
+	Film,
+	Gauge,
+	Info,
 	Monitor,
 	PackageCheck,
 	PlayCircle,
+	Scissors,
+	ShieldCheck,
 	Square,
-	Volume2,
 	X,
 } from "lucide-react";
 import {
@@ -85,8 +90,11 @@ type EditorNextRouteProps = {
 	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
 	initialRuntime?: RuntimeSupport;
 	inspectLocalAsset?: LocalMediaAssetInspector;
+	mockUploadedMediaState?: boolean;
 	now?: () => number;
 };
+
+const mockUploadedMediaPreviewPosterSrc = "/editor-workbench-prototype-frame.jpg";
 
 export function EditorNextRoute({
 	createAssetId = () => createBrowserId("asset"),
@@ -97,6 +105,7 @@ export function EditorNextRoute({
 	deliverGeneratedMedia = deliverBrowserGeneratedMedia,
 	initialRuntime,
 	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
+	mockUploadedMediaState,
 	now = () => Date.now(),
 }: EditorNextRouteProps) {
 	const runtime = useMemo(
@@ -115,6 +124,23 @@ export function EditorNextRoute({
 	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
 	const [localFileInputKey, setLocalFileInputKey] = useState(0);
 	const protectBeforeUnload = shouldProtectEditorBeforeUnload(session);
+	const visualFixture = useMemo(
+		() => createMockUploadedMediaFixture(runtime),
+		[runtime],
+	);
+	const visualFixtureActive =
+		session.status === "empty" &&
+		runtime.supported &&
+		(mockUploadedMediaState ?? shouldUseMockUploadedMediaStateFromUrl());
+	const displayedSession = visualFixtureActive
+		? visualFixture.session
+		: session;
+	const displayedPreviewSource = visualFixtureActive
+		? visualFixture.source
+		: previewSource;
+	const displayedPreviewPosterSrc = visualFixtureActive
+		? mockUploadedMediaPreviewPosterSrc
+		: undefined;
 
 	useEffect(() => {
 		if (!protectBeforeUnload) {
@@ -346,12 +372,14 @@ export function EditorNextRoute({
 
 	return (
 		<EditorWorkbenchFrame
-			activeAsset={session.status === "ready" ? session.asset : null}
+			activeAsset={
+				displayedSession.status === "ready" ? displayedSession.asset : null
+			}
 			runtime={runtime}
-			status={session.status}
+			status={displayedSession.status}
 		>
-			{session.status === "unsupported-runtime" ? (
-				<UnsupportedRuntimeState session={session} />
+			{displayedSession.status === "unsupported-runtime" ? (
+				<UnsupportedRuntimeState session={displayedSession} />
 			) : (
 				<EditorSessionShell
 					onDefaultExportCancelRequested={cancelDefaultExport}
@@ -386,8 +414,9 @@ export function EditorNextRoute({
 							type: "selection.start.setFromPlayhead",
 						})
 					}
-					previewSource={previewSource}
-					session={session}
+					previewPosterSrc={displayedPreviewPosterSrc}
+					previewSource={displayedPreviewSource}
+					session={displayedSession}
 				/>
 			)}
 		</EditorWorkbenchFrame>
@@ -414,35 +443,35 @@ function EditorWorkbenchFrame({
 					aria-label="Editor workbench top bar"
 					className="grid min-w-0 grid-cols-[minmax(12rem,auto)_minmax(0,1fr)_auto] items-center gap-3 border-b border-workbench-border-strong bg-workbench px-2.5"
 				>
-					<div className="flex min-w-0 items-center gap-3">
-						<div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-workbench-border-strong bg-workbench-viewer">
-							<FileVideo aria-hidden="true" className="size-4" />
+					<div className="flex min-w-0 items-center gap-2">
+						<div className="flex size-7 shrink-0 items-center justify-center rounded border border-workbench-border-strong bg-workbench-viewer text-workbench-selected">
+							<Scissors aria-hidden="true" className="size-4" />
 						</div>
 						<div className="min-w-0">
 							<h1 className="truncate text-xs font-semibold uppercase tracking-normal">
 								YAFFW
 							</h1>
-							<p className="truncate text-[10px] uppercase leading-none tracking-normal text-muted-foreground">
+							<p className="truncate text-[10px] uppercase leading-none tracking-[0.18em] text-muted-foreground">
 								Editor workbench
 							</p>
 						</div>
 					</div>
 					<TopBarMediaAssetSummary asset={activeAsset} />
 					<div className="flex min-w-0 items-center justify-end gap-2">
-						<div className="flex min-w-0 items-center gap-2 rounded-md border border-workbench-border bg-workbench-inspector px-2.5 py-1 text-xs">
+						<div className="flex h-7 min-w-0 items-center gap-1.5 rounded border border-workbench-border bg-workbench-inspector px-2 text-xs">
 							{runtime.supported ? (
-								<CheckCircle2
+								<ShieldCheck
 									aria-hidden="true"
-									className="size-4 shrink-0 text-chart-2"
+									className="size-3.5 shrink-0 text-workbench-progress"
 								/>
 							) : (
 								<AlertTriangle
 									aria-hidden="true"
-									className="size-4 shrink-0 text-destructive"
+									className="size-3.5 shrink-0 text-destructive"
 								/>
 							)}
 							<span className="truncate font-medium">
-								{runtime.supported ? "Runtime ready" : "Runtime blocked"}
+								{runtime.supported ? "WebCodecs" : "Runtime blocked"}
 							</span>
 						</div>
 					</div>
@@ -612,6 +641,7 @@ type EditorSessionShellProps = {
 	onSelectionRangeMoveRequested: (deltaUs: number) => void;
 	onSelectionResetRequested: () => void;
 	onSelectionStartRequested: (playheadUs: number) => void;
+	previewPosterSrc?: string;
 	previewSource: Blob | null;
 	session: Exclude<EditorSessionState, { status: "unsupported-runtime" }>;
 };
@@ -628,6 +658,7 @@ function EditorSessionShell({
 	onSelectionRangeMoveRequested,
 	onSelectionResetRequested,
 	onSelectionStartRequested,
+	previewPosterSrc,
 	previewSource,
 	session,
 }: EditorSessionShellProps) {
@@ -680,6 +711,7 @@ function EditorSessionShell({
 					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 					onSelectionResetRequested={onSelectionResetRequested}
 					onSelectionStartRequested={onSelectionStartRequested}
+					previewPosterSrc={previewPosterSrc}
 					selection={session.selection}
 					selectionEditingDisabled={selectionEditingDisabled}
 					shortcutsDisabled={selectionEditingDisabled}
@@ -705,34 +737,94 @@ function EditorSessionShell({
 	);
 }
 
-function WorkbenchRegionHeader({
+function WorkbenchPanelHeader({
 	icon,
-	kicker,
+	trailing,
 	title,
 }: {
 	icon: AnalyticsIconElement;
-	kicker: string;
+	trailing?: ReactNode;
 	title: string;
 }) {
 	return (
-		<div className="flex min-w-0 max-w-full flex-1 items-start gap-3 overflow-hidden">
-			<div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-workbench-border bg-background">
+		<div className="flex h-[42px] shrink-0 items-center justify-between border-b border-workbench-border px-3">
+			<div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+				{cloneElement(icon, {
+					"aria-hidden": true,
+					className: "size-4 text-workbench-selected",
+				})}
+				<span className="truncate">{title}</span>
+			</div>
+			{trailing ? <div className="shrink-0">{trailing}</div> : null}
+		</div>
+	);
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+	return (
+		<div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+			{children}
+		</div>
+	);
+}
+
+function CompactMetric({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="min-w-0">
+			<div className="truncate leading-tight text-muted-foreground/75">
+				{label}
+			</div>
+			<div className="truncate font-mono leading-tight text-foreground">
+				{value}
+			</div>
+		</div>
+	);
+}
+
+function CompactTrackRow({
+	icon,
+	label,
+	meta,
+	status,
+}: {
+	icon: AnalyticsIconElement;
+	label: string;
+	meta: string;
+	status: string;
+}) {
+	return (
+		<div className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded border border-workbench-border bg-workbench-lane px-2 py-1.5">
+			<div className="text-muted-foreground">
 				{cloneElement(icon, {
 					"aria-hidden": true,
 					className: "size-4",
 				})}
 			</div>
-			<div className="min-w-0 max-w-full overflow-hidden">
-				<p className="text-xs font-medium uppercase text-muted-foreground">
-					{kicker}
-				</p>
-				<h2
-					className="break-words text-base font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]"
-					id="editor-next-import-title"
-				>
-					{title}
-				</h2>
+			<div className="min-w-0">
+				<div className="truncate text-xs font-medium leading-tight text-foreground">
+					{label}
+				</div>
+				<div className="truncate text-[10px] leading-tight text-muted-foreground">
+					{meta}
+				</div>
 			</div>
+			<Badge
+				className="border-workbench-border bg-workbench-hover text-[10px] text-workbench-progress"
+				variant="outline"
+			>
+				{status}
+			</Badge>
+		</div>
+	);
+}
+
+function CompactTimeBox({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded border border-workbench-border bg-workbench-lane p-1.5">
+			<div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+				{label}
+			</div>
+			<div className="truncate font-mono text-xs text-foreground">{value}</div>
 		</div>
 	);
 }
@@ -755,90 +847,122 @@ function ActiveMediaAssetContext({
 	return (
 		<section
 			aria-label="Media asset context"
-			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:min-h-full xl:rounded-none xl:border-0"
+			className="flex min-w-0 max-w-full flex-col overflow-hidden overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:min-h-full xl:rounded-none xl:border-0"
 		>
-			<div className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden">
-				<WorkbenchRegionHeader
-					icon={<FileVideo />}
-					kicker="Ready media asset"
-					title={viewModel.identity.name}
-				/>
-				<div className="flex shrink-0 flex-col items-end gap-2">
-					<Badge variant="secondary">Ready</Badge>
+			<WorkbenchPanelHeader
+				icon={<FileVideo />}
+				title="Media asset"
+				trailing={
 					<Button
+						aria-label={viewModel.closeFile.label}
+						className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
 						disabled={viewModel.closeFile.disabled}
 						onClick={onCloseFileRequested}
-						size="sm"
+						size="icon"
+						title={viewModel.closeFile.label}
 						type="button"
 						variant="outline"
 					>
 						<X data-icon="inline-start" />
-						{viewModel.closeFile.label}
 					</Button>
+				}
+			/>
+			<div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-2">
+				<SectionLabel>Source</SectionLabel>
+				<div
+					aria-label="Loaded media asset"
+					className="mb-3 space-y-1 rounded border border-workbench-border bg-workbench-lane p-2"
+				>
+					<div className="truncate text-sm font-medium text-foreground">
+						{viewModel.identity.name}
+					</div>
+					<div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+						<CompactMetric
+							label="Size"
+							value={factValue(viewModel.provenanceFacts, "Size")}
+						/>
+						<CompactMetric
+							label="Duration"
+							value={formatMediaTime(session.asset.durationUs)}
+						/>
+						<CompactMetric
+							label="Codec"
+							value={formatAssetCodecSummary(session.asset)}
+						/>
+						<CompactMetric
+							label="Frames"
+							value={formatTopBarFrameTiming(session.asset)}
+						/>
+					</div>
+				</div>
+
+				<SectionLabel>Tracks</SectionLabel>
+				<div className="mb-3 space-y-1.5">
+					{session.asset.tracks.video.map((track, trackIndex) => (
+						<CompactTrackRow
+							icon={<Film />}
+							key={track.id}
+							label={track.label ?? `Video ${trackIndex + 1}`}
+							meta={formatVideoTrackMeta(track)}
+							status="Previewable"
+						/>
+					))}
+					{session.asset.tracks.audio.map((track, trackIndex) => (
+						<CompactTrackRow
+							icon={<AudioLines />}
+							key={track.id}
+							label={track.label ?? `Audio ${trackIndex + 1}`}
+							meta={formatAudioTrackMeta(track)}
+							status="ready"
+						/>
+					))}
+					{session.asset.tracks.audio.length === 0 ? (
+						<CompactTrackRow
+							icon={<AudioLines />}
+							label="Audio"
+							meta="No audio tracks"
+							status="none"
+						/>
+					) : null}
+				</div>
+
+				<SectionLabel>Selection</SectionLabel>
+				<div className="grid grid-cols-2 gap-2 text-[11px]">
+					<CompactTimeBox
+						label="Start"
+						value={formatMediaTime(session.selection.startUs)}
+					/>
+					<CompactTimeBox
+						label="End"
+						value={formatMediaTime(session.selection.endUs)}
+					/>
+					<CompactTimeBox
+						label="Duration"
+						value={formatMediaTime(
+							session.selection.endUs - session.selection.startUs,
+						)}
+					/>
+					<CompactTimeBox
+						label="Coverage"
+						value={formatSelectionCoverage(session.selection, session.asset)}
+					/>
+				</div>
+
+				<div className="mt-auto pt-2">
+					<div className="flex min-w-0 items-center gap-2 rounded border border-workbench-border bg-workbench-lane p-1.5 text-[10px] leading-none text-muted-foreground">
+						<Info
+							aria-hidden="true"
+							className="size-3.5 shrink-0 text-workbench-selected"
+						/>
+						<span className="shrink-0 font-medium text-foreground">
+							Workbench intent
+						</span>
+						<span className="min-w-0 truncate">
+							One asset, one playhead, one exported selection.
+						</span>
+					</div>
 				</div>
 			</div>
-			<div
-				aria-label="Loaded media asset"
-				className="grid min-w-0 max-w-full gap-1 border-t border-workbench-border pt-3"
-			>
-				<p className="text-xs font-medium uppercase text-muted-foreground">
-					Media asset
-				</p>
-				<p className="min-w-0 max-w-full whitespace-normal break-words text-sm font-medium leading-5 text-foreground [overflow-wrap:anywhere]">
-					{viewModel.identity.name}
-				</p>
-			</div>
-			<MediaAssetContextSection
-				facts={viewModel.provenanceFacts}
-				icon={<FileVideo />}
-				title="Source context"
-			/>
-			<MediaAssetContextSection
-				facts={viewModel.videoFacts}
-				icon={<Monitor />}
-				title="Video facts"
-			/>
-			<MediaAssetContextSection
-				facts={viewModel.audioFacts}
-				icon={<Volume2 />}
-				title="Audio facts"
-			/>
-			<MediaAssetContextSection
-				facts={viewModel.selectionFacts}
-				icon={<BarChart3 />}
-				title="Selection context"
-			/>
-		</section>
-	);
-}
-
-function MediaAssetContextSection({
-	facts,
-	icon,
-	title,
-}: {
-	facts: MediaAssetContextFact[];
-	icon: AnalyticsIconElement;
-	title: string;
-}) {
-	return (
-		<section className="grid min-w-0 gap-2 border-t border-workbench-border pt-3">
-			<h3 className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
-				{cloneElement(icon, {
-					"aria-hidden": true,
-					className: "size-3.5",
-				})}
-				{title}
-			</h3>
-			<dl className="grid min-w-0 max-w-full gap-2 overflow-hidden">
-				{facts.map((fact) => (
-					<WorkbenchFact
-						key={`${title}-${fact.label}`}
-						label={fact.label}
-						value={fact.value}
-					/>
-				))}
-			</dl>
 		</section>
 	);
 }
@@ -888,19 +1012,6 @@ function NonReadyImportSurface({
 				</div>
 				<SessionStatusLine session={session} />
 			</div>
-		</div>
-	);
-}
-
-function WorkbenchFact({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="grid min-w-0 max-w-full gap-1 overflow-hidden rounded-md border border-workbench-border bg-background/70 px-3 py-2">
-			<dt className="text-xs font-medium uppercase text-muted-foreground">
-				{label}
-			</dt>
-			<dd className="min-w-0 max-w-full whitespace-normal break-words font-mono text-xs leading-5 [overflow-wrap:anywhere]">
-				{value}
-			</dd>
 		</div>
 	);
 }
@@ -965,15 +1076,12 @@ function ExportInspectorPanel({
 	return (
 		<section
 			aria-label="Export inspector"
-			className="min-w-0 overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm xl:min-h-full xl:rounded-none xl:border-0 xl:shadow-none"
+			className="flex min-w-0 flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector shadow-sm xl:min-h-full xl:rounded-none xl:border-0 xl:shadow-none"
 		>
-			<div className="flex items-start justify-between gap-3 border-b border-workbench-border bg-background/55 px-4 py-3">
-				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
-					<span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-background">
-						<PackageCheck aria-hidden="true" className="size-4" />
-					</span>
-					Export inspector
-				</h2>
+			<WorkbenchPanelHeader
+				icon={<PackageCheck />}
+				title="Export inspector"
+				trailing={
 				<Badge
 					className="shrink-0"
 					variant={
@@ -982,40 +1090,55 @@ function ExportInspectorPanel({
 				>
 					{viewModel.badge.label}
 				</Badge>
-			</div>
+				}
+			/>
 
-			<div className="flex flex-col gap-4 p-4">
+			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
 				<section
 					aria-label="Export review"
-					className="grid gap-4 overflow-visible"
+					className="overflow-visible rounded border border-workbench-selected/35 bg-workbench-hover/45 p-2.5"
 				>
-					<h3 className="text-xs font-semibold uppercase text-muted-foreground">
-						Export review
-					</h3>
-					<div className="grid gap-2">
-						<ExportReviewRow
-							label={viewModel.review.plannedOutput.label}
+					<div className="mb-2 flex items-start justify-between gap-3">
+						<div>
+							<h3 className="text-sm font-semibold text-foreground">
+								Export review
+							</h3>
+							<div className="text-[11px] text-muted-foreground">
+								Start-time snapshot
+							</div>
+						</div>
+						<Badge
+							className="border-workbench-selected/40 bg-workbench-selected/10 text-workbench-selected"
+							variant="outline"
+						>
+							{viewModel.badge.label}
+						</Badge>
+					</div>
+					<div className="space-y-2">
+						<InspectorLine
+							label="Output"
 							value={viewModel.review.plannedOutput.value}
 						/>
 						{viewModel.review.supported ? (
 							<>
-								<ExportReviewRow
-									label={viewModel.review.method.label}
+								<InspectorLine
+									label="Strategy"
 									value={viewModel.review.method.value}
 								/>
-								<ExportReviewRow
-									label={viewModel.review.precision.label}
+								<InspectorLine
+									label="Precision"
 									value={viewModel.review.precision.value}
+								/>
+								<InspectorLine
+									label="Runtime"
+									value={formatRuntimeSummary(runtime)}
 								/>
 							</>
 						) : null}
 					</div>
 
-					<p className="rounded-md border-l-2 border-primary/60 bg-background/70 px-3 py-2 text-sm leading-6 text-muted-foreground">
-						{viewModel.review.reason}
-					</p>
 					{viewModel.review.supported ? null : (
-						<p className="rounded-md bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
+						<p className="mt-2 rounded bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
 							{viewModel.review.technicalDetails}
 						</p>
 					)}
@@ -1023,6 +1146,11 @@ function ExportInspectorPanel({
 				<RuntimeChecksSection
 					capability={viewModel.capability}
 					checks={viewModel.runtimeChecks}
+					selectedRange={
+						viewModel.review.supported
+							? viewModel.review.precision.value
+							: "Blocked"
+					}
 				/>
 				<ExportJobStatus
 					deliveryAction={deliveryAction}
@@ -1045,31 +1173,42 @@ function ExportInspectorPanel({
 function RuntimeChecksSection({
 	capability,
 	checks,
+	selectedRange,
 }: {
 	capability: ExportInspectorCapabilityViewModel;
 	checks: ExportInspectorRuntimeCheckViewModel[];
+	selectedRange: string;
 }) {
+	const runtimeReady = checks.every((check) => check.available);
+
 	return (
 		<section
 			aria-label="Runtime checks"
-			className="grid gap-3 border-t border-workbench-border pt-4"
+			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
 		>
-			<h3 className="text-xs font-semibold uppercase text-muted-foreground">
-				Runtime checks
-			</h3>
-			<ExportReviewRow label={capability.label} value={capability.value} />
-			<ul className="flex flex-col gap-3 text-sm text-muted-foreground">
-				{checks.map((row) => (
-					<li
-						className="flex min-w-0 items-center justify-between gap-3"
-						key={row.label}
-					>
-						<span className="min-w-0 truncate">{row.label}</span>
-						<Badge variant={row.available ? "secondary" : "destructive"}>
-							{row.status}
-						</Badge>
-					</li>
-				))}
+			<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+				<Gauge aria-hidden="true" className="size-4 text-workbench-progress" />
+				Capability
+			</div>
+			<ul className="flex flex-col gap-2 text-[11px] text-muted-foreground">
+				<li className="flex min-w-0 items-center justify-between gap-3">
+					<span className="min-w-0 truncate">Default profile</span>
+					<CompactStatusBadge tone={capability.tone}>
+						{capability.value === "Ready" ? "Supported" : "Blocked"}
+					</CompactStatusBadge>
+				</li>
+				<li className="flex min-w-0 items-center justify-between gap-3">
+					<span className="min-w-0 truncate">Selected range</span>
+					<CompactStatusBadge tone={capability.tone}>
+						{selectedRange}
+					</CompactStatusBadge>
+				</li>
+				<li className="flex min-w-0 items-center justify-between gap-3">
+					<span className="min-w-0 truncate">Runtime checks</span>
+					<CompactStatusBadge tone={runtimeReady ? "ready" : "blocked"}>
+						{runtimeReady ? "Ready" : "Missing"}
+					</CompactStatusBadge>
+				</li>
 			</ul>
 		</section>
 	);
@@ -1089,7 +1228,7 @@ function ExportJobStatus({
 }) {
 	if (status.kind === "running") {
 		return (
-			<div className="grid min-w-0 gap-2 rounded-md border bg-background p-3">
+			<div className="grid min-w-0 gap-2 rounded border border-workbench-border bg-workbench-lane p-3">
 				<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
 					<span className="font-medium">{status.title}</span>
 					<Badge className="max-w-32 truncate" variant="outline">
@@ -1110,9 +1249,13 @@ function ExportJobStatus({
 		return (
 			<div
 				aria-label="Generated media status"
-				className="grid min-w-0 auto-rows-max gap-3 overflow-visible rounded-md border bg-background p-3 text-sm"
+				className="grid min-w-0 auto-rows-max gap-3 overflow-visible rounded border border-workbench-border bg-workbench-lane p-3 text-sm"
 			>
-				<div className="flex min-w-0 items-center justify-between gap-3">
+				<div className="flex min-w-0 items-center gap-2">
+					<BadgeCheck
+						aria-hidden="true"
+						className="size-4 text-workbench-progress"
+					/>
 					<span className="min-w-0 font-medium">{status.title}</span>
 					<Badge className="shrink-0" variant="outline">
 						{status.deliveryState}
@@ -1143,7 +1286,7 @@ function ExportJobStatus({
 
 	if (status.kind === "failed") {
 		return (
-			<div className="grid min-w-0 gap-1 rounded-md border border-destructive/40 bg-background p-3 text-sm">
+			<div className="grid min-w-0 gap-1 rounded border border-destructive/40 bg-workbench-lane p-3 text-sm">
 				<span className="font-medium text-destructive">{status.message}</span>
 				{status.technicalDetails ? (
 					<p className="break-words text-xs text-muted-foreground">
@@ -1156,7 +1299,7 @@ function ExportJobStatus({
 
 	if (status.kind === "cancelled") {
 		return (
-			<div className="rounded-md border bg-background p-3 text-sm text-muted-foreground">
+			<div className="rounded border border-workbench-border bg-workbench-lane p-3 text-sm text-muted-foreground">
 				{status.message}
 			</div>
 		);
@@ -1178,28 +1321,32 @@ function ExportReviewActions({
 }) {
 	if (action.kind === "cancel") {
 		return (
-			<Button
-				className="w-full"
-				onClick={onCancelExport}
-				type="button"
-				variant="outline"
-			>
-				<Square data-icon="inline-start" />
-				Cancel export
-			</Button>
+			<GeneratedMediaActionShell>
+				<Button
+					className="h-8 w-full"
+					onClick={onCancelExport}
+					type="button"
+					variant="outline"
+				>
+					<Square data-icon="inline-start" />
+					Cancel export
+				</Button>
+			</GeneratedMediaActionShell>
 		);
 	}
 
 	if (action.kind === "download") {
 		return (
-			<Button
-				className="w-full"
-				onClick={() => onDownloadGeneratedMedia(action.generatedMedia)}
-				type="button"
-			>
-				<Download data-icon="inline-start" />
-				Download generated media
-			</Button>
+			<GeneratedMediaActionShell>
+				<Button
+					className="h-8 w-full"
+					onClick={() => onDownloadGeneratedMedia(action.generatedMedia)}
+					type="button"
+				>
+					<Download data-icon="inline-start" />
+					Download generated media
+				</Button>
+			</GeneratedMediaActionShell>
 		);
 	}
 
@@ -1208,19 +1355,39 @@ function ExportReviewActions({
 	}
 
 	return (
-		<Button
-			className="w-full"
-			disabled={action.disabled}
-			onClick={onStartExport}
-			type="button"
-		>
-			<PlayCircle data-icon="inline-start" />
-			{action.label}
-		</Button>
+		<GeneratedMediaActionShell>
+			<Button
+				className="h-8 w-full bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
+				disabled={action.disabled}
+				onClick={onStartExport}
+				type="button"
+			>
+				<PlayCircle data-icon="inline-start" />
+				{action.label}
+			</Button>
+		</GeneratedMediaActionShell>
 	);
 }
 
-function ExportReviewRow({
+function GeneratedMediaActionShell({ children }: { children: ReactNode }) {
+	return (
+		<section className="rounded border border-workbench-border bg-workbench-lane p-2.5">
+			<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+				<BadgeCheck
+					aria-hidden="true"
+					className="size-4 text-workbench-progress"
+				/>
+				Generated media
+			</div>
+			<div className="mb-2 text-[11px] leading-4 text-muted-foreground">
+				No generated media yet. Export and delivery stay separate.
+			</div>
+			{children}
+		</section>
+	);
+}
+
+function InspectorLine({
 	label,
 	value,
 }: {
@@ -1228,14 +1395,32 @@ function ExportReviewRow({
 	value: string;
 }) {
 	return (
-		<div className="grid min-w-0 gap-1 rounded-md border bg-background/70 px-3 py-2.5 text-sm">
-			<span className="text-xs font-medium uppercase text-muted-foreground">
-				{label}
-			</span>
-			<span className="min-w-0 break-words font-mono leading-5 text-foreground">
+		<div className="flex items-start justify-between gap-3 text-[11px]">
+			<span className="text-muted-foreground">{label}</span>
+			<span className="min-w-0 break-words text-right font-medium text-foreground">
 				{value}
 			</span>
 		</div>
+	);
+}
+
+function CompactStatusBadge({
+	children,
+	tone,
+}: {
+	children: ReactNode;
+	tone: "blocked" | "ready";
+}) {
+	return (
+		<span
+			className={`rounded px-2 py-0.5 font-medium ${
+				tone === "ready"
+					? "bg-workbench-hover text-workbench-selected"
+					: "bg-destructive/15 text-destructive"
+			}`}
+		>
+			{children}
+		</span>
 	);
 }
 
@@ -1288,6 +1473,140 @@ function runtimeCheckRows(runtime: EditorSessionState["runtime"]) {
 			label: "Local file APIs",
 		},
 	];
+}
+
+function createMockUploadedMediaFixture(
+	runtime: RuntimeSupport,
+): {
+	session: Extract<EditorSessionState, { status: "ready" }>;
+	source: Blob;
+} {
+	const asset: ReadyMediaAsset = {
+		durationUs: 13_500_000,
+		exportCapability: {
+			profile: {
+				audioCodec: "aac",
+				container: "mp4",
+				videoCodec: "h264",
+			},
+			supported: true,
+		},
+		frameTiming: {
+			fps: 60,
+			frameDurationUs: 16_667,
+			source: "known",
+		},
+		id: "asset-editor-next-visual-fixture",
+		label: "stalker-patch-1.5-teaser.mp4",
+		provenance: {
+			fileName: "stalker-patch-1.5-teaser.mp4",
+			mimeType: "video/mp4",
+			sizeBytes: 30_000_000,
+		},
+		tracks: {
+			audio: [
+				{
+					channels: 2,
+					codec: "aac",
+					id: "audio-fixture-voice",
+					kind: "audio",
+					label: "Voice",
+					language: "en",
+					sampleRate: 48_000,
+				},
+				{
+					channels: 2,
+					codec: "aac",
+					id: "audio-fixture-desktop",
+					kind: "audio",
+					label: "Desktop",
+					language: "und",
+					sampleRate: 48_000,
+				},
+			],
+			video: [
+				{
+					codec: "h264",
+					height: 2160,
+					id: "video-fixture-main",
+					kind: "video",
+					label: "Video 1",
+					width: 3840,
+				},
+			],
+		},
+	};
+
+	return {
+		session: {
+			asset,
+			export: {
+				status: "reviewing",
+			},
+			importEnabled: false,
+			runtime,
+			selection: {
+				endUs: 9_860_000,
+				startUs: 2_440_000,
+			},
+			status: "ready",
+		},
+		source: new Blob(["editor-next visual fixture"], {
+			type: "video/mp4",
+		}),
+	};
+}
+
+function shouldUseMockUploadedMediaStateFromUrl(): boolean {
+	if (typeof window === "undefined") {
+		return false;
+	}
+
+	return (
+		new URLSearchParams(window.location.search).get("mockUploadedMedia") === "1"
+	);
+}
+
+function factValue(facts: MediaAssetContextFact[], label: string): string {
+	return facts.find((fact) => fact.label === label)?.value ?? "Unknown";
+}
+
+function formatAssetCodecSummary(asset: ReadyMediaAsset): string {
+	const videoCodec = asset.tracks.video[0]?.codec?.trim() || "Video";
+	const audioCodec = asset.tracks.audio[0]?.codec?.trim() || "Audio";
+
+	return `${videoCodec.toUpperCase()} / ${audioCodec.toUpperCase()}`;
+}
+
+function formatVideoTrackMeta(
+	track: ReadyMediaAsset["tracks"]["video"][number],
+): string {
+	if (track.width && track.height) {
+		return `${track.width} x ${track.height}`;
+	}
+
+	return "Resolution unknown";
+}
+
+function formatAudioTrackMeta(
+	track: ReadyMediaAsset["tracks"]["audio"][number],
+): string {
+	return track.language?.trim() || "und";
+}
+
+function formatSelectionCoverage(
+	selection: Selection,
+	asset: ReadyMediaAsset,
+): string {
+	const durationUs = Math.max(0, selection.endUs - selection.startUs);
+	const coveragePercent =
+		asset.durationUs > 0 ? (durationUs / asset.durationUs) * 100 : 0;
+
+	return `${formatNumber(coveragePercent)}%`;
+}
+
+function formatRuntimeSummary(runtime: RuntimeSupport): string {
+	return runtime.supported ? "Chromium WebCodecs ready" : "Runtime blocked";
 }
 
 function SessionStatusLine({
@@ -1363,6 +1682,14 @@ function SessionStatusLine({
 			Waiting for a media asset draft.
 		</p>
 	);
+}
+
+function formatNumber(value: number): string {
+	if (Number.isInteger(value)) {
+		return `${value}`;
+	}
+
+	return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function formatMediaTime(timeUs: number): string {

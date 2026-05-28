@@ -1,4 +1,4 @@
-import { LocateFixed, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { AudioWaveform, LocateFixed, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { ALL_FORMATS, AudioBufferSink, BlobSource, Input } from "mediabunny";
 import {
 	type MouseEvent as ReactMouseEvent,
@@ -475,49 +475,36 @@ export function SelectionTimeline({
 	return (
 		<section
 			aria-label="Selection timeline"
-			className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden rounded-md border bg-background p-4 xl:rounded-none xl:border-0 xl:bg-workbench-timeline xl:p-3"
+			className="grid min-h-full grid-rows-[38px_minmax(0,1fr)] gap-0 overflow-hidden rounded-md border bg-workbench-timeline xl:rounded-none xl:border-0"
 		>
-			<div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-				<div className="grid gap-2">
-					<div className="flex flex-wrap items-center gap-2">
-						<Badge variant="outline">Media-time surface</Badge>
-						<Badge variant="secondary">
-							{asset.tracks.audio.length === 1
-								? "1 waveform lane"
-								: `${asset.tracks.audio.length} waveform lanes`}
-						</Badge>
-					</div>
-					<dl className="grid gap-2 text-sm sm:grid-cols-3">
-						<TimelineFact
-							label="Selection start"
-							value={formatMediaTime(visibleSelection.startUs)}
-						/>
-						<TimelineFact
-							label="Selection end"
-							value={formatMediaTime(visibleSelection.endUs)}
-						/>
-						<TimelineFact
-							label="Selection duration"
-							value={formatMediaTime(
-								visibleSelection.endUs - visibleSelection.startUs,
-							)}
-						/>
-					</dl>
+			<div className="flex min-w-0 items-center justify-between border-b border-workbench-border px-3">
+				<div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+					<AudioWaveform
+						aria-hidden="true"
+						className="size-4 text-workbench-progress"
+					/>
+					<span className="truncate">Selection and waveform</span>
+					<span className="hidden font-mono text-[11px] font-normal text-muted-foreground sm:inline">
+						{formatMediaTime(visibleSelection.endUs - visibleSelection.startUs)}
+					</span>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
+				<div className="flex shrink-0 items-center gap-2">
 					<Button
 						aria-label="Reset selection"
+						className="h-7 rounded border-workbench-border bg-workbench-viewer px-2 text-xs text-foreground hover:bg-workbench-hover"
 						disabled={selectionEditingDisabled}
 						onClick={onSelectionResetRequested}
-						size="icon"
+						size="sm"
 						type="button"
 						variant="outline"
 					>
 						<RotateCcw data-icon="inline-start" />
+						Reset
 					</Button>
 					<Button
 						aria-label="Zoom out timeline"
+						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
 						disabled={zoom <= MINIMUM_ZOOM}
 						onClick={() =>
 							setZoom((currentZoom) => clampZoom(currentZoom - 0.5))
@@ -528,11 +515,11 @@ export function SelectionTimeline({
 					>
 						<ZoomOut data-icon="inline-start" />
 					</Button>
-					<label className="grid min-w-36 gap-1 text-xs font-medium text-muted-foreground">
-						Zoom
+					<label className="hidden min-w-28 items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
+						<span>Zoom</span>
 						<input
 							aria-label="Timeline zoom"
-							className="h-7 accent-primary"
+							className="h-6 min-w-0 accent-primary"
 							max={MAXIMUM_ZOOM}
 							min={MINIMUM_ZOOM}
 							onChange={(event) =>
@@ -545,6 +532,7 @@ export function SelectionTimeline({
 					</label>
 					<Button
 						aria-label="Zoom in timeline"
+						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
 						disabled={zoom >= MAXIMUM_ZOOM}
 						onClick={() =>
 							setZoom((currentZoom) => clampZoom(currentZoom + 0.5))
@@ -558,6 +546,7 @@ export function SelectionTimeline({
 					<Button
 						aria-label="Keep playhead centered"
 						aria-pressed={playheadFollowEnabled}
+						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
 						onClick={() =>
 							setPlayheadFollowEnabled(
 								(currentFollowEnabled) => !currentFollowEnabled,
@@ -573,19 +562,20 @@ export function SelectionTimeline({
 				</div>
 			</div>
 
-			<div
-				className="min-h-0 overflow-x-auto rounded-md border border-workbench-border-strong bg-workbench-timeline text-workbench-timeline-foreground"
-				data-testid="selection-timeline-scroll"
-				ref={scrollContainerRef}
-			>
+			<div className="min-h-0 overflow-hidden p-4">
 				<div
-					className="relative flex min-h-full flex-col"
-					data-testid="selection-timeline-track"
-					ref={trackRef}
-					style={{
-						minWidth: `${zoom * 100}%`,
-					}}
+					className="h-full min-h-0 overflow-x-auto rounded border border-workbench-border bg-workbench-timeline text-workbench-timeline-foreground"
+					data-testid="selection-timeline-scroll"
+					ref={scrollContainerRef}
 				>
+					<div
+						className="relative flex min-h-full flex-col"
+						data-testid="selection-timeline-track"
+						ref={trackRef}
+						style={{
+							minWidth: `${zoom * 100}%`,
+						}}
+					>
 					<button
 						aria-label="Seek timeline ruler"
 						className="relative block h-12 w-full cursor-crosshair border-0 border-b border-workbench-border bg-workbench-ruler p-0 text-left"
@@ -709,6 +699,7 @@ export function SelectionTimeline({
 								<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
 							</span>
 						</button>
+					</div>
 					</div>
 				</div>
 			</div>
@@ -1065,15 +1056,6 @@ function canvasTokenColor(
 ) {
 	return (
 		getComputedStyle(element).getPropertyValue(tokenName).trim() || fallback
-	);
-}
-
-function TimelineFact({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="grid gap-1 rounded-md border bg-card px-3 py-2">
-			<dt className="text-xs text-muted-foreground">{label}</dt>
-			<dd className="font-mono text-sm tabular-nums">{value}</dd>
-		</div>
 	);
 }
 

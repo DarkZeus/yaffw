@@ -70,6 +70,27 @@ describe("EditorNextRoute", () => {
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
+	it("can render the uploaded-media visual fixture without exposing upload controls", async () => {
+		render(
+			<EditorNextRoute
+				initialRuntime={supportedRuntime}
+				mockUploadedMediaState
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(
+				screen.getByLabelText("Preview for stalker-patch-1.5-teaser.mp4"),
+			).toBeTruthy();
+		});
+		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(
+			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
+		).toBeGreaterThan(0);
+		expect(screen.getByText("Selection and waveform")).toBeTruthy();
+		expect(screen.getByText("Generated media")).toBeTruthy();
+	});
+
 	it("renders the unsupported runtime state before exposing local import", () => {
 		render(
 			<EditorNextRoute
@@ -164,45 +185,26 @@ describe("EditorNextRoute", () => {
 		expect(mediaAssetContext.className).toContain("bg-workbench-inspector");
 		const loadedMediaAsset =
 			within(mediaAssetContext).getByLabelText("Loaded media asset");
-		expect(within(loadedMediaAsset).getByText("Media asset")).toBeTruthy();
 		expect(within(loadedMediaAsset).getByText("picked.mp4")).toBeTruthy();
-		expect(loadedMediaAsset.className).not.toContain("overflow-hidden");
-		expect(loadedMediaAsset.className).not.toContain("rounded-md");
-		expect(within(mediaAssetContext).getByText("Asset identity")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("asset-picked")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Source context")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Source file")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).getAllByText("picked.mp4").length,
-		).toBeGreaterThanOrEqual(2);
-		const sourceFileFact = within(mediaAssetContext).getByText("Source file")
-			.parentElement;
-		expect(sourceFileFact?.textContent).toContain("picked.mp4");
-		expect(sourceFileFact?.className).toContain("max-w-full");
-		expect(sourceFileFact?.querySelector("dd")?.className).toContain(
-			"[overflow-wrap:anywhere]",
-		);
-		expect(sourceFileFact?.querySelector("dd")?.className).toContain(
-			"max-w-full",
-		);
+		expect(loadedMediaAsset.className).toContain("rounded");
+		expect(within(mediaAssetContext).getByText("Source")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Selection")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Workbench intent")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Type")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("MP4")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Video facts")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("1920x1080")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("16:9")).toBeTruthy();
+		expect(within(mediaAssetContext).getAllByText("Duration").length).toBe(2);
+		expect(within(mediaAssetContext).getByText("Codec")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("AVC / AAC")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Frames")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("30 fps known")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Stereo")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("48 kHz")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Selection context")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Selection start")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Selection end")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).getByText("Selection duration"),
-		).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Asset coverage")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Main")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("1920 x 1080")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Voice")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("eng")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Start")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("End")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Coverage")).toBeTruthy();
 		expect(
 			within(mediaAssetContext).getAllByText("00:00:00.000").length,
 		).toBeGreaterThan(0);
@@ -214,24 +216,22 @@ describe("EditorNextRoute", () => {
 			within(mediaAssetContext).queryByText("Runtime readiness"),
 		).toBeNull();
 		expect(within(mediaAssetContext).queryByText("Default export")).toBeNull();
-		expect(
-			within(mediaAssetContext).getAllByText("Ready").length,
-		).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Media analytics")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
 		const exportInspector =
 			within(inspectorRegion).getByLabelText("Export inspector");
 		expect(within(exportInspector).getByText("Export review")).toBeTruthy();
+		expect(within(exportInspector).getByText("Capability")).toBeTruthy();
+		expect(within(exportInspector).getByText("Default profile")).toBeTruthy();
+		expect(within(exportInspector).getByText("Selected range")).toBeTruthy();
 		expect(within(exportInspector).getByText("Runtime checks")).toBeTruthy();
-		expect(within(exportInspector).getByText("Export capability")).toBeTruthy();
-		expect(within(exportInspector).getByText("Video decoder")).toBeTruthy();
-		expect(within(exportInspector).getByText("Local file APIs")).toBeTruthy();
-		expect(screen.getByText("Planned output")).toBeTruthy();
+		expect(screen.getByText("Output")).toBeTruthy();
 		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
+		expect(screen.getByText("Strategy")).toBeTruthy();
 		expect(screen.getByText("Fast export")).toBeTruthy();
-		expect(screen.getByText("Expected precision")).toBeTruthy();
-		expect(screen.getByText("Full asset")).toBeTruthy();
+		expect(screen.getByText("Precision")).toBeTruthy();
+		expect(screen.getAllByText("Full asset").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
@@ -362,7 +362,7 @@ describe("EditorNextRoute", () => {
 		expect(
 			within(transportControls).getByLabelText("Preview media-time readouts")
 				.className,
-		).toContain("sm:grid-cols-4");
+		).toContain("font-mono");
 		expect(
 			within(centerRegion).getByRole("button", {
 				name: "Open fullscreen preview",
@@ -433,7 +433,7 @@ describe("EditorNextRoute", () => {
 		);
 		expect(selectionTimeline.className).toContain("min-h-full");
 		expect(selectionTimeline.className).toContain(
-			"grid-rows-[auto_minmax(0,1fr)]",
+			"grid-rows-[38px_minmax(0,1fr)]",
 		);
 		expect(
 			within(selectionRegion).getByTestId("selection-timeline-scroll")
@@ -876,7 +876,7 @@ describe("EditorNextRoute", () => {
 		).toBeNull();
 		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Language eng").length).toBeGreaterThan(0);
-		expect(within(selectionRegion).getByText("Selection duration")).toBeTruthy();
+		expect(within(selectionRegion).getByText("Selection and waveform")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
 		fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
@@ -925,8 +925,9 @@ describe("EditorNextRoute", () => {
 		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
-		expect(within(mediaAssetContext).getByText("Audio facts")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("None")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("No audio tracks")).toBeTruthy();
+		expect(within(mediaAssetContext).getByText("none")).toBeTruthy();
 	});
 
 	it("shows unsupported-media failures with technical details on demand", async () => {

@@ -110,30 +110,24 @@ describe("editor-next final first-slice smoke coverage", () => {
 			expect(dispatchBeforeUnload()).toBe(true);
 		});
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
-		expect(screen.getAllByText("Selection start").length).toBeGreaterThan(0);
-		expect(screen.getAllByText("Selection end").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("Start").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("End").length).toBeGreaterThan(0);
 		expect(
 			within(screen.getByLabelText("Workbench selection region")).getByText(
-				"Selection duration",
+				"Selection and waveform",
 			),
 		).toBeTruthy();
-		expect(screen.getByText("1 waveform lane")).toBeTruthy();
 		expect(screen.getByLabelText("Timeline zoom")).toBeTruthy();
 		expect(
 			screen.getByRole("button", { name: "Zoom in timeline" }),
 		).toBeTruthy();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
-		expect(screen.getByText("Planned output")).toBeTruthy();
+		expect(screen.getByText("Output")).toBeTruthy();
 		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
-		expect(screen.getByText("Method")).toBeTruthy();
+		expect(screen.getByText("Strategy")).toBeTruthy();
 		expect(screen.getByText("Fast export")).toBeTruthy();
-		expect(screen.getByText("Expected precision")).toBeTruthy();
-		expect(screen.getByText("Full asset")).toBeTruthy();
-		expect(
-			screen.getByText(
-				"The current selection covers the full asset, so export can use the default output profile without boundary trimming.",
-			),
-		).toBeTruthy();
+		expect(screen.getByText("Precision")).toBeTruthy();
+		expect(screen.getAllByText("Full asset").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 		expect(screen.queryByText("URL import")).toBeNull();
 		expect(screen.queryByText("Custom output")).toBeNull();
@@ -225,11 +219,11 @@ describe("editor-next final first-slice smoke coverage", () => {
 		await waitFor(() => {
 			expect(screen.getByLabelText("Preview for video-only.mp4")).toBeTruthy();
 		});
-		expect(screen.getByText("0 waveform lanes")).toBeTruthy();
 		expect(
 			screen.getByText("No audio tracks available for waveform lanes."),
 		).toBeTruthy();
-		expect(screen.getByText("None")).toBeTruthy();
+		expect(screen.getByText("No audio tracks")).toBeTruthy();
+		expect(screen.getByText("none")).toBeTruthy();
 
 		unmount();
 
