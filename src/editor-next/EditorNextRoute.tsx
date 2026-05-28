@@ -622,7 +622,7 @@ function EditorSessionShell({
 		>
 			<section
 				aria-label="Workbench media asset region"
-				className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
+				className="flex min-h-0 min-w-0 max-w-full flex-col gap-4 overflow-x-hidden overflow-y-auto rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:col-start-1 xl:row-start-1"
 			>
 				<ActiveMediaAssetContext
 					closeFileDisabled={closeFileDisabled}
@@ -674,14 +674,14 @@ function WorkbenchRegionHeader({
 	title: string;
 }) {
 	return (
-		<div className="flex min-w-0 items-start gap-3">
+		<div className="flex min-w-0 max-w-full flex-1 items-start gap-3 overflow-hidden">
 			<div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-workbench-border bg-background">
 				{cloneElement(icon, {
 					"aria-hidden": true,
 					className: "size-4",
 				})}
 			</div>
-			<div className="min-w-0">
+			<div className="min-w-0 max-w-full overflow-hidden">
 				<p className="text-xs font-medium uppercase text-muted-foreground">
 					{kicker}
 				</p>
@@ -712,8 +712,11 @@ function ActiveMediaAssetContext({
 	});
 
 	return (
-		<section aria-label="Media asset context" className="grid min-w-0 gap-4">
-			<div className="flex items-start justify-between gap-3">
+		<section
+			aria-label="Media asset context"
+			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden"
+		>
+			<div className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden">
 				<WorkbenchRegionHeader
 					icon={<FileVideo />}
 					kicker="Ready media asset"
@@ -733,9 +736,17 @@ function ActiveMediaAssetContext({
 					</Button>
 				</div>
 			</div>
-			<p className="text-sm leading-6 text-muted-foreground">
-				{viewModel.identity.summary}
-			</p>
+			<div
+				aria-label="Loaded media asset"
+				className="grid min-w-0 max-w-full gap-1 border-t border-workbench-border pt-3"
+			>
+				<p className="text-xs font-medium uppercase text-muted-foreground">
+					Media asset
+				</p>
+				<p className="min-w-0 max-w-full whitespace-normal break-words text-sm font-medium leading-5 text-foreground [overflow-wrap:anywhere]">
+					{viewModel.identity.name}
+				</p>
+			</div>
 			<MediaAssetContextSection
 				facts={viewModel.provenanceFacts}
 				icon={<FileVideo />}
@@ -778,7 +789,7 @@ function MediaAssetContextSection({
 				})}
 				{title}
 			</h3>
-			<dl className="grid gap-2">
+			<dl className="grid min-w-0 max-w-full gap-2 overflow-hidden">
 				{facts.map((fact) => (
 					<WorkbenchFact
 						key={`${title}-${fact.label}`}
@@ -842,11 +853,11 @@ function NonReadyImportSurface({
 
 function WorkbenchFact({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="grid min-w-0 gap-1 overflow-hidden rounded-md border border-workbench-border bg-background/70 px-3 py-2">
+		<div className="grid min-w-0 max-w-full gap-1 overflow-hidden rounded-md border border-workbench-border bg-background/70 px-3 py-2">
 			<dt className="text-xs font-medium uppercase text-muted-foreground">
 				{label}
 			</dt>
-			<dd className="min-w-0 whitespace-normal break-words font-mono text-xs leading-5 [overflow-wrap:anywhere]">
+			<dd className="min-w-0 max-w-full whitespace-normal break-words font-mono text-xs leading-5 [overflow-wrap:anywhere]">
 				{value}
 			</dd>
 		</div>

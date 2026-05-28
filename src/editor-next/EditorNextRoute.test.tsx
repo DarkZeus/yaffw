@@ -151,22 +151,35 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		const mediaAssetRegion = screen.getByLabelText(
+			"Workbench media asset region",
+		);
+		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
+		expect(mediaAssetRegion.className).toContain("min-w-0");
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
-		expect(
-			within(mediaAssetContext).getByText(
-				"Loaded for preview, selection, and export.",
-			),
-		).toBeTruthy();
+		expect(mediaAssetContext.className).toContain("overflow-x-hidden");
+		const loadedMediaAsset =
+			within(mediaAssetContext).getByLabelText("Loaded media asset");
+		expect(within(loadedMediaAsset).getByText("Media asset")).toBeTruthy();
+		expect(within(loadedMediaAsset).getByText("picked.mp4")).toBeTruthy();
+		expect(loadedMediaAsset.className).not.toContain("overflow-hidden");
+		expect(loadedMediaAsset.className).not.toContain("rounded-md");
 		expect(within(mediaAssetContext).getByText("Asset identity")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("asset-picked")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Source context")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Source file")).toBeTruthy();
-		expect(within(mediaAssetContext).getAllByText("picked.mp4").length).toBe(2);
+		expect(
+			within(mediaAssetContext).getAllByText("picked.mp4").length,
+		).toBeGreaterThanOrEqual(2);
 		const sourceFileFact = within(mediaAssetContext).getByText("Source file")
 			.parentElement;
 		expect(sourceFileFact?.textContent).toContain("picked.mp4");
+		expect(sourceFileFact?.className).toContain("max-w-full");
 		expect(sourceFileFact?.querySelector("dd")?.className).toContain(
 			"[overflow-wrap:anywhere]",
+		);
+		expect(sourceFileFact?.querySelector("dd")?.className).toContain(
+			"max-w-full",
 		);
 		expect(within(mediaAssetContext).getByText("Size")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("5 B")).toBeTruthy();
