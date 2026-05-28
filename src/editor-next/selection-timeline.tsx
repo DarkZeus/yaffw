@@ -475,7 +475,7 @@ export function SelectionTimeline({
 	return (
 		<section
 			aria-label="Selection timeline"
-			className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden rounded-md border bg-background p-4"
+			className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden rounded-md border bg-background p-4 xl:rounded-none xl:border-0 xl:bg-workbench-timeline xl:p-3"
 		>
 			<div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
 				<div className="grid gap-2">

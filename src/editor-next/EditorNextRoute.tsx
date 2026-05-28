@@ -345,7 +345,11 @@ export function EditorNextRoute({
 	}
 
 	return (
-		<EditorWorkbenchFrame runtime={runtime} status={session.status}>
+		<EditorWorkbenchFrame
+			activeAsset={session.status === "ready" ? session.asset : null}
+			runtime={runtime}
+			status={session.status}
+		>
 			{session.status === "unsupported-runtime" ? (
 				<UnsupportedRuntimeState session={session} />
 			) : (
@@ -391,41 +395,41 @@ export function EditorNextRoute({
 }
 
 type EditorWorkbenchFrameProps = {
+	activeAsset: ReadyMediaAsset | null;
 	children: ReactNode;
 	runtime: RuntimeSupport;
 	status: EditorSessionState["status"];
 };
 
 function EditorWorkbenchFrame({
+	activeAsset,
 	children,
 	runtime,
 	status,
 }: EditorWorkbenchFrameProps) {
 	return (
 		<main className="workbench dark h-screen min-h-screen overflow-hidden bg-workbench text-foreground">
-			<div className="grid h-full min-h-0 grid-rows-[3rem_minmax(0,1fr)] overflow-hidden">
+			<div className="grid h-full min-h-0 grid-rows-[2.625rem_minmax(0,1fr)] overflow-hidden">
 				<header
 					aria-label="Editor workbench top bar"
-					className="flex min-w-0 items-center justify-between gap-3 border-b border-workbench-border-strong bg-workbench px-3"
+					className="grid min-w-0 grid-cols-[minmax(12rem,auto)_minmax(0,1fr)_auto] items-center gap-3 border-b border-workbench-border-strong bg-workbench px-2.5"
 				>
 					<div className="flex min-w-0 items-center gap-3">
-						<div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-workbench-border-strong bg-workbench-viewer">
+						<div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-workbench-border-strong bg-workbench-viewer">
 							<FileVideo aria-hidden="true" className="size-4" />
 						</div>
 						<div className="min-w-0">
-							<h1 className="truncate text-sm font-semibold tracking-tight">
-								Editor-next
+							<h1 className="truncate text-xs font-semibold uppercase tracking-normal">
+								YAFFW
 							</h1>
-							<p className="truncate text-xs text-muted-foreground">
-								Single-asset editor workbench
+							<p className="truncate text-[10px] uppercase leading-none tracking-normal text-muted-foreground">
+								Editor workbench
 							</p>
 						</div>
 					</div>
-					<div className="flex min-w-0 items-center gap-2">
-						<Badge className="hidden sm:inline-flex" variant="outline">
-							First slice
-						</Badge>
-						<div className="flex min-w-0 items-center gap-2 rounded-md border border-workbench-border bg-workbench-inspector px-2.5 py-1.5 text-xs">
+					<TopBarMediaAssetSummary asset={activeAsset} />
+					<div className="flex min-w-0 items-center justify-end gap-2">
+						<div className="flex min-w-0 items-center gap-2 rounded-md border border-workbench-border bg-workbench-inspector px-2.5 py-1 text-xs">
 							{runtime.supported ? (
 								<CheckCircle2
 									aria-hidden="true"
@@ -447,7 +451,7 @@ function EditorWorkbenchFrame({
 					<EditorWorkbenchRail status={status} />
 					<div
 						className={`min-h-0 min-w-0 overflow-auto overscroll-contain bg-workbench p-3 md:p-4 ${
-							status === "ready" ? "xl:overflow-hidden" : ""
+							status === "ready" ? "xl:overflow-hidden xl:p-0" : ""
 						}`}
 					>
 						{children}
@@ -455,6 +459,42 @@ function EditorWorkbenchFrame({
 				</div>
 			</div>
 		</main>
+	);
+}
+
+function TopBarMediaAssetSummary({ asset }: { asset: ReadyMediaAsset | null }) {
+	if (!asset) {
+		return (
+			<div
+				aria-label="Top bar media asset summary"
+				className="hidden min-w-0 md:block"
+			/>
+		);
+	}
+
+	const primaryVideo = asset.tracks.video[0];
+	const resolution =
+		primaryVideo?.width && primaryVideo.height
+			? `${primaryVideo.width} x ${primaryVideo.height}`
+			: "Resolution unknown";
+
+	return (
+		<div
+			aria-label="Top bar media asset summary"
+			className="hidden min-w-0 items-center justify-center gap-3 font-mono text-[11px] text-muted-foreground lg:flex"
+		>
+			<span className="max-w-[28rem] truncate">{asset.label}</span>
+			<span aria-hidden="true" className="text-workbench-border-strong">
+				|
+			</span>
+			<span className="whitespace-nowrap">{resolution}</span>
+			<span aria-hidden="true" className="text-workbench-border-strong">
+				|
+			</span>
+			<span className="whitespace-nowrap">
+				{formatTopBarFrameTiming(asset)}
+			</span>
+		</div>
 	);
 }
 
@@ -620,11 +660,11 @@ function EditorSessionShell({
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-3 xl:h-[calc(100vh-5rem)] xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_3.25rem_38%] xl:overflow-hidden"
+			className="grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-3 xl:h-full xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_2.75rem_38%] xl:gap-0 xl:overflow-hidden"
 		>
 			<section
 				aria-label="Workbench media asset region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-workbench-border-strong xl:bg-workbench-inspector"
 			>
 				<ActiveMediaAssetContext
 					closeFileDisabled={closeFileDisabled}
@@ -649,7 +689,7 @@ function EditorSessionShell({
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-workbench-border-strong xl:bg-workbench-inspector"
 			>
 				<ExportInspectorPanel
 					asset={session.asset}
@@ -715,7 +755,7 @@ function ActiveMediaAssetContext({
 	return (
 		<section
 			aria-label="Media asset context"
-			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector p-4"
+			className="grid min-w-0 max-w-full gap-4 overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector p-4 xl:min-h-full xl:rounded-none xl:border-0"
 		>
 			<div className="flex min-w-0 max-w-full items-start justify-between gap-3 overflow-hidden">
 				<WorkbenchRegionHeader
@@ -925,7 +965,7 @@ function ExportInspectorPanel({
 	return (
 		<section
 			aria-label="Export inspector"
-			className="min-w-0 overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm"
+			className="min-w-0 overflow-visible rounded-md border border-workbench-border bg-workbench-inspector shadow-sm xl:min-h-full xl:rounded-none xl:border-0 xl:shadow-none"
 		>
 			<div className="flex items-start justify-between gap-3 border-b border-workbench-border bg-background/55 px-4 py-3">
 				<h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold tracking-tight">
@@ -1341,6 +1381,14 @@ function formatMediaTime(timeUs: number): string {
 		3,
 		"0",
 	)}`;
+}
+
+function formatTopBarFrameTiming(asset: ReadyMediaAsset): string {
+	const fps = Number.isInteger(asset.frameTiming.fps)
+		? String(asset.frameTiming.fps)
+		: asset.frameTiming.fps.toFixed(2);
+
+	return `${fps} fps ${asset.frameTiming.source}`;
 }
 
 function createGeneratedMedia({

@@ -293,7 +293,7 @@ export function NativePreviewPlayer({
 		<>
 			<section
 				aria-label="Workbench center region"
-				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer xl:col-start-2 xl:row-start-1 xl:min-h-0"
+				className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer xl:col-start-2 xl:row-start-1 xl:min-h-0 xl:rounded-none xl:border-y-0"
 			>
 				<section
 					aria-label="Native preview player"
@@ -368,15 +368,15 @@ export function NativePreviewPlayer({
 
 			<section
 				aria-label="Workbench transport region"
-				className="min-h-[3.25rem] rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden"
+				className="min-h-[3.25rem] rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden xl:rounded-none xl:border-x-0"
 			>
 				<div
 					aria-label="Preview transport controls"
-					className="grid min-h-[3.25rem] min-w-0 gap-2 px-2 py-1.5 lg:grid-cols-[auto_minmax(18rem,1fr)_minmax(18rem,auto)] lg:items-center xl:h-full xl:overflow-hidden"
+					className="grid min-h-[3.25rem] min-w-0 gap-2 px-2 py-1.5 lg:grid-cols-[auto_minmax(18rem,1fr)_minmax(18rem,auto)] lg:items-center xl:h-full xl:min-h-0 xl:overflow-hidden xl:py-0.5"
 				>
 					<div
 						aria-label="Primary preview controls"
-						className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-workbench-border bg-background/55 p-1 lg:flex-nowrap"
+						className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-workbench-border bg-background/55 p-1 lg:flex-nowrap xl:p-0.5"
 					>
 						<Button
 							aria-label={isPlaying ? "Pause" : "Play"}
@@ -504,7 +504,7 @@ export function NativePreviewPlayer({
 
 			<section
 				aria-label="Workbench selection region"
-				className="min-h-[22rem] overflow-x-hidden overscroll-contain xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto"
+				className="min-h-[22rem] overflow-x-hidden overscroll-contain xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto xl:border-t xl:border-workbench-border-strong xl:bg-workbench-timeline"
 			>
 				<SelectionTimeline
 					asset={asset}

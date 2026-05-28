@@ -51,7 +51,8 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Editor-next")).toBeTruthy();
+		expect(screen.getByText("YAFFW")).toBeTruthy();
+		expect(screen.getByText("Editor workbench")).toBeTruthy();
 		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
 		const rail = screen.getByLabelText("Editor workbench rail");
 		expect(rail).toBeTruthy();
@@ -274,17 +275,24 @@ describe("EditorNextRoute", () => {
 			).toBeTruthy();
 		});
 
+		const topBarAssetSummary = screen.getByLabelText(
+			"Top bar media asset summary",
+		);
+		expect(topBarAssetSummary.textContent).toContain("center-preview.mp4");
+		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
+		expect(topBarAssetSummary.textContent).toContain("30 fps known");
 		expect(
 			screen.getByLabelText("Editor workbench rail").parentElement?.className,
 		).toContain("grid-cols-[4rem_minmax(0,1fr)]");
 		const readyWorkbench = screen.getByLabelText("Editor workbench session");
-		expect(readyWorkbench.className).toContain("xl:h-[calc(100vh-5rem)]");
+		expect(readyWorkbench.className).toContain("xl:h-full");
 		expect(readyWorkbench.className).toContain(
 			"xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem]",
 		);
 		expect(readyWorkbench.className).toContain(
-			"xl:grid-rows-[minmax(0,1fr)_3.25rem_38%]",
+			"xl:grid-rows-[minmax(0,1fr)_2.75rem_38%]",
 		);
+		expect(readyWorkbench.className).toContain("xl:gap-0");
 		const centerRegion = screen.getByLabelText("Workbench center region");
 		const transportRegion = screen.getByLabelText("Workbench transport region");
 		const transportControls = within(transportRegion).getByLabelText(
@@ -310,14 +318,19 @@ describe("EditorNextRoute", () => {
 		).toBeNull();
 		expect(mediaAssetRegion.className).toContain("xl:col-start-1");
 		expect(mediaAssetRegion.className).toContain("xl:row-start-1");
+		expect(mediaAssetRegion.className).toContain("xl:border-r");
 		expect(centerRegion.className).toContain("xl:col-start-2");
 		expect(centerRegion.className).toContain("xl:row-start-1");
+		expect(centerRegion.className).toContain("xl:rounded-none");
 		expect(inspectorRegion.className).toContain("xl:col-start-3");
 		expect(inspectorRegion.className).toContain("xl:row-start-1");
+		expect(inspectorRegion.className).toContain("xl:border-l");
 		expect(transportRegion.className).toContain("xl:col-span-3");
 		expect(transportRegion.className).toContain("xl:row-start-2");
+		expect(transportRegion.className).toContain("xl:rounded-none");
 		expect(selectionRegion.className).toContain("xl:col-span-3");
 		expect(selectionRegion.className).toContain("xl:row-start-3");
+		expect(selectionRegion.className).toContain("xl:border-t");
 		expect(
 			within(selectionRegion).getByLabelText("Selection timeline"),
 		).toBeTruthy();
@@ -391,7 +404,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Preview for overflow.mp4")).toBeTruthy();
 		});
 
-		const page = screen.getByText("Editor-next").closest("main");
+		const page = screen.getByLabelText("Editor workbench top bar").closest("main");
 		expect(page?.className).toContain("h-screen");
 		expect(page?.className).toContain("overflow-hidden");
 
