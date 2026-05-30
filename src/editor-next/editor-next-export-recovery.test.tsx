@@ -6,6 +6,7 @@ import {
 	render,
 	screen,
 	waitFor,
+	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -71,7 +72,18 @@ describe("editor-next export recovery", () => {
 			expect(screen.getByText("Default export failed.")).toBeTruthy();
 		});
 
-		expect(screen.getByText("Encoder rejected the source video.")).toBeTruthy();
+		const technicalDetails = screen
+			.getByText("Technical details")
+			.closest("details");
+		expect(technicalDetails).toBeTruthy();
+		expect(technicalDetails?.open).toBe(false);
+		expect(technicalDetails?.textContent).toContain(
+			"Encoder rejected the source video.",
+		);
+		fireEvent.click(
+			within(technicalDetails as HTMLElement).getByText("Technical details"),
+		);
+		expect(technicalDetails?.open).toBe(true);
 		expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
 		expect(
 			screen.getByRole("button", { name: "Start default export" }),

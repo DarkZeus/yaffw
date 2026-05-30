@@ -1334,12 +1334,15 @@ function ExportJobStatus({
 
 	if (status.kind === "failed") {
 		return (
-			<div className="grid min-w-0 gap-1 rounded border border-destructive/40 bg-workbench-lane p-3 text-sm">
+			<div className="grid min-w-0 gap-2 rounded border border-destructive/40 bg-workbench-lane p-3 text-sm">
 				<span className="font-medium text-destructive">{status.message}</span>
 				{status.technicalDetails ? (
-					<p className="break-words text-xs text-muted-foreground">
-						{status.technicalDetails}
-					</p>
+					<details className="text-xs text-muted-foreground">
+						<summary className="cursor-pointer font-medium text-foreground">
+							Technical details
+						</summary>
+						<p className="mt-2 break-words">{status.technicalDetails}</p>
+					</details>
 				) : null}
 			</div>
 		);

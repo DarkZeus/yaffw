@@ -404,6 +404,61 @@ describe("editor-next session runtime gate", () => {
 		expect(cancelled.export.status).toBe("cancelled");
 	});
 
+	it("ignores stale export events after a failed job is retried", () => {
+		const retrying = editorSessionReducer(
+			editorSessionReducer(startExport(createReadySession()), {
+				jobId: "export-1",
+				message: "Default export failed.",
+				type: "export.failed",
+			}),
+			{
+				cancelSupported: true,
+				jobId: "export-2",
+				type: "export.started",
+			},
+		);
+
+		expect(retrying.status).toBe("ready");
+		if (retrying.status !== "ready") {
+			throw new Error(`Expected ready, got ${retrying.status}`);
+		}
+		expect(retrying.export.status).toBe("running");
+		if (retrying.export.status !== "running") {
+			throw new Error(`Expected running, got ${retrying.export.status}`);
+		}
+
+		expect(
+			editorSessionReducer(retrying, {
+				jobId: "export-1",
+				progress: {
+					completedRatio: 0.95,
+					phase: "muxing",
+				},
+				type: "export.progressed",
+			}),
+		).toBe(retrying);
+		expect(
+			editorSessionReducer(retrying, {
+				generatedMedia,
+				jobId: "export-1",
+				type: "export.succeeded",
+			}),
+		).toBe(retrying);
+		expect(
+			editorSessionReducer(retrying, {
+				jobId: "export-1",
+				message: "Late failure from the previous export.",
+				type: "export.failed",
+			}),
+		).toBe(retrying);
+		expect(
+			editorSessionReducer(retrying, {
+				jobId: "export-1",
+				type: "export.cancelled",
+			}),
+		).toBe(retrying);
+	});
+
 	it("does not start export from an invalid review and ignores unsupported cancellation", () => {
 		const invalidReviewReady = createReadySession({
 			endUs: 1_500_000,
