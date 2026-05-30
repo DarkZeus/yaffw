@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
 import {
 	runFullAssetExportArtifactHarness,
+	runFixtureCatalogExportArtifactHarness,
 	runSelectedRangeExportArtifactHarness,
 } from "./export-artifact-harness";
 import { inspectGeneratedMediaBlob } from "./generated-media-inspector";
@@ -92,6 +93,76 @@ describe("full-asset export artifact harness", () => {
 				"The harness captures generated media bytes directly; download remains a separate Delivery action.",
 			required: true,
 		});
+	});
+});
+
+describe("fixture catalog export artifact harness", () => {
+	it("measures supported fixtures and reports unsupported fixture export capability", async () => {
+		const inspectLocalAsset = vi.fn(async (draft) =>
+			inspectionForFixtureLabel(draft.label),
+		);
+		const run = vi.fn(async ({ selection, source }) => {
+			const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
+				(candidate) => candidate.fileName === source.name,
+			);
+			expect(fixture).toBeDefined();
+
+			if (!fixture) {
+				throw new Error(`Unexpected fixture source ${source.name}.`);
+			}
+
+			expect(selection).toEqual(fixture.selections.full);
+
+			if (fixture.container === "webm") {
+				throw new Error(
+					"WebM input cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
+				);
+			}
+
+			return {
+				blob: source,
+				fileName: `${fixture.id}-export.mp4`,
+				mimeType: "video/mp4",
+			};
+		});
+
+		const catalog = await runFixtureCatalogExportArtifactHarness({
+			fetchFixtureBlob: (fixture) =>
+				readFixtureBlob(fixture.publicPath, fixture.expected.mimeTypePrefix),
+			inspectGeneratedMedia: inspectGeneratedMediaBlob,
+			inspectLocalAsset,
+			runtime: supportedRuntime,
+			runner: {
+				cancelSupported: true,
+				run,
+			},
+		});
+
+		expect(catalog.summary).toEqual({
+			exported: 2,
+			total: 3,
+			unsupported: 1,
+		});
+		expect(run).toHaveBeenCalledTimes(2);
+
+		const videoOnly = exportedCatalogResult(catalog, "mp4-video-only");
+		expect(videoOnly.report.inspection.container).toBe("mp4");
+		expect(videoOnly.report.inspection.tracks.video).toHaveLength(1);
+		expect(videoOnly.report.inspection.tracks.audio).toHaveLength(0);
+
+		const withAudio = exportedCatalogResult(catalog, "mp4-video-with-audio");
+		expect(withAudio.report.inspection.container).toBe("mp4");
+		expect(withAudio.report.inspection.tracks.video).toHaveLength(1);
+		expect(withAudio.report.inspection.tracks.audio).toHaveLength(1);
+
+		const webm = unsupportedCatalogResult(catalog, "webm-video-only");
+		expect(webm.failure.stage).toBe("asset-capability");
+		expect(webm.failure.reason).toBe(
+			"This file cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
+		);
+		expect(webm.failure.technicalDetails).toContain(
+			"does not silently fall back",
+		);
 	});
 });
 
@@ -197,3 +268,69 @@ const supportedInspection = {
 		},
 	],
 } satisfies LocalMediaAssetInspection;
+
+function inspectionForFixtureLabel(label: string): LocalMediaAssetInspection {
+	const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
+		(candidate) => candidate.fileName === label,
+	);
+
+	if (!fixture) {
+		throw new Error(`Unknown fixture ${label}.`);
+	}
+
+	return {
+		...supportedInspection,
+		audioTracks:
+			fixture.expected.audioTrackCount === 0
+				? []
+				: [
+						{
+							channels: 2,
+							codec: "mp4a.40.2",
+							id: "audio-1",
+							label: "Audio 1",
+							sampleRate: 44_100,
+						},
+					],
+		defaultProfileExportable: fixture.container === "mp4",
+		videoTracks: [
+			{
+				codec: fixture.container === "mp4" ? "avc1.42c00d" : "vp8",
+				height: 90,
+				id: "video-1",
+				label: "Video 1",
+				width: 160,
+			},
+		],
+	};
+}
+
+function exportedCatalogResult(
+	catalog: Awaited<ReturnType<typeof runFixtureCatalogExportArtifactHarness>>,
+	fixtureId: string,
+) {
+	const result = catalog.results.find(
+		(candidate) => candidate.fixture.id === fixtureId,
+	);
+
+	if (!result || result.status !== "exported") {
+		throw new Error(`Expected exported catalog result for ${fixtureId}.`);
+	}
+
+	return result;
+}
+
+function unsupportedCatalogResult(
+	catalog: Awaited<ReturnType<typeof runFixtureCatalogExportArtifactHarness>>,
+	fixtureId: string,
+) {
+	const result = catalog.results.find(
+		(candidate) => candidate.fixture.id === fixtureId,
+	);
+
+	if (!result || result.status !== "unsupported") {
+		throw new Error(`Expected unsupported catalog result for ${fixtureId}.`);
+	}
+
+	return result;
+}

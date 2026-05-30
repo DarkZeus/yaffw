@@ -66,6 +66,51 @@ export type ExportArtifactHarnessResult = {
 	report: ExportArtifactHarnessReport;
 };
 
+export type ExportArtifactHarnessFailureStage =
+	| "asset-capability"
+	| "export-runner"
+	| "fixture-source"
+	| "generated-media-inspection"
+	| "runtime-capability";
+
+export type ExportFixtureCatalogSelectionKind =
+	keyof ExportCorrectnessFixture["selections"];
+
+export type ExportFixtureCatalogHarnessOptions = Omit<
+	ExportArtifactHarnessOptions,
+	"fixture" | "selection" | "selectionLabel"
+> & {
+	fixtures?: readonly ExportCorrectnessFixture[];
+	selectionKind?: ExportFixtureCatalogSelectionKind;
+};
+
+export type ExportFixtureCatalogHarnessResult = {
+	results: ExportFixtureCatalogResult[];
+	summary: {
+		exported: number;
+		total: number;
+		unsupported: number;
+	};
+};
+
+export type ExportFixtureCatalogResult =
+	| {
+			artifact: ExportArtifactHarnessResult["artifact"];
+			fixture: ExportArtifactHarnessReport["fixture"];
+			report: ExportArtifactHarnessReport;
+			status: "exported";
+	  }
+	| {
+			failure: {
+				reason: string;
+				stage: ExportArtifactHarnessFailureStage;
+				technicalDetails?: string;
+			};
+			fixture: ExportArtifactHarnessReport["fixture"];
+			selection: Selection;
+			status: "unsupported";
+	  };
+
 export type ExportArtifactHarnessReport = {
 	delivery: {
 		performed: false;
@@ -110,6 +155,55 @@ export type FullAssetExportArtifactHarnessOptions =
 export type FullAssetExportArtifactHarnessResult = ExportArtifactHarnessResult;
 export type FullAssetExportArtifactHarnessReport = ExportArtifactHarnessReport;
 
+export async function runFixtureCatalogExportArtifactHarness({
+	fixtures = EXPORT_CORRECTNESS_FIXTURES,
+	selectionKind = "full",
+	...options
+}: ExportFixtureCatalogHarnessOptions = {}): Promise<ExportFixtureCatalogHarnessResult> {
+	const selectionLabel = selectionLabelForCatalogKind(selectionKind);
+	const results: ExportFixtureCatalogResult[] = [];
+
+	for (const fixture of fixtures) {
+		const selection = fixture.selections[selectionKind];
+
+		try {
+			const result = await runExportArtifactHarness({
+				...options,
+				fixture,
+				selection,
+				selectionLabel,
+			});
+
+			results.push({
+				artifact: result.artifact,
+				fixture: result.report.fixture,
+				report: result.report,
+				status: "exported",
+			});
+		} catch (error) {
+			results.push({
+				failure: failureFromError(error),
+				fixture: fixtureReport(fixture, selectionLabel),
+				selection,
+				status: "unsupported",
+			});
+		}
+	}
+
+	const exported = results.filter(
+		(result) => result.status === "exported",
+	).length;
+
+	return {
+		results,
+		summary: {
+			exported,
+			total: results.length,
+			unsupported: results.length - exported,
+		},
+	};
+}
+
 export async function runFullAssetExportArtifactHarness(
 	options: FullAssetExportArtifactHarnessOptions = {},
 ): Promise<FullAssetExportArtifactHarnessResult> {
@@ -152,12 +246,25 @@ async function runExportArtifactHarness({
 	signal,
 }: ExportArtifactHarnessOptions): Promise<ExportArtifactHarnessResult> {
 	if (!runtime.supported) {
-		throw new Error(
-			`Export artifact harness requires a supported runtime. ${runtime.reason}`,
+		throw new ExportArtifactHarnessFailure(
+			"runtime-capability",
+			"The current runtime cannot run export fixture measurements.",
+			runtime.reason,
 		);
 	}
 
-	const sourceBlob = await fetchFixtureBlob(fixture);
+	let sourceBlob: Blob;
+
+	try {
+		sourceBlob = await fetchFixtureBlob(fixture);
+	} catch (error) {
+		throw new ExportArtifactHarnessFailure(
+			"fixture-source",
+			`Fixture ${fixture.id} could not be loaded.`,
+			errorToTechnicalDetails(error),
+		);
+	}
+
 	const source = createFixtureSource(sourceBlob, fixture);
 	const draft = createLocalMediaAssetDraft(source, {
 		createDraftId,
@@ -169,29 +276,47 @@ async function runExportArtifactHarness({
 	});
 
 	if (analysis.status !== "ready") {
-		throw new Error(
-			`Fixture ${fixture.id} could not become a ready media asset. ${
-				analysis.failure.message
-			}${
-				analysis.failure.technicalDetails
-					? ` ${analysis.failure.technicalDetails}`
-					: ""
-			}`,
+		throw new ExportArtifactHarnessFailure(
+			"asset-capability",
+			analysis.failure.message,
+			analysis.failure.technicalDetails,
 		);
 	}
 
 	const progress: ExportProgress[] = [];
 	const exportSignal = signal ?? new AbortController().signal;
-	const exportResult = await runner.run({
-		asset: analysis.asset,
-		onProgress: (event) => {
-			progress.push(event);
-		},
-		selection,
-		signal: exportSignal,
-		source,
-	});
-	const generatedBytes = new Uint8Array(await exportResult.blob.arrayBuffer());
+	let exportResult: Awaited<ReturnType<DefaultExportRunner["run"]>>;
+
+	try {
+		exportResult = await runner.run({
+			asset: analysis.asset,
+			onProgress: (event) => {
+				progress.push(event);
+			},
+			selection,
+			signal: exportSignal,
+			source,
+		});
+	} catch (error) {
+		throw new ExportArtifactHarnessFailure(
+			"export-runner",
+			"Fixture export failed before generated media could be inspected.",
+			errorToTechnicalDetails(error),
+		);
+	}
+
+	let generatedBytes: Uint8Array;
+
+	try {
+		generatedBytes = new Uint8Array(await exportResult.blob.arrayBuffer());
+	} catch (error) {
+		throw new ExportArtifactHarnessFailure(
+			"export-runner",
+			"Fixture export failed before generated media bytes could be captured.",
+			errorToTechnicalDetails(error),
+		);
+	}
+
 	const generatedMimeType =
 		exportResult.mimeType ||
 		exportResult.blob.type ||
@@ -200,7 +325,18 @@ async function runExportArtifactHarness({
 		exportResult.blob.type === generatedMimeType
 			? exportResult.blob
 			: new Blob([generatedBytes], { type: generatedMimeType });
-	const inspection = await inspectGeneratedMedia(generatedBlob);
+	let inspection: GeneratedMediaInspection;
+
+	try {
+		inspection = await inspectGeneratedMedia(generatedBlob);
+	} catch (error) {
+		throw new ExportArtifactHarnessFailure(
+			"generated-media-inspection",
+			"Generated media could not be inspected.",
+			errorToTechnicalDetails(error),
+		);
+	}
+
 	const rangeAccuracy = classifyExportRangeAccuracy({
 		frameTiming: analysis.asset.frameTiming,
 		generatedMedia: inspection,
@@ -241,11 +377,7 @@ async function runExportArtifactHarness({
 			},
 			exportReview,
 			fixture: {
-				fileName: fixture.fileName,
-				id: fixture.id,
-				label: fixture.label,
-				publicPath: fixture.publicPath,
-				selectionLabel,
+				...fixtureReport(fixture, selectionLabel),
 			},
 			inspection,
 			rangeAccuracy,
@@ -265,6 +397,76 @@ async function runExportArtifactHarness({
 			},
 		},
 	};
+}
+
+class ExportArtifactHarnessFailure extends Error {
+	readonly reason: string;
+	readonly stage: ExportArtifactHarnessFailureStage;
+	readonly technicalDetails?: string;
+
+	constructor(
+		stage: ExportArtifactHarnessFailureStage,
+		reason: string,
+		technicalDetails?: string,
+	) {
+		super(technicalDetails ? `${reason} ${technicalDetails}` : reason);
+		this.name = "ExportArtifactHarnessFailure";
+		this.reason = reason;
+		this.stage = stage;
+		this.technicalDetails = technicalDetails;
+	}
+}
+
+function failureFromError(error: unknown): {
+	reason: string;
+	stage: ExportArtifactHarnessFailureStage;
+	technicalDetails?: string;
+} {
+	if (error instanceof ExportArtifactHarnessFailure) {
+		return {
+			reason: error.reason,
+			stage: error.stage,
+			technicalDetails: error.technicalDetails,
+		};
+	}
+
+	return {
+		reason: "Fixture export failed before generated media could be inspected.",
+		stage: "export-runner",
+		technicalDetails: errorToTechnicalDetails(error),
+	};
+}
+
+function fixtureReport(
+	fixture: ExportCorrectnessFixture,
+	selectionLabel: string,
+): ExportArtifactHarnessReport["fixture"] {
+	return {
+		fileName: fixture.fileName,
+		id: fixture.id,
+		label: fixture.label,
+		publicPath: fixture.publicPath,
+		selectionLabel,
+	};
+}
+
+function selectionLabelForCatalogKind(
+	selectionKind: ExportFixtureCatalogSelectionKind,
+): string {
+	switch (selectionKind) {
+		case "full":
+			return "full asset";
+		case "selectedRange":
+			return "selected range";
+	}
+}
+
+function errorToTechnicalDetails(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return String(error);
 }
 
 function defaultFullAssetFixture(): ExportCorrectnessFixture {

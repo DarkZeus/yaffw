@@ -43,6 +43,15 @@ doubles so the fast tests do not depend on browser encoding availability. The
 same harness defaults to the real browser analyzer, real default export runner,
 and browser fixture fetch when it is invoked from a supported Chromium runtime.
 
+`runFixtureCatalogExportArtifactHarness` extends that measured path across the
+registered fixture catalog. The catalog report records one result per fixture:
+`exported` results include the captured Generated media inspection, range
+classification, export review, and delivery separation; `unsupported` results
+name the failing capability stage, reason, and technical details. This keeps
+MP4, WebM, video-only, and video-with-audio cases explicit without silently
+falling back to another output profile or treating delivery as part of export
+correctness.
+
 ## Precision policy
 
 Known or estimated frame timing is useful for tolerances, but it does not prove
@@ -70,6 +79,13 @@ The current committed baseline can guarantee:
   duration in media-time microseconds.
 - Fixture inspection can report duration and track inventory for tiny MP4 and
   WebM assets.
+- Catalog fixture export measurement can cover the tiny MP4 video-only and MP4
+  video-with-audio cases through the same artifact report shape, including
+  generated video/audio track inventory checks.
+- WebM fixture measurement is explicit: it either produces inspected Generated
+  media through the current runtime or records an unsupported capability result
+  with technical details. It does not silently change the default output
+  profile.
 
 The current baseline does not yet prove:
 
