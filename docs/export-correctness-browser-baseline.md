@@ -1,7 +1,8 @@
 # Export correctness browser baseline
 
 This note records the conservative browser/WebCodecs baseline restored for
-issue #28 under the parent export-correctness PRD in issue #11.
+issue #28 and published as the final baseline decision in issue #33 under the
+parent export-correctness PRD in issue #11.
 
 ## Fixture catalog
 
@@ -52,6 +53,34 @@ MP4, WebM, video-only, and video-with-audio cases explicit without silently
 falling back to another output profile or treating delivery as part of export
 correctness.
 
+## Measured behavior
+
+Full-asset fixture export is the strongest current browser/WebCodecs path. The
+artifact harness captures Generated media bytes before delivery, inspects the
+result, and keeps the export review in the `Fast export` / `Full asset` state
+because the requested Selection is `[0, durationUs)`. The tiny MP4 video-only
+fixture is inspected as a roughly 2-second MP4 with one video track and no audio
+track.
+
+Catalog measurement covers three registered 2-second fixtures. The current
+default MP4/H.264/AAC profile supports the MP4 video-only and MP4 video-with-AAC
+cases in the harness report shape, including generated track inventory checks:
+the video-only result has one generated video track and no generated audio
+tracks; the video-with-audio result has one generated video track and one
+generated audio track. The WebM video-only fixture is explicit rather than
+silent fallback: if the runtime cannot export it with the default profile, the
+catalog result is `unsupported` at the capability stage with technical details.
+
+Selected-range fixture export remains a duration-only measurement. The
+registered selected range is `[500000, 1500000)`, a 1-second half-open
+media-time Selection inside each 2-second fixture. The selected-range harness can
+inspect generated duration and report drift in microseconds; the committed fast
+test path records a 2-second Generated media artifact for that 1-second request,
+so the report exposes `+1000000us` duration drift and keeps export review in
+`Best-effort export` / `Best effort`. That duration evidence is useful because
+it catches overlong or short artifacts, but it does not identify whether the
+start boundary, end boundary, or both boundaries drifted.
+
 ## Precision policy
 
 Known or estimated frame timing is useful for tolerances, but it does not prove
@@ -92,17 +121,36 @@ The current baseline does not yet prove:
 - Browser-runner selected-range boundary accuracy.
 - Start or end boundary drift for generated export artifacts.
 - Audio/video alignment in generated export artifacts.
-- Runtime support across the broader fixture catalog.
+- Track inventory beyond the registered tiny fixture catalog.
+- Runtime support across broader browsers, containers, codecs, durations, and
+  multi-track media.
+
+Track inventory measurement currently proves only whether inspected generated
+tracks are present in the fixture result. It does not prove audio/video sync,
+codec suitability beyond the default profile facts, or behavior for media with
+more than one audio track.
 
 Out of scope for this baseline: server export fallback, native FFmpeg export,
 smart rendering, custom output settings, and generated media preview.
 
 ## Follow-up direction
 
-The next slice should broaden generated-media measurements across the fixture
-catalog and keep feeding inspected artifacts through the conservative classifier.
-Until a harness provides start and end boundary evidence, browser selected-range
-export should keep conservative best-effort language. If later measurements show
-boundary drift or audio/video alignment outside tolerance, native FFmpeg should
-be considered as an additional runtime capability instead of weakening the
-editor model.
+The issue #33 decision is: keep the browser/WebCodecs export path, but defer
+stronger selected-range precision claims. Full-asset browser export can continue
+to be presented as full-asset output when default profile capability is
+available. Selected-range browser export must remain best effort until YAFFW has
+generated-media evidence for both the requested start and end boundaries.
+
+The next implementation direction should be browser hardening only where it
+creates missing evidence: add start/end boundary measurement and audio/video
+alignment checks to the artifact harness, then feed those facts through the
+existing conservative classifier. Do not add server fallback, native FFmpeg,
+smart rendering, custom output settings, or Generated media preview in this
+decision slice.
+
+Native FFmpeg should be considered as a future runtime capability only if the
+next boundary/alignment measurements show browser/WebCodecs drift outside the
+current frame tolerance or missing track behavior that the browser runner cannot
+reasonably harden. Until that evidence exists, the product decision is to keep
+honest best-effort selected-range language rather than introduce another export
+runtime.
