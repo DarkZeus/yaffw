@@ -17,6 +17,25 @@ reports container, duration, track inventory, and primary video dimensions. The
 normal fast test loop covers those measured facts without requiring a manual
 download delivery action.
 
+## Browser artifact harness
+
+`runFullAssetExportArtifactHarness` imports the tiny MP4 video-only fixture as a
+local media asset, runs the full-asset Selection through the default browser
+export runner, captures the Generated media bytes directly, and inspects the
+captured artifact with the generated-media inspector.
+
+The harness report keeps export execution, generated-media inspection, and
+Delivery action separate. It records the requested Selection in media-time
+microseconds, export progress events, captured artifact size and MIME type,
+inspected duration and track inventory, and an explicit note that download was
+not performed. Download remains a user-facing Delivery action after export
+success.
+
+The normal Vitest loop exercises the harness with injected runner and analysis
+doubles so the fast tests do not depend on browser encoding availability. The
+same harness defaults to the real browser analyzer, real default export runner,
+and browser fixture fetch when it is invoked from a supported Chromium runtime.
+
 ## Precision policy
 
 Known or estimated frame timing is useful for tolerances, but it does not prove
