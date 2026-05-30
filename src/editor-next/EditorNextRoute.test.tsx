@@ -265,8 +265,8 @@ describe("EditorNextRoute", () => {
 		expect(screen.getAllByText("Full asset").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
-		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
-		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
+		fireEvent.keyDown(document.body, { code: "KeyL", key: "l" });
+		fireEvent.keyDown(document.body, { code: "BracketLeft", key: "[" });
 
 		await waitFor(() => {
 			expect(screen.getAllByText("00:00:10.000").length).toBeGreaterThan(0);

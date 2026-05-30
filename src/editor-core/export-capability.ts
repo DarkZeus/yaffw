@@ -4,6 +4,10 @@ import {
 	type ReadyMediaAsset,
 	type Selection,
 } from "./model";
+import {
+	classifyExportRangeAccuracy,
+	type ExportRangeAccuracyReport,
+} from "./export-correctness";
 import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type PlannedOutput = {
@@ -20,7 +24,10 @@ export type ExportMethod = {
 	label: string;
 };
 
-export type ExportPrecisionKey = "best-effort" | "frame-aligned" | "full-asset";
+export type ExportPrecisionKey =
+	| "best-effort"
+	| "full-asset"
+	| "proven-precise";
 
 export type ExportPrecision = {
 	key: ExportPrecisionKey;
@@ -58,6 +65,7 @@ type PlanDefaultExportCapabilityOptions = {
 	asset: ExportCapabilityPlanningAsset;
 	defaultProfileExportable?: boolean;
 	profile?: DefaultOutputProfile;
+	rangeAccuracy?: ExportRangeAccuracyReport;
 	runtime: RuntimeSupport;
 	selection: Selection;
 };
@@ -66,6 +74,7 @@ export function planDefaultExportCapability({
 	asset,
 	defaultProfileExportable = asset.exportCapability.supported,
 	profile = DEFAULT_OUTPUT_PROFILE,
+	rangeAccuracy,
 	runtime,
 	selection,
 }: PlanDefaultExportCapabilityOptions): ExportCapabilityReview {
@@ -119,14 +128,15 @@ export function planDefaultExportCapability({
 		};
 	}
 
-	if (
-		asset.frameTiming.source === "known" &&
-		selectionIsFrameAligned(
+	const selectedRangeAccuracy =
+		rangeAccuracy ??
+		classifyExportRangeAccuracy({
+			frameTiming: asset.frameTiming,
 			selection,
-			asset.durationUs,
-			asset.frameTiming.frameDurationUs,
-		)
-	) {
+			sourceDurationUs: asset.durationUs,
+		});
+
+	if (selectedRangeAccuracy.kind === "proven-precise") {
 		return {
 			method: {
 				key: "precision",
@@ -134,12 +144,11 @@ export function planDefaultExportCapability({
 			},
 			plannedOutput,
 			precision: {
-				key: "frame-aligned",
-				label: "Frame-aligned",
+				key: "proven-precise",
+				label: selectedRangeAccuracy.label,
 			},
 			profile,
-			reason:
-				"The current selection aligns to known frame timing for the default output profile.",
+			reason: selectedRangeAccuracy.reason,
 			supported: true,
 		};
 	}
@@ -155,10 +164,7 @@ export function planDefaultExportCapability({
 			label: "Best effort",
 		},
 		profile,
-		reason:
-			asset.frameTiming.source === "estimated"
-				? "Exact frame timing is unavailable, so export will use media-time boundaries with estimated frame timing."
-				: "The current selection is not aligned to known frame timing, so export precision is best effort.",
+		reason: selectedRangeAccuracy.reason,
 		supported: true,
 	};
 }
@@ -212,31 +218,4 @@ function isFullAssetSelection(
 	durationUs: number,
 ): boolean {
 	return selection.startUs === 0 && selection.endUs === durationUs;
-}
-
-function selectionIsFrameAligned(
-	selection: Selection,
-	durationUs: number,
-	frameDurationUs: number,
-): boolean {
-	return (
-		mediaTimeIsFrameAligned(selection.startUs, durationUs, frameDurationUs) &&
-		mediaTimeIsFrameAligned(selection.endUs, durationUs, frameDurationUs)
-	);
-}
-
-function mediaTimeIsFrameAligned(
-	timeUs: number,
-	durationUs: number,
-	frameDurationUs: number,
-): boolean {
-	if (timeUs === 0 || timeUs === durationUs) {
-		return true;
-	}
-
-	if (!Number.isSafeInteger(frameDurationUs) || frameDurationUs <= 0) {
-		return false;
-	}
-
-	return timeUs % frameDurationUs === 0;
 }

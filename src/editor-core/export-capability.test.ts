@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { classifyExportRangeAccuracy } from "./export-correctness";
 import { planDefaultExportCapability } from "./export-capability";
 import type { ReadyMediaAsset, Selection } from "./model";
 import { DEFAULT_OUTPUT_PROFILE } from "./model";
@@ -44,7 +45,7 @@ describe("default export capability planning", () => {
 		expect(review.profile).toEqual(DEFAULT_OUTPUT_PROFILE);
 	});
 
-	it("labels a frame-aligned selection with known timing as precision export", () => {
+	it("keeps frame-aligned selections best effort until generated-media evidence proves precision", () => {
 		const review = planDefaultExportCapability({
 			asset: {
 				...readyAsset,
@@ -66,9 +67,45 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
+		expect(review.method.label).toBe("Best-effort export");
+		expect(review.precision.label).toBe("Best effort");
+		expect(review.reason).toContain("has not been proven");
+	});
+
+	it("labels a selected range as precision export only with proven boundary evidence", () => {
+		const selection = {
+			endUs: 4_000_000,
+			startUs: 1_000_000,
+		};
+		const rangeAccuracy = classifyExportRangeAccuracy({
+			boundaryEvidence: {
+				endDeltaUs: 0,
+				kind: "start-and-end",
+				startDeltaUs: 0,
+			},
+			frameTiming: {
+				fps: 25,
+				frameDurationUs: 40_000,
+				source: "known",
+			},
+			selection,
+			sourceDurationUs: readyAsset.durationUs,
+		});
+		const review = planDefaultExportCapability({
+			asset: readyAsset,
+			rangeAccuracy,
+			runtime: supportedRuntime,
+			selection,
+		});
+
+		expect(review.supported).toBe(true);
+		if (!review.supported) {
+			throw new Error(`Expected supported review: ${review.reason}`);
+		}
+
 		expect(review.method.label).toBe("Precision export");
-		expect(review.precision.label).toBe("Frame-aligned");
-		expect(review.reason).toContain("known frame timing");
+		expect(review.precision.label).toBe("Proven precise");
+		expect(review.reason).toContain("selection boundaries");
 	});
 
 	it("labels estimated or unaligned selections as best-effort export with a reason", () => {
