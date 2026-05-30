@@ -5,7 +5,10 @@ import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { describe, expect, it, vi } from "vitest";
 
 import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
-import { runFullAssetExportArtifactHarness } from "./export-artifact-harness";
+import {
+	runFullAssetExportArtifactHarness,
+	runSelectedRangeExportArtifactHarness,
+} from "./export-artifact-harness";
 import { inspectGeneratedMediaBlob } from "./generated-media-inspector";
 
 describe("full-asset export artifact harness", () => {
@@ -89,6 +92,69 @@ describe("full-asset export artifact harness", () => {
 				"The harness captures generated media bytes directly; download remains a separate Delivery action.",
 			required: true,
 		});
+	});
+});
+
+describe("selected-range export artifact harness", () => {
+	it("captures a selected-range artifact and reports duration drift conservatively", async () => {
+		const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
+			(candidate) => candidate.id === "mp4-video-only",
+		);
+		expect(fixture).toBeDefined();
+
+		if (!fixture) {
+			throw new Error("Expected the tiny MP4 video-only fixture to exist.");
+		}
+
+		const fixtureBlob = await readFixtureBlob(
+			fixture.publicPath,
+			fixture.expected.mimeTypePrefix,
+		);
+		const inspectLocalAsset = vi.fn(async () => supportedInspection);
+		const run = vi.fn(async ({ selection }) => {
+			expect(selection).toEqual(fixture.selections.selectedRange);
+
+			return {
+				blob: fixtureBlob,
+				fileName: "tiny-video-only-selected-export.mp4",
+				mimeType: "video/mp4",
+			};
+		});
+
+		const result = await runSelectedRangeExportArtifactHarness({
+			fetchFixtureBlob: async () => fixtureBlob,
+			fixture,
+			inspectGeneratedMedia: inspectGeneratedMediaBlob,
+			inspectLocalAsset,
+			runtime: supportedRuntime,
+			runner: {
+				cancelSupported: true,
+				run,
+			},
+		});
+
+		expect(run).toHaveBeenCalledTimes(1);
+		expect(result.report.execution.requestedSelection).toEqual(
+			fixture.selections.selectedRange,
+		);
+		expect(result.report.rangeAccuracy.kind).toBe("best-effort");
+		expect(result.report.rangeAccuracy.generatedDurationUs).toBe(
+			fixture.expected.durationUs,
+		);
+		expect(result.report.rangeAccuracy.requestedDurationUs).toBe(1_000_000);
+		expect(result.report.rangeAccuracy.durationDeltaUs).toBe(1_000_000);
+		expect(result.report.rangeAccuracy.toleranceUs).toBe(40_000);
+		expect(result.report.exportReview.supported).toBe(true);
+		if (!result.report.exportReview.supported) {
+			throw new Error(
+				`Expected supported review: ${result.report.exportReview.reason}`,
+			);
+		}
+		expect(result.report.exportReview.method.label).toBe("Best-effort export");
+		expect(result.report.exportReview.precision.label).toBe("Best effort");
+		expect(result.report.exportReview.reason).toContain(
+			"boundary evidence is unavailable",
+		);
 	});
 });
 

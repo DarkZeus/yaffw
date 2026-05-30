@@ -108,6 +108,42 @@ describe("default export capability planning", () => {
 		expect(review.reason).toContain("selection boundaries");
 	});
 
+	it("keeps the export review best effort when measured boundary drift exceeds tolerance", () => {
+		const selection = {
+			endUs: 4_000_000,
+			startUs: 1_000_000,
+		};
+		const rangeAccuracy = classifyExportRangeAccuracy({
+			boundaryEvidence: {
+				endDeltaUs: 0,
+				kind: "start-and-end",
+				startDeltaUs: 41_000,
+			},
+			frameTiming: {
+				fps: 25,
+				frameDurationUs: 40_000,
+				source: "known",
+			},
+			selection,
+			sourceDurationUs: readyAsset.durationUs,
+		});
+		const review = planDefaultExportCapability({
+			asset: readyAsset,
+			rangeAccuracy,
+			runtime: supportedRuntime,
+			selection,
+		});
+
+		expect(review.supported).toBe(true);
+		if (!review.supported) {
+			throw new Error(`Expected supported review: ${review.reason}`);
+		}
+
+		expect(review.method.label).toBe("Best-effort export");
+		expect(review.precision.label).toBe("Best effort");
+		expect(review.reason).toContain("outside the current frame tolerance");
+	});
+
 	it("labels estimated or unaligned selections as best-effort export with a reason", () => {
 		const review = planDefaultExportCapability({
 			asset: {

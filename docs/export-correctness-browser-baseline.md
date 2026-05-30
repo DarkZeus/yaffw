@@ -24,12 +24,19 @@ local media asset, runs the full-asset Selection through the default browser
 export runner, captures the Generated media bytes directly, and inspects the
 captured artifact with the generated-media inspector.
 
-The harness report keeps export execution, generated-media inspection, and
-Delivery action separate. It records the requested Selection in media-time
-microseconds, export progress events, captured artifact size and MIME type,
-inspected duration and track inventory, and an explicit note that download was
-not performed. Download remains a user-facing Delivery action after export
-success.
+`runSelectedRangeExportArtifactHarness` uses the same browser runner path with a
+non-full Selection from the fixture catalog. Its report compares the requested
+half-open Selection duration with the measured Generated media duration,
+records duration drift in media-time microseconds, and feeds the conservative
+range-accuracy result into the export review planner.
+
+The harness report keeps export execution, generated-media inspection,
+range-accuracy classification, export review language, and Delivery action
+separate. It records the requested Selection in media-time microseconds, export
+progress events, captured artifact size and MIME type, inspected duration and
+track inventory, duration drift where measurable, and an explicit note that
+download was not performed. Download remains a user-facing Delivery action after
+export success.
 
 The normal Vitest loop exercises the harness with injected runner and analysis
 doubles so the fast tests do not depend on browser encoding availability. The
@@ -43,6 +50,10 @@ selected-range export precision. Editor-next now keeps selected ranges labeled
 as best effort until generated-media evidence proves both requested boundaries
 within the current frame tolerance.
 
+Measured duration alone can expose drift, but it does not prove boundary
+precision because it cannot identify whether the start, end, or both boundaries
+moved.
+
 Full-asset export remains a separate classification. A full-asset export can be
 reported as full asset without claiming selected-range boundary precision,
 because no trim boundary is being validated.
@@ -55,6 +66,8 @@ The current committed baseline can guarantee:
 - Full-asset selections are classified separately from selected-range precision.
 - Selected ranges are best effort unless a range-accuracy report contains
   measured start and end boundary evidence.
+- Selected-range harness reports can now compare requested and generated
+  duration in media-time microseconds.
 - Fixture inspection can report duration and track inventory for tiny MP4 and
   WebM assets.
 
@@ -70,9 +83,10 @@ smart rendering, custom output settings, and generated media preview.
 
 ## Follow-up direction
 
-The next slice should capture generated media from the real browser export
-runner and feed it through the inspector. Until that harness provides boundary
-evidence, browser selected-range export should keep conservative best-effort
-language. If later measurements show boundary drift or audio/video alignment
-outside tolerance, native FFmpeg should be considered as an additional runtime
-capability instead of weakening the editor model.
+The next slice should broaden generated-media measurements across the fixture
+catalog and keep feeding inspected artifacts through the conservative classifier.
+Until a harness provides start and end boundary evidence, browser selected-range
+export should keep conservative best-effort language. If later measurements show
+boundary drift or audio/video alignment outside tolerance, native FFmpeg should
+be considered as an additional runtime capability instead of weakening the
+editor model.

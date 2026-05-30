@@ -1,4 +1,12 @@
-import type { GeneratedMediaInspection } from "@/editor-core/export-correctness";
+import {
+	planDefaultExportCapability,
+	type ExportCapabilityReview,
+} from "@/editor-core/export-capability";
+import {
+	classifyExportRangeAccuracy,
+	type ExportRangeAccuracyReport,
+	type GeneratedMediaInspection,
+} from "@/editor-core/export-correctness";
 import {
 	analyzeLocalMediaAssetDraft,
 	type LocalMediaAssetInspector,
@@ -28,7 +36,7 @@ import { inspectGeneratedMediaBlob } from "./generated-media-inspector";
 
 type FixtureSource = Blob & LocalFileSource;
 
-export type FullAssetExportArtifactHarnessOptions = {
+export type ExportArtifactHarnessOptions = {
 	createAssetId?: () => string;
 	createDraftId?: () => string;
 	createFixtureSource?: (
@@ -42,10 +50,12 @@ export type FullAssetExportArtifactHarnessOptions = {
 	runner?: DefaultExportRunner;
 	runnerLabel?: string;
 	runtime?: RuntimeSupport;
+	selection?: Selection;
+	selectionLabel?: string;
 	signal?: AbortSignal;
 };
 
-export type FullAssetExportArtifactHarnessResult = {
+export type ExportArtifactHarnessResult = {
 	artifact: {
 		blob: Blob;
 		bytes: Uint8Array;
@@ -53,10 +63,10 @@ export type FullAssetExportArtifactHarnessResult = {
 		mimeType: string;
 		sizeBytes: number;
 	};
-	report: FullAssetExportArtifactHarnessReport;
+	report: ExportArtifactHarnessReport;
 };
 
-export type FullAssetExportArtifactHarnessReport = {
+export type ExportArtifactHarnessReport = {
 	delivery: {
 		performed: false;
 		reason: string;
@@ -72,13 +82,16 @@ export type FullAssetExportArtifactHarnessReport = {
 		requestedSelection: Selection;
 		runner: string;
 	};
+	exportReview: ExportCapabilityReview;
 	fixture: {
 		fileName: string;
 		id: string;
 		label: string;
 		publicPath: string;
+		selectionLabel: string;
 	};
 	inspection: GeneratedMediaInspection;
+	rangeAccuracy: ExportRangeAccuracyReport;
 	source: {
 		asset: Pick<
 			ReadyMediaAsset,
@@ -92,7 +105,38 @@ export type FullAssetExportArtifactHarnessReport = {
 	};
 };
 
-export async function runFullAssetExportArtifactHarness({
+export type FullAssetExportArtifactHarnessOptions =
+	ExportArtifactHarnessOptions;
+export type FullAssetExportArtifactHarnessResult = ExportArtifactHarnessResult;
+export type FullAssetExportArtifactHarnessReport = ExportArtifactHarnessReport;
+
+export async function runFullAssetExportArtifactHarness(
+	options: FullAssetExportArtifactHarnessOptions = {},
+): Promise<FullAssetExportArtifactHarnessResult> {
+	const fixture = options.fixture ?? defaultFullAssetFixture();
+
+	return runExportArtifactHarness({
+		...options,
+		fixture,
+		selection: options.selection ?? fixture.selections.full,
+		selectionLabel: options.selectionLabel ?? "full asset",
+	});
+}
+
+export async function runSelectedRangeExportArtifactHarness(
+	options: ExportArtifactHarnessOptions = {},
+): Promise<ExportArtifactHarnessResult> {
+	const fixture = options.fixture ?? defaultFullAssetFixture();
+
+	return runExportArtifactHarness({
+		...options,
+		fixture,
+		selection: options.selection ?? fixture.selections.selectedRange,
+		selectionLabel: options.selectionLabel ?? "selected range",
+	});
+}
+
+async function runExportArtifactHarness({
 	createAssetId = () => "export-artifact-harness-asset",
 	createDraftId = () => "export-artifact-harness-draft",
 	createFixtureSource = createBrowserFixtureSource,
@@ -103,10 +147,14 @@ export async function runFullAssetExportArtifactHarness({
 	runner = browserDefaultExportRunner,
 	runnerLabel = "browserDefaultExportRunner",
 	runtime = detectRuntimeSupport(),
+	selection = fixture.selections.full,
+	selectionLabel = "full asset",
 	signal,
-}: FullAssetExportArtifactHarnessOptions = {}): Promise<FullAssetExportArtifactHarnessResult> {
+}: ExportArtifactHarnessOptions): Promise<ExportArtifactHarnessResult> {
 	if (!runtime.supported) {
-		throw new Error(`Export artifact harness requires a supported runtime. ${runtime.reason}`);
+		throw new Error(
+			`Export artifact harness requires a supported runtime. ${runtime.reason}`,
+		);
 	}
 
 	const sourceBlob = await fetchFixtureBlob(fixture);
@@ -139,18 +187,32 @@ export async function runFullAssetExportArtifactHarness({
 		onProgress: (event) => {
 			progress.push(event);
 		},
-		selection: analysis.selection,
+		selection,
 		signal: exportSignal,
 		source,
 	});
 	const generatedBytes = new Uint8Array(await exportResult.blob.arrayBuffer());
 	const generatedMimeType =
-		exportResult.mimeType || exportResult.blob.type || "application/octet-stream";
+		exportResult.mimeType ||
+		exportResult.blob.type ||
+		"application/octet-stream";
 	const generatedBlob =
 		exportResult.blob.type === generatedMimeType
 			? exportResult.blob
 			: new Blob([generatedBytes], { type: generatedMimeType });
 	const inspection = await inspectGeneratedMedia(generatedBlob);
+	const rangeAccuracy = classifyExportRangeAccuracy({
+		frameTiming: analysis.asset.frameTiming,
+		generatedMedia: inspection,
+		selection,
+		sourceDurationUs: analysis.asset.durationUs,
+	});
+	const exportReview = planDefaultExportCapability({
+		asset: analysis.asset,
+		rangeAccuracy,
+		runtime,
+		selection,
+	});
 
 	return {
 		artifact: {
@@ -174,16 +236,19 @@ export async function runFullAssetExportArtifactHarness({
 					sizeBytes: generatedBlob.size,
 				},
 				progress,
-				requestedSelection: analysis.selection,
+				requestedSelection: selection,
 				runner: runnerLabel,
 			},
+			exportReview,
 			fixture: {
 				fileName: fixture.fileName,
 				id: fixture.id,
 				label: fixture.label,
 				publicPath: fixture.publicPath,
+				selectionLabel,
 			},
 			inspection,
+			rangeAccuracy,
 			source: {
 				asset: {
 					durationUs: analysis.asset.durationUs,
@@ -196,7 +261,7 @@ export async function runFullAssetExportArtifactHarness({
 					mimeType: source.type,
 					sizeBytes: source.size,
 				},
-				selection: analysis.selection,
+				selection,
 			},
 		},
 	};
@@ -208,7 +273,9 @@ function defaultFullAssetFixture(): ExportCorrectnessFixture {
 	);
 
 	if (!fixture) {
-		throw new Error("The tiny MP4 video-only export fixture is not registered.");
+		throw new Error(
+			"The tiny MP4 video-only export fixture is not registered.",
+		);
 	}
 
 	return fixture;

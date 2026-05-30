@@ -40,6 +40,65 @@ describe("export range accuracy classification", () => {
 		expect(report.reason).toContain("boundary evidence is unavailable");
 	});
 
+	it.each([
+		{
+			expectedReason: "boundary evidence is unavailable",
+			expectedToleranceUs: 40_000,
+			frameTiming: knownFrameTiming,
+			generatedDurationUs: 1_200_000,
+			label: "known frame timing with a frame-aligned selection",
+			selection: {
+				endUs: 1_600_000,
+				startUs: 400_000,
+			},
+		},
+		{
+			expectedReason: "boundary evidence is unavailable",
+			expectedToleranceUs: 40_000,
+			frameTiming: knownFrameTiming,
+			generatedDurationUs: 1_020_000,
+			label: "known frame timing with an unaligned selection",
+			selection: selectedRange,
+		},
+		{
+			expectedReason: "Exact frame timing is unavailable",
+			expectedToleranceUs: 33_333,
+			frameTiming: estimatedFrameTiming,
+			generatedDurationUs: 1_000_000,
+			label: "estimated frame timing",
+			selection: selectedRange,
+		},
+	])(
+		"keeps duration-only generated-media evidence best effort for $label",
+		({
+			expectedReason,
+			expectedToleranceUs,
+			frameTiming,
+			generatedDurationUs,
+			selection,
+		}) => {
+			const report = classifyExportRangeAccuracy({
+				generatedMedia: {
+					durationUs: generatedDurationUs,
+				},
+				frameTiming,
+				selection,
+				sourceDurationUs: 2_000_000,
+			});
+
+			expect(report.kind).toBe("best-effort");
+			expect(report.generatedDurationUs).toBe(generatedDurationUs);
+			expect(report.requestedDurationUs).toBe(
+				selection.endUs - selection.startUs,
+			);
+			expect(report.durationDeltaUs).toBe(
+				generatedDurationUs - (selection.endUs - selection.startUs),
+			);
+			expect(report.toleranceUs).toBe(expectedToleranceUs);
+			expect(report.reason).toContain(expectedReason);
+		},
+	);
+
 	it("proves precision only when measured boundaries are inside frame tolerance", () => {
 		const precise = classifyExportRangeAccuracy({
 			boundaryEvidence: {
