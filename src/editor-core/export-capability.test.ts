@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyExportRangeAccuracy } from "./export-correctness";
 import { planDefaultExportCapability } from "./export-capability";
+import { classifyExportRangeAccuracy } from "./export-correctness";
 import type { ReadyMediaAsset, Selection } from "./model";
 import { DEFAULT_OUTPUT_PROFILE } from "./model";
 import { evaluateRuntimeSupport } from "./runtime-capabilities";
@@ -27,7 +27,7 @@ describe("default export capability planning", () => {
 		expect(review.plannedOutput.container).toBe("mp4");
 	});
 
-	it("labels a full compatible asset selection as fast export", () => {
+	it("labels a full compatible asset selection as a whole-file export", () => {
 		const review = planDefaultExportCapability({
 			asset: readyAsset,
 			runtime: supportedRuntime,
@@ -39,13 +39,13 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
-		expect(review.method.label).toBe("Fast export");
-		expect(review.precision.label).toBe("Full asset");
+		expect(review.method.label).toBe("Whole file export");
+		expect(review.precision.label).toBe("Whole file");
 		expect(review.reason).toContain("full asset");
 		expect(review.profile).toEqual(DEFAULT_OUTPUT_PROFILE);
 	});
 
-	it("keeps frame-aligned selections best effort until generated-media evidence proves precision", () => {
+	it("keeps frame-aligned selections unverified until generated-media evidence proves precision", () => {
 		const review = planDefaultExportCapability({
 			asset: {
 				...readyAsset,
@@ -67,8 +67,8 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
-		expect(review.method.label).toBe("Best-effort export");
-		expect(review.precision.label).toBe("Best effort");
+		expect(review.method.label).toBe("Standard export");
+		expect(review.precision.label).toBe("Boundaries unverified");
 		expect(review.reason).toContain("has not been proven");
 	});
 
@@ -103,12 +103,12 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
-		expect(review.method.label).toBe("Precision export");
-		expect(review.precision.label).toBe("Proven precise");
+		expect(review.method.label).toBe("Verified export");
+		expect(review.precision.label).toBe("Boundaries verified");
 		expect(review.reason).toContain("selection boundaries");
 	});
 
-	it("keeps the export review best effort when measured boundary drift exceeds tolerance", () => {
+	it("keeps the export review unverified when measured boundary drift exceeds tolerance", () => {
 		const selection = {
 			endUs: 4_000_000,
 			startUs: 1_000_000,
@@ -139,12 +139,12 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
-		expect(review.method.label).toBe("Best-effort export");
-		expect(review.precision.label).toBe("Best effort");
+		expect(review.method.label).toBe("Standard export");
+		expect(review.precision.label).toBe("Boundaries unverified");
 		expect(review.reason).toContain("outside the current frame tolerance");
 	});
 
-	it("labels estimated or unaligned selections as best-effort export with a reason", () => {
+	it("labels estimated or unaligned selections as standard export with a reason", () => {
 		const review = planDefaultExportCapability({
 			asset: {
 				...readyAsset,
@@ -167,8 +167,8 @@ describe("default export capability planning", () => {
 			throw new Error(`Expected supported review: ${review.reason}`);
 		}
 
-		expect(review.method.label).toBe("Best-effort export");
-		expect(review.precision.label).toBe("Best effort");
+		expect(review.method.label).toBe("Standard export");
+		expect(review.precision.label).toBe("Boundaries unverified");
 		expect(review.reason).toContain("Exact frame timing is unavailable");
 	});
 });

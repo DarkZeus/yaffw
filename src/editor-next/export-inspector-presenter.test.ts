@@ -6,8 +6,8 @@ import {
 	type ReadyMediaAsset,
 	type Selection,
 } from "@/editor-core/model";
-import type { ExportSessionState } from "@/editor-core/session";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import type { ExportSessionState } from "@/editor-core/session";
 
 import { createExportInspectorViewModel } from "./export-inspector-presenter";
 
@@ -38,12 +38,12 @@ describe("export inspector presenter", () => {
 			{ available: true, label: "Local file APIs", status: "Ready" },
 		]);
 		expect(viewModel.review).toEqual({
-			method: { label: "Method", value: "Fast export" },
+			method: { label: "Export", value: "Whole file export" },
 			plannedOutput: {
-				label: "Planned output",
+				label: "Format",
 				value: "MP4 / H.264 video / AAC audio",
 			},
-			precision: { label: "Expected precision", value: "Full asset" },
+			precision: { label: "Range", value: "Whole file" },
 			reason:
 				"The current selection covers the full asset, so export can use the default output profile without boundary trimming.",
 			supported: true,
@@ -54,7 +54,7 @@ describe("export inspector presenter", () => {
 		expect(viewModel.action).toEqual({
 			disabled: false,
 			kind: "start",
-			label: "Start default export",
+			label: "Start export",
 		});
 	});
 
@@ -87,7 +87,7 @@ describe("export inspector presenter", () => {
 		});
 		expect(viewModel.review).toEqual({
 			plannedOutput: {
-				label: "Planned output",
+				label: "Format",
 				value: "MP4 / H.264 video / AAC audio",
 			},
 			reason:
@@ -99,7 +99,7 @@ describe("export inspector presenter", () => {
 		expect(viewModel.action).toEqual({
 			disabled: true,
 			kind: "start",
-			label: "Start default export",
+			label: "Start export",
 		});
 	});
 
@@ -175,7 +175,7 @@ describe("export inspector presenter", () => {
 		expect(viewModel.action).toEqual({
 			disabled: false,
 			kind: "start",
-			label: "Start default export",
+			label: "Start export",
 		});
 	});
 
@@ -202,7 +202,7 @@ describe("export inspector presenter", () => {
 			disabled: false,
 			generatedMedia,
 			kind: "download",
-			label: "Download generated media",
+			label: "Download export",
 		});
 
 		const delivered = createExportInspectorViewModel({
@@ -227,7 +227,7 @@ describe("export inspector presenter", () => {
 			disabled: false,
 			generatedMedia,
 			kind: "download",
-			label: "Download generated media",
+			label: "Download export",
 		});
 	});
 
@@ -249,7 +249,7 @@ describe("export inspector presenter", () => {
 		expect(viewModel.action).toEqual({
 			disabled: false,
 			kind: "start",
-			label: "Start default export",
+			label: "Start export",
 		});
 	});
 });
@@ -352,7 +352,7 @@ function exportJob({
 			review: {
 				method: {
 					key: "fast",
-					label: "Fast export",
+					label: "Whole file export",
 				},
 				plannedOutput: {
 					audioCodec: "aac",
@@ -362,7 +362,7 @@ function exportJob({
 				},
 				precision: {
 					key: "full-asset",
-					label: "Full asset",
+					label: "Whole file",
 				},
 				profile: DEFAULT_OUTPUT_PROFILE,
 				reason:

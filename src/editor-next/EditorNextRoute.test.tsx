@@ -88,7 +88,7 @@ describe("EditorNextRoute", () => {
 			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
 		).toBeGreaterThan(0);
 		expect(screen.getByText("Selection and waveform")).toBeTruthy();
-		expect(screen.getByText("Generated media")).toBeTruthy();
+		expect(screen.getByText("Export file")).toBeTruthy();
 	});
 
 	it("renders the unsupported runtime state before exposing local import", () => {
@@ -220,7 +220,7 @@ describe("EditorNextRoute", () => {
 			within(mediaAssetContext).getAllByText("Frames").length,
 		).toBeGreaterThanOrEqual(1);
 		expect(
-			within(mediaAssetContext).getAllByText("30 fps known").length,
+			within(mediaAssetContext).getAllByText("30 fps").length,
 		).toBeGreaterThanOrEqual(1);
 		expect(
 			within(mediaAssetContext).getAllByText("Main").length,
@@ -252,17 +252,23 @@ describe("EditorNextRoute", () => {
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
 		const exportInspector =
 			within(inspectorRegion).getByLabelText("Export inspector");
-		expect(within(exportInspector).getByText("Export review")).toBeTruthy();
-		expect(within(exportInspector).getByText("Capability")).toBeTruthy();
-		expect(within(exportInspector).getByText("Default profile")).toBeTruthy();
-		expect(within(exportInspector).getByText("Selected range")).toBeTruthy();
-		expect(within(exportInspector).getByText("Runtime checks")).toBeTruthy();
-		expect(screen.getByText("Output")).toBeTruthy();
-		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
-		expect(screen.getByText("Strategy")).toBeTruthy();
-		expect(screen.getByText("Fast export")).toBeTruthy();
-		expect(screen.getByText("Precision")).toBeTruthy();
-		expect(screen.getAllByText("Full asset").length).toBeGreaterThan(0);
+		expect(within(exportInspector).getByText("Export settings")).toBeTruthy();
+		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
+		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
+		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();
+		expect(within(exportInspector).queryByText("Selected range")).toBeNull();
+		expect(within(exportInspector).getByText("Format")).toBeTruthy();
+		expect(
+			within(exportInspector).getByText("MP4 / H.264 video / AAC audio"),
+		).toBeTruthy();
+		expect(
+			within(exportInspector).getAllByText("Export").length,
+		).toBeGreaterThan(0);
+		expect(within(exportInspector).getByText("Whole file export")).toBeTruthy();
+		expect(within(exportInspector).getByText("Range")).toBeTruthy();
+		expect(
+			within(exportInspector).getAllByText("Whole file").length,
+		).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
 		fireEvent.keyDown(document.body, { code: "KeyL", key: "l" });
@@ -282,7 +288,7 @@ describe("EditorNextRoute", () => {
 			within(mediaAssetContext).getAllByText("16.67%").length,
 		).toBeGreaterThan(0);
 		await waitFor(() => {
-			expect(screen.getByText("Best-effort export")).toBeTruthy();
+			expect(screen.getByText("Standard export")).toBeTruthy();
 		});
 	});
 
@@ -315,7 +321,7 @@ describe("EditorNextRoute", () => {
 		);
 		expect(topBarAssetSummary.textContent).not.toContain("center-preview.mp4");
 		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
-		expect(topBarAssetSummary.textContent).toContain("30 fps known");
+		expect(topBarAssetSummary.textContent).toContain("30 fps");
 		expect(
 			screen.getByLabelText("Editor workbench rail").parentElement?.className,
 		).toContain("grid-cols-[4rem_minmax(0,1fr)]");
@@ -439,7 +445,9 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Preview for overflow.mp4")).toBeTruthy();
 		});
 
-		const page = screen.getByLabelText("Editor workbench top bar").closest("main");
+		const page = screen
+			.getByLabelText("Editor workbench top bar")
+			.closest("main");
 		expect(page?.className).toContain("h-screen");
 		expect(page?.className).toContain("overflow-hidden");
 
@@ -453,19 +461,20 @@ describe("EditorNextRoute", () => {
 		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
 		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
 		expect(mediaAssetRegion.className).toContain("overscroll-contain");
+		expect(mediaAssetRegion.className).toContain("xl:[contain:layout_paint]");
 
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
 		expect(inspectorRegion.className).toContain("overflow-x-hidden");
 		expect(inspectorRegion.className).toContain("xl:overflow-y-auto");
 		expect(inspectorRegion.className).toContain("overscroll-contain");
+		expect(inspectorRegion.className).toContain("xl:[contain:layout_paint]");
 
 		const selectionRegion = screen.getByLabelText("Workbench selection region");
 		expect(selectionRegion.className).toContain("overflow-x-hidden");
 		expect(selectionRegion.className).toContain("xl:overflow-y-auto");
 		expect(selectionRegion.className).toContain("overscroll-contain");
-		const selectionTimeline = within(selectionRegion).getByLabelText(
-			"Selection timeline",
-		);
+		const selectionTimeline =
+			within(selectionRegion).getByLabelText("Selection timeline");
 		expect(selectionTimeline.className).toContain("min-h-full");
 		expect(selectionTimeline.className).toContain(
 			"grid-rows-[38px_minmax(0,1fr)]",
@@ -525,9 +534,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByLabelText("Export review")).toBeTruthy();
 		});
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Start default export" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(exportRun).toHaveBeenCalledTimes(1);
@@ -548,7 +555,7 @@ describe("EditorNextRoute", () => {
 			within(screen.getByLabelText("Generated media status")).getByRole(
 				"button",
 				{
-					name: "Download generated media",
+					name: "Download export",
 				},
 			),
 		).toBeTruthy();
@@ -573,9 +580,7 @@ describe("EditorNextRoute", () => {
 			phase: "preparing",
 		});
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Download generated media" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Download export" }));
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
 			blob: generatedBlob,
@@ -668,14 +673,10 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(
-				screen.getByRole("button", { name: "Start default export" }),
-			).toBeTruthy();
+			expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 		});
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Start default export" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(screen.getByText("Export complete")).toBeTruthy();
@@ -696,7 +697,7 @@ describe("EditorNextRoute", () => {
 		expect(screen.queryByLabelText("Selection timeline")).toBeNull();
 		expect(screen.queryByLabelText("Export review")).toBeNull();
 		expect(
-			screen.queryByRole("button", { name: "Download generated media" }),
+			screen.queryByRole("button", { name: "Download export" }),
 		).toBeNull();
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 	});
@@ -735,9 +736,7 @@ describe("EditorNextRoute", () => {
 				.disabled,
 		).toBe(false);
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Start default export" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(
@@ -855,14 +854,10 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(
-				screen.getByRole("button", { name: "Start default export" }),
-			).toBeTruthy();
+			expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 		});
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Start default export" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(exportRun).toHaveBeenCalledTimes(1);
@@ -910,8 +905,12 @@ describe("EditorNextRoute", () => {
 			within(centerRegion).queryByLabelText("Selection timeline"),
 		).toBeNull();
 		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
-		expect(screen.getAllByText("Language eng").length).toBeGreaterThan(0);
-		expect(within(selectionRegion).getByText("Selection and waveform")).toBeTruthy();
+		expect(screen.queryByText("Language eng")).toBeNull();
+		expect(screen.getAllByText("AAC").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("2 channels").length).toBeGreaterThan(0);
+		expect(
+			within(selectionRegion).getByText("Selection and waveform"),
+		).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
 		fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {

@@ -1,6 +1,6 @@
 import {
-	planDefaultExportCapability,
 	type ExportCapabilityReview,
+	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import type {
 	ExportProgress,
@@ -62,7 +62,7 @@ export type ExportInspectorActionViewModel =
 	| {
 			disabled: boolean;
 			kind: "start";
-			label: "Start default export";
+			label: "Start export";
 	  }
 	| {
 			disabled: false;
@@ -73,7 +73,7 @@ export type ExportInspectorActionViewModel =
 			disabled: false;
 			generatedMedia: GeneratedMedia;
 			kind: "download";
-			label: "Download generated media";
+			label: "Download export";
 	  }
 	| {
 			kind: "none";
@@ -177,7 +177,7 @@ function reviewViewModel(
 	if (!review.supported) {
 		return {
 			plannedOutput: {
-				label: "Planned output",
+				label: "Format",
 				value: review.plannedOutput.label,
 			},
 			reason: review.reason,
@@ -188,15 +188,15 @@ function reviewViewModel(
 
 	return {
 		method: {
-			label: "Method",
+			label: "Export",
 			value: review.method.label,
 		},
 		plannedOutput: {
-			label: "Planned output",
+			label: "Format",
 			value: review.plannedOutput.label,
 		},
 		precision: {
-			label: "Expected precision",
+			label: "Range",
 			value: review.precision.label,
 		},
 		reason: review.reason,
@@ -267,13 +267,13 @@ function actionForExportState(
 				disabled: false,
 				generatedMedia: exportState.generatedMedia,
 				kind: "download",
-				label: "Download generated media",
+				label: "Download export",
 			};
 		default:
 			return {
 				disabled: !reviewSupported,
 				kind: "start",
-				label: "Start default export",
+				label: "Start export",
 			};
 	}
 }

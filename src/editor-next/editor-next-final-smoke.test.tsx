@@ -122,12 +122,13 @@ describe("editor-next final first-slice smoke coverage", () => {
 			screen.getByRole("button", { name: "Zoom in timeline" }),
 		).toBeTruthy();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
-		expect(screen.getByText("Output")).toBeTruthy();
+
+		expect(screen.getByText("Format")).toBeTruthy();
 		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
-		expect(screen.getByText("Strategy")).toBeTruthy();
-		expect(screen.getByText("Fast export")).toBeTruthy();
-		expect(screen.getByText("Precision")).toBeTruthy();
-		expect(screen.getAllByText("Full asset").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("Export").length).toBeGreaterThan(0);
+		expect(screen.getByText("Whole file export")).toBeTruthy();
+		expect(screen.getByText("Range")).toBeTruthy();
+		expect(screen.getAllByText("Whole file").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 		expect(screen.queryByText("URL import")).toBeNull();
 		expect(screen.queryByText("Custom output")).toBeNull();
@@ -142,12 +143,10 @@ describe("editor-next final first-slice smoke coverage", () => {
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 
 		await waitFor(() => {
-			expect(screen.getByText("Best-effort export")).toBeTruthy();
+			expect(screen.getByText("Standard export")).toBeTruthy();
 		});
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Start default export" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(exportRun).toHaveBeenCalledTimes(1);
@@ -168,9 +167,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 		expect(screen.queryByRole("button", { name: /use generated/i })).toBeNull();
 
-		fireEvent.click(
-			screen.getByRole("button", { name: "Download generated media" }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: "Download export" }));
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
 			blob: generatedBlob,

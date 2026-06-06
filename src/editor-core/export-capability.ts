@@ -1,13 +1,13 @@
 import {
+	type ExportRangeAccuracyReport,
+	classifyExportRangeAccuracy,
+} from "./export-correctness";
+import {
 	DEFAULT_OUTPUT_PROFILE,
 	type DefaultOutputProfile,
 	type ReadyMediaAsset,
 	type Selection,
 } from "./model";
-import {
-	classifyExportRangeAccuracy,
-	type ExportRangeAccuracyReport,
-} from "./export-correctness";
 import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type PlannedOutput = {
@@ -114,12 +114,12 @@ export function planDefaultExportCapability({
 		return {
 			method: {
 				key: "fast",
-				label: "Fast export",
+				label: "Whole file export",
 			},
 			plannedOutput,
 			precision: {
 				key: "full-asset",
-				label: "Full asset",
+				label: "Whole file",
 			},
 			profile,
 			reason:
@@ -140,12 +140,12 @@ export function planDefaultExportCapability({
 		return {
 			method: {
 				key: "precision",
-				label: "Precision export",
+				label: "Verified export",
 			},
 			plannedOutput,
 			precision: {
 				key: "proven-precise",
-				label: selectedRangeAccuracy.label,
+				label: "Boundaries verified",
 			},
 			profile,
 			reason: selectedRangeAccuracy.reason,
@@ -156,12 +156,12 @@ export function planDefaultExportCapability({
 	return {
 		method: {
 			key: "best-effort",
-			label: "Best-effort export",
+			label: "Standard export",
 		},
 		plannedOutput,
 		precision: {
 			key: "best-effort",
-			label: "Best effort",
+			label: "Boundaries unverified",
 		},
 		profile,
 		reason: selectedRangeAccuracy.reason,

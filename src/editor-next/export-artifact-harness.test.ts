@@ -4,12 +4,12 @@ import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysi
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { describe, expect, it, vi } from "vitest";
 
-import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
 import {
-	runFullAssetExportArtifactHarness,
 	runFixtureCatalogExportArtifactHarness,
+	runFullAssetExportArtifactHarness,
 	runSelectedRangeExportArtifactHarness,
 } from "./export-artifact-harness";
+import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
 import { inspectGeneratedMediaBlob } from "./generated-media-inspector";
 
 describe("full-asset export artifact harness", () => {
@@ -221,8 +221,10 @@ describe("selected-range export artifact harness", () => {
 				`Expected supported review: ${result.report.exportReview.reason}`,
 			);
 		}
-		expect(result.report.exportReview.method.label).toBe("Best-effort export");
-		expect(result.report.exportReview.precision.label).toBe("Best effort");
+		expect(result.report.exportReview.method.label).toBe("Standard export");
+		expect(result.report.exportReview.precision.label).toBe(
+			"Boundaries unverified",
+		);
 		expect(result.report.exportReview.reason).toContain(
 			"boundary evidence is unavailable",
 		);

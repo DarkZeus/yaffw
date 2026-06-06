@@ -62,53 +62,89 @@ describe("NativePreviewPlayer", () => {
 		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
 	});
 
-	it("renders preview and transport as separate workbench chrome regions", () => {
-		renderPlayer();
+	it("renders preview and transport as separate workbench chrome regions", async () => {
+		const getBoundingClientRect = vi
+			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+			.mockImplementation(function getElementRect(this: HTMLElement) {
+				if (this.getAttribute("aria-label") === "Preview viewer surface") {
+					return createTestDomRect({ height: 300, width: 900 });
+				}
 
-		const centerRegion = screen.getByLabelText("Workbench center region");
-		const nativePreview = within(centerRegion).getByLabelText(
-			"Native preview player",
-		);
-		const viewerHeader =
-			within(nativePreview).getByLabelText("Preview viewer header");
-		const viewerSurface =
-			within(nativePreview).getByLabelText("Preview viewer surface");
-		const aperture = within(viewerSurface).getByLabelText("Preview aperture");
-		const transportRegion = screen.getByLabelText("Workbench transport region");
-		const transportControls = within(transportRegion).getByLabelText(
-			"Preview transport controls",
-		);
-		const primaryControls = within(transportControls).getByLabelText(
-			"Primary preview controls",
-		);
-		const mediaTimeReadouts = within(transportControls).getByLabelText(
-			"Preview media-time readouts",
-		);
-		const playbackSettings = within(transportControls).getByLabelText(
-			"Preview playback settings",
-		);
+				return createTestDomRect({ height: 0, width: 0 });
+			});
 
-		expect(centerRegion.className).toContain("bg-workbench-viewer");
-		expect(viewerHeader.className).toContain("border-workbench-border");
-		expect(viewerHeader.textContent).not.toContain("clip.mp4");
-		expect(
-			within(viewerHeader).getByText("Program viewer").parentElement?.className,
-		).toContain("whitespace-nowrap");
-		expect(viewerSurface.className).toContain("bg-workbench-viewer");
-		expect(aperture.className).toContain("border-workbench-border-strong");
-		expect(transportRegion.className).toContain("bg-workbench-transport");
-		expect(transportControls.className).toContain("grid");
-		expect(primaryControls.className).toContain("justify-center");
-		expect(mediaTimeReadouts.className).toContain("font-mono");
-		expect(playbackSettings.className).toContain("justify-end");
-		expect(
-			within(centerRegion).queryByLabelText("Preview transport controls"),
-		).toBeNull();
-		expect(
-			within(viewerHeader).getByRole("button", {
-				name: "Open fullscreen preview",
-			}),
-		).toBeTruthy();
+		try {
+			renderPlayer();
+
+			const centerRegion = screen.getByLabelText("Workbench center region");
+			const nativePreview = within(centerRegion).getByLabelText(
+				"Native preview player",
+			);
+			const viewerHeader = within(nativePreview).getByLabelText(
+				"Preview viewer header",
+			);
+			const viewerSurface = within(nativePreview).getByLabelText(
+				"Preview viewer surface",
+			);
+			const aperture = within(viewerSurface).getByLabelText("Preview aperture");
+			const transportRegion = screen.getByLabelText(
+				"Workbench transport region",
+			);
+			const transportControls = within(transportRegion).getByLabelText(
+				"Preview transport controls",
+			);
+			const primaryControls = within(transportControls).getByLabelText(
+				"Primary preview controls",
+			);
+			const mediaTimeReadouts = within(transportControls).getByLabelText(
+				"Preview media-time readouts",
+			);
+			const playbackSettings = within(transportControls).getByLabelText(
+				"Preview playback settings",
+			);
+
+			expect(centerRegion.className).toContain("bg-workbench-viewer");
+			expect(viewerHeader.className).toContain("border-workbench-border");
+			expect(viewerHeader.textContent).not.toContain("clip.mp4");
+			expect(
+				within(viewerHeader).getByText("Program viewer").parentElement
+					?.className,
+			).toContain("whitespace-nowrap");
+			expect(viewerSurface.className).toContain("bg-workbench-viewer");
+			expect(aperture.className).toContain("border-workbench-border-strong");
+			expect(aperture.className).toContain("max-h-full");
+			expect(aperture.style.aspectRatio).toBe(String(16 / 9));
+			await waitFor(() => {
+				expect(aperture.style.width).toBe("533.333333px");
+				expect(aperture.style.height).toBe("300px");
+			});
+			expect(
+				within(aperture).getByLabelText("Preview for clip.mp4").className,
+			).toContain("object-contain");
+			expect(
+				within(aperture).getByLabelText("Preview for clip.mp4").className,
+			).not.toContain("object-cover");
+			expect(transportRegion.className).toContain("bg-workbench-transport");
+			expect(transportControls.className).toContain("grid");
+			expect(primaryControls.className).toContain("justify-center");
+			expect(
+				within(primaryControls)
+					.getByRole("button", { name: "Loop selection" })
+					.getAttribute("aria-pressed"),
+			).toBe("false");
+			expect(mediaTimeReadouts.className).toContain("font-mono");
+			expect(playbackSettings.className).toContain("justify-end");
+			expect(
+				within(centerRegion).queryByLabelText("Preview transport controls"),
+			).toBeNull();
+			expect(
+				within(viewerHeader).getByRole("button", {
+					name: "Open fullscreen preview",
+				}),
+			).toBeTruthy();
+		} finally {
+			getBoundingClientRect.mockRestore();
+		}
 	});
 
 	it("drives play, pause, seek, speed, volume, mute, and frame-step through native video commands", async () => {
@@ -155,15 +191,162 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
-	it("samples the native video clock on animation frames while playing", async () => {
-		const frameCallbacks: FrameRequestCallback[] = [];
-		const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-			frameCallbacks.push(callback);
-			return frameCallbacks.length;
+	it("loops inside the selection only after playback enters the selected range", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		renderPlayer({
+			selection: {
+				endUs: 8_000_000,
+				startUs: 4_000_000,
+			},
 		});
-		const cancelAnimationFrame = vi.fn();
-		vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
-		vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+		const loopButton = screen.getByRole("button", {
+			name: "Loop selection",
+		});
+
+		expect(loopButton.getAttribute("aria-pressed")).toBe("false");
+		fireEvent.click(loopButton);
+		expect(loopButton.getAttribute("aria-pressed")).toBe("true");
+
+		video.currentTime = 2;
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(2);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:02.000",
+		);
+
+		video.currentTime = 4.5;
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(4.5);
+
+		video.currentTime = 8.1;
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(4);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:04.000",
+		);
+	});
+
+	it("does not jump backward when playback starts after the selection", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		renderPlayer({
+			selection: {
+				endUs: 8_000_000,
+				startUs: 4_000_000,
+			},
+		});
+
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Loop selection" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Seek forward 10 seconds" }),
+		);
+		expect(video.currentTime).toBe(10);
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		runNextPreviewFrame(frameCallbacks);
+
+		expect(video.currentTime).toBe(10);
+
+		video.currentTime = 12;
+		fireEvent.ended(video);
+
+		expect(video.currentTime).toBe(12);
+		expect(play).toHaveBeenCalledTimes(1);
+		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+	});
+
+	it("re-evaluates loop entry when the selection changes", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const view = renderPlayer({
+			selection: {
+				endUs: 8_000_000,
+				startUs: 4_000_000,
+			},
+		});
+
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Loop selection" }));
+		video.currentTime = 4.5;
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(4.5);
+
+		view.rerender(
+			createPlayerElement({
+				selection: {
+					endUs: 11_000_000,
+					startUs: 9_000_000,
+				},
+			}),
+		);
+		expect(
+			screen
+				.getByRole("button", { name: "Loop selection" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+
+		video.currentTime = 8.5;
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(8.5);
+
+		video.currentTime = 11.2;
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(9);
+	});
+
+	it("resets selection loop for each preview source", async () => {
+		const nextSource = new File(["next video"], "next.mp4", {
+			type: "video/mp4",
+		});
+		const view = renderPlayer();
+
+		fireEvent.click(screen.getByRole("button", { name: "Loop selection" }));
+		expect(
+			screen
+				.getByRole("button", { name: "Loop selection" })
+				.getAttribute("aria-pressed"),
+		).toBe("true");
+
+		view.rerender(createPlayerElement({ source: nextSource }));
+
+		await waitFor(() => {
+			expect(
+				screen
+					.getByRole("button", { name: "Loop selection" })
+					.getAttribute("aria-pressed"),
+			).toBe("false");
+		});
+		expect(createObjectURL).toHaveBeenCalledWith(nextSource);
+	});
+
+	it("samples the native video clock on animation frames while playing", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
 
 		renderPlayer();
 
@@ -181,9 +364,7 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		video.currentTime = 1.25;
-		act(() => {
-			frameCallbacks.shift()?.(16);
-		});
+		runNextPreviewFrame(frameCallbacks);
 
 		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
 			"00:00:01.250",
@@ -283,7 +464,13 @@ const previewSource = new File(["video"], "clip.mp4", { type: "video/mp4" });
 function renderPlayer(
 	props: Partial<React.ComponentProps<typeof NativePreviewPlayer>> = {},
 ) {
-	return render(
+	return render(createPlayerElement(props));
+}
+
+function createPlayerElement(
+	props: Partial<React.ComponentProps<typeof NativePreviewPlayer>> = {},
+) {
+	return (
 		<NativePreviewPlayer
 			asset={readyAsset}
 			onSelectionEndRequested={() => {}}
@@ -293,8 +480,51 @@ function renderPlayer(
 			selection={selection}
 			source={previewSource}
 			{...props}
-		/>,
+		/>
 	);
+}
+
+function stubPreviewAnimationFrames() {
+	const frameCallbacks: FrameRequestCallback[] = [];
+	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+		frameCallbacks.push(callback);
+		return frameCallbacks.length;
+	});
+	const cancelAnimationFrame = vi.fn();
+	vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+	vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+	return {
+		cancelAnimationFrame,
+		frameCallbacks,
+		requestAnimationFrame,
+	};
+}
+
+function runNextPreviewFrame(frameCallbacks: FrameRequestCallback[]) {
+	act(() => {
+		frameCallbacks.shift()?.(16);
+	});
+}
+
+function createTestDomRect({
+	height,
+	width,
+}: {
+	height: number;
+	width: number;
+}): DOMRect {
+	return {
+		bottom: height,
+		height,
+		left: 0,
+		right: width,
+		toJSON: () => ({}),
+		top: 0,
+		width,
+		x: 0,
+		y: 0,
+	} as DOMRect;
 }
 
 const readyAsset = {

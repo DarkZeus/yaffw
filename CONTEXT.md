@@ -4,13 +4,25 @@ YAFFW is a local-first media editor for personal video editing workflows. Its co
 
 ## Language
 
+**YAFFW**:
+The product name for the local-first media editor; it is not expanded in product UI.
+_Avoid_: Yet Another FFMPEG wrapper
+
 **Local-first media editor**:
 An editor where the user's loaded media and editing decisions are primary, and processing should happen locally when feasible.
 _Avoid_: downloader, FFmpeg wrapper
 
+**Editor workbench**:
+A dense editor surface organized around continuous preview, selection, waveform context, and export review for one active media asset.
+_Avoid_: dashboard, document page, project workspace, multi-asset NLE
+
 **Media asset**:
 A media item available to the editor as the subject of preview, selection, analysis, and export.
 _Avoid_: upload, download result, server file, file path
+
+**Asset identity**:
+The app-generated identity of a media asset within YAFFW.
+_Avoid_: filename, object URL, server path, source URL
 
 **Media asset draft**:
 An import result that can be loaded and analyzed into a media asset.
@@ -18,11 +30,27 @@ _Avoid_: API response, download response, uploaded file
 
 **Ready media asset**:
 A media asset that can be previewed and safely edited.
-_Avoid_: fully analyzed asset, uploaded asset
+_Avoid_: fully analyzed asset, uploaded asset, preview-only asset
+
+**Asset analysis**:
+Information derived from a media asset, keyed by asset identity.
+_Avoid_: asset fields, upload metadata
+
+**Preview resource**:
+A disposable browser resource used to preview a media asset.
+_Avoid_: asset identity, domain source
 
 **Import adapter**:
 A mechanism that brings media from an external source into the editor as a media asset.
 _Avoid_: acquisition workflow, downloader core
+
+**Close file**:
+A user action that unloads the active media asset and returns the editor to the empty import state.
+_Avoid_: replace file, reset page
+
+**Unload protection**:
+A browser prompt used to warn before leaving a page when session-local editor work would be lost.
+_Avoid_: persisted project, autosave
 
 **Single-asset editing session**:
 An editing session centered on exactly one active media asset and the user's decisions about that asset.
@@ -33,56 +61,205 @@ A user choice that changes the exported media produced from the active media ass
 _Avoid_: playback state, UI state, progress state
 
 **Selection**:
-The time range of the active media asset that will be exported.
+The half-open media-time range of the active media asset that will be exported.
 _Avoid_: trim, timeline
+
+**Media time**:
+A timestamp in the media asset's own time coordinate system, represented internally as integer microseconds.
+_Avoid_: wall-clock time, UI frame number, floating-point seconds
+
+**Frame timing**:
+Known or estimated information for mapping between media time and frame-oriented UI actions.
+_Avoid_: guaranteed FPS, frame identity
 
 **Playhead**:
 The current preview position within the active media asset.
 _Avoid_: current time, cursor
 
+**Playback speed**:
+A preview setting that changes playback rate without changing exported media.
+_Avoid_: output speed, frame interpolation
+
+**Preview volume**:
+A preview setting for global playback volume or mute state that does not affect exported media.
+_Avoid_: audio mix decision, track volume
+
+**Selection loop**:
+A preview setting that repeats playback after playback enters the current selection without changing exported media.
+_Avoid_: looped export, selected area loop, range repeat
+
+**Keyboard shortcut**:
+A UI adapter command that invokes playback or editing behavior without changing the domain language.
+_Avoid_: core command, global hotkey
+
 **Waveform**:
 A visual representation of audio amplitude over time for a media asset or audio track.
 _Avoid_: timeline
+
+**Waveform lane**:
+A waveform display for one audio track, used as selection context.
+_Avoid_: audio mix control, editable track lane
+
+**Timeline zoom**:
+A UI scale control for inspecting media-time detail in the selection and waveform surface.
+_Avoid_: project timeline, composition zoom
 
 **Media track**:
 A video, audio, or subtitle stream discovered inside a media asset.
 _Avoid_: waveform lane, stream object
 
+**Subtitle track**:
+A timed text track associated with a media asset.
+_Avoid_: video overlay, transcript, burned-in text
+
+**Subtitle cue**:
+A time-bounded text item inside a subtitle track.
+_Avoid_: frame, marker, waveform label
+
 **Audio mix decision**:
 A user choice that changes how an audio track contributes to exported media.
 _Avoid_: waveform setting, player volume
+
+**Output settings**:
+Editing decisions that describe the intended generated media format and quality.
+_Avoid_: quality modal state, export form state
+
+**Default output profile**:
+The output settings YAFFW uses when the user has not chosen custom export settings.
+_Avoid_: browser default, conversion preset
 
 **Export job**:
 A processing run that applies editing decisions to a media asset and produces generated media.
 _Avoid_: trim request, download action
 
+**Export progress**:
+The current phase and optional completion estimate of a running export job.
+_Avoid_: job dashboard, server event stream
+
+**Export cancellation**:
+A user request to stop a running export job when the current export runner supports stopping safely.
+_Avoid_: closing the app, deleting generated media
+
+**Export review**:
+A pre-export UI state that shows the planned output, export strategy, expected precision, and reason before the user starts an export job.
+_Avoid_: quality modal, advanced export settings
+
 **Generated media**:
 Media produced by an export job.
 _Avoid_: download, trimmed video
 
-**Fallback job**:
-A server-run processing job used only when local editor processing cannot satisfy an import or export need.
-_Avoid_: default export, server trim
+**Delivery action**:
+A user action that saves, downloads, shares, or otherwise moves generated media out of the completed export result.
+_Avoid_: export job, generated media
+
+**Export capability**:
+Whether and how the current processing environment can produce generated media for a media asset and editing decision set.
+_Avoid_: hidden browser support check, codec flag
+
+**Runtime capability**:
+An import, preview, analysis, or export ability available in the environment where YAFFW is currently running.
+_Avoid_: app mode, browser mode, desktop mode
+
+**Supported runtime**:
+A runtime that provides the browser media APIs YAFFW needs for the editor-next workflow.
+_Avoid_: progressive enhancement target, universal browser support
+
+**Smart rendering**:
+An advanced export strategy that re-encodes only the parts of a selection that cannot be copied exactly, stream-copies safe encoded ranges, and combines the pieces into generated media.
+_Avoid_: first-slice requirement, automatic fallback
 
 ## Relationships
 
 - YAFFW edits one active **Media asset** at a time.
+- Editor-next may use an **Editor workbench** UI inspired by professional media editors, but the product model remains a **Single-asset editing session**, not a multi-asset project or composition.
+- The **Editor workbench** frame, including the narrow status rail, is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the left media-asset panel and right export inspector are shown only after a **Ready media asset** exists.
+- The long-run **Editor workbench** direction should favor an Edit-page-style layout: central preview, prominent selection/waveform surface, and inspector-style panels for asset facts, export review, and delivery.
+- In the long-run **Editor workbench**, the left side should answer what media asset is loaded, the center should answer what selection is being chosen, and the right inspector should answer what generated media will be produced.
+- The left **Editor workbench** panel should present compact source, media-track, and **Selection** context for the active **Media asset**; runtime checks, export capability, **Export review**, and **Generated media** status belong together in the inspector side of the workbench.
+- In the ready state, the **Editor workbench** should fit the viewport-height editor composition; overflow belongs inside workbench panels or the selection/waveform surface rather than in an outer page scroll.
+- The ready-state desktop **Editor workbench** should use the resolved workbench proportions: narrow status rail, compact left media-asset panel, central preview, compact right inspector, slim transport strip, and a lower selection/waveform surface around two-fifths of the viewport height.
+- Surrounding **Editor workbench** chrome should use the scoped `.workbench` design tokens that carry the resolved prototype palette and border treatment.
+- The long-run **Editor workbench** should use a balanced Edit-page split: preview remains the visual anchor, while the selection and waveform surface gets enough height to support serious media-time inspection.
+- The **Selection** and **Waveform** interaction surface is a mature editor component; workbench visual-parity changes should preserve its established behavior and visual treatment while placing it in the lower workbench region.
+- The long-run **Editor workbench** should include a narrow status rail for major workbench areas without turning those areas into separate app modes or navigation destinations.
+- **Waveform lane** identity should be embedded inside each lane row using media-track language such as voice or desktop, rather than using separate NLE-style track labels such as V1, A1, or A2.
+- A **Media asset** has **Asset identity** assigned by YAFFW; source details are provenance, not identity.
+- A **Preview resource** may be derived from a **Media asset**, but it is owned by an adapter layer and must be disposed explicitly.
 - An **Import adapter** produces a **Media asset draft**; it does not own editor behavior.
 - A **Media asset draft** is loaded and analyzed into a **Media asset**.
 - A **Media asset** may originate from local file selection or an external URL.
-- A **Ready media asset** has enough known duration and track inventory to accept editing decisions.
-- Metadata, track analysis, waveform rendering, backing storage, and export jobs belong around a **Media asset**; none of them replace it as the editor's central concept.
+- A file prepared or re-encoded outside YAFFW is still just a **Media asset draft** when imported.
+- **Close file** always asks for confirmation, then disposes active preview resources, clears analysis, editing decisions, and any generated media result, and returns to the empty import state.
+- The first slice disables **Close file** while an **Export job** is running.
+- The first slice does not persist editor state across page refreshes, but uses **Unload protection** while an active media asset, running export, or generated media result exists.
+- Editor-next requires a **Supported runtime**; if WebCodecs is unavailable, the app should block access to the editor workflow with a clear unsupported-runtime message.
+- Editor-next is Chromium-first; other browsers are supported only when they provide the needed standards-based media API surface.
+- Runtime entry checks verify basic browser media API support; asset-specific **Export capability** is computed after a media asset is analyzed.
+- In the first slice, a **Ready media asset** must be previewable, have known duration and enough track inventory to edit, and be exportable with the default output profile.
+- If a media asset cannot become ready because default export is unsupported, the UI shows a plain failure message with technical details available on demand.
+- The first slice targets video media with optional audio tracks; video-only media is supported, while audio-only media is deferred and should fail with a clear unsupported-file message.
+- **Asset analysis** records such as metadata, frame rate, track inventory, waveform data, and export capability belong around a **Media asset**; none of them replace it as the editor's central concept.
 - A **Single-asset editing session** owns the active **Media asset** and the **Editing decisions** for that asset.
 - Playback position, fullscreen state, loading progress, and analysis progress are not **Editing decisions**.
+- **Timeline zoom** is inspection state owned by the UI adapter, not an **Editing decision**.
+- **Playback speed** is preview state, not an **Editing decision**.
+- **Preview volume** is preview state, not an **Audio mix decision**.
+- **Selection loop** is preview state, not an **Editing decision**.
+- **Selection loop** starts off for each newly loaded **Media asset**.
+- Preview and transport chrome may follow the resolved **Editor workbench** composition as long as **Playhead**, **Playback speed**, **Preview volume**, fullscreen, seeking, and shortcut behavior are preserved.
+- The **Selection loop** control belongs with preview transport controls because it changes playback behavior, not selection editing or export review.
 - A **Selection** is an **Editing decision**; a **Playhead** is preview state.
+- **Selection** boundaries and **Playhead** position are represented as **Media time**; frame numbers are derived labels when frame metadata is available.
+- **Selection** includes media at or after its start and excludes media at or after its end.
+- When **Selection loop** is enabled, playback outside the current **Selection** continues normally until it enters the selection; once playback has entered the selection, reaching the selection end seeks playback back to the selection start and continues preview playback.
+- Changing **Selection** while **Selection loop** is enabled keeps the loop enabled and re-evaluates whether playback has entered the new selection.
+- A **Selection** must be inside the media asset duration and last at least one known or estimated frame.
+- **Frame timing** may be known from metadata or analysis, or estimated when exact frame timing is not yet available.
+- When **Frame timing** is unknown, frame stepping and minimum **Selection** duration may use an estimated 30 FPS until better metadata or frame analysis is available.
+- A **Ready media asset** starts with a **Selection** covering the full asset duration, represented as `[0, durationUs)`.
+- Resetting **Selection** restores `[0, durationUs)` and does not move the **Playhead**.
+- The **Playhead** may be inside or outside the **Selection**, may equal `durationUs` as an end-position state, and never changes export output by itself.
+- First-slice **Keyboard shortcuts** include Space or K for play/pause, Left/Right for one-second seek, J/L for ten-second seek, Shift+Left/Shift+Right for frame stepping, and [/] for setting selection boundaries to the playhead.
+- Setting **Selection** boundaries with keyboard shortcuts uses the current **Playhead** position and does not move the playhead.
+- **Selection loop** does not have a keyboard shortcut in the first implementation.
+- **Keyboard shortcuts** work at the page level, but are disabled while typing into inputs, while a dialog is active, or while an export job is running.
+- First-slice selection editing uses handles, range-body drag, and keyboard commands; start/end timecode inputs are deferred.
+- The first slice may show read-only **Selection** start, end, and duration labels in `HH:MM:SS.mmm` format.
 - A timeline control may display a **Waveform**, **Playhead**, and **Selection**, but "timeline" is not a domain object in the single-asset editor.
 - A **Media asset** contains zero or more **Media tracks**.
+- A **Subtitle track** is a kind of **Media track**, but subtitle support is deferred beyond the first slice.
+- A **Subtitle cue** is expressed in **Media time** and should be transformed by selection/export rules only when subtitle support is explicitly added.
 - An **Audio mix decision** is an **Editing decision** for one **Media track**.
-- A **Waveform** may be derived from a **Media track**, but it is not the track and is not required for editing.
+- The first slice may show audio track count, labels, and language metadata, but does not expose audio mix controls.
+- **Output settings** are **Editing decisions** even when the UI only supports default output.
+- The **Default output profile** prefers MP4 with H.264 video and AAC audio when the current **Runtime capability** supports it; browser-friendly alternatives such as WebM are fallbacks.
+- The first-slice **Default output profile** does not include a user-defined target bitrate; source bitrate may only be used as an export-runner hint if the runtime needs one.
+- Custom **Output settings** such as target bitrate are future options and may require re-encoding the selected media.
+- A **Waveform** may be derived from a **Media track**, but it is not the track and is not required for readiness or export.
+- The first slice should load per-track **Waveform lanes** progressively for audio tracks when available because separate tracks may carry different selection context, such as desktop audio versus voice.
+- First-slice **Waveform lanes** do not imply audio mix controls.
+- **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context.
+- The first slice shows all available **Waveform lanes** and uses vertical scrolling if the lanes exceed the available viewport.
+- All **Waveform lanes** align to the same **Media time** ruler and share one **Selection** and **Playhead** overlay.
+- Clicking a **Waveform lane** seeks the shared **Playhead** to that media time.
+- Dragging a **Waveform lane** does not create or change **Selection** in the first slice; selection changes use handles, range body drag, or keyboard commands.
+- The first slice includes minimal **Timeline zoom** with horizontal scrolling while keeping waveform lanes, selection, and playhead aligned.
 - An **Export job** consumes one **Media asset** and the session's **Editing decisions**.
+- An **Export job** runs from a snapshot of the **Media asset** and **Editing decisions** captured when the job starts.
+- A running **Export job** reports minimal **Export progress** such as preparing, encoding, muxing, or finalizing.
+- **Export cancellation** is available only when the active export runner can stop safely; the UI should not imply cancellation when it is unsupported.
+- The first slice disables editing changes while an **Export job** is running.
+- **Runtime capability** determines which import, preview, analysis, and export paths are available; it does not create a separate editor model.
+- **Export capability** is checked before an **Export job** starts and should expose the planned export strategy, expected precision, and user-facing reason.
+- If the default output profile is unavailable for the active asset and runtime, the asset does not enter the ready editor in the first slice.
+- The first-slice **Export review** should make export strategy and precision visible without introducing custom output controls.
+- **Export review** should describe export strategies in product language such as fast export or precision export, while implementation labels may remain technical.
+- The first-slice **Export review** shows the chosen export strategy; it does not let the user manually choose between strategies.
+- **Smart rendering** is a future **Export capability**, not a requirement for the first local-file editor slice.
 - An **Export job** produces **Generated media**; saving or downloading that result is a separate delivery concern.
-- **Generated media** may become a **Media asset draft** only through explicit user action.
-- A **Fallback job** may support an **Import adapter** or **Export job**, but it is not the normal editing path.
+- The first slice should require an explicit **Delivery action** such as download after export succeeds; auto-download can be a later preference.
+- The first slice does not preview **Generated media** before delivery.
+- **Generated media** may become a **Media asset draft** only through explicit user action, but this is deferred beyond the first slice.
 
 ## Example dialogue
 

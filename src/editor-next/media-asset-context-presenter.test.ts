@@ -37,7 +37,7 @@ describe("media asset context presenter", () => {
 			{ label: "Primary video", value: "Screen" },
 			{ label: "Resolution", value: "1920x1080" },
 			{ label: "Aspect", value: "16:9" },
-			{ label: "Frame timing", value: "60 fps known" },
+			{ label: "Frame timing", value: "60 fps" },
 			{ label: "Codec", value: "h264" },
 		]);
 		expect(viewModel.audioFacts).toEqual([

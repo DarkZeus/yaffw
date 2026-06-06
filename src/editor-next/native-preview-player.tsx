@@ -4,6 +4,7 @@ import {
 	Maximize2,
 	Pause,
 	Play,
+	Repeat2,
 	Rewind,
 	SkipBack,
 	SkipForward,
@@ -12,11 +13,13 @@ import {
 	VolumeX,
 } from "lucide-react";
 import {
+	type CSSProperties,
 	type ChangeEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -62,21 +65,28 @@ export function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const previewSurfaceRef = useRef<HTMLElement | null>(null);
 	const playheadRef = useRef<MediaTimeUs>(0);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
+	const selectionLoopEnteredRef = useRef(false);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
 	const [playbackRate, setPlaybackRate] = useState(1);
 	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
+	const [previewSurfaceSize, setPreviewSurfaceSize] =
+		useState<PreviewSurfaceSize | null>(null);
 	const [previewUrl, setPreviewUrl] = useState("");
+	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
 	const [volume, setVolume] = useState(1);
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
 		setPreviewUrl(objectUrl);
 		playheadRef.current = 0;
+		selectionLoopEnteredRef.current = false;
 		setPlayheadUsState(0);
 		setIsPlaying(false);
+		setSelectionLoopEnabled(false);
 
 		return () => {
 			URL.revokeObjectURL(objectUrl);
@@ -97,6 +107,15 @@ export function NativePreviewPlayer({
 		[asset.durationUs],
 	);
 
+	const updateSelectionLoopEntryFromPlayhead = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			selectionLoopEnteredRef.current =
+				selectionLoopEnabled &&
+				isMediaTimeInsideSelection(nextPlayheadUs, selection);
+		},
+		[selection, selectionLoopEnabled],
+	);
+
 	const seekToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
 			const video = videoRef.current;
@@ -110,9 +129,10 @@ export function NativePreviewPlayer({
 				video.currentTime = clampedPlayheadUs / 1_000_000;
 			}
 
+			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
 		},
-		[asset.durationUs, setPlayheadUs],
+		[asset.durationUs, setPlayheadUs, updateSelectionLoopEntryFromPlayhead],
 	);
 
 	const seekByUs = useCallback(
@@ -188,6 +208,17 @@ export function NativePreviewPlayer({
 		setMuted(nextMuted);
 	}, [muted]);
 
+	const toggleSelectionLoop = useCallback(() => {
+		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
+			const nextSelectionLoopEnabled = !currentSelectionLoopEnabled;
+			selectionLoopEnteredRef.current =
+				nextSelectionLoopEnabled &&
+				isMediaTimeInsideSelection(playheadRef.current, selection);
+
+			return nextSelectionLoopEnabled;
+		});
+	}, [selection]);
+
 	const requestFullscreen = useCallback(() => {
 		void videoRef.current?.requestFullscreen?.();
 	}, []);
@@ -199,8 +230,55 @@ export function NativePreviewPlayer({
 			return;
 		}
 
-		setPlayheadUs(secondsToMicroseconds(video.currentTime));
-	}, [setPlayheadUs]);
+		const previousPlayheadUs = playheadRef.current;
+		const nativePlayheadUs = secondsToMicroseconds(video.currentTime);
+
+		if (!isPlaying) {
+			updateSelectionLoopEntryFromPlayhead(nativePlayheadUs);
+			setPlayheadUs(nativePlayheadUs);
+			return;
+		}
+
+		if (
+			selectionLoopEnabled &&
+			shouldLoopSelectionPlayback({
+				currentPlayheadUs: nativePlayheadUs,
+				previousPlayheadUs,
+				selection,
+				selectionEntered: selectionLoopEnteredRef.current,
+			})
+		) {
+			selectionLoopEnteredRef.current = true;
+			video.currentTime = selection.startUs / 1_000_000;
+			setPlayheadUs(selection.startUs);
+			return;
+		}
+
+		if (
+			selectionLoopEnabled &&
+			hasPlaybackEnteredSelection({
+				currentPlayheadUs: nativePlayheadUs,
+				previousPlayheadUs,
+				selection,
+			})
+		) {
+			selectionLoopEnteredRef.current = true;
+		}
+
+		setPlayheadUs(nativePlayheadUs);
+	}, [
+		isPlaying,
+		selection,
+		selectionLoopEnabled,
+		setPlayheadUs,
+		updateSelectionLoopEntryFromPlayhead,
+	]);
+
+	useEffect(() => {
+		selectionLoopEnteredRef.current =
+			selectionLoopEnabled &&
+			isMediaTimeInsideSelection(playheadRef.current, selection);
+	}, [selection, selectionLoopEnabled]);
 
 	useEffect(() => {
 		if (!isPlaying) {
@@ -237,9 +315,32 @@ export function NativePreviewPlayer({
 	}, [isPlaying, syncPlayheadWithNativeVideo]);
 
 	const handleEnded = useCallback(() => {
+		const video = videoRef.current;
+
+		if (
+			video &&
+			selectionLoopEnabled &&
+			selectionLoopEnteredRef.current &&
+			selection.endUs >= asset.durationUs
+		) {
+			video.currentTime = selection.startUs / 1_000_000;
+			setPlayheadUs(selection.startUs);
+			setIsPlaying(true);
+			void video.play().catch(() => {
+				setIsPlaying(false);
+			});
+			return;
+		}
+
 		setIsPlaying(false);
 		setPlayheadUs(asset.durationUs);
-	}, [asset.durationUs, setPlayheadUs]);
+	}, [
+		asset.durationUs,
+		selection.endUs,
+		selection.startUs,
+		selectionLoopEnabled,
+		setPlayheadUs,
+	]);
 
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent) => {
@@ -291,6 +392,64 @@ export function NativePreviewPlayer({
 	const canFullscreen =
 		typeof videoRef.current?.requestFullscreen === "function" ||
 		typeof HTMLVideoElement.prototype.requestFullscreen === "function";
+	const previewAspectRatio = getPreviewAspectRatio(asset);
+	const previewApertureStyle = createPreviewApertureStyle(
+		previewAspectRatio,
+		previewSurfaceSize,
+	);
+
+	useLayoutEffect(() => {
+		const previewSurface = previewSurfaceRef.current;
+
+		if (!previewSurface) {
+			return;
+		}
+
+		function measurePreviewSurface() {
+			if (!previewSurface) {
+				return;
+			}
+
+			const rect = previewSurface.getBoundingClientRect();
+			const style = window.getComputedStyle(previewSurface);
+			const width = Math.max(
+				0,
+				rect.width -
+					parseCssPixels(style.paddingLeft) -
+					parseCssPixels(style.paddingRight),
+			);
+			const height = Math.max(
+				0,
+				rect.height -
+					parseCssPixels(style.paddingTop) -
+					parseCssPixels(style.paddingBottom),
+			);
+
+			setPreviewSurfaceSize((currentSize) =>
+				currentSize &&
+				Math.abs(currentSize.width - width) < 0.5 &&
+				Math.abs(currentSize.height - height) < 0.5
+					? currentSize
+					: { height, width },
+			);
+		}
+
+		measurePreviewSurface();
+
+		if (typeof ResizeObserver === "undefined") {
+			window.addEventListener("resize", measurePreviewSurface);
+			return () => {
+				window.removeEventListener("resize", measurePreviewSurface);
+			};
+		}
+
+		const resizeObserver = new ResizeObserver(measurePreviewSurface);
+		resizeObserver.observe(previewSurface);
+
+		return () => {
+			resizeObserver.disconnect();
+		};
+	}, []);
 
 	return (
 		<>
@@ -310,10 +469,14 @@ export function NativePreviewPlayer({
 							<CircleDot
 								aria-hidden="true"
 								className={`size-3 shrink-0 ${
-									isPlaying ? "text-workbench-progress" : "text-workbench-playhead"
+									isPlaying
+										? "text-workbench-progress"
+										: "text-workbench-playhead"
 								}`}
 							/>
-							<span className="font-medium text-foreground">Program viewer</span>
+							<span className="font-medium text-foreground">
+								Program viewer
+							</span>
 							<span className="font-mono text-muted-foreground/70">
 								{playbackRate}x
 							</span>
@@ -338,19 +501,19 @@ export function NativePreviewPlayer({
 							</Button>
 						</div>
 					</div>
-					<div
+					<section
 						aria-label="Preview viewer surface"
 						className="grid min-h-0 flex-1 place-items-center overflow-hidden bg-workbench-viewer p-3 xl:p-4"
-						role="group"
+						ref={previewSurfaceRef}
 					>
-						<div
+						<section
 							aria-label="Preview aperture"
-							className="relative aspect-video w-full max-w-5xl overflow-hidden border border-workbench-border-strong bg-black shadow-2xl"
-							role="group"
+							className="relative max-h-full w-full max-w-5xl overflow-hidden border border-workbench-border-strong bg-black shadow-2xl"
+							style={previewApertureStyle}
 						>
 							<video
 								aria-label={`Preview for ${asset.label}`}
-								className="h-full w-full bg-black object-cover"
+								className="h-full w-full bg-black object-contain"
 								onEnded={handleEnded}
 								onPause={() => setIsPlaying(false)}
 								onPlay={() => setIsPlaying(true)}
@@ -363,8 +526,8 @@ export function NativePreviewPlayer({
 							>
 								<track kind="captions" />
 							</video>
-						</div>
-					</div>
+						</section>
+					</section>
 				</section>
 			</section>
 
@@ -442,6 +605,13 @@ export function NativePreviewPlayer({
 						>
 							<FastForward data-icon="inline-start" />
 						</PreviewIconButton>
+						<PreviewToggleButton
+							label="Loop selection"
+							onClick={toggleSelectionLoop}
+							pressed={selectionLoopEnabled}
+						>
+							<Repeat2 data-icon="inline-start" />
+						</PreviewToggleButton>
 					</div>
 
 					<div
@@ -521,6 +691,100 @@ export function NativePreviewPlayer({
 	);
 }
 
+type PreviewSurfaceSize = {
+	height: number;
+	width: number;
+};
+
+function getPreviewAspectRatio(asset: ReadyMediaAsset): number {
+	const primaryVideo = asset.tracks.video[0];
+	const width = primaryVideo?.width ?? 16;
+	const height = primaryVideo?.height ?? 9;
+
+	if (width <= 0 || height <= 0) {
+		return 16 / 9;
+	}
+
+	return width / height;
+}
+
+function shouldLoopSelectionPlayback({
+	currentPlayheadUs,
+	previousPlayheadUs,
+	selection,
+	selectionEntered,
+}: {
+	currentPlayheadUs: MediaTimeUs;
+	previousPlayheadUs: MediaTimeUs;
+	selection: Selection;
+	selectionEntered: boolean;
+}): boolean {
+	const enteredSelection =
+		selectionEntered ||
+		hasPlaybackEnteredSelection({
+			currentPlayheadUs,
+			previousPlayheadUs,
+			selection,
+		});
+
+	return enteredSelection && currentPlayheadUs >= selection.endUs;
+}
+
+function hasPlaybackEnteredSelection({
+	currentPlayheadUs,
+	previousPlayheadUs,
+	selection,
+}: {
+	currentPlayheadUs: MediaTimeUs;
+	previousPlayheadUs: MediaTimeUs;
+	selection: Selection;
+}): boolean {
+	return (
+		isMediaTimeInsideSelection(currentPlayheadUs, selection) ||
+		(previousPlayheadUs < selection.startUs &&
+			currentPlayheadUs >= selection.startUs)
+	);
+}
+
+function isMediaTimeInsideSelection(
+	playheadUs: MediaTimeUs,
+	selection: Selection,
+): boolean {
+	return playheadUs >= selection.startUs && playheadUs < selection.endUs;
+}
+
+function createPreviewApertureStyle(
+	aspectRatio: number,
+	surfaceSize: PreviewSurfaceSize | null,
+): CSSProperties {
+	if (!surfaceSize || surfaceSize.width <= 0 || surfaceSize.height <= 0) {
+		return {
+			aspectRatio: String(aspectRatio),
+		};
+	}
+
+	const width = Math.min(surfaceSize.width, surfaceSize.height * aspectRatio);
+	const height = width / aspectRatio;
+
+	return {
+		aspectRatio: String(aspectRatio),
+		height: `${formatCssNumber(height)}px`,
+		width: `${formatCssNumber(width)}px`,
+	};
+}
+
+function parseCssPixels(value: string): number {
+	const parsedValue = Number.parseFloat(value);
+
+	return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
+function formatCssNumber(value: number): string {
+	return Number.isInteger(value)
+		? String(value)
+		: value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 function PreviewIconButton({
 	children,
 	label,
@@ -536,6 +800,37 @@ function PreviewIconButton({
 			className="size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
 			onClick={onClick}
 			size="icon"
+			type="button"
+			variant="outline"
+		>
+			{children}
+		</Button>
+	);
+}
+
+function PreviewToggleButton({
+	children,
+	label,
+	onClick,
+	pressed,
+}: {
+	children: ReactNode;
+	label: string;
+	onClick: () => void;
+	pressed: boolean;
+}) {
+	return (
+		<Button
+			aria-label={label}
+			aria-pressed={pressed}
+			className={
+				pressed
+					? "size-8 rounded border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
+					: "size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+			}
+			onClick={onClick}
+			size="icon"
+			title={label}
 			type="button"
 			variant="outline"
 		>

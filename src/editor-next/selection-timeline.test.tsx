@@ -43,7 +43,7 @@ describe("SelectionTimeline", () => {
 				trackIndex: 0,
 			}),
 		).toEqual({
-			metadata: ["Language eng", "AAC", "2 channels"],
+			metadata: ["AAC", "2 channels"],
 			status: {
 				label: "Waveform ready",
 				tone: "ready",
@@ -62,7 +62,7 @@ describe("SelectionTimeline", () => {
 				trackIndex: 1,
 			}),
 		).toEqual({
-			metadata: ["Language unknown", "Codec unknown", "Channels unknown"],
+			metadata: ["Codec unknown", "Channels unknown"],
 			status: {
 				label: "Loading waveform",
 				tone: "pending",
@@ -83,9 +83,9 @@ describe("SelectionTimeline", () => {
 				trackIndex: 2,
 			}),
 		).toEqual({
-			metadata: ["Language unknown", "OPUS", "1 channel"],
+			metadata: ["OPUS", "1 channel"],
 			status: {
-				label: "Waveform unavailable",
+				label: "Waveform generation failed",
 				tone: "unavailable",
 			},
 			title: "Desktop",
@@ -109,17 +109,16 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
 		expect(screen.getByText("Voice")).toBeTruthy();
 		expect(screen.getByText("Game audio")).toBeTruthy();
-		expect(screen.getByText("Language eng")).toBeTruthy();
-		expect(screen.getByText("Language spa")).toBeTruthy();
+		expect(screen.queryByText(/Language/)).toBeNull();
 		expect(screen.getAllByText("AAC").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("2 channels").length).toBeGreaterThan(0);
 
 		await waitFor(() => {
-			expect(screen.getByText("Waveform ready")).toBeTruthy();
 			expect(
-				screen.getAllByText("Waveform unavailable").length,
+				screen.getAllByText("Waveform generation failed").length,
 			).toBeGreaterThan(0);
 		});
+		expect(screen.queryByText("Waveform ready")).toBeNull();
 		expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
 		expect(screen.getByLabelText("Move selection range").parentElement).toBe(
 			screen.getByTestId("selection-timeline-lane-surface"),

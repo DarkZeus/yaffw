@@ -1,165 +1,96 @@
-# YAFFW - Yet Another FFmpeg Wrapper
+# YAFFW
 
-A simple, browser-based video editor built with React and FFmpeg. Trim, convert (TBD), and concatenate (TBD) videos with an intuitive interface and keyboard shortcuts.
+YAFFW is a local-first media editor for personal video editing workflows. The current rewrite centers on `editor-next`: a single-asset editor workbench for loading a local video, previewing it, choosing a media-time Selection, reviewing export capability, running a browser export job, and explicitly delivering the Generated media.
 
-![Video Editor Screenshot](https://github.com/DarkZeus/yaffw/blob/master/public/image.png?raw=true)
+The long-term product is no longer an FFmpeg-wrapper UI. Legacy server-backed editor and bulk-download routes still exist while the browser-first editor model is being proven, but new editor work should follow the domain language in [CONTEXT.md](./CONTEXT.md).
 
-> **⚠️ Personal Project Disclaimer**  
-> This project is highly opinionated and was built specifically to address my personal video editing workflow needs. While it's open source and you're welcome to use or fork it, please note that feature requests, extensive customizations, or significant architectural changes may not align with the project's focused scope. Consider it a reference implementation rather than a general-purpose solution.
+## Current Surface
 
-## ✨ Features
+- `/editor-next`: current rewrite path for local-file editing.
+- `/`: legacy media editor surface.
+- `/bulk-download`: legacy acquisition surface.
 
-### ✅ **Current Features (Alpha)**
-- **🎬 Video Trimming** - Precise start/end point selection with timeline scrubbing
-- **📱 Streaming Upload** - Handle large video files with progress tracking
-- **⚡ Fast Processing** - Stream copy for trimming (no re-encoding)
+## Editor-Next Capabilities
 
-### 🚧 **Planned for Alpha Release**
-- **🔄 Format Conversion** - Convert between MP4, AVI, MOV, WebM, and more
-- **🔗 Video Concatenation** - Merge multiple videos seamlessly
+- Local file import into a Ready media asset.
+- Runtime gate for browser media APIs, with Chromium/WebCodecs as the primary target.
+- Native video preview with playhead, frame stepping, playback speed, volume, fullscreen, and keyboard controls.
+- Media-time Selection represented as half-open integer microsecond ranges.
+- Selection handles, range dragging, read-only time labels, zoom, and waveform lanes for audio tracks when available.
+- Export review for the default MP4/H.264/AAC output profile.
+- Browser export through Mediabunny/WebCodecs with explicit Generated media delivery.
+- Export failure and cancellation recovery that keeps the active media asset and Selection retryable.
 
-### User Experience
-- **⌨️ Keyboard Shortcuts** - Professional editing shortcuts (Space, J/K, I/O, etc.)
-- **🎯 Real-time Preview** - Immediate video playback with timeline navigation
-- **📊 Video Analytics** - Detailed metadata display (resolution, bitrate, codec, etc.)
-- **🎨 Modern UI** - Built with Tailwind CSS and shadcn/ui components
-- **📱 Responsive Design** - Works on desktop and tablet devices
+## Export Correctness
 
-## 🛠️ Tech Stack
+The current export truth is documented in [docs/export-correctness-browser-baseline.md](./docs/export-correctness-browser-baseline.md).
 
-### Frontend
-- **React 19** with TypeScript
-- **TanStack Router** for routing
-- **TanStack Query** for API state management
-- **Tailwind CSS** for styling
-- **shadcn/ui** for UI components
-- **React Player** for video playback
-- **React Dropzone** for file uploads
+Short version:
 
-### Backend
-- **Hono** - Fast web framework
-- **FFmpeg** - Video processing engine
-- **Node.js** with TypeScript
-- **Chunked file upload** support
+- Full-asset browser export is the strongest current path when the default profile is supported.
+- Selected-range browser export uses Mediabunny conversion as the intended precision path, but it should not be described as proven precise until real-runner generated-media evidence proves requested duration plus start/end boundaries.
+- Native FFmpeg is not the next step. It should be considered only if real Mediabunny boundary or audio/video alignment measurements expose a browser limitation that cannot be fixed in the browser runner.
 
-## 🚀 Quick Start
+## Project Docs
 
-### Prerequisites
-- **Node.js** 18+ and **pnpm**
-- **FFmpeg** installed and accessible via command line
+- [CONTEXT.md](./CONTEXT.md): domain language and current product model.
+- [docs/adr](./docs/adr): architectural decision records. Keep these as durable decision history; add a new ADR or mark one superseded instead of deleting useful decisions.
+- [docs/export-correctness-browser-baseline.md](./docs/export-correctness-browser-baseline.md): current browser export evidence and follow-up direction.
+- [docs/editor-next-future-subtitles.md](./docs/editor-next-future-subtitles.md): deferred subtitle support notes.
 
-### Installation
+Completed PRDs and issue implementation plans should stay in GitHub issue history rather than as long-lived repo docs once their decisions are captured in ADRs, `CONTEXT.md`, tests, or current baseline docs.
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd yaffw
-   ```
+## Tech Stack
 
-2. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
+- React 19 and TypeScript.
+- TanStack Router and TanStack Query.
+- Tailwind CSS and shadcn-style Radix components.
+- Mediabunny and WebCodecs for browser media analysis/export.
+- Hono server routes for legacy upload, URL acquisition, and bulk-download workflows.
+- Vitest for tests.
 
-3. **Verify FFmpeg installation**
-   ```bash
-   ffmpeg -version
-   ```
+## Development
 
-### Running the Application
+Install dependencies:
 
-1. **Start the servers**
-   ```bash
-   pnpm dev
-   ```
-   Frontend runs on `http://localhost:3000` backend runs on `http://localhost:3001`
-
-2. **Open your browser**
-   Navigate to `http://localhost:3000`
-
-## 📖 Usage Guide
-
-### Current Workflow (Alpha)
-
-1. **📂 Upload Video**
-   - Drag & drop video files or click to browse
-   - Supports: MP4, AVI, MOV, MKV, WebM
-   - Large files upload with progress tracking
-
-2. **✂️ Trim Video**
-   - Use the timeline slider to set start/end points
-   - Press `J` to set trim start, `K` to set trim end
-   - Preview your selection in real-time
-   - Press `Enter` or click "Trim Video" to process
-   - Download the trimmed result
-
-### 🚧 Coming Soon (Alpha Release)
-- **🔄 Format Conversion** - Convert between different video formats
-- **🔗 Video Concatenation** - Merge multiple videos into one
-
-### ⌨️ Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Space` | Play/Pause |
-| `←` `→` | Seek 5 seconds |
-| `Shift + ←` `→` | Seek 1 second |
-| `J` | Set trim start point |
-| `K` | Set trim end point |
-| `I` | Jump to trim start |
-| `O` | Jump to trim end |
-| `Home` | Jump to beginning |
-| `End` | Jump to end |
-| `Enter` | Export/Trim video |
-| `R` | Reset trim points |
-
-### Development Roadmap
-
-**Current (Pre-Alpha):**
-- ✅ Video trimming with timeline controls
-- ✅ Chunked file upload for large videos  
-- ✅ Keyboard shortcuts and professional UI
-
-**Alpha Release Goals:**
-- 🚧 Format conversion (MP4, AVI, MOV, WebM)
-- 🚧 Video concatenation  
-- 🚧 Batch processing support
-
-**Future Enhancements:**
-- 🔮 Audio track editing
-- 🔮 Basic video filters
-- 🔮 Subtitle support
-- 🔮 Cloud storage integration
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**FFmpeg not found:**
 ```bash
-# Install FFmpeg
-# Windows: Download from https://ffmpeg.org/
-# macOS: brew install ffmpeg
-# Linux: apt install ffmpeg
+pnpm install
 ```
 
-**Large file upload fails:**
-- Check disk space in `uploads/` directory
-- Increase server timeout limits
-- Verify FFmpeg memory limits
+Run the full legacy-plus-frontend development stack:
 
-**Video corruption:**
-- Try trimming out corrupted sections
-- Use format conversion to fix minor issues
-- Check original recording software settings
+```bash
+pnpm dev
+```
 
-## 🙏 Acknowledgments
+Run only the Vite frontend on port 3000:
 
-- **FFmpeg** - The backbone of video processing
-- **shadcn/ui** - Beautiful, accessible UI components
-- **TanStack** - Excellent React ecosystem tools
-- **Hono** - Fast and lightweight web framework
+```bash
+pnpm frontend
+```
 
----
+Verify the editor-next TypeScript boundary:
 
-**Built with ❤️ for video creators and developers**
+```bash
+npm run typecheck
+```
+
+Run tests:
+
+```bash
+npm run test
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+## Working Rules
+
+- Prefer browser-local editor processing for editor-next.
+- Keep acquisition and bulk download behavior out of the editor core.
+- Model generated media separately from delivery actions.
+- Preserve the single-asset editing session model until a future feature earns a broader model.
+- Do not add server export fallback, native FFmpeg, smart rendering, custom output settings, or generated-media preview without a concrete decision record.

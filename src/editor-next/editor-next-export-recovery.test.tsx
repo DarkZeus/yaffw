@@ -66,7 +66,7 @@ describe("editor-next export recovery", () => {
 			expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
 			expect(screen.getByText("Default export failed.")).toBeTruthy();
@@ -85,9 +85,7 @@ describe("editor-next export recovery", () => {
 		);
 		expect(technicalDetails?.open).toBe(true);
 		expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: "Start default export" }),
-		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 
 		const localFileInput = screen.queryByLabelText("Local video file");
 		if (localFileInput instanceof HTMLElement) {
@@ -98,7 +96,7 @@ describe("editor-next export recovery", () => {
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 
 		await waitFor(() => {
-			expect(screen.getByText("Best-effort export")).toBeTruthy();
+			expect(screen.getByText("Standard export")).toBeTruthy();
 		});
 		expect(screen.queryByText("Default export failed.")).toBeNull();
 	});
@@ -143,10 +141,12 @@ describe("editor-next export recovery", () => {
 			expect(screen.getByLabelText("Preview for cancel.mp4")).toBeTruthy();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start default export" }));
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Cancel export" })).toBeTruthy();
+			expect(
+				screen.getByRole("button", { name: "Cancel export" }),
+			).toBeTruthy();
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Cancel export" }));
 
@@ -155,9 +155,7 @@ describe("editor-next export recovery", () => {
 		});
 
 		expect(screen.getByLabelText("Preview for cancel.mp4")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: "Start default export" }),
-		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 		expect(exportRun).toHaveBeenCalledTimes(1);
 	});
 });

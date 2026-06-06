@@ -79,13 +79,14 @@ function videoFactsForAsset(
 		},
 		{
 			label: "Aspect",
-			value: formatAspectRatio(primaryVideoTrack?.width, primaryVideoTrack?.height),
+			value: formatAspectRatio(
+				primaryVideoTrack?.width,
+				primaryVideoTrack?.height,
+			),
 		},
 		{
 			label: "Frame timing",
-			value: `${formatNumber(asset.frameTiming.fps)} fps ${
-				asset.frameTiming.source === "known" ? "known" : "estimated"
-			}`,
+			value: formatFrameTiming(asset.frameTiming),
 		},
 		{ label: "Codec", value: primaryVideoTrack?.codec ?? "Unknown" },
 	];
@@ -114,7 +115,7 @@ function audioFactsForAsset(
 			value: formatSampleRate(primaryAudioTrack.sampleRate),
 		},
 		{ label: "Codec", value: primaryAudioTrack.codec ?? "Unknown" },
-		{ label: "Language", value: primaryAudioTrack.language ?? "und" },
+		{ label: "Language", value: formatLanguage(primaryAudioTrack.language) },
 	];
 }
 
@@ -213,6 +214,24 @@ function formatSampleRate(sampleRate?: number): string {
 	}
 
 	return `${sampleRate} Hz`;
+}
+
+function formatFrameTiming(
+	frameTiming: ReadyMediaAsset["frameTiming"],
+): string {
+	const fps = `${formatNumber(frameTiming.fps)} fps`;
+
+	return frameTiming.source === "estimated" ? `${fps} estimated` : fps;
+}
+
+function formatLanguage(language?: string): string {
+	const normalizedLanguage = language?.trim();
+
+	if (!normalizedLanguage || normalizedLanguage.toLowerCase() === "und") {
+		return "Unknown";
+	}
+
+	return normalizedLanguage;
 }
 
 function formatNumber(value: number): string {

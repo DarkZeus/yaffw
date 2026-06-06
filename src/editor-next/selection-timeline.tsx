@@ -1,4 +1,10 @@
-import { AudioWaveform, LocateFixed, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import {
+	AudioWaveform,
+	LocateFixed,
+	RotateCcw,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import { ALL_FORMATS, AudioBufferSink, BlobSource, Input } from "mediabunny";
 import {
 	type MouseEvent as ReactMouseEvent,
@@ -12,6 +18,11 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
 	AudioMediaTrack,
 	MediaTimeUs,
@@ -580,130 +591,134 @@ export function SelectionTimeline({
 							minWidth: `${zoom * 100}%`,
 						}}
 					>
-					<button
-						aria-label="Seek timeline ruler"
-						className="relative block h-12 w-full cursor-crosshair border-0 border-b border-workbench-border bg-workbench-ruler p-0 text-left"
-						onMouseDown={(event) => {
-							if (shouldUseMouseFallback()) {
-								seekFromLanePointer(event);
-							}
-						}}
-						onPointerDown={seekFromLanePointer}
-						type="button"
-					>
-						{timeMarkers.map((marker) => (
-							<div
-								className="absolute top-0 flex h-full -translate-x-px flex-col items-center justify-end gap-1 pb-1"
-								key={marker.timeUs}
-								style={{ left: `${marker.percent}%` }}
-							>
-								<div className="h-4 w-px bg-workbench-border-strong" />
-								<span className="font-mono text-[11px] text-muted-foreground">
-									{formatMediaTime(marker.timeUs)}
-								</span>
-							</div>
-						))}
-					</button>
-
-					<div
-						className="relative min-h-0 flex-1"
-						data-testid="selection-timeline-lane-surface"
-					>
-						<div className="relative max-h-72 overflow-y-auto">
-							{asset.tracks.audio.length > 0 ? (
-								asset.tracks.audio.map((track, trackIndex) => (
-									<WaveformLane
-										key={track.id}
-										lane={laneStates[track.id] ?? { status: "loading", track }}
-										onPointerDown={seekFromLanePointer}
-										trackIndex={trackIndex}
-									/>
-								))
-							) : (
-								<div className="grid min-h-24 place-items-center border-b border-workbench-border px-4 text-sm text-muted-foreground">
-									No audio tracks available for waveform lanes.
+						<button
+							aria-label="Seek timeline ruler"
+							className="relative block h-12 w-full cursor-crosshair border-0 border-b border-workbench-border bg-workbench-ruler p-0 text-left"
+							onMouseDown={(event) => {
+								if (shouldUseMouseFallback()) {
+									seekFromLanePointer(event);
+								}
+							}}
+							onPointerDown={seekFromLanePointer}
+							type="button"
+						>
+							{timeMarkers.map((marker) => (
+								<div
+									className="absolute top-0 h-full w-0 -translate-x-px"
+									key={marker.timeUs}
+									style={{ left: `${marker.percent}%` }}
+								>
+									<div className="absolute bottom-5 left-0 h-4 w-px bg-workbench-border-strong" />
+									<span
+										className={`absolute bottom-1 whitespace-nowrap font-mono text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
+									>
+										{formatMediaTime(marker.timeUs)}
+									</span>
 								</div>
-							)}
-						</div>
+							))}
+						</button>
 
 						<div
-							aria-hidden="true"
-							className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
-							data-testid="selection-range-outline"
-							style={{
-								left: `${selectionStartPercent}%`,
-								width: `${selectionEndPercent - selectionStartPercent}%`,
-							}}
-						/>
-						<button
-							aria-label="Move selection range"
-							className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
-							disabled={selectionEditingDisabled}
-							onMouseDown={(event) => {
-								if (shouldUseMouseFallback()) {
-									beginRangeDrag(event);
-								}
-							}}
-							onPointerDown={beginRangeDrag}
-							style={{
-								left: `${selectionStartPercent}%`,
-								width: `${selectionEndPercent - selectionStartPercent}%`,
-							}}
-							type="button"
-						/>
-						<button
-							aria-label="Selection start handle"
-							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-							disabled={selectionEditingDisabled}
-							onMouseDown={(event) => {
-								if (shouldUseMouseFallback()) {
-									beginHandleDrag(event, "start");
-								}
-							}}
-							onPointerDown={(event) => beginHandleDrag(event, "start")}
-							style={{ left: `${selectionStartPercent}%` }}
-							type="button"
+							className="relative min-h-0 flex-1"
+							data-testid="selection-timeline-lane-surface"
 						>
-							<span
-								className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
-								data-testid="selection-start-handle-rail"
+							<div className="relative max-h-72 overflow-y-auto">
+								{asset.tracks.audio.length > 0 ? (
+									asset.tracks.audio.map((track, trackIndex) => (
+										<WaveformLane
+											key={track.id}
+											lane={
+												laneStates[track.id] ?? { status: "loading", track }
+											}
+											onPointerDown={seekFromLanePointer}
+											trackIndex={trackIndex}
+										/>
+									))
+								) : (
+									<div className="grid min-h-24 place-items-center border-b border-workbench-border px-4 text-sm text-muted-foreground">
+										No audio tracks available for waveform lanes.
+									</div>
+								)}
+							</div>
+
+							<div
+								aria-hidden="true"
+								className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
+								data-testid="selection-range-outline"
+								style={{
+									left: `${selectionStartPercent}%`,
+									width: `${selectionEndPercent - selectionStartPercent}%`,
+								}}
 							/>
-						</button>
-						<button
-							aria-label="Selection end handle"
-							className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-							disabled={selectionEditingDisabled}
-							onMouseDown={(event) => {
-								if (shouldUseMouseFallback()) {
-									beginHandleDrag(event, "end");
-								}
-							}}
-							onPointerDown={(event) => beginHandleDrag(event, "end")}
-							style={{ left: `${selectionEndPercent}%` }}
-							type="button"
-						>
-							<span
-								className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
-								data-testid="selection-end-handle-rail"
+							<button
+								aria-label="Move selection range"
+								className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+								disabled={selectionEditingDisabled}
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										beginRangeDrag(event);
+									}
+								}}
+								onPointerDown={beginRangeDrag}
+								style={{
+									left: `${selectionStartPercent}%`,
+									width: `${selectionEndPercent - selectionStartPercent}%`,
+								}}
+								type="button"
 							/>
-						</button>
-						<button
-							aria-label="Playhead handle"
-							className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
-							onMouseDown={(event) => {
-								if (shouldUseMouseFallback()) {
-									beginPlayheadDrag(event);
-								}
-							}}
-							onPointerDown={beginPlayheadDrag}
-							style={{ left: `${playheadPercent}%` }}
-							type="button"
-						>
-							<span className="relative block w-0.5 bg-workbench-playhead">
-								<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
-							</span>
-						</button>
-					</div>
+							<button
+								aria-label="Selection start handle"
+								className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+								disabled={selectionEditingDisabled}
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										beginHandleDrag(event, "start");
+									}
+								}}
+								onPointerDown={(event) => beginHandleDrag(event, "start")}
+								style={{ left: `${selectionStartPercent}%` }}
+								type="button"
+							>
+								<span
+									className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
+									data-testid="selection-start-handle-rail"
+								/>
+							</button>
+							<button
+								aria-label="Selection end handle"
+								className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+								disabled={selectionEditingDisabled}
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										beginHandleDrag(event, "end");
+									}
+								}}
+								onPointerDown={(event) => beginHandleDrag(event, "end")}
+								style={{ left: `${selectionEndPercent}%` }}
+								type="button"
+							>
+								<span
+									className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
+									data-testid="selection-end-handle-rail"
+								/>
+							</button>
+							<button
+								aria-label="Playhead handle"
+								className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										beginPlayheadDrag(event);
+									}
+								}}
+								onPointerDown={beginPlayheadDrag}
+								style={{ left: `${playheadPercent}%` }}
+								type="button"
+							>
+								<span className="relative block w-0.5 bg-workbench-playhead">
+									<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
+								</span>
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -844,7 +859,7 @@ function WaveformLane({
 				) : null}
 				{lane.status === "unavailable" ? (
 					<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
-						Waveform unavailable
+						Waveform generation failed
 					</div>
 				) : null}
 			</button>
@@ -860,25 +875,23 @@ function LaneStatus({
 	status: WaveformLaneIdentityViewModel["status"];
 }) {
 	if (status.tone === "ready") {
-		return (
-			<Badge
-				className="bg-workbench-progress/15 text-workbench-progress"
-				variant="secondary"
-			>
-				{status.label}
-			</Badge>
-		);
+		return null;
 	}
 
 	if (lane.status === "unavailable") {
 		return (
-			<Badge
-				className="border-workbench-border-strong text-muted-foreground"
-				title={lane.reason}
-				variant="outline"
-			>
-				{status.label}
-			</Badge>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Badge
+						className="pointer-events-auto border-destructive/45 bg-destructive/15 text-destructive"
+						tabIndex={0}
+						variant="outline"
+					>
+						{status.label}
+					</Badge>
+				</TooltipTrigger>
+				<TooltipContent className="max-w-80">{lane.reason}</TooltipContent>
+			</Tooltip>
 		);
 	}
 
@@ -901,23 +914,12 @@ export function createWaveformLaneIdentityViewModel({
 
 	return {
 		metadata: [
-			formatTrackLanguage(track.language),
 			formatTrackCodec(track.codec),
 			formatTrackChannels(track.channels),
 		],
 		status: formatWaveformLaneStatus(status),
 		title,
 	};
-}
-
-function formatTrackLanguage(language: string | undefined) {
-	const normalizedLanguage = language?.trim();
-
-	if (!normalizedLanguage || normalizedLanguage.toLowerCase() === "und") {
-		return "Language unknown";
-	}
-
-	return `Language ${normalizedLanguage}`;
 }
 
 function formatTrackCodec(codec: string | undefined) {
@@ -954,7 +956,7 @@ function formatWaveformLaneStatus(
 			};
 		case "unavailable":
 			return {
-				label: "Waveform unavailable",
+				label: "Waveform generation failed",
 				tone: "unavailable",
 			};
 	}
@@ -1212,16 +1214,31 @@ function cancelTimelineFrame(frameId: number) {
 }
 
 function createTimeMarkers(durationUs: MediaTimeUs, zoom: number) {
-	const markerCount = Math.max(5, Math.min(17, Math.round(5 + zoom * 3)));
+	const markerCount = Math.max(5, Math.min(17, Math.round(2 + zoom * 3)));
 
 	return Array.from({ length: markerCount }, (_, index) => {
 		const percent = markerCount === 1 ? 0 : (index / (markerCount - 1)) * 100;
 
 		return {
+			placement:
+				index === 0 ? "start" : index === markerCount - 1 ? "end" : "middle",
 			percent,
 			timeUs: Math.round((durationUs * percent) / 100),
 		};
 	});
+}
+
+function timeMarkerLabelClassName(
+	placement: ReturnType<typeof createTimeMarkers>[number]["placement"],
+) {
+	switch (placement) {
+		case "end":
+			return "right-0 text-right";
+		case "middle":
+			return "left-0 -translate-x-1/2 text-center";
+		case "start":
+			return "left-0 text-left";
+	}
 }
 
 function mediaTimeFromClientX(

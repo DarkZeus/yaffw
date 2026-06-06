@@ -1,8 +1,8 @@
 import {
 	AlertTriangle,
 	AudioLines,
-	BarChart3,
 	BadgeCheck,
+	BarChart3,
 	Download,
 	FileVideo,
 	Film,
@@ -53,24 +53,24 @@ import {
 } from "@/editor-core/session";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
 import {
-	browserDefaultExportRunner,
 	type DefaultExportRunner,
+	browserDefaultExportRunner,
 	isDefaultExportCancelledError,
 } from "./default-export-runner";
 import {
-	deliverBrowserGeneratedMedia,
-	type GeneratedMediaDeliveryRequest,
-} from "./generated-media-delivery";
-import {
-	createExportInspectorViewModel,
 	type ExportInspectorActionViewModel,
 	type ExportInspectorCapabilityViewModel,
 	type ExportInspectorRuntimeCheckViewModel,
 	type ExportInspectorStatusViewModel,
+	createExportInspectorViewModel,
 } from "./export-inspector-presenter";
 import {
-	createMediaAssetContextViewModel,
+	type GeneratedMediaDeliveryRequest,
+	deliverBrowserGeneratedMedia,
+} from "./generated-media-delivery";
+import {
 	type MediaAssetContextFact,
+	createMediaAssetContextViewModel,
 } from "./media-asset-context-presenter";
 import { NativePreviewPlayer } from "./native-preview-player";
 
@@ -93,7 +93,8 @@ type EditorNextRouteProps = {
 	now?: () => number;
 };
 
-const mockUploadedMediaPreviewPosterSrc = "/editor-workbench-prototype-frame.jpg";
+const mockUploadedMediaPreviewPosterSrc =
+	"/editor-workbench-prototype-frame.jpg";
 
 export function EditorNextRoute({
 	createAssetId = () => createBrowserId("asset"),
@@ -690,7 +691,7 @@ function EditorSessionShell({
 		>
 			<section
 				aria-label="Workbench media asset region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-workbench-border-strong xl:bg-workbench-inspector"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-workbench-border-strong xl:bg-workbench-inspector xl:[contain:layout_paint]"
 			>
 				<ActiveMediaAssetContext
 					closeFileDisabled={closeFileDisabled}
@@ -716,7 +717,7 @@ function EditorSessionShell({
 
 			<aside
 				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-workbench-border-strong xl:bg-workbench-inspector"
+				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-workbench-border-strong xl:bg-workbench-inspector xl:[contain:layout_paint]"
 			>
 				<ExportInspectorPanel
 					asset={session.asset}
@@ -785,7 +786,7 @@ function CompactTrackRow({
 	icon: AnalyticsIconElement;
 	label: string;
 	meta: string;
-	status: string;
+	status?: string;
 }) {
 	return (
 		<div className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded border border-workbench-border bg-workbench-lane px-2 py-1.5">
@@ -803,12 +804,14 @@ function CompactTrackRow({
 					{meta}
 				</div>
 			</div>
-			<Badge
-				className="border-workbench-border bg-workbench-hover text-[10px] text-workbench-progress"
-				variant="outline"
-			>
-				{status}
-			</Badge>
+			{status ? (
+				<Badge
+					className="border-workbench-border bg-workbench-hover text-[10px] text-workbench-progress"
+					variant="outline"
+				>
+					{status}
+				</Badge>
+			) : null}
 		</div>
 	);
 }
@@ -946,7 +949,7 @@ function ActiveMediaAssetContext({
 							key={track.id}
 							label={track.label ?? `Video ${trackIndex + 1}`}
 							meta={formatVideoTrackMeta(track)}
-							status="Previewable"
+							status="Preview"
 						/>
 					))}
 					{session.asset.tracks.audio.map((track, trackIndex) => (
@@ -955,7 +958,6 @@ function ActiveMediaAssetContext({
 							key={track.id}
 							label={track.label ?? `Audio ${trackIndex + 1}`}
 							meta={formatAudioTrackMeta(track)}
-							status="ready"
 						/>
 					))}
 					{session.asset.tracks.audio.length === 0 ? (
@@ -1128,16 +1130,16 @@ function ExportInspectorPanel({
 		>
 			<WorkbenchPanelHeader
 				icon={<PackageCheck />}
-				title="Export inspector"
+				title="Export"
 				trailing={
-				<Badge
-					className="shrink-0"
-					variant={
-						viewModel.badge.tone === "ready" ? "secondary" : "destructive"
-					}
-				>
-					{viewModel.badge.label}
-				</Badge>
+					<Badge
+						className="shrink-0"
+						variant={
+							viewModel.badge.tone === "ready" ? "secondary" : "destructive"
+						}
+					>
+						{viewModel.badge.label}
+					</Badge>
 				}
 			/>
 
@@ -1149,32 +1151,26 @@ function ExportInspectorPanel({
 					<div className="mb-2 flex items-start justify-between gap-3">
 						<div>
 							<h3 className="text-sm font-semibold text-foreground">
-								Export review
+								Export settings
 							</h3>
 							<div className="text-[11px] text-muted-foreground">
-								Start-time snapshot
+								Current settings
 							</div>
 						</div>
-						<Badge
-							className="border-workbench-selected/40 bg-workbench-selected/10 text-workbench-selected"
-							variant="outline"
-						>
-							{viewModel.badge.label}
-						</Badge>
 					</div>
 					<div className="space-y-2">
 						<InspectorLine
-							label="Output"
+							label={viewModel.review.plannedOutput.label}
 							value={viewModel.review.plannedOutput.value}
 						/>
 						{viewModel.review.supported ? (
 							<>
 								<InspectorLine
-									label="Strategy"
+									label={viewModel.review.method.label}
 									value={viewModel.review.method.value}
 								/>
 								<InspectorLine
-									label="Precision"
+									label={viewModel.review.precision.label}
 									value={viewModel.review.precision.value}
 								/>
 								<InspectorLine
@@ -1194,11 +1190,6 @@ function ExportInspectorPanel({
 				<RuntimeChecksSection
 					capability={viewModel.capability}
 					checks={viewModel.runtimeChecks}
-					selectedRange={
-						viewModel.review.supported
-							? viewModel.review.precision.value
-							: "Blocked"
-					}
 				/>
 				<ExportJobStatus
 					deliveryAction={deliveryAction}
@@ -1221,38 +1212,30 @@ function ExportInspectorPanel({
 function RuntimeChecksSection({
 	capability,
 	checks,
-	selectedRange,
 }: {
 	capability: ExportInspectorCapabilityViewModel;
 	checks: ExportInspectorRuntimeCheckViewModel[];
-	selectedRange: string;
 }) {
 	const runtimeReady = checks.every((check) => check.available);
 
 	return (
 		<section
-			aria-label="Runtime checks"
+			aria-label="Export requirements"
 			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
 		>
 			<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
 				<Gauge aria-hidden="true" className="size-4 text-workbench-progress" />
-				Capability
+				Requirements
 			</div>
 			<ul className="flex flex-col gap-2 text-[11px] text-muted-foreground">
 				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">Default profile</span>
+					<span className="min-w-0 truncate">MP4 export</span>
 					<CompactStatusBadge tone={capability.tone}>
 						{capability.value === "Ready" ? "Supported" : "Blocked"}
 					</CompactStatusBadge>
 				</li>
 				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">Selected range</span>
-					<CompactStatusBadge tone={capability.tone}>
-						{selectedRange}
-					</CompactStatusBadge>
-				</li>
-				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">Runtime checks</span>
+					<span className="min-w-0 truncate">Browser APIs</span>
 					<CompactStatusBadge tone={runtimeReady ? "ready" : "blocked"}>
 						{runtimeReady ? "Ready" : "Missing"}
 					</CompactStatusBadge>
@@ -1395,7 +1378,7 @@ function ExportReviewActions({
 					type="button"
 				>
 					<Download data-icon="inline-start" />
-					Download generated media
+					{action.label}
 				</Button>
 			</GeneratedMediaActionShell>
 		);
@@ -1428,10 +1411,10 @@ function GeneratedMediaActionShell({ children }: { children: ReactNode }) {
 					aria-hidden="true"
 					className="size-4 text-workbench-progress"
 				/>
-				Generated media
+				Export file
 			</div>
 			<div className="mb-2 text-[11px] leading-4 text-muted-foreground">
-				No generated media yet. Export and delivery stay separate.
+				No export yet.
 			</div>
 			{children}
 		</section>
@@ -1482,7 +1465,7 @@ function RuntimeChecksPanel({
 }) {
 	return (
 		<section className="flex flex-col gap-3 rounded-md border bg-card p-4">
-			<h2 className="text-sm font-semibold tracking-tight">Runtime checks</h2>
+			<h2 className="text-sm font-semibold tracking-tight">Browser support</h2>
 			<ul className="flex flex-col gap-3 text-sm text-muted-foreground">
 				{runtimeCheckRows(session.runtime).map((row) => (
 					<li
@@ -1526,9 +1509,7 @@ function runtimeCheckRows(runtime: EditorSessionState["runtime"]) {
 	];
 }
 
-function createMockUploadedMediaFixture(
-	runtime: RuntimeSupport,
-): {
+function createMockUploadedMediaFixture(runtime: RuntimeSupport): {
 	session: Extract<EditorSessionState, { status: "ready" }>;
 	source: Blob;
 } {
@@ -1642,7 +1623,28 @@ function formatVideoTrackMeta(
 function formatAudioTrackMeta(
 	track: ReadyMediaAsset["tracks"]["audio"][number],
 ): string {
-	return track.language?.trim() || "und";
+	const facts = [
+		formatAudioChannels(track.channels),
+		track.sampleRate ? `${formatNumber(track.sampleRate / 1000)} kHz` : null,
+	].filter((fact): fact is string => Boolean(fact));
+
+	return facts.length > 0 ? facts.join(", ") : "Audio track";
+}
+
+function formatAudioChannels(channels?: number): string | null {
+	if (!channels || channels <= 0) {
+		return null;
+	}
+
+	if (channels === 1) {
+		return "Mono";
+	}
+
+	if (channels === 2) {
+		return "Stereo";
+	}
+
+	return `${channels} channels`;
 }
 
 function formatSelectionCoverage(
@@ -1657,7 +1659,7 @@ function formatSelectionCoverage(
 }
 
 function formatRuntimeSummary(runtime: RuntimeSupport): string {
-	return runtime.supported ? "Chromium WebCodecs ready" : "Runtime blocked";
+	return runtime.supported ? "WebCodecs ready" : "Runtime blocked";
 }
 
 function SessionStatusLine({
@@ -1766,7 +1768,9 @@ function formatTopBarFrameTiming(asset: ReadyMediaAsset): string {
 		? String(asset.frameTiming.fps)
 		: asset.frameTiming.fps.toFixed(2);
 
-	return `${fps} fps ${asset.frameTiming.source}`;
+	return asset.frameTiming.source === "estimated"
+		? `${fps} fps estimated`
+		: `${fps} fps`;
 }
 
 function createGeneratedMedia({
