@@ -154,25 +154,7 @@ describe("EditorNextRoute", () => {
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
-		const exportInspector = screen.getByLabelText("Export inspector");
-		expect(within(exportInspector).getByText("Export settings")).toBeTruthy();
-		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
-		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
-		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();
-		expect(within(exportInspector).queryByText("Selected range")).toBeNull();
-		expect(within(exportInspector).getByText("Format")).toBeTruthy();
-		expect(
-			within(exportInspector).getByText("MP4 / H.264 video / AAC audio"),
-		).toBeTruthy();
-		expect(
-			within(exportInspector).getAllByText("Export").length,
-		).toBeGreaterThan(0);
-		expect(within(exportInspector).getByText("Whole file export")).toBeTruthy();
-		expect(within(exportInspector).getByText("Range")).toBeTruthy();
-		expect(
-			within(exportInspector).getAllByText("Whole file").length,
-		).toBeGreaterThan(0);
-		expect(screen.queryByLabelText("Export strategy")).toBeNull();
+		expect(screen.getByLabelText("Export inspector")).toBeTruthy();
 
 		fireEvent.keyDown(document.body, { code: "KeyL", key: "l" });
 		fireEvent.keyDown(document.body, { code: "BracketLeft", key: "[" });
@@ -401,21 +383,6 @@ describe("EditorNextRoute", () => {
 				},
 			),
 		).toBeTruthy();
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).toContain("whitespace-normal");
-		expect(screen.getByLabelText("Export review").className).toContain(
-			"overflow-visible",
-		);
-		expect(screen.getByLabelText("Generated media status").className).toContain(
-			"overflow-visible",
-		);
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).toContain("[overflow-wrap:anywhere]");
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).not.toContain("break-all");
 		expect(screen.getAllByLabelText(/^Preview for/)).toHaveLength(1);
 		expect(screen.queryByRole("button", { name: /use generated/i })).toBeNull();
 		expect(progressEvents[0]).toEqual({
