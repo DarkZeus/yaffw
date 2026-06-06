@@ -546,7 +546,11 @@ export function SelectionTimeline({
 					<Button
 						aria-label="Keep playhead centered"
 						aria-pressed={playheadFollowEnabled}
-						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
+						className={`hidden size-7 rounded sm:inline-flex ${
+							playheadFollowEnabled
+								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
+								: "border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+						}`}
 						onClick={() =>
 							setPlayheadFollowEnabled(
 								(currentFollowEnabled) => !currentFollowEnabled,
@@ -555,7 +559,7 @@ export function SelectionTimeline({
 						size="icon"
 						title="Keep playhead centered"
 						type="button"
-						variant={playheadFollowEnabled ? "secondary" : "outline"}
+						variant="outline"
 					>
 						<LocateFixed data-icon="inline-start" />
 					</Button>

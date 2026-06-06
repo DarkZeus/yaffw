@@ -181,10 +181,15 @@ describe("SelectionTimeline", () => {
 		});
 
 		expect(followButton.getAttribute("aria-pressed")).toBe("false");
+		expect(followButton.className).toContain("bg-workbench-viewer");
+		expect(followButton.className).not.toContain("bg-workbench-selected");
 
 		fireEvent.click(followButton);
 
 		expect(followButton.getAttribute("aria-pressed")).toBe("true");
+		expect(followButton.className).toContain("bg-workbench-progress/15");
+		expect(followButton.className).toContain("text-workbench-progress");
+		expect(followButton.className).not.toContain("bg-workbench-selected");
 		await waitFor(() => {
 			expect(scrollTo).toHaveBeenCalledWith({
 				behavior: "smooth",
