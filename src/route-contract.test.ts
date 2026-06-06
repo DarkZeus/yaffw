@@ -16,7 +16,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "./routeTree.gen";
 
 const prototypeRoutePath = "/editor-next-workbench-prototype";
+const legacyRoutePath = "/legacy-editor";
 const sourceDir = dirname(fileURLToPath(import.meta.url));
+const legacyRouteFile = join(sourceDir, "routes/legacy-editor.tsx");
 const prototypeRouteFile = join(
 	sourceDir,
 	"routes/editor-next-workbench-prototype.tsx",
@@ -79,14 +81,13 @@ describe("app route contract", () => {
 		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
 	});
 
-	it("keeps the legacy editor fallback directly reachable but hidden from navigation", async () => {
-		renderAppAt("/legacy-editor");
+	it("does not publish the temporary legacy editor fallback", () => {
+		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
+		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
 
-		expect(
-			await screen.findByText("Drop your video or click to browse"),
-		).toBeTruthy();
-		expect(document.querySelector('a[href="/legacy-editor"]')).toBeNull();
-		expect(screen.queryByRole("link", { name: "Legacy Editor" })).toBeNull();
+		expect(routeTreeSource).not.toContain(legacyRoutePath);
+		expect(existsSync(legacyRouteFile)).toBe(false);
+		expect(appSidebarSource).not.toContain(legacyRoutePath);
 	});
 
 	it("keeps bulk download reachable in the normal app shell", async () => {
