@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-
-import { EditorNextRoute } from '@/editor-next/EditorNextRoute'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/editor-next')({
-  component: EditorNextRoute,
+  beforeLoad: () => {
+    throw redirect({ replace: true, to: '/' })
+  },
 })

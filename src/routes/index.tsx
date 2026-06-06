@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { VideoEditorLayout } from '../components/VideoEditorLayout'
+
+import { EditorNextRoute } from '@/editor-next/EditorNextRoute'
 
 export const Route = createFileRoute('/')({
-  component: VideoEditorLayout,
+  component: EditorNextRoute,
 })

@@ -1,7 +1,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  Clapperboard,
   Download,
   Video,
 } from "lucide-react"
@@ -22,17 +21,12 @@ import {
 
 const items = [
   {
-    title: "Media Editor",
+    title: "Editor",
     url: "/",
     icon: Video,
   },
   {
-    title: "Editor Next",
-    url: "/editor-next",
-    icon: Clapperboard,
-  },
-  {
-    title: "Bulk Download",
+    title: "Bulk download",
     url: "/bulk-download",
     icon: Download,
   },
@@ -45,7 +39,7 @@ export function AppSidebar() {
     <Sidebar variant="inset" collapsible="offcanvas">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Yet Another FFMPEG wrapper</SidebarGroupLabel>
+          <SidebarGroupLabel>YAFFW</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestRouteImport } from './routes/test'
+import { Route as LegacyEditorRouteImport } from './routes/legacy-editor'
 import { Route as EditorNextRouteImport } from './routes/editor-next'
 import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const TestRoute = TestRouteImport.update({
   id: '/test',
   path: '/test',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegacyEditorRoute = LegacyEditorRouteImport.update({
+  id: '/legacy-editor',
+  path: '/legacy-editor',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditorNextRoute = EditorNextRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
+  '/legacy-editor': typeof LegacyEditorRoute
   '/test': typeof TestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
+  '/legacy-editor': typeof LegacyEditorRoute
   '/test': typeof TestRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
+  '/legacy-editor': typeof LegacyEditorRoute
   '/test': typeof TestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bulk-download' | '/editor-next' | '/test'
+  fullPaths:
+    | '/'
+    | '/bulk-download'
+    | '/editor-next'
+    | '/legacy-editor'
+    | '/test'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bulk-download' | '/editor-next' | '/test'
-  id: '__root__' | '/' | '/bulk-download' | '/editor-next' | '/test'
+  to: '/' | '/bulk-download' | '/editor-next' | '/legacy-editor' | '/test'
+  id:
+    | '__root__'
+    | '/'
+    | '/bulk-download'
+    | '/editor-next'
+    | '/legacy-editor'
+    | '/test'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BulkDownloadRoute: typeof BulkDownloadRoute
   EditorNextRoute: typeof EditorNextRoute
+  LegacyEditorRoute: typeof LegacyEditorRoute
   TestRoute: typeof TestRoute
 }
 
@@ -76,6 +97,13 @@ declare module '@tanstack/react-router' {
       path: '/test'
       fullPath: '/test'
       preLoaderRoute: typeof TestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legacy-editor': {
+      id: '/legacy-editor'
+      path: '/legacy-editor'
+      fullPath: '/legacy-editor'
+      preLoaderRoute: typeof LegacyEditorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/editor-next': {
@@ -106,6 +134,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BulkDownloadRoute: BulkDownloadRoute,
   EditorNextRoute: EditorNextRoute,
+  LegacyEditorRoute: LegacyEditorRoute,
   TestRoute: TestRoute,
 }
 export const routeTree = rootRouteImport
