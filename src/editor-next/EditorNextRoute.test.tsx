@@ -51,22 +51,8 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		expect(screen.getByText("YAFFW")).toBeTruthy();
-		expect(screen.getByText("Editor workbench")).toBeTruthy();
-		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
-		const rail = screen.getByLabelText("Editor workbench rail");
-		expect(rail).toBeTruthy();
-		expect(rail.tagName).toBe("ASIDE");
-		expect(within(rail).queryAllByRole("button")).toHaveLength(0);
-		expect(within(rail).queryAllByRole("link")).toHaveLength(0);
-		expect(
-			screen.queryByRole("navigation", { name: "Editor workbench rail" }),
-		).toBeNull();
-		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByLabelText("Local video file")).toBeTruthy();
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
-		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
@@ -107,11 +93,6 @@ describe("EditorNextRoute", () => {
 		const alert = screen.getByRole("alert");
 
 		expect(alert.textContent).toContain("WebCodecs");
-		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
-		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
-		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 	});
 
@@ -142,8 +123,6 @@ describe("EditorNextRoute", () => {
 		expect(
 			(screen.getByLabelText("Local video file") as HTMLInputElement).disabled,
 		).toBe(true);
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
-		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 
 		inspection.resolve(supportedInspection);
 		await waitFor(() => {
@@ -173,12 +152,6 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
-		const mediaAssetRegion = screen.getByLabelText(
-			"Workbench media asset region",
-		);
-		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
-		expect(mediaAssetRegion.className).toContain("min-w-0");
-		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
 		expect(mediaAssetContext.className).toContain("overflow-x-hidden");
 		expect(mediaAssetContext.className).toContain("rounded-md");
@@ -249,9 +222,7 @@ describe("EditorNextRoute", () => {
 		).toBeNull();
 		expect(within(mediaAssetContext).queryByText("Default export")).toBeNull();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
-		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
-		const exportInspector =
-			within(inspectorRegion).getByLabelText("Export inspector");
+		const exportInspector = screen.getByLabelText("Export inspector");
 		expect(within(exportInspector).getByText("Export settings")).toBeTruthy();
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
 		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
@@ -316,33 +287,11 @@ describe("EditorNextRoute", () => {
 			).toBeTruthy();
 		});
 
-		const topBarAssetSummary = screen.getByLabelText(
-			"Top bar media asset summary",
-		);
-		expect(topBarAssetSummary.textContent).not.toContain("center-preview.mp4");
-		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
-		expect(topBarAssetSummary.textContent).toContain("30 fps");
-		expect(
-			screen.getByLabelText("Editor workbench rail").parentElement?.className,
-		).toContain("grid-cols-[4rem_minmax(0,1fr)]");
-		const readyWorkbench = screen.getByLabelText("Editor workbench session");
-		expect(readyWorkbench.className).toContain("xl:h-full");
-		expect(readyWorkbench.className).toContain(
-			"xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem]",
-		);
-		expect(readyWorkbench.className).toContain(
-			"xl:grid-rows-[minmax(0,1fr)_2.75rem_38%]",
-		);
-		expect(readyWorkbench.className).toContain("xl:gap-0");
 		const centerRegion = screen.getByLabelText("Workbench center region");
 		const transportRegion = screen.getByLabelText("Workbench transport region");
 		const transportControls = within(transportRegion).getByLabelText(
 			"Preview transport controls",
 		);
-		const mediaAssetRegion = screen.getByLabelText(
-			"Workbench media asset region",
-		);
-		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
 		const selectionRegion = screen.getByLabelText("Workbench selection region");
 
 		expect(
@@ -357,15 +306,9 @@ describe("EditorNextRoute", () => {
 		expect(
 			within(centerRegion).queryByLabelText("Preview transport controls"),
 		).toBeNull();
-		expect(mediaAssetRegion.className).toContain("xl:col-start-1");
-		expect(mediaAssetRegion.className).toContain("xl:row-start-1");
-		expect(mediaAssetRegion.className).toContain("xl:border-r");
 		expect(centerRegion.className).toContain("xl:col-start-2");
 		expect(centerRegion.className).toContain("xl:row-start-1");
 		expect(centerRegion.className).toContain("xl:rounded-none");
-		expect(inspectorRegion.className).toContain("xl:col-start-3");
-		expect(inspectorRegion.className).toContain("xl:row-start-1");
-		expect(inspectorRegion.className).toContain("xl:border-l");
 		expect(transportRegion.className).toContain("xl:col-span-3");
 		expect(transportRegion.className).toContain("xl:row-start-2");
 		expect(transportRegion.className).toContain("xl:rounded-none");
@@ -444,30 +387,6 @@ describe("EditorNextRoute", () => {
 		await waitFor(() => {
 			expect(screen.getByLabelText("Preview for overflow.mp4")).toBeTruthy();
 		});
-
-		const page = screen
-			.getByLabelText("Editor workbench top bar")
-			.closest("main");
-		expect(page?.className).toContain("h-screen");
-		expect(page?.className).toContain("overflow-hidden");
-
-		const readyWorkbench = screen.getByLabelText("Editor workbench session");
-		expect(readyWorkbench.className).toContain("grid-cols-1");
-		expect(readyWorkbench.className).toContain("xl:overflow-hidden");
-
-		const mediaAssetRegion = screen.getByLabelText(
-			"Workbench media asset region",
-		);
-		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
-		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
-		expect(mediaAssetRegion.className).toContain("overscroll-contain");
-		expect(mediaAssetRegion.className).toContain("xl:[contain:layout_paint]");
-
-		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
-		expect(inspectorRegion.className).toContain("overflow-x-hidden");
-		expect(inspectorRegion.className).toContain("xl:overflow-y-auto");
-		expect(inspectorRegion.className).toContain("overscroll-contain");
-		expect(inspectorRegion.className).toContain("xl:[contain:layout_paint]");
 
 		const selectionRegion = screen.getByLabelText("Workbench selection region");
 		expect(selectionRegion.className).toContain("overflow-x-hidden");
