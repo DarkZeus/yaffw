@@ -1,15 +1,11 @@
 import { type ChangeEvent, type DragEvent, useMemo } from "react";
 
 import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis";
-import type { ReadyMediaAsset } from "@/editor-core/model";
 import {
 	type RuntimeSupport,
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
-import {
-	type EditorSessionState,
-	canCloseEditorSession,
-} from "@/editor-core/session";
+import { canCloseEditorSession } from "@/editor-core/session";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
 import {
 	type DefaultExportRunner,
@@ -20,6 +16,11 @@ import {
 	EditorWorkbenchFrame,
 	UnsupportedRuntimeState,
 } from "./editor-workbench";
+import {
+	EDITOR_WORKBENCH_VISUAL_FIXTURE_PREVIEW_POSTER_SRC,
+	createEditorWorkbenchVisualFixture,
+	shouldUseEditorWorkbenchVisualFixtureFromUrl,
+} from "./editor-workbench-visual-fixture";
 import { ExportInspectorPanel } from "./export-inspector";
 import {
 	type GeneratedMediaDeliveryRequest,
@@ -42,9 +43,6 @@ type EditorNextRouteProps = {
 	mockUploadedMediaState?: boolean;
 	now?: () => number;
 };
-
-const mockUploadedMediaPreviewPosterSrc =
-	"/editor-workbench-prototype-frame.jpg";
 
 export function EditorNextRoute({
 	confirmCloseFile,
@@ -77,13 +75,13 @@ export function EditorNextRoute({
 			runtime,
 		});
 	const visualFixture = useMemo(
-		() => createMockUploadedMediaFixture(runtime),
+		() => createEditorWorkbenchVisualFixture(runtime),
 		[runtime],
 	);
 	const visualFixtureActive =
 		session.status === "empty" &&
 		runtime.supported &&
-		(mockUploadedMediaState ?? shouldUseMockUploadedMediaStateFromUrl());
+		(mockUploadedMediaState ?? shouldUseEditorWorkbenchVisualFixtureFromUrl());
 	const displayedSession = visualFixtureActive
 		? visualFixture.session
 		: session;
@@ -91,7 +89,7 @@ export function EditorNextRoute({
 		? visualFixture.source
 		: previewSource;
 	const displayedPreviewPosterSrc = visualFixtureActive
-		? mockUploadedMediaPreviewPosterSrc
+		? EDITOR_WORKBENCH_VISUAL_FIXTURE_PREVIEW_POSTER_SRC
 		: undefined;
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -181,96 +179,6 @@ export function EditorNextRoute({
 				/>
 			)}
 		</EditorWorkbenchFrame>
-	);
-}
-
-function createMockUploadedMediaFixture(runtime: RuntimeSupport): {
-	session: Extract<EditorSessionState, { status: "ready" }>;
-	source: Blob;
-} {
-	const asset: ReadyMediaAsset = {
-		durationUs: 13_500_000,
-		exportCapability: {
-			profile: {
-				audioCodec: "aac",
-				container: "mp4",
-				videoCodec: "h264",
-			},
-			supported: true,
-		},
-		frameTiming: {
-			fps: 60,
-			frameDurationUs: 16_667,
-			source: "known",
-		},
-		id: "asset-editor-next-visual-fixture",
-		label: "stalker-patch-1.5-teaser.mp4",
-		provenance: {
-			fileName: "stalker-patch-1.5-teaser.mp4",
-			mimeType: "video/mp4",
-			sizeBytes: 30_000_000,
-		},
-		tracks: {
-			audio: [
-				{
-					channels: 2,
-					codec: "aac",
-					id: "audio-fixture-voice",
-					kind: "audio",
-					label: "Voice",
-					language: "en",
-					sampleRate: 48_000,
-				},
-				{
-					channels: 2,
-					codec: "aac",
-					id: "audio-fixture-desktop",
-					kind: "audio",
-					label: "Desktop",
-					language: "und",
-					sampleRate: 48_000,
-				},
-			],
-			video: [
-				{
-					codec: "h264",
-					height: 2160,
-					id: "video-fixture-main",
-					kind: "video",
-					label: "Video 1",
-					width: 3840,
-				},
-			],
-		},
-	};
-
-	return {
-		session: {
-			asset,
-			export: {
-				status: "reviewing",
-			},
-			importEnabled: false,
-			runtime,
-			selection: {
-				endUs: 9_860_000,
-				startUs: 2_440_000,
-			},
-			status: "ready",
-		},
-		source: new Blob(["editor-next visual fixture"], {
-			type: "video/mp4",
-		}),
-	};
-}
-
-function shouldUseMockUploadedMediaStateFromUrl(): boolean {
-	if (typeof window === "undefined") {
-		return false;
-	}
-
-	return (
-		new URLSearchParams(window.location.search).get("mockUploadedMedia") === "1"
 	);
 }
 
