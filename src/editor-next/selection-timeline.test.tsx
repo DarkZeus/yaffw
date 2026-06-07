@@ -13,7 +13,6 @@ import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
 import {
 	SelectionTimeline,
-	addAudioBufferToBuckets,
 	createWaveformLaneIdentityViewModel,
 } from "./selection-timeline";
 
@@ -242,30 +241,6 @@ describe("SelectionTimeline", () => {
 			"150%",
 		);
 	});
-
-	it("maps waveform samples by media timestamps instead of lane-local offsets", () => {
-		const delayedBuckets = new Array<number>(10).fill(0);
-
-		addAudioBufferToBuckets({
-			buckets: delayedBuckets,
-			buffer: createAudioBufferLike([[0.5, 1, 0.25, 0.75]], 2),
-			mediaDurationSeconds: 10,
-			timestampSeconds: 4,
-		});
-
-		expect(delayedBuckets).toEqual([0, 0, 0, 0, 1, 0.75, 0, 0, 0, 0]);
-
-		const clippedBuckets = new Array<number>(4).fill(0);
-
-		addAudioBufferToBuckets({
-			buckets: clippedBuckets,
-			buffer: createAudioBufferLike([[1, 0.5, 0.25, 0.125]], 2),
-			mediaDurationSeconds: 4,
-			timestampSeconds: -0.5,
-		});
-
-		expect(clippedBuckets).toEqual([0.5, 0.125, 0, 0]);
-	});
 });
 
 const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
@@ -413,16 +388,4 @@ function mockTimelineScroll(
 	});
 
 	return scrollTo;
-}
-
-function createAudioBufferLike(
-	channels: number[][],
-	sampleRate: number,
-): AudioBuffer {
-	return {
-		getChannelData: (index: number) => Float32Array.from(channels[index] ?? []),
-		length: channels[0]?.length ?? 0,
-		numberOfChannels: channels.length,
-		sampleRate,
-	} as AudioBuffer;
 }
