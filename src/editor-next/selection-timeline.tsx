@@ -27,6 +27,21 @@ import {
 	setSelectionStartFromPlayhead,
 } from "@/editor-core/selection";
 
+import {
+	MAXIMUM_TIMELINE_ZOOM,
+	MINIMUM_TIMELINE_ZOOM,
+	centeredTimelineScrollLeft,
+	clampTimelineZoom,
+	clientXToMediaDelta,
+	clientXToMediaTime,
+	createSelectionTimelineMarkers,
+	formatMediaTime,
+	mediaTimeToPercent,
+} from "./selection-timeline-geometry";
+import type {
+	SelectionTimelineMarkerPlacement,
+	TimelineTrackGeometry,
+} from "./selection-timeline-geometry.types";
 import { WaveformLane } from "./selection-waveform-lane";
 import {
 	loadBrowserWaveformLane,
@@ -67,9 +82,6 @@ type DragState =
 			type: "start";
 	  };
 
-const MINIMUM_ZOOM = 1;
-const MAXIMUM_ZOOM = 4;
-
 export function SelectionTimeline({
 	asset,
 	onPlayheadSeekRequested,
@@ -109,7 +121,7 @@ export function SelectionTimeline({
 		[asset.durationUs, asset.frameTiming],
 	);
 	const timeMarkers = useMemo(
-		() => createTimeMarkers(asset.durationUs, zoom),
+		() => createSelectionTimelineMarkers(asset.durationUs, zoom),
 		[asset.durationUs, zoom],
 	);
 
@@ -124,11 +136,11 @@ export function SelectionTimeline({
 			}
 
 			if (dragState.type === "playhead") {
-				const nextPlayheadUs = mediaTimeFromClientX(
+				const nextPlayheadUs = clientXToMediaTime({
 					clientX,
-					trackRef.current,
-					asset.durationUs,
-				);
+					durationUs: asset.durationUs,
+					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+				});
 				setDraftPlayheadUs(nextPlayheadUs);
 				onPlayheadSeekRequested(nextPlayheadUs);
 				return;
@@ -137,7 +149,11 @@ export function SelectionTimeline({
 			if (dragState.type === "start") {
 				const nextSelection = setSelectionStartFromPlayhead(
 					dragState.initialSelection,
-					mediaTimeFromClientX(clientX, trackRef.current, asset.durationUs),
+					clientXToMediaTime({
+						clientX,
+						durationUs: asset.durationUs,
+						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+					}),
 					selectionContext,
 				);
 				setDraftSelection(nextSelection);
@@ -148,7 +164,11 @@ export function SelectionTimeline({
 			if (dragState.type === "end") {
 				const nextSelection = setSelectionEndFromPlayhead(
 					dragState.initialSelection,
-					mediaTimeFromClientX(clientX, trackRef.current, asset.durationUs),
+					clientXToMediaTime({
+						clientX,
+						durationUs: asset.durationUs,
+						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+					}),
 					selectionContext,
 				);
 				setDraftSelection(nextSelection);
@@ -156,12 +176,12 @@ export function SelectionTimeline({
 				return;
 			}
 
-			const deltaUs = mediaDeltaFromClientX(
+			const deltaUs = clientXToMediaDelta({
 				clientX,
-				dragState.startClientX,
-				trackRef.current,
-				asset.durationUs,
-			);
+				durationUs: asset.durationUs,
+				startClientX: dragState.startClientX,
+				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+			});
 			setDraftSelection(
 				moveSelectionRangeByDelta(
 					dragState.initialSelection,
@@ -206,22 +226,22 @@ export function SelectionTimeline({
 			latestDragClientXRef.current = null;
 
 			if (dragState.type === "playhead") {
-				const nextPlayheadUs = mediaTimeFromClientX(
-					event.clientX,
-					trackRef.current,
-					asset.durationUs,
-				);
+				const nextPlayheadUs = clientXToMediaTime({
+					clientX: event.clientX,
+					durationUs: asset.durationUs,
+					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+				});
 				onPlayheadSeekRequested(nextPlayheadUs);
 			}
 
 			if (dragState.type === "start") {
 				const nextSelection = setSelectionStartFromPlayhead(
 					dragState.initialSelection,
-					mediaTimeFromClientX(
-						event.clientX,
-						trackRef.current,
-						asset.durationUs,
-					),
+					clientXToMediaTime({
+						clientX: event.clientX,
+						durationUs: asset.durationUs,
+						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+					}),
 					selectionContext,
 				);
 				onPlayheadSeekRequested(nextSelection.startUs);
@@ -231,11 +251,11 @@ export function SelectionTimeline({
 			if (dragState.type === "end") {
 				const nextSelection = setSelectionEndFromPlayhead(
 					dragState.initialSelection,
-					mediaTimeFromClientX(
-						event.clientX,
-						trackRef.current,
-						asset.durationUs,
-					),
+					clientXToMediaTime({
+						clientX: event.clientX,
+						durationUs: asset.durationUs,
+						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+					}),
 					selectionContext,
 				);
 				onPlayheadSeekRequested(nextSelection.endUs);
@@ -244,12 +264,12 @@ export function SelectionTimeline({
 
 			if (dragState.type === "range") {
 				onSelectionRangeMoveRequested(
-					mediaDeltaFromClientX(
-						event.clientX,
-						dragState.startClientX,
-						trackRef.current,
-						asset.durationUs,
-					),
+					clientXToMediaDelta({
+						clientX: event.clientX,
+						durationUs: asset.durationUs,
+						startClientX: dragState.startClientX,
+						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+					}),
 				);
 			}
 
@@ -311,7 +331,11 @@ export function SelectionTimeline({
 		event.preventDefault();
 		event.stopPropagation();
 		setDraftPlayheadUs(
-			mediaTimeFromClientX(event.clientX, trackRef.current, asset.durationUs),
+			clientXToMediaTime({
+				clientX: event.clientX,
+				durationUs: asset.durationUs,
+				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+			}),
 		);
 		setDragState({
 			type: "playhead",
@@ -342,7 +366,11 @@ export function SelectionTimeline({
 			| ReactPointerEvent<HTMLButtonElement>,
 	) {
 		onPlayheadSeekRequested(
-			mediaTimeFromClientX(event.clientX, trackRef.current, asset.durationUs),
+			clientXToMediaTime({
+				clientX: event.clientX,
+				durationUs: asset.durationUs,
+				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+			}),
 		);
 	}
 
@@ -382,22 +410,19 @@ export function SelectionTimeline({
 			const maxScrollLeft =
 				scrollContainer.scrollWidth - scrollContainer.clientWidth;
 
-			if (maxScrollLeft <= 0) {
-				return;
-			}
-
 			const trackWidth =
 				track.getBoundingClientRect().width ||
 				scrollContainer.clientWidth * zoom ||
 				scrollContainer.scrollWidth;
-			const playheadCenterX = (playheadPercent / 100) * trackWidth;
-			const nextScrollLeft = clamp(
-				playheadCenterX - scrollContainer.clientWidth / 2,
-				0,
+			const nextScrollLeft = centeredTimelineScrollLeft({
+				currentScrollLeft: scrollContainer.scrollLeft,
 				maxScrollLeft,
-			);
+				playheadPercent,
+				trackWidthPx: trackWidth,
+				viewportWidthPx: scrollContainer.clientWidth,
+			});
 
-			if (Math.abs(scrollContainer.scrollLeft - nextScrollLeft) < 0.5) {
+			if (nextScrollLeft === null) {
 				return;
 			}
 
@@ -460,9 +485,9 @@ export function SelectionTimeline({
 					<Button
 						aria-label="Zoom out timeline"
 						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
-						disabled={zoom <= MINIMUM_ZOOM}
+						disabled={zoom <= MINIMUM_TIMELINE_ZOOM}
 						onClick={() =>
-							setZoom((currentZoom) => clampZoom(currentZoom - 0.5))
+							setZoom((currentZoom) => clampTimelineZoom(currentZoom - 0.5))
 						}
 						size="icon"
 						type="button"
@@ -475,10 +500,14 @@ export function SelectionTimeline({
 						<input
 							aria-label="Timeline zoom"
 							className="h-6 min-w-0 accent-primary"
-							max={MAXIMUM_ZOOM}
-							min={MINIMUM_ZOOM}
+							max={MAXIMUM_TIMELINE_ZOOM}
+							min={MINIMUM_TIMELINE_ZOOM}
 							onChange={(event) =>
-								setZoom(clampZoom(Number.parseFloat(event.currentTarget.value)))
+								setZoom(
+									clampTimelineZoom(
+										Number.parseFloat(event.currentTarget.value),
+									),
+								)
 							}
 							step="0.5"
 							type="range"
@@ -488,9 +517,9 @@ export function SelectionTimeline({
 					<Button
 						aria-label="Zoom in timeline"
 						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
-						disabled={zoom >= MAXIMUM_ZOOM}
+						disabled={zoom >= MAXIMUM_TIMELINE_ZOOM}
 						onClick={() =>
-							setZoom((currentZoom) => clampZoom(currentZoom + 0.5))
+							setZoom((currentZoom) => clampTimelineZoom(currentZoom + 0.5))
 						}
 						size="icon"
 						type="button"
@@ -687,24 +716,7 @@ function cancelTimelineFrame(frameId: number) {
 	window.clearTimeout(frameId);
 }
 
-function createTimeMarkers(durationUs: MediaTimeUs, zoom: number) {
-	const markerCount = Math.max(5, Math.min(17, Math.round(2 + zoom * 3)));
-
-	return Array.from({ length: markerCount }, (_, index) => {
-		const percent = markerCount === 1 ? 0 : (index / (markerCount - 1)) * 100;
-
-		return {
-			placement:
-				index === 0 ? "start" : index === markerCount - 1 ? "end" : "middle",
-			percent,
-			timeUs: Math.round((durationUs * percent) / 100),
-		};
-	});
-}
-
-function timeMarkerLabelClassName(
-	placement: ReturnType<typeof createTimeMarkers>[number]["placement"],
-) {
+function timeMarkerLabelClassName(placement: SelectionTimelineMarkerPlacement) {
 	switch (placement) {
 		case "end":
 			return "right-0 text-right";
@@ -715,67 +727,17 @@ function timeMarkerLabelClassName(
 	}
 }
 
-function mediaTimeFromClientX(
-	clientX: number,
+function timelineTrackGeometryFromElement(
 	trackElement: HTMLElement | null,
-	durationUs: MediaTimeUs,
-) {
+): TimelineTrackGeometry | null {
 	const rect = trackElement?.getBoundingClientRect();
 
-	if (!Number.isFinite(clientX) || !rect || rect.width <= 0) {
-		return 0;
+	if (!rect || rect.width <= 0) {
+		return null;
 	}
 
-	return Math.round(
-		clamp((clientX - rect.left) / rect.width, 0, 1) * durationUs,
-	);
-}
-
-function mediaDeltaFromClientX(
-	clientX: number,
-	startClientX: number,
-	trackElement: HTMLElement | null,
-	durationUs: MediaTimeUs,
-) {
-	const rect = trackElement?.getBoundingClientRect();
-
-	if (!Number.isFinite(clientX) || !rect || rect.width <= 0) {
-		return 0;
-	}
-
-	return Math.round(((clientX - startClientX) / rect.width) * durationUs);
-}
-
-function mediaTimeToPercent(timeUs: MediaTimeUs, durationUs: MediaTimeUs) {
-	if (durationUs <= 0) {
-		return 0;
-	}
-
-	return clamp((timeUs / durationUs) * 100, 0, 100);
-}
-
-function clampZoom(zoom: number) {
-	return clamp(zoom, MINIMUM_ZOOM, MAXIMUM_ZOOM);
-}
-
-function clamp(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
-}
-
-function formatMediaTime(timeUs: number): string {
-	const totalMilliseconds = Math.floor(timeUs / 1_000);
-	const milliseconds = totalMilliseconds % 1_000;
-	const totalSeconds = Math.floor(totalMilliseconds / 1_000);
-	const seconds = totalSeconds % 60;
-	const totalMinutes = Math.floor(totalSeconds / 60);
-	const minutes = totalMinutes % 60;
-	const hours = Math.floor(totalMinutes / 60);
-
-	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-		2,
-		"0",
-	)}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(
-		3,
-		"0",
-	)}`;
+	return {
+		leftPx: rect.left,
+		widthPx: rect.width,
+	};
 }
