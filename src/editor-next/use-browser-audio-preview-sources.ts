@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
+import {
+	type BrowserAudioPreviewSourceCache,
+	createBrowserAudioPreviewSourceCache,
+	createBrowserAudioPreviewSourcePlanKey,
+} from "./browser-audio-preview-source-cache";
 import {
 	type BrowserAudioPreviewSource,
 	type BrowserAudioPreviewSourceFailure,
@@ -43,83 +44,73 @@ export function useBrowserAudioPreviewSources({
 	enabled: boolean;
 	source: Blob;
 }): BrowserAudioPreviewSourcesState {
-	const sourceCacheRef = useRef(new Map<string, BrowserAudioPreviewSource>());
-	const sourceCacheOwnerRef = useRef<{
-		asset: ReadyMediaAsset;
-		source: Blob;
-	} | null>(null);
+	const sourceCacheRef = useRef<BrowserAudioPreviewSourceCache | null>(null);
 	const [state, setState] = useState<BrowserAudioPreviewSourcesState>({
 		status: "disabled",
 	});
-	const channelModeKey = createAudioPreviewChannelModeKey(asset, audioMix);
-	const finalPeakGuardDb = audioMix.finalPeakGuardDb;
+	const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
+		asset,
+		audioMix,
+	});
+
+	if (!sourceCacheRef.current) {
+		sourceCacheRef.current = createBrowserAudioPreviewSourceCache();
+	}
 
 	useEffect(() => {
 		return () => {
-			revokeAudioPreviewSourceCache(sourceCacheRef.current);
+			sourceCacheRef.current?.dispose();
 		};
 	}, []);
 
 	useEffect(() => {
 		const sourceCache = sourceCacheRef.current;
-		const cacheOwner = sourceCacheOwnerRef.current;
-
-		if (cacheOwner?.asset !== asset || cacheOwner.source !== source) {
-			revokeAudioPreviewSourceCache(sourceCache);
-			sourceCacheOwnerRef.current = { asset, source };
-		}
 
 		if (!enabled) {
-			revokeAudioPreviewSourceCache(sourceCache);
-			sourceCacheOwnerRef.current = null;
+			sourceCache?.dispose();
 			setState({ status: "disabled" });
 			return;
 		}
 
-		const abortController = new AbortController();
-		let cancelled = false;
-		const sourceRequests = createAudioPreviewSourceRequests({
-			asset,
-			channelModeKey,
-			finalPeakGuardDb,
-		});
-		const missingSourceRequests = sourceRequests.filter(
-			(request) => !sourceCache.has(request.cacheKey),
-		);
-		const cachedSources = collectCachedAudioPreviewSources({
-			sourceCache,
-			sourceRequests,
-		});
-
-		if (missingSourceRequests.length === 0) {
+		if (!sourceCache) {
 			setState({
 				failures: [],
-				sources: cachedSources,
+				reason: "Audio preview source cache is unavailable.",
+				status: "failed",
+			});
+			return;
+		}
+
+		sourceCache.resetForMediaAssetSource({ asset, source });
+
+		const abortController = new AbortController();
+		let cancelled = false;
+		const plan = sourceCache.plan({
+			asset,
+			planKey: sourcePlanKey,
+		});
+
+		if (plan.missingTrackIds.size === 0) {
+			setState({
+				failures: [],
+				sources: plan.cachedSources,
 				status: "ready",
 			});
 			return;
 		}
 
-		const missingTrackIds = new Set(
-			missingSourceRequests.map((request) => request.trackId),
-		);
-
 		setState({
-			preparingTrackIds: missingTrackIds,
-			sources: cachedSources,
+			preparingTrackIds: plan.missingTrackIds,
+			sources: plan.cachedSources,
 			status: "loading",
 		});
 
 		void prepareBrowserAudioPreviewSources({
-			audioMix: createAudioPreviewMixSnapshot({
-				asset,
-				channelModeKey,
-				finalPeakGuardDb,
-			}),
+			audioMix: plan.audioMix,
 			asset,
 			signal: abortController.signal,
 			source,
-			trackIds: missingTrackIds,
+			trackIds: plan.missingTrackIds,
 		})
 			.then((result) => {
 				if (cancelled) {
@@ -127,31 +118,11 @@ export function useBrowserAudioPreviewSources({
 					return;
 				}
 
-				const sourceRequestsByTrackId = new Map(
-					sourceRequests.map((request) => [request.trackId, request]),
-				);
-
-				for (const source of result.sources) {
-					const request = sourceRequestsByTrackId.get(source.trackId);
-
-					if (!request) {
-						revokeBrowserAudioPreviewSources({ sources: [source] });
-						continue;
-					}
-
-					const currentSource = sourceCache.get(request.cacheKey);
-
-					if (currentSource && currentSource !== source) {
-						revokeBrowserAudioPreviewSources({ sources: [currentSource] });
-					}
-
-					sourceCache.set(request.cacheKey, source);
-				}
-
-				const sources = collectCachedAudioPreviewSources({
-					sourceCache,
-					sourceRequests,
+				sourceCache.storePreparedSources({
+					plan,
+					sources: result.sources,
 				});
+				const sources = sourceCache.collectSources(plan);
 
 				if (sources.length > 0) {
 					setState({
@@ -186,111 +157,9 @@ export function useBrowserAudioPreviewSources({
 			cancelled = true;
 			abortController.abort();
 		};
-	}, [asset, channelModeKey, enabled, finalPeakGuardDb, source]);
+	}, [asset, enabled, source, sourcePlanKey]);
 
 	return state;
-}
-
-type AudioPreviewSourceRequest = {
-	cacheKey: string;
-	trackId: string;
-};
-
-function revokeAudioPreviewSourceCache(
-	sourceCache: Map<string, BrowserAudioPreviewSource>,
-) {
-	if (sourceCache.size === 0) {
-		return;
-	}
-
-	revokeBrowserAudioPreviewSources({
-		sources: Array.from(sourceCache.values()),
-	});
-	sourceCache.clear();
-}
-
-function createAudioPreviewSourceRequests({
-	asset,
-	channelModeKey,
-	finalPeakGuardDb,
-}: {
-	asset: ReadyMediaAsset;
-	channelModeKey: string;
-	finalPeakGuardDb: number;
-}): AudioPreviewSourceRequest[] {
-	const channelModes = new Map(
-		JSON.parse(channelModeKey) as Array<[string, AudioTrackChannelMode]>,
-	);
-
-	return asset.tracks.audio.map((track) => {
-		const channelMode = channelModes.get(track.id) ?? "preserve";
-		const peakGuardKey =
-			channelMode === "preserve" ? "source" : String(finalPeakGuardDb);
-
-		return {
-			cacheKey: `${track.id}:${channelMode}:${peakGuardKey}`,
-			trackId: track.id,
-		};
-	});
-}
-
-function collectCachedAudioPreviewSources({
-	sourceCache,
-	sourceRequests,
-}: {
-	sourceCache: ReadonlyMap<string, BrowserAudioPreviewSource>;
-	sourceRequests: AudioPreviewSourceRequest[];
-}) {
-	return sourceRequests.flatMap((request) => {
-		const source = sourceCache.get(request.cacheKey);
-
-		return source ? [source] : [];
-	});
-}
-
-function createAudioPreviewChannelModeKey(
-	asset: ReadyMediaAsset,
-	audioMix: AudioMix,
-) {
-	return JSON.stringify(
-		asset.tracks.audio.map(
-			(track) =>
-				[
-					track.id,
-					audioMix.tracks[track.id]?.channelMode ?? "preserve",
-				] satisfies [string, AudioTrackChannelMode],
-		),
-	);
-}
-
-function createAudioPreviewMixSnapshot({
-	asset,
-	channelModeKey,
-	finalPeakGuardDb,
-}: {
-	asset: ReadyMediaAsset;
-	channelModeKey: string;
-	finalPeakGuardDb: number;
-}): AudioMix {
-	const channelModes = new Map(
-		JSON.parse(channelModeKey) as Array<[string, AudioTrackChannelMode]>,
-	);
-
-	return {
-		finalPeakGuardDb,
-		outputChannels: 2,
-		tracks: Object.fromEntries(
-			asset.tracks.audio.map((track) => [
-				track.id,
-				{
-					channelMode: channelModes.get(track.id) ?? "preserve",
-					include: true,
-					trackId: track.id,
-					volumePercent: 100,
-				},
-			]),
-		),
-	};
 }
 
 function isAbortError(error: unknown) {
