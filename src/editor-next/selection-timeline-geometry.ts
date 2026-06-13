@@ -126,24 +126,6 @@ export function centeredTimelineScrollLeft({
 	return nextScrollLeft;
 }
 
-export function formatMediaTime(timeUs: number): string {
-	const totalMilliseconds = Math.floor(timeUs / 1_000);
-	const milliseconds = totalMilliseconds % 1_000;
-	const totalSeconds = Math.floor(totalMilliseconds / 1_000);
-	const seconds = totalSeconds % 60;
-	const totalMinutes = Math.floor(totalSeconds / 60);
-	const minutes = totalMinutes % 60;
-	const hours = Math.floor(totalMinutes / 60);
-
-	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-		2,
-		"0",
-	)}:${String(seconds).padStart(2, "0")}.${String(milliseconds).padStart(
-		3,
-		"0",
-	)}`;
-}
-
 function clampNumber(value: number, min: number, max: number) {
 	return Math.min(Math.max(value, min), max);
 }

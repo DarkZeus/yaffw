@@ -30,6 +30,7 @@ import {
 	setSelectionStartFromPlayhead,
 } from "@/editor-core/selection";
 
+import { formatMediaTime } from "./media-time-presentation";
 import {
 	MAXIMUM_TIMELINE_ZOOM,
 	MINIMUM_TIMELINE_ZOOM,
@@ -38,7 +39,6 @@ import {
 	clientXToMediaDelta,
 	clientXToMediaTime,
 	createSelectionTimelineMarkers,
-	formatMediaTime,
 	mediaTimeToPercent,
 } from "./selection-timeline-geometry";
 import type {

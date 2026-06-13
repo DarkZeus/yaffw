@@ -4,6 +4,7 @@ import type {
 	Selection,
 	VideoMediaTrack,
 } from "@/editor-core/model";
+import { formatMediaTime } from "./media-time-presentation";
 
 export type MediaAssetContextFact = {
 	label: string;
@@ -135,20 +136,6 @@ function selectionFactsForAsset(
 	];
 }
 
-function formatMediaTime(microseconds: number): string {
-	const totalMilliseconds = Math.floor(microseconds / 1_000);
-	const milliseconds = totalMilliseconds % 1_000;
-	const totalSeconds = Math.floor(totalMilliseconds / 1_000);
-	const seconds = totalSeconds % 60;
-	const totalMinutes = Math.floor(totalSeconds / 60);
-	const minutes = totalMinutes % 60;
-	const hours = Math.floor(totalMinutes / 60);
-
-	return `${padTime(hours)}:${padTime(minutes)}:${padTime(seconds)}.${String(
-		milliseconds,
-	).padStart(3, "0")}`;
-}
-
 function formatFileSize(bytes: number): string {
 	if (bytes <= 0) {
 		return "0 B";
@@ -253,8 +240,4 @@ function greatestCommonDivisor(first: number, second: number): number {
 	}
 
 	return a || 1;
-}
-
-function padTime(value: number): string {
-	return String(value).padStart(2, "0");
 }

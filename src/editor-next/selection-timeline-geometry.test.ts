@@ -8,7 +8,6 @@ import {
 	clientXToMediaDelta,
 	clientXToMediaTime,
 	createSelectionTimelineMarkers,
-	formatMediaTime,
 	mediaTimeToPercent,
 } from "./selection-timeline-geometry";
 
@@ -114,8 +113,7 @@ describe("selection timeline geometry", () => {
 		).toBe(0);
 	});
 
-	it("formats media time and maps media time to percentages", () => {
-		expect(formatMediaTime(3_723_004_000)).toBe("01:02:03.004");
+	it("maps media time to percentages", () => {
 		expect(mediaTimeToPercent(3_000_000, 12_000_000)).toBe(25);
 		expect(mediaTimeToPercent(-1_000_000, 12_000_000)).toBe(0);
 		expect(mediaTimeToPercent(13_000_000, 12_000_000)).toBe(100);
