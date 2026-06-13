@@ -20,7 +20,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type MultiTrack from "wavesurfer-multitrack";
 
 import { Button } from "@/components/ui/button";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -35,10 +34,9 @@ import { formatMediaTime } from "./media-time-presentation";
 import {
 	applyMultitrackPreviewVolumes,
 	canUseBrowserAudioPreviewTransport,
-	createMultitrackPreviewTracks,
-	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
+import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { SelectionTimeline } from "./selection-timeline";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
@@ -87,10 +85,9 @@ export function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
-	const multitrackRef = useRef<MultiTrack | null>(null);
+	const getPlaybackRateRef = useRef<() => number>(() => 1);
+	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const [previewUrl, setPreviewUrl] = useState("");
-	const [multitrackReady, setMultitrackReady] = useState(false);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
 	);
@@ -117,8 +114,21 @@ export function NativePreviewPlayer({
 		audioPreviewSources.status === "loading"
 			? audioPreviewSources.preparingTrackIds
 			: EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS;
+	const readPreviewAudioMonitoringPlaybackRate = useCallback(
+		() => getPlaybackRateRef.current(),
+		[],
+	);
+	const readPreviewAudioMonitoringPlayheadUs = useCallback(
+		() => getPlayheadUsRef.current(),
+		[],
+	);
+	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
+		audioPreviewSources,
+		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
+		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
+	});
 	const audioTransportReady =
-		audioPreviewSources.status === "ready" && multitrackReady;
+		audioPreviewSources.status === "ready" && audioMonitoring.ready;
 
 	const {
 		getPlaybackRate,
@@ -145,11 +155,13 @@ export function NativePreviewPlayer({
 		audioTransportReady,
 		durationUs: asset.durationUs,
 		frameDurationUs: asset.frameTiming.frameDurationUs,
-		multitrackRef,
+		multitrackRef: audioMonitoring.multitrackRef,
 		selection,
 		source,
 		videoRef,
 	});
+	getPlaybackRateRef.current = getPlaybackRate;
+	getPlayheadUsRef.current = getPlayheadUs;
 
 	const updatePlaybackRate = useCallback(
 		(event: ChangeEvent<HTMLSelectElement>) => {
@@ -166,86 +178,17 @@ export function NativePreviewPlayer({
 	);
 
 	useEffect(() => {
-		const container = multitrackContainerRef.current;
-
-		if (
-			audioPreviewSources.status !== "ready" ||
-			audioPreviewSources.sources.length === 0 ||
-			!container
-		) {
-			multitrackRef.current?.destroy();
-			multitrackRef.current = null;
-			setMultitrackReady(false);
-			container?.replaceChildren();
-			return;
-		}
-
-		let disposed = false;
-		let multitrack: MultiTrack | null = null;
-		let unsubscribeCanPlay: (() => void) | undefined;
-
-		setMultitrackReady(false);
-		container.replaceChildren();
-
-		void import("wavesurfer-multitrack")
-			.then(({ default: Multitrack }) => {
-				if (disposed) {
-					return;
-				}
-
-				multitrack = Multitrack.create(
-					createMultitrackPreviewTracks(audioPreviewSources.sources),
-					{
-						container,
-						cursorColor: "transparent",
-						cursorWidth: 0,
-						minPxPerSec: 1,
-						trackBackground: "transparent",
-						trackBorderColor: "transparent",
-					},
-				);
-				multitrackRef.current = multitrack;
-				unsubscribeCanPlay = multitrack.on("canplay", () => {
-					if (disposed) {
-						return;
-					}
-
-					multitrack?.setTime(getPlayheadUs() / 1_000_000);
-					setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
-					setMultitrackReady(true);
-				});
-			})
-			.catch(() => {
-				if (!disposed) {
-					multitrackRef.current = null;
-					setMultitrackReady(false);
-				}
-			});
-
-		return () => {
-			disposed = true;
-			unsubscribeCanPlay?.();
-			if (multitrackRef.current === multitrack) {
-				multitrackRef.current = null;
-			}
-			multitrack?.destroy();
-			setMultitrackReady(false);
-			container.replaceChildren();
-		};
-	}, [audioPreviewSources, getPlaybackRate, getPlayheadUs]);
-
-	useEffect(() => {
 		if (
 			audioPreviewSources.status !== "ready" ||
 			!audioTransportReady ||
-			!multitrackRef.current
+			!audioMonitoring.multitrackRef.current
 		) {
 			return;
 		}
 
 		applyMultitrackPreviewVolumes({
 			audioMix,
-			multitrack: multitrackRef.current,
+			multitrack: audioMonitoring.multitrackRef.current,
 			muted,
 			soloedAudioTrackId,
 			sources: audioPreviewSources.sources,
@@ -253,6 +196,7 @@ export function NativePreviewPlayer({
 		});
 	}, [
 		audioMix,
+		audioMonitoring.multitrackRef,
 		audioPreviewSources,
 		audioTransportReady,
 		muted,
@@ -359,7 +303,7 @@ export function NativePreviewPlayer({
 								aria-hidden="true"
 								className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden opacity-0"
 								data-testid="multitrack-preview-transport"
-								ref={multitrackContainerRef}
+								ref={audioMonitoring.multitrackContainerRef}
 							/>
 						</section>
 					</section>
