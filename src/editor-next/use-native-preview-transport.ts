@@ -1,0 +1,486 @@
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import type MultiTrack from "wavesurfer-multitrack";
+
+import type { MediaTimeUs, Selection } from "@/editor-core/model";
+
+import { setMultitrackPreviewPlaybackRate } from "./native-preview-audio-transport";
+
+type UseNativePreviewTransportOptions = {
+	audioTransportReady: boolean;
+	durationUs: MediaTimeUs;
+	frameDurationUs: MediaTimeUs;
+	multitrackRef: RefObject<MultiTrack | null>;
+	selection: Selection;
+	source: Blob;
+	videoRef: RefObject<HTMLVideoElement | null>;
+};
+
+export function useNativePreviewTransport({
+	audioTransportReady,
+	durationUs,
+	frameDurationUs,
+	multitrackRef,
+	selection,
+	source,
+	videoRef,
+}: UseNativePreviewTransportOptions) {
+	const playheadRef = useRef<MediaTimeUs>(0);
+	const playbackRateRef = useRef(1);
+	const playheadAnimationFrameRef = useRef<number | null>(null);
+	const selectionLoopEnteredRef = useRef(false);
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [muted, setMuted] = useState(false);
+	const [playbackRate, setPlaybackRate] = useState(1);
+	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
+	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
+	const [volume, setVolume] = useState(1);
+
+	const getPlaybackRate = useCallback(() => playbackRateRef.current, []);
+	const getPlayheadUs = useCallback(() => playheadRef.current, []);
+
+	useEffect(() => {
+		if (!source) {
+			return;
+		}
+
+		playheadRef.current = 0;
+		selectionLoopEnteredRef.current = false;
+		setPlayheadUsState(0);
+		setIsPlaying(false);
+		setSelectionLoopEnabled(false);
+	}, [source]);
+
+	const setPlayheadUs = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const clampedPlayheadUs = clampMediaTime(
+				Math.round(nextPlayheadUs),
+				0,
+				durationUs,
+			);
+
+			playheadRef.current = clampedPlayheadUs;
+			setPlayheadUsState(clampedPlayheadUs);
+		},
+		[durationUs],
+	);
+
+	const setPreviewTransportTime = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const nextTimeSeconds = nextPlayheadUs / 1_000_000;
+			const video = videoRef.current;
+
+			if (video) {
+				video.currentTime = nextTimeSeconds;
+			}
+
+			if (audioTransportReady) {
+				multitrackRef.current?.setTime(nextTimeSeconds);
+			}
+		},
+		[audioTransportReady, multitrackRef, videoRef],
+	);
+
+	const updateSelectionLoopEntryFromPlayhead = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			selectionLoopEnteredRef.current =
+				selectionLoopEnabled &&
+				isMediaTimeInsideSelection(nextPlayheadUs, selection);
+		},
+		[selection, selectionLoopEnabled],
+	);
+
+	const seekToUs = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const clampedPlayheadUs = clampMediaTime(
+				Math.round(nextPlayheadUs),
+				0,
+				durationUs,
+			);
+
+			setPreviewTransportTime(clampedPlayheadUs);
+			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
+			setPlayheadUs(clampedPlayheadUs);
+		},
+		[
+			durationUs,
+			setPlayheadUs,
+			setPreviewTransportTime,
+			updateSelectionLoopEntryFromPlayhead,
+		],
+	);
+
+	const seekByUs = useCallback(
+		(deltaUs: MediaTimeUs) => {
+			seekToUs(playheadRef.current + deltaUs);
+		},
+		[seekToUs],
+	);
+
+	const stepFrame = useCallback(
+		(direction: -1 | 1) => {
+			multitrackRef.current?.pause();
+			videoRef.current?.pause();
+			setIsPlaying(false);
+			seekByUs(direction * frameDurationUs);
+		},
+		[frameDurationUs, multitrackRef, seekByUs, videoRef],
+	);
+
+	const togglePlayback = useCallback(async () => {
+		const video = videoRef.current;
+
+		if (!video) {
+			return;
+		}
+
+		if (isPlaying) {
+			multitrackRef.current?.pause();
+			video.pause();
+			setIsPlaying(false);
+			return;
+		}
+
+		try {
+			if (audioTransportReady) {
+				video.muted = true;
+				multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
+			}
+			await video.play();
+			if (audioTransportReady) {
+				multitrackRef.current?.play();
+			}
+			setIsPlaying(true);
+		} catch {
+			multitrackRef.current?.pause();
+			setIsPlaying(false);
+		}
+	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
+
+	const setPreviewPlaybackRate = useCallback(
+		(nextPlaybackRate: number) => {
+			const video = videoRef.current;
+
+			if (video) {
+				video.playbackRate = nextPlaybackRate;
+			}
+
+			setMultitrackPreviewPlaybackRate(multitrackRef.current, nextPlaybackRate);
+			playbackRateRef.current = nextPlaybackRate;
+			setPlaybackRate(nextPlaybackRate);
+		},
+		[multitrackRef, videoRef],
+	);
+
+	const setPreviewVolume = useCallback(
+		(nextVolume: number) => {
+			const video = videoRef.current;
+
+			if (video) {
+				video.volume = nextVolume;
+			}
+
+			setVolume(nextVolume);
+		},
+		[videoRef],
+	);
+
+	const toggleMuted = useCallback(() => {
+		const nextMuted = !muted;
+		const video = videoRef.current;
+
+		if (video) {
+			video.muted = nextMuted;
+		}
+
+		setMuted(nextMuted);
+	}, [muted, videoRef]);
+
+	useEffect(() => {
+		const video = videoRef.current;
+
+		if (!video) {
+			return;
+		}
+
+		video.muted = audioTransportReady || muted;
+	}, [audioTransportReady, muted, videoRef]);
+
+	useEffect(() => {
+		if (!audioTransportReady || !isPlaying) {
+			return;
+		}
+
+		const video = videoRef.current;
+		if (video) {
+			video.muted = true;
+		}
+		multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
+		multitrackRef.current?.play();
+	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
+
+	const toggleSelectionLoop = useCallback(() => {
+		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
+			const nextSelectionLoopEnabled = !currentSelectionLoopEnabled;
+			selectionLoopEnteredRef.current =
+				nextSelectionLoopEnabled &&
+				isMediaTimeInsideSelection(playheadRef.current, selection);
+
+			return nextSelectionLoopEnabled;
+		});
+	}, [selection]);
+
+	const syncPlayheadWithNativeVideo = useCallback(() => {
+		const video = videoRef.current;
+
+		if (!video) {
+			return;
+		}
+
+		const previousPlayheadUs = playheadRef.current;
+		const transportTimeSeconds =
+			audioTransportReady && multitrackRef.current
+				? multitrackRef.current.getCurrentTime()
+				: video.currentTime;
+		const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
+
+		if (
+			audioTransportReady &&
+			Number.isFinite(transportTimeSeconds) &&
+			Math.abs(video.currentTime - transportTimeSeconds) > 0.25
+		) {
+			video.currentTime = transportTimeSeconds;
+		}
+
+		if (!isPlaying) {
+			updateSelectionLoopEntryFromPlayhead(nativePlayheadUs);
+			setPlayheadUs(nativePlayheadUs);
+			return;
+		}
+
+		if (
+			selectionLoopEnabled &&
+			shouldLoopSelectionPlayback({
+				currentPlayheadUs: nativePlayheadUs,
+				previousPlayheadUs,
+				selection,
+				selectionEntered: selectionLoopEnteredRef.current,
+			})
+		) {
+			selectionLoopEnteredRef.current = true;
+			setPreviewTransportTime(selection.startUs);
+			setPlayheadUs(selection.startUs);
+			return;
+		}
+
+		if (
+			selectionLoopEnabled &&
+			hasPlaybackEnteredSelection({
+				currentPlayheadUs: nativePlayheadUs,
+				previousPlayheadUs,
+				selection,
+			})
+		) {
+			selectionLoopEnteredRef.current = true;
+		}
+
+		setPlayheadUs(nativePlayheadUs);
+	}, [
+		audioTransportReady,
+		isPlaying,
+		multitrackRef,
+		selection,
+		selectionLoopEnabled,
+		setPlayheadUs,
+		setPreviewTransportTime,
+		updateSelectionLoopEntryFromPlayhead,
+		videoRef,
+	]);
+
+	useEffect(() => {
+		selectionLoopEnteredRef.current =
+			selectionLoopEnabled &&
+			isMediaTimeInsideSelection(playheadRef.current, selection);
+	}, [selection, selectionLoopEnabled]);
+
+	useEffect(() => {
+		if (!isPlaying) {
+			if (playheadAnimationFrameRef.current !== null) {
+				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				playheadAnimationFrameRef.current = null;
+			}
+			return;
+		}
+
+		let cancelled = false;
+
+		function syncOnAnimationFrame() {
+			if (cancelled) {
+				return;
+			}
+
+			syncPlayheadWithNativeVideo();
+			playheadAnimationFrameRef.current =
+				requestPreviewFrame(syncOnAnimationFrame);
+		}
+
+		playheadAnimationFrameRef.current =
+			requestPreviewFrame(syncOnAnimationFrame);
+
+		return () => {
+			cancelled = true;
+
+			if (playheadAnimationFrameRef.current !== null) {
+				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				playheadAnimationFrameRef.current = null;
+			}
+		};
+	}, [isPlaying, syncPlayheadWithNativeVideo]);
+
+	const handleEnded = useCallback(() => {
+		const video = videoRef.current;
+
+		if (
+			video &&
+			selectionLoopEnabled &&
+			selectionLoopEnteredRef.current &&
+			selection.endUs >= durationUs
+		) {
+			setPreviewTransportTime(selection.startUs);
+			setPlayheadUs(selection.startUs);
+			setIsPlaying(true);
+			void video.play().catch(() => {
+				setIsPlaying(false);
+			});
+			if (audioTransportReady) {
+				multitrackRef.current?.play();
+			}
+			return;
+		}
+
+		multitrackRef.current?.pause();
+		setIsPlaying(false);
+		setPlayheadUs(durationUs);
+	}, [
+		audioTransportReady,
+		durationUs,
+		multitrackRef,
+		selection.endUs,
+		selection.startUs,
+		selectionLoopEnabled,
+		setPlayheadUs,
+		setPreviewTransportTime,
+		videoRef,
+	]);
+
+	const handleNativePause = useCallback(() => {
+		multitrackRef.current?.pause();
+		setIsPlaying(false);
+	}, [multitrackRef]);
+
+	const handleNativePlay = useCallback(() => {
+		setIsPlaying(true);
+	}, []);
+
+	return {
+		getPlaybackRate,
+		getPlayheadUs,
+		handleEnded,
+		handleNativePause,
+		handleNativePlay,
+		isPlaying,
+		muted,
+		playbackRate,
+		playheadUs,
+		seekByUs,
+		seekToUs,
+		selectionLoopEnabled,
+		setPreviewPlaybackRate,
+		setPreviewVolume,
+		stepFrame,
+		syncPlayheadWithNativeVideo,
+		toggleMuted,
+		togglePlayback,
+		toggleSelectionLoop,
+		volume,
+	};
+}
+
+function shouldLoopSelectionPlayback({
+	currentPlayheadUs,
+	previousPlayheadUs,
+	selection,
+	selectionEntered,
+}: {
+	currentPlayheadUs: MediaTimeUs;
+	previousPlayheadUs: MediaTimeUs;
+	selection: Selection;
+	selectionEntered: boolean;
+}): boolean {
+	const enteredSelection =
+		selectionEntered ||
+		hasPlaybackEnteredSelection({
+			currentPlayheadUs,
+			previousPlayheadUs,
+			selection,
+		});
+
+	return enteredSelection && currentPlayheadUs >= selection.endUs;
+}
+
+function hasPlaybackEnteredSelection({
+	currentPlayheadUs,
+	previousPlayheadUs,
+	selection,
+}: {
+	currentPlayheadUs: MediaTimeUs;
+	previousPlayheadUs: MediaTimeUs;
+	selection: Selection;
+}): boolean {
+	return (
+		isMediaTimeInsideSelection(currentPlayheadUs, selection) ||
+		(previousPlayheadUs < selection.startUs &&
+			currentPlayheadUs >= selection.startUs)
+	);
+}
+
+function isMediaTimeInsideSelection(
+	playheadUs: MediaTimeUs,
+	selection: Selection,
+): boolean {
+	return playheadUs >= selection.startUs && playheadUs < selection.endUs;
+}
+
+function secondsToMicroseconds(seconds: number): MediaTimeUs {
+	return Math.round(seconds * 1_000_000);
+}
+
+function clampMediaTime(
+	valueUs: MediaTimeUs,
+	minUs: MediaTimeUs,
+	maxUs: MediaTimeUs,
+): MediaTimeUs {
+	return Math.min(Math.max(valueUs, minUs), maxUs);
+}
+
+function requestPreviewFrame(callback: FrameRequestCallback): number {
+	if (typeof window.requestAnimationFrame === "function") {
+		return window.requestAnimationFrame(callback);
+	}
+
+	return window.setTimeout(() => callback(window.performance.now()), 16);
+}
+
+function cancelPreviewFrame(frameId: number) {
+	if (typeof window.cancelAnimationFrame === "function") {
+		window.cancelAnimationFrame(frameId);
+		return;
+	}
+
+	window.clearTimeout(frameId);
+}

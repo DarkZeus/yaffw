@@ -42,6 +42,7 @@ import {
 } from "./native-preview-audio-transport";
 import { SelectionTimeline } from "./selection-timeline";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
+import { useNativePreviewTransport } from "./use-native-preview-transport";
 
 type NativePreviewPlayerProps = {
 	asset: ReadyMediaAsset;
@@ -94,33 +95,18 @@ export function NativePreviewPlayer({
 	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
 	const multitrackRef = useRef<MultiTrack | null>(null);
 	const previewSurfaceRef = useRef<HTMLElement | null>(null);
-	const playheadRef = useRef<MediaTimeUs>(0);
-	const playbackRateRef = useRef(1);
-	const playheadAnimationFrameRef = useRef<number | null>(null);
-	const selectionLoopEnteredRef = useRef(false);
-	const [isPlaying, setIsPlaying] = useState(false);
-	const [muted, setMuted] = useState(false);
-	const [playbackRate, setPlaybackRate] = useState(1);
-	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
 	const [previewSurfaceSize, setPreviewSurfaceSize] =
 		useState<PreviewSurfaceSize | null>(null);
 	const [previewUrl, setPreviewUrl] = useState("");
-	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
 	const [multitrackReady, setMultitrackReady] = useState(false);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
 	);
-	const [volume, setVolume] = useState(1);
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
 		setPreviewUrl(objectUrl);
-		playheadRef.current = 0;
-		selectionLoopEnteredRef.current = false;
-		setPlayheadUsState(0);
-		setIsPlaying(false);
 		setSoloedAudioTrackId(null);
-		setSelectionLoopEnabled(false);
 
 		return () => {
 			URL.revokeObjectURL(objectUrl);
@@ -140,149 +126,50 @@ export function NativePreviewPlayer({
 	const audioTransportReady =
 		audioPreviewSources.status === "ready" && multitrackReady;
 
-	const setPlayheadUs = useCallback(
-		(nextPlayheadUs: MediaTimeUs) => {
-			const clampedPlayheadUs = clampMediaTime(
-				Math.round(nextPlayheadUs),
-				0,
-				asset.durationUs,
-			);
-
-			playheadRef.current = clampedPlayheadUs;
-			setPlayheadUsState(clampedPlayheadUs);
-		},
-		[asset.durationUs],
-	);
-
-	const setPreviewTransportTime = useCallback(
-		(nextPlayheadUs: MediaTimeUs) => {
-			const nextTimeSeconds = nextPlayheadUs / 1_000_000;
-			const video = videoRef.current;
-
-			if (video) {
-				video.currentTime = nextTimeSeconds;
-			}
-
-			if (audioTransportReady) {
-				multitrackRef.current?.setTime(nextTimeSeconds);
-			}
-		},
-		[audioTransportReady],
-	);
-
-	const updateSelectionLoopEntryFromPlayhead = useCallback(
-		(nextPlayheadUs: MediaTimeUs) => {
-			selectionLoopEnteredRef.current =
-				selectionLoopEnabled &&
-				isMediaTimeInsideSelection(nextPlayheadUs, selection);
-		},
-		[selection, selectionLoopEnabled],
-	);
-
-	const seekToUs = useCallback(
-		(nextPlayheadUs: MediaTimeUs) => {
-			const clampedPlayheadUs = clampMediaTime(
-				Math.round(nextPlayheadUs),
-				0,
-				asset.durationUs,
-			);
-
-			setPreviewTransportTime(clampedPlayheadUs);
-			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
-			setPlayheadUs(clampedPlayheadUs);
-		},
-		[
-			asset.durationUs,
-			setPlayheadUs,
-			setPreviewTransportTime,
-			updateSelectionLoopEntryFromPlayhead,
-		],
-	);
-
-	const seekByUs = useCallback(
-		(deltaUs: MediaTimeUs) => {
-			seekToUs(playheadRef.current + deltaUs);
-		},
-		[seekToUs],
-	);
-
-	const stepFrame = useCallback(
-		(direction: -1 | 1) => {
-			multitrackRef.current?.pause();
-			videoRef.current?.pause();
-			setIsPlaying(false);
-			seekByUs(direction * asset.frameTiming.frameDurationUs);
-		},
-		[asset.frameTiming.frameDurationUs, seekByUs],
-	);
-
-	const togglePlayback = useCallback(async () => {
-		const video = videoRef.current;
-
-		if (!video) {
-			return;
-		}
-
-		if (isPlaying) {
-			multitrackRef.current?.pause();
-			video.pause();
-			setIsPlaying(false);
-			return;
-		}
-
-		try {
-			if (audioTransportReady) {
-				video.muted = true;
-				multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
-			}
-			await video.play();
-			if (audioTransportReady) {
-				multitrackRef.current?.play();
-			}
-			setIsPlaying(true);
-		} catch {
-			multitrackRef.current?.pause();
-			setIsPlaying(false);
-		}
-	}, [audioTransportReady, isPlaying]);
+	const {
+		getPlaybackRate,
+		getPlayheadUs,
+		handleEnded,
+		handleNativePause,
+		handleNativePlay,
+		isPlaying,
+		muted,
+		playbackRate,
+		playheadUs,
+		seekByUs,
+		seekToUs,
+		selectionLoopEnabled,
+		setPreviewPlaybackRate,
+		setPreviewVolume,
+		stepFrame,
+		syncPlayheadWithNativeVideo,
+		toggleMuted,
+		togglePlayback,
+		toggleSelectionLoop,
+		volume,
+	} = useNativePreviewTransport({
+		audioTransportReady,
+		durationUs: asset.durationUs,
+		frameDurationUs: asset.frameTiming.frameDurationUs,
+		multitrackRef,
+		selection,
+		source,
+		videoRef,
+	});
 
 	const updatePlaybackRate = useCallback(
 		(event: ChangeEvent<HTMLSelectElement>) => {
-			const nextPlaybackRate = Number.parseFloat(event.currentTarget.value);
-			const video = videoRef.current;
-
-			if (video) {
-				video.playbackRate = nextPlaybackRate;
-			}
-
-			setMultitrackPreviewPlaybackRate(multitrackRef.current, nextPlaybackRate);
-			playbackRateRef.current = nextPlaybackRate;
-			setPlaybackRate(nextPlaybackRate);
+			setPreviewPlaybackRate(Number.parseFloat(event.currentTarget.value));
 		},
-		[],
+		[setPreviewPlaybackRate],
 	);
 
-	const updateVolume = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-		const nextVolume = Number.parseInt(event.currentTarget.value, 10) / 100;
-		const video = videoRef.current;
-
-		if (video) {
-			video.volume = nextVolume;
-		}
-
-		setVolume(nextVolume);
-	}, []);
-
-	const toggleMuted = useCallback(() => {
-		const nextMuted = !muted;
-		const video = videoRef.current;
-
-		if (video) {
-			video.muted = nextMuted;
-		}
-
-		setMuted(nextMuted);
-	}, [muted]);
+	const updateVolume = useCallback(
+		(event: ChangeEvent<HTMLInputElement>) => {
+			setPreviewVolume(Number.parseInt(event.currentTarget.value, 10) / 100);
+		},
+		[setPreviewVolume],
+	);
 
 	useEffect(() => {
 		const container = multitrackContainerRef.current;
@@ -329,8 +216,8 @@ export function NativePreviewPlayer({
 						return;
 					}
 
-					multitrack?.setTime(playheadRef.current / 1_000_000);
-					setMultitrackPreviewPlaybackRate(multitrack, playbackRateRef.current);
+					multitrack?.setTime(getPlayheadUs() / 1_000_000);
+					setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
 					setMultitrackReady(true);
 				});
 			})
@@ -351,7 +238,7 @@ export function NativePreviewPlayer({
 			setMultitrackReady(false);
 			container.replaceChildren();
 		};
-	}, [audioPreviewSources]);
+	}, [audioPreviewSources, getPlaybackRate, getPlayheadUs]);
 
 	useEffect(() => {
 		if (
@@ -379,182 +266,9 @@ export function NativePreviewPlayer({
 		volume,
 	]);
 
-	useEffect(() => {
-		const video = videoRef.current;
-
-		if (!video) {
-			return;
-		}
-
-		video.muted = audioTransportReady || muted;
-	}, [audioTransportReady, muted]);
-
-	useEffect(() => {
-		if (!audioTransportReady || !isPlaying) {
-			return;
-		}
-
-		const video = videoRef.current;
-		if (video) {
-			video.muted = true;
-		}
-		multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
-		multitrackRef.current?.play();
-	}, [audioTransportReady, isPlaying]);
-
-	const toggleSelectionLoop = useCallback(() => {
-		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
-			const nextSelectionLoopEnabled = !currentSelectionLoopEnabled;
-			selectionLoopEnteredRef.current =
-				nextSelectionLoopEnabled &&
-				isMediaTimeInsideSelection(playheadRef.current, selection);
-
-			return nextSelectionLoopEnabled;
-		});
-	}, [selection]);
-
 	const requestFullscreen = useCallback(() => {
 		void videoRef.current?.requestFullscreen?.();
 	}, []);
-
-	const syncPlayheadWithNativeVideo = useCallback(() => {
-		const video = videoRef.current;
-
-		if (!video) {
-			return;
-		}
-
-		const previousPlayheadUs = playheadRef.current;
-		const transportTimeSeconds =
-			audioTransportReady && multitrackRef.current
-				? multitrackRef.current.getCurrentTime()
-				: video.currentTime;
-		const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
-
-		if (
-			audioTransportReady &&
-			Number.isFinite(transportTimeSeconds) &&
-			Math.abs(video.currentTime - transportTimeSeconds) > 0.25
-		) {
-			video.currentTime = transportTimeSeconds;
-		}
-
-		if (!isPlaying) {
-			updateSelectionLoopEntryFromPlayhead(nativePlayheadUs);
-			setPlayheadUs(nativePlayheadUs);
-			return;
-		}
-
-		if (
-			selectionLoopEnabled &&
-			shouldLoopSelectionPlayback({
-				currentPlayheadUs: nativePlayheadUs,
-				previousPlayheadUs,
-				selection,
-				selectionEntered: selectionLoopEnteredRef.current,
-			})
-		) {
-			selectionLoopEnteredRef.current = true;
-			setPreviewTransportTime(selection.startUs);
-			setPlayheadUs(selection.startUs);
-			return;
-		}
-
-		if (
-			selectionLoopEnabled &&
-			hasPlaybackEnteredSelection({
-				currentPlayheadUs: nativePlayheadUs,
-				previousPlayheadUs,
-				selection,
-			})
-		) {
-			selectionLoopEnteredRef.current = true;
-		}
-
-		setPlayheadUs(nativePlayheadUs);
-	}, [
-		audioTransportReady,
-		isPlaying,
-		selection,
-		selectionLoopEnabled,
-		setPlayheadUs,
-		setPreviewTransportTime,
-		updateSelectionLoopEntryFromPlayhead,
-	]);
-
-	useEffect(() => {
-		selectionLoopEnteredRef.current =
-			selectionLoopEnabled &&
-			isMediaTimeInsideSelection(playheadRef.current, selection);
-	}, [selection, selectionLoopEnabled]);
-
-	useEffect(() => {
-		if (!isPlaying) {
-			if (playheadAnimationFrameRef.current !== null) {
-				cancelPreviewFrame(playheadAnimationFrameRef.current);
-				playheadAnimationFrameRef.current = null;
-			}
-			return;
-		}
-
-		let cancelled = false;
-
-		function syncOnAnimationFrame() {
-			if (cancelled) {
-				return;
-			}
-
-			syncPlayheadWithNativeVideo();
-			playheadAnimationFrameRef.current =
-				requestPreviewFrame(syncOnAnimationFrame);
-		}
-
-		playheadAnimationFrameRef.current =
-			requestPreviewFrame(syncOnAnimationFrame);
-
-		return () => {
-			cancelled = true;
-
-			if (playheadAnimationFrameRef.current !== null) {
-				cancelPreviewFrame(playheadAnimationFrameRef.current);
-				playheadAnimationFrameRef.current = null;
-			}
-		};
-	}, [isPlaying, syncPlayheadWithNativeVideo]);
-
-	const handleEnded = useCallback(() => {
-		const video = videoRef.current;
-
-		if (
-			video &&
-			selectionLoopEnabled &&
-			selectionLoopEnteredRef.current &&
-			selection.endUs >= asset.durationUs
-		) {
-			setPreviewTransportTime(selection.startUs);
-			setPlayheadUs(selection.startUs);
-			setIsPlaying(true);
-			void video.play().catch(() => {
-				setIsPlaying(false);
-			});
-			if (audioTransportReady) {
-				multitrackRef.current?.play();
-			}
-			return;
-		}
-
-		multitrackRef.current?.pause();
-		setIsPlaying(false);
-		setPlayheadUs(asset.durationUs);
-	}, [
-		audioTransportReady,
-		asset.durationUs,
-		selection.endUs,
-		selection.startUs,
-		selectionLoopEnabled,
-		setPlayheadUs,
-		setPreviewTransportTime,
-	]);
 
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent) => {
@@ -574,8 +288,8 @@ export function NativePreviewPlayer({
 				onSeekBackwardLarge: () => seekByUs(-10_000_000),
 				onSeekForward: () => seekByUs(1_000_000),
 				onSeekForwardLarge: () => seekByUs(10_000_000),
-				onSelectionEnd: () => onSelectionEndRequested(playheadRef.current),
-				onSelectionStart: () => onSelectionStartRequested(playheadRef.current),
+				onSelectionEnd: () => onSelectionEndRequested(getPlayheadUs()),
+				onSelectionStart: () => onSelectionStartRequested(getPlayheadUs()),
 				onTogglePlayback: () => {
 					void togglePlayback();
 				},
@@ -588,6 +302,7 @@ export function NativePreviewPlayer({
 		[
 			onSelectionEndRequested,
 			onSelectionStartRequested,
+			getPlayheadUs,
 			seekByUs,
 			shortcutsDisabled,
 			stepFrame,
@@ -729,11 +444,8 @@ export function NativePreviewPlayer({
 								aria-label={`Preview for ${asset.label}`}
 								className="h-full w-full bg-black object-contain"
 								onEnded={handleEnded}
-								onPause={() => {
-									multitrackRef.current?.pause();
-									setIsPlaying(false);
-								}}
-								onPlay={() => setIsPlaying(true)}
+								onPause={handleNativePause}
+								onPlay={handleNativePlay}
 								onSeeked={syncPlayheadWithNativeVideo}
 								onTimeUpdate={syncPlayheadWithNativeVideo}
 								poster={previewPosterSrc}
@@ -938,51 +650,6 @@ function getPreviewAspectRatio(asset: ReadyMediaAsset): number {
 	return width / height;
 }
 
-function shouldLoopSelectionPlayback({
-	currentPlayheadUs,
-	previousPlayheadUs,
-	selection,
-	selectionEntered,
-}: {
-	currentPlayheadUs: MediaTimeUs;
-	previousPlayheadUs: MediaTimeUs;
-	selection: Selection;
-	selectionEntered: boolean;
-}): boolean {
-	const enteredSelection =
-		selectionEntered ||
-		hasPlaybackEnteredSelection({
-			currentPlayheadUs,
-			previousPlayheadUs,
-			selection,
-		});
-
-	return enteredSelection && currentPlayheadUs >= selection.endUs;
-}
-
-function hasPlaybackEnteredSelection({
-	currentPlayheadUs,
-	previousPlayheadUs,
-	selection,
-}: {
-	currentPlayheadUs: MediaTimeUs;
-	previousPlayheadUs: MediaTimeUs;
-	selection: Selection;
-}): boolean {
-	return (
-		isMediaTimeInsideSelection(currentPlayheadUs, selection) ||
-		(previousPlayheadUs < selection.startUs &&
-			currentPlayheadUs >= selection.startUs)
-	);
-}
-
-function isMediaTimeInsideSelection(
-	playheadUs: MediaTimeUs,
-	selection: Selection,
-): boolean {
-	return playheadUs >= selection.startUs && playheadUs < selection.endUs;
-}
-
 function createPreviewApertureStyle(
 	aspectRatio: number,
 	surfaceSize: PreviewSurfaceSize | null,
@@ -1149,35 +816,6 @@ function isEditableTarget(target: Element): boolean {
 	const tagName = target.tagName.toLowerCase();
 
 	return tagName === "input" || tagName === "textarea" || tagName === "select";
-}
-
-function secondsToMicroseconds(seconds: number): MediaTimeUs {
-	return Math.round(seconds * 1_000_000);
-}
-
-function clampMediaTime(
-	valueUs: MediaTimeUs,
-	minUs: MediaTimeUs,
-	maxUs: MediaTimeUs,
-): MediaTimeUs {
-	return Math.min(Math.max(valueUs, minUs), maxUs);
-}
-
-function requestPreviewFrame(callback: FrameRequestCallback): number {
-	if (typeof window.requestAnimationFrame === "function") {
-		return window.requestAnimationFrame(callback);
-	}
-
-	return window.setTimeout(() => callback(window.performance.now()), 16);
-}
-
-function cancelPreviewFrame(frameId: number) {
-	if (typeof window.cancelAnimationFrame === "function") {
-		window.cancelAnimationFrame(frameId);
-		return;
-	}
-
-	window.clearTimeout(frameId);
 }
 
 function formatMediaTime(timeUs: number): string {
