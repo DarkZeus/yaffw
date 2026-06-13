@@ -13,13 +13,11 @@ import {
 	VolumeX,
 } from "lucide-react";
 import {
-	type CSSProperties,
 	type ChangeEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
-	useLayoutEffect,
 	useRef,
 	useState,
 } from "react";
@@ -41,6 +39,7 @@ import {
 	createMultitrackPreviewTracks,
 	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
+import { usePreviewApertureLayout } from "./preview-aperture-layout";
 import { SelectionTimeline } from "./selection-timeline";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
@@ -95,14 +94,13 @@ export function NativePreviewPlayer({
 	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
 	const multitrackRef = useRef<MultiTrack | null>(null);
-	const previewSurfaceRef = useRef<HTMLElement | null>(null);
-	const [previewSurfaceSize, setPreviewSurfaceSize] =
-		useState<PreviewSurfaceSize | null>(null);
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [multitrackReady, setMultitrackReady] = useState(false);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
 	);
+	const { previewApertureStyle, previewSurfaceRef } =
+		usePreviewApertureLayout(asset);
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
@@ -322,64 +320,6 @@ export function NativePreviewPlayer({
 	const canFullscreen =
 		typeof videoRef.current?.requestFullscreen === "function" ||
 		typeof HTMLVideoElement.prototype.requestFullscreen === "function";
-	const previewAspectRatio = getPreviewAspectRatio(asset);
-	const previewApertureStyle = createPreviewApertureStyle(
-		previewAspectRatio,
-		previewSurfaceSize,
-	);
-
-	useLayoutEffect(() => {
-		const previewSurface = previewSurfaceRef.current;
-
-		if (!previewSurface) {
-			return;
-		}
-
-		function measurePreviewSurface() {
-			if (!previewSurface) {
-				return;
-			}
-
-			const rect = previewSurface.getBoundingClientRect();
-			const style = window.getComputedStyle(previewSurface);
-			const width = Math.max(
-				0,
-				rect.width -
-					parseCssPixels(style.paddingLeft) -
-					parseCssPixels(style.paddingRight),
-			);
-			const height = Math.max(
-				0,
-				rect.height -
-					parseCssPixels(style.paddingTop) -
-					parseCssPixels(style.paddingBottom),
-			);
-
-			setPreviewSurfaceSize((currentSize) =>
-				currentSize &&
-				Math.abs(currentSize.width - width) < 0.5 &&
-				Math.abs(currentSize.height - height) < 0.5
-					? currentSize
-					: { height, width },
-			);
-		}
-
-		measurePreviewSurface();
-
-		if (typeof ResizeObserver === "undefined") {
-			window.addEventListener("resize", measurePreviewSurface);
-			return () => {
-				window.removeEventListener("resize", measurePreviewSurface);
-			};
-		}
-
-		const resizeObserver = new ResizeObserver(measurePreviewSurface);
-		resizeObserver.observe(previewSurface);
-
-		return () => {
-			resizeObserver.disconnect();
-		};
-	}, []);
 
 	return (
 		<>
@@ -632,55 +572,6 @@ export function NativePreviewPlayer({
 			</section>
 		</>
 	);
-}
-
-type PreviewSurfaceSize = {
-	height: number;
-	width: number;
-};
-
-function getPreviewAspectRatio(asset: ReadyMediaAsset): number {
-	const primaryVideo = asset.tracks.video[0];
-	const width = primaryVideo?.width ?? 16;
-	const height = primaryVideo?.height ?? 9;
-
-	if (width <= 0 || height <= 0) {
-		return 16 / 9;
-	}
-
-	return width / height;
-}
-
-function createPreviewApertureStyle(
-	aspectRatio: number,
-	surfaceSize: PreviewSurfaceSize | null,
-): CSSProperties {
-	if (!surfaceSize || surfaceSize.width <= 0 || surfaceSize.height <= 0) {
-		return {
-			aspectRatio: String(aspectRatio),
-		};
-	}
-
-	const width = Math.min(surfaceSize.width, surfaceSize.height * aspectRatio);
-	const height = width / aspectRatio;
-
-	return {
-		aspectRatio: String(aspectRatio),
-		height: `${formatCssNumber(height)}px`,
-		width: `${formatCssNumber(width)}px`,
-	};
-}
-
-function parseCssPixels(value: string): number {
-	const parsedValue = Number.parseFloat(value);
-
-	return Number.isFinite(parsedValue) ? parsedValue : 0;
-}
-
-function formatCssNumber(value: number): string {
-	return Number.isInteger(value)
-		? String(value)
-		: value.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function PreviewIconButton({
