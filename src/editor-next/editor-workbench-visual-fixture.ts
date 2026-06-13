@@ -1,3 +1,4 @@
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorWorkbenchVisualFixture } from "./editor-workbench-visual-fixture.types";
@@ -67,6 +68,7 @@ export function createEditorWorkbenchVisualFixture(
 	return {
 		session: {
 			asset,
+			audioMix: createDefaultAudioMix(asset),
 			export: {
 				status: "reviewing",
 			},

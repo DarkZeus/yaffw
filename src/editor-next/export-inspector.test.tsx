@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import {
 	DEFAULT_OUTPUT_PROFILE,
 	type ExportProgress,
@@ -361,6 +362,7 @@ function exportJob({
 		progress,
 		snapshot: {
 			asset: readyAsset,
+			audioMix: createDefaultAudioMix(readyAsset),
 			review: {
 				method: {
 					key: "fast",

@@ -1,4 +1,11 @@
+import { createDefaultAudioMix } from "./audio-mix";
+import {
+	type ExportCapabilityReview,
+	planDefaultExportCapability,
+} from "./export-capability";
 import type {
+	AudioMix,
+	AudioTrackChannelMode,
 	ExportProgress,
 	GeneratedMedia,
 	MediaAssetDraft,
@@ -7,10 +14,6 @@ import type {
 	Selection,
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
-import {
-	planDefaultExportCapability,
-	type ExportCapabilityReview,
-} from "./export-capability";
 import {
 	moveSelectionRangeByDelta,
 	resetSelection,
@@ -41,6 +44,7 @@ export type LoadingSession = {
 
 export type ExportJobSnapshot = {
 	asset: ReadyMediaAsset;
+	audioMix: AudioMix;
 	review: Extract<ExportCapabilityReview, { supported: true }>;
 	selection: Selection;
 };
@@ -78,6 +82,7 @@ export type ExportSessionState =
 	  };
 
 export type ReadySession = {
+	audioMix: AudioMix;
 	asset: ReadyMediaAsset;
 	export: ExportSessionState;
 	importEnabled: false;
@@ -138,6 +143,21 @@ export type EditorSessionAction =
 	  }
 	| {
 			type: "selection.reset";
+	  }
+	| {
+			include: boolean;
+			trackId: string;
+			type: "audio.track.include.set";
+	  }
+	| {
+			channelMode: AudioTrackChannelMode;
+			trackId: string;
+			type: "audio.track.channelMode.set";
+	  }
+	| {
+			trackId: string;
+			type: "audio.track.volume.set";
+			volumePercent: number;
 	  }
 	| {
 			cancelSupported: boolean;
@@ -215,6 +235,7 @@ export function editorSessionReducer(
 			}
 
 			return {
+				audioMix: createDefaultAudioMix(action.asset),
 				asset: action.asset,
 				export: {
 					status: "reviewing",
@@ -296,6 +317,75 @@ export function editorSessionReducer(
 					frameTiming: state.asset.frameTiming,
 				}),
 			};
+		case "audio.track.include.set":
+			if (!canChangeEditingDecisions(state)) {
+				return state;
+			}
+
+			if (!state.audioMix.tracks[action.trackId]) {
+				return state;
+			}
+
+			return {
+				...state,
+				audioMix: {
+					...state.audioMix,
+					tracks: {
+						...state.audioMix.tracks,
+						[action.trackId]: {
+							...state.audioMix.tracks[action.trackId],
+							include: action.include,
+						},
+					},
+				},
+				export: resetExportReviewAfterEditingDecision(state.export),
+			};
+		case "audio.track.channelMode.set":
+			if (!canChangeEditingDecisions(state)) {
+				return state;
+			}
+
+			if (!state.audioMix.tracks[action.trackId]) {
+				return state;
+			}
+
+			return {
+				...state,
+				audioMix: {
+					...state.audioMix,
+					tracks: {
+						...state.audioMix.tracks,
+						[action.trackId]: {
+							...state.audioMix.tracks[action.trackId],
+							channelMode: action.channelMode,
+						},
+					},
+				},
+				export: resetExportReviewAfterEditingDecision(state.export),
+			};
+		case "audio.track.volume.set":
+			if (!canChangeEditingDecisions(state)) {
+				return state;
+			}
+
+			if (!state.audioMix.tracks[action.trackId]) {
+				return state;
+			}
+
+			return {
+				...state,
+				audioMix: {
+					...state.audioMix,
+					tracks: {
+						...state.audioMix.tracks,
+						[action.trackId]: {
+							...state.audioMix.tracks[action.trackId],
+							volumePercent: clampAudioTrackVolumePercent(action.volumePercent),
+						},
+					},
+				},
+				export: resetExportReviewAfterEditingDecision(state.export),
+			};
 		case "export.started": {
 			if (state.status !== "ready" || state.export.status === "running") {
 				return state;
@@ -322,6 +412,7 @@ export function editorSessionReducer(
 						},
 						snapshot: {
 							asset: state.asset,
+							audioMix: state.audioMix,
 							review,
 							selection: { ...state.selection },
 						},
@@ -466,4 +557,12 @@ function resetExportReviewAfterEditingDecision(
 	return {
 		status: "reviewing",
 	};
+}
+
+function clampAudioTrackVolumePercent(volumePercent: number) {
+	if (!Number.isFinite(volumePercent)) {
+		return 100;
+	}
+
+	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }

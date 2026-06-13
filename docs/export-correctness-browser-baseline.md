@@ -71,15 +71,16 @@ generated audio track. The WebM video-only fixture is explicit rather than
 silent fallback: if the runtime cannot export it with the default profile, the
 catalog result is `unsupported` at the capability stage with technical details.
 
-Selected-range fixture export remains a duration-only measurement. The
-registered selected range is `[500000, 1500000)`, a 1-second half-open
-media-time Selection inside each 2-second fixture. The selected-range harness can
-inspect generated duration and report drift in microseconds; the committed fast
-test path records a 2-second Generated media artifact for that 1-second request,
-so the report exposes `+1000000us` duration drift and keeps export review in
-`Best-effort export` / `Best effort`. That duration evidence is useful because
-it catches overlong or short artifacts, but it does not identify whether the
-start boundary, end boundary, or both boundaries drifted.
+Selected-range fixture export is currently a harness shape, not a real-runner
+precision result. The registered selected range is `[500000, 1500000)`, a
+1-second half-open media-time Selection inside each 2-second fixture. The
+selected-range harness can inspect generated duration and report drift in
+microseconds, but the committed fast test path uses an injected runner that
+returns the original 2-second fixture blob for that 1-second request. The
+resulting `+1000000us` duration drift proves the harness can detect a bad
+artifact; it does not prove browser/Mediabunny selected-range export drifts.
+Real selected-range browser export still needs to be measured through the
+default Mediabunny runner.
 
 ## Precision policy
 
@@ -104,8 +105,8 @@ The current committed baseline can guarantee:
 - Full-asset selections are classified separately from selected-range precision.
 - Selected ranges are best effort unless a range-accuracy report contains
   measured start and end boundary evidence.
-- Selected-range harness reports can now compare requested and generated
-  duration in media-time microseconds.
+- Selected-range harness reports can compare requested and generated duration in
+  media-time microseconds when a runner supplies a generated artifact.
 - Fixture inspection can report duration and track inventory for tiny MP4 and
   WebM assets.
 - Catalog fixture export measurement can cover the tiny MP4 video-only and MP4
@@ -118,6 +119,7 @@ The current committed baseline can guarantee:
 
 The current baseline does not yet prove:
 
+- Real browser/Mediabunny selected-range duration accuracy.
 - Browser-runner selected-range boundary accuracy.
 - Start or end boundary drift for generated export artifacts.
 - Audio/video alignment in generated export artifacts.
@@ -135,22 +137,23 @@ smart rendering, custom output settings, and generated media preview.
 
 ## Follow-up direction
 
-The issue #33 decision is: keep the browser/WebCodecs export path, but defer
-stronger selected-range precision claims. Full-asset browser export can continue
-to be presented as full-asset output when default profile capability is
-available. Selected-range browser export must remain best effort until YAFFW has
-generated-media evidence for both the requested start and end boundaries.
+The corrected issue #33 decision is: keep the browser/WebCodecs export path and
+treat Mediabunny conversion as the intended selected-range precision path.
+Full-asset browser export can continue to be presented as full-asset output when
+default profile capability is available. Selected-range browser export should
+not be described as proven precise until YAFFW has real-runner generated-media
+evidence for the requested duration plus both requested start and end
+boundaries.
 
-The next implementation direction should be browser hardening only where it
-creates missing evidence: add start/end boundary measurement and audio/video
-alignment checks to the artifact harness, then feed those facts through the
-existing conservative classifier. Do not add server fallback, native FFmpeg,
-smart rendering, custom output settings, or Generated media preview in this
-decision slice.
+The next implementation direction is to replace the selected-range fake-runner
+conclusion with real Mediabunny export evidence. Run the default browser export
+runner against selected-range fixtures, inspect the resulting duration, add
+start/end boundary measurement and audio/video alignment checks, then feed those
+facts through the existing conservative classifier. If selected-range conversion
+can still take a packet-copy path in some case, selected-range precision export
+should explicitly set `forceTranscode: true` for video and audio.
 
-Native FFmpeg should be considered as a future runtime capability only if the
-next boundary/alignment measurements show browser/WebCodecs drift outside the
-current frame tolerance or missing track behavior that the browser runner cannot
-reasonably harden. Until that evidence exists, the product decision is to keep
-honest best-effort selected-range language rather than introduce another export
-runtime.
+Do not add server fallback, native FFmpeg, smart rendering, custom output
+settings, or Generated media preview as the next step. Native FFmpeg should be a
+future runtime capability only if real Mediabunny boundary/alignment evidence
+shows a browser limitation that cannot be fixed in the browser export runner.

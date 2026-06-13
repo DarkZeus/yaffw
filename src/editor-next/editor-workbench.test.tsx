@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import {
 	DEFAULT_OUTPUT_PROFILE,
 	type ReadyMediaAsset,
@@ -272,6 +273,7 @@ const readyAsset = {
 
 const readySession = {
 	asset: readyAsset,
+	audioMix: createDefaultAudioMix(readyAsset),
 	export: {
 		status: "reviewing",
 	},

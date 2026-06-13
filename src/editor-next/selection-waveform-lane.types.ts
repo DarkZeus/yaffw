@@ -3,17 +3,44 @@ import type {
 	PointerEvent as ReactPointerEvent,
 } from "react";
 
-import type { AudioMediaTrack } from "@/editor-core/model";
+import type {
+	AudioMediaTrack,
+	AudioMixTrackDecision,
+	AudioTrackChannelMode,
+	MediaTimeUs,
+	Selection,
+} from "@/editor-core/model";
 
 import type { WaveformLaneState } from "./selection-waveform-lanes.types";
+import type { WaveformRegionSelectionChange } from "./selection-waveform-surface.types";
 
 export type WaveformLanePointerEvent =
 	| ReactMouseEvent<HTMLButtonElement>
 	| ReactPointerEvent<HTMLButtonElement>;
 
 export type WaveformLaneProps = {
+	audioDecision?: AudioMixTrackDecision;
+	durationUs: MediaTimeUs;
 	lane: WaveformLaneState;
+	minimumSelectionDurationUs: MediaTimeUs;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onAudioTrackVolumePercentChange?: (
+		trackId: string,
+		volumePercent: number,
+	) => void;
+	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onPointerDown: (event: WaveformLanePointerEvent) => void;
+	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	selection: Selection;
+	selectionEditingDisabled: boolean;
+	selectionEditInProgress: boolean;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloedAudioTrackId?: string | null;
 	trackIndex: number;
 };
 

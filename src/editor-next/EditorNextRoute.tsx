@@ -131,6 +131,10 @@ export function EditorNextRoute({
 		displayedSession.status === "ready" && displayedPreviewSource ? (
 			<NativePreviewPlayer
 				asset={displayedSession.asset}
+				audioMix={displayedSession.audioMix}
+				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
+				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
+				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
 				onSelectionEndRequested={commands.setSelectionEndFromPlayhead}
 				onSelectionRangeMoveRequested={commands.moveSelectionRange}
 				onSelectionResetRequested={commands.resetSelection}

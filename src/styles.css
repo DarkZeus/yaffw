@@ -250,3 +250,35 @@ code {
 		@apply bg-background text-foreground;
 	}
 }
+
+@layer components {
+	.selection-waveform-surface ::part(editor-selection-region) {
+		box-sizing: border-box;
+		border-top: 2px solid var(--workbench-selected);
+		border-bottom: 2px solid var(--workbench-selected);
+		border-radius: 0;
+		background-color: color-mix(
+			in oklch,
+			var(--workbench-selected) 16%,
+			transparent
+		) !important;
+	}
+
+	.selection-waveform-surface ::part(region-handle-left),
+	.selection-waveform-surface ::part(region-handle-right) {
+		width: 10px !important;
+		background-color: transparent;
+	}
+
+	.selection-waveform-surface ::part(region-handle-left) {
+		border-left: 2px solid var(--workbench-selected) !important;
+		border-radius: 0;
+		box-shadow: var(--shadow-workbench-selection-start);
+	}
+
+	.selection-waveform-surface ::part(region-handle-right) {
+		border-right: 2px solid var(--workbench-selected) !important;
+		border-radius: 0;
+		box-shadow: var(--shadow-workbench-selection-end);
+	}
+}

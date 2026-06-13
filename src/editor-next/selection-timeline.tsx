@@ -16,7 +16,10 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
+	AudioMix,
+	AudioTrackChannelMode,
 	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
@@ -48,18 +51,31 @@ import {
 	useWaveformLaneStates,
 } from "./selection-waveform-lanes";
 import type { WaveformLaneLoader } from "./selection-waveform-lanes.types";
+import type { WaveformRegionSelectionChange } from "./selection-waveform-surface.types";
 
 type SelectionTimelineProps = {
 	asset: ReadyMediaAsset;
+	audioMix?: AudioMix;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onAudioTrackVolumePercentChange?: (
+		trackId: string,
+		volumePercent: number,
+	) => void;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndCommitRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;
 	onSelectionStartCommitRequested: (playheadUs: MediaTimeUs) => void;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	playheadUs: MediaTimeUs;
 	playheadUpdatesAreLive?: boolean;
 	selection: Selection;
 	selectionEditingDisabled?: boolean;
+	soloedAudioTrackId?: string | null;
 	source: Blob;
 	waveformLaneLoader?: WaveformLaneLoader;
 };
@@ -84,15 +100,21 @@ type DragState =
 
 export function SelectionTimeline({
 	asset,
+	audioMix = createDefaultAudioMix(asset),
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onAudioTrackVolumePercentChange,
 	onPlayheadSeekRequested,
 	onSelectionEndCommitRequested,
 	onSelectionRangeMoveRequested,
 	onSelectionResetRequested,
 	onSelectionStartCommitRequested,
+	onSoloedAudioTrackChange,
 	playheadUs,
 	playheadUpdatesAreLive = false,
 	selection,
 	selectionEditingDisabled = false,
+	soloedAudioTrackId = null,
 	source,
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
@@ -106,6 +128,7 @@ export function SelectionTimeline({
 	);
 	const [draftSelection, setDraftSelection] = useState<Selection | null>(null);
 	const [playheadFollowEnabled, setPlayheadFollowEnabled] = useState(false);
+	const [regionSelectionEditing, setRegionSelectionEditing] = useState(false);
 	const [zoom, setZoom] = useState(1);
 	const laneStates = useWaveformLaneStates({
 		asset,
@@ -113,6 +136,7 @@ export function SelectionTimeline({
 		waveformLaneLoader,
 	});
 	const visibleSelection = draftSelection ?? selection;
+	const selectionEditInProgress = dragState !== null || regionSelectionEditing;
 	const selectionContext = useMemo(
 		() => ({
 			durationUs: asset.durationUs,
@@ -123,6 +147,88 @@ export function SelectionTimeline({
 	const timeMarkers = useMemo(
 		() => createSelectionTimelineMarkers(asset.durationUs, zoom),
 		[asset.durationUs, zoom],
+	);
+	const readyWaveformLaneCount = Object.values(laneStates).filter(
+		(laneState) => laneState.status === "ready",
+	).length;
+	const selectionIsRegionBacked = readyWaveformLaneCount > 0;
+	const minimumSelectionDurationUs = Math.max(
+		1,
+		Math.min(asset.frameTiming.frameDurationUs, asset.durationUs),
+	);
+	const normalizeRegionSelectionChange = useCallback(
+		(change: WaveformRegionSelectionChange): Selection => {
+			if (change.side === "start") {
+				return setSelectionStartFromPlayhead(
+					change.initialSelection,
+					change.selection.startUs,
+					selectionContext,
+				);
+			}
+
+			if (change.side === "end") {
+				return setSelectionEndFromPlayhead(
+					change.initialSelection,
+					change.selection.endUs,
+					selectionContext,
+				);
+			}
+
+			return moveSelectionRangeByDelta(
+				change.initialSelection,
+				change.selection.startUs - change.initialSelection.startUs,
+				selectionContext,
+			);
+		},
+		[selectionContext],
+	);
+	const previewRegionSelectionChange = useCallback(
+		(change: WaveformRegionSelectionChange) => {
+			const nextSelection = normalizeRegionSelectionChange(change);
+
+			setRegionSelectionEditing(true);
+			setDraftSelection(nextSelection);
+
+			if (change.side === "start") {
+				onPlayheadSeekRequested(nextSelection.startUs);
+			}
+
+			if (change.side === "end") {
+				onPlayheadSeekRequested(nextSelection.endUs);
+			}
+		},
+		[normalizeRegionSelectionChange, onPlayheadSeekRequested],
+	);
+	const commitRegionSelectionChange = useCallback(
+		(change: WaveformRegionSelectionChange) => {
+			const nextSelection = normalizeRegionSelectionChange(change);
+
+			setDraftSelection(null);
+			setRegionSelectionEditing(false);
+
+			if (change.side === "start") {
+				onPlayheadSeekRequested(nextSelection.startUs);
+				onSelectionStartCommitRequested(nextSelection.startUs);
+				return;
+			}
+
+			if (change.side === "end") {
+				onPlayheadSeekRequested(nextSelection.endUs);
+				onSelectionEndCommitRequested(nextSelection.endUs);
+				return;
+			}
+
+			onSelectionRangeMoveRequested(
+				nextSelection.startUs - change.initialSelection.startUs,
+			);
+		},
+		[
+			normalizeRegionSelectionChange,
+			onPlayheadSeekRequested,
+			onSelectionEndCommitRequested,
+			onSelectionRangeMoveRequested,
+			onSelectionStartCommitRequested,
+		],
 	);
 
 	useEffect(() => {
@@ -390,12 +496,11 @@ export function SelectionTimeline({
 		draftPlayheadUs ?? playheadUs,
 		asset.durationUs,
 	);
-	const selectionMotionClassName =
-		dragState === null
-			? "transition-[left,width] duration-200 ease-out motion-reduce:transition-none"
-			: "transition-none";
+	const selectionMotionClassName = !selectionEditInProgress
+		? "transition-[left,width] duration-200 ease-out motion-reduce:transition-none"
+		: "transition-none";
 	const playheadMotionClassName =
-		dragState === null && !playheadUpdatesAreLive
+		!selectionEditInProgress && !playheadUpdatesAreLive
 			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
 	const centerPlayheadInScrollContainer = useCallback(
@@ -440,16 +545,16 @@ export function SelectionTimeline({
 	);
 
 	useEffect(() => {
-		if (!playheadFollowEnabled || dragState !== null) {
+		if (!playheadFollowEnabled || selectionEditInProgress) {
 			return;
 		}
 
 		centerPlayheadInScrollContainer(playheadUpdatesAreLive ? "auto" : "smooth");
 	}, [
 		centerPlayheadInScrollContainer,
-		dragState,
 		playheadFollowEnabled,
 		playheadUpdatesAreLive,
+		selectionEditInProgress,
 	]);
 
 	return (
@@ -599,11 +704,29 @@ export function SelectionTimeline({
 								{asset.tracks.audio.length > 0 ? (
 									asset.tracks.audio.map((track, trackIndex) => (
 										<WaveformLane
+											audioDecision={audioMix.tracks[track.id]}
+											durationUs={asset.durationUs}
 											key={track.id}
 											lane={
 												laneStates[track.id] ?? { status: "loading", track }
 											}
+											minimumSelectionDurationUs={minimumSelectionDurationUs}
+											onAudioTrackChannelModeChange={
+												onAudioTrackChannelModeChange
+											}
+											onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+											onAudioTrackVolumePercentChange={
+												onAudioTrackVolumePercentChange
+											}
+											onPlayheadSeekRequested={onPlayheadSeekRequested}
 											onPointerDown={seekFromLanePointer}
+											onSelectionCommitRequested={commitRegionSelectionChange}
+											onSelectionPreviewRequested={previewRegionSelectionChange}
+											onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+											selection={visibleSelection}
+											selectionEditingDisabled={selectionEditingDisabled}
+											selectionEditInProgress={selectionEditInProgress}
+											soloedAudioTrackId={soloedAudioTrackId}
 											trackIndex={trackIndex}
 										/>
 									))
@@ -614,67 +737,71 @@ export function SelectionTimeline({
 								)}
 							</div>
 
-							<div
-								aria-hidden="true"
-								className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
-								data-testid="selection-range-outline"
-								style={{
-									left: `${selectionStartPercent}%`,
-									width: `${selectionEndPercent - selectionStartPercent}%`,
-								}}
-							/>
-							<button
-								aria-label="Move selection range"
-								className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
-								disabled={selectionEditingDisabled}
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										beginRangeDrag(event);
-									}
-								}}
-								onPointerDown={beginRangeDrag}
-								style={{
-									left: `${selectionStartPercent}%`,
-									width: `${selectionEndPercent - selectionStartPercent}%`,
-								}}
-								type="button"
-							/>
-							<button
-								aria-label="Selection start handle"
-								className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-								disabled={selectionEditingDisabled}
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										beginHandleDrag(event, "start");
-									}
-								}}
-								onPointerDown={(event) => beginHandleDrag(event, "start")}
-								style={{ left: `${selectionStartPercent}%` }}
-								type="button"
-							>
-								<span
-									className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
-									data-testid="selection-start-handle-rail"
-								/>
-							</button>
-							<button
-								aria-label="Selection end handle"
-								className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-								disabled={selectionEditingDisabled}
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										beginHandleDrag(event, "end");
-									}
-								}}
-								onPointerDown={(event) => beginHandleDrag(event, "end")}
-								style={{ left: `${selectionEndPercent}%` }}
-								type="button"
-							>
-								<span
-									className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
-									data-testid="selection-end-handle-rail"
-								/>
-							</button>
+							{selectionIsRegionBacked && dragState === null ? null : (
+								<>
+									<div
+										aria-hidden="true"
+										className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
+										data-testid="selection-range-outline"
+										style={{
+											left: `${selectionStartPercent}%`,
+											width: `${selectionEndPercent - selectionStartPercent}%`,
+										}}
+									/>
+									<button
+										aria-label="Move selection range"
+										className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+										disabled={selectionEditingDisabled}
+										onMouseDown={(event) => {
+											if (shouldUseMouseFallback()) {
+												beginRangeDrag(event);
+											}
+										}}
+										onPointerDown={beginRangeDrag}
+										style={{
+											left: `${selectionStartPercent}%`,
+											width: `${selectionEndPercent - selectionStartPercent}%`,
+										}}
+										type="button"
+									/>
+									<button
+										aria-label="Selection start handle"
+										className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+										disabled={selectionEditingDisabled}
+										onMouseDown={(event) => {
+											if (shouldUseMouseFallback()) {
+												beginHandleDrag(event, "start");
+											}
+										}}
+										onPointerDown={(event) => beginHandleDrag(event, "start")}
+										style={{ left: `${selectionStartPercent}%` }}
+										type="button"
+									>
+										<span
+											className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
+											data-testid="selection-start-handle-rail"
+										/>
+									</button>
+									<button
+										aria-label="Selection end handle"
+										className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+										disabled={selectionEditingDisabled}
+										onMouseDown={(event) => {
+											if (shouldUseMouseFallback()) {
+												beginHandleDrag(event, "end");
+											}
+										}}
+										onPointerDown={(event) => beginHandleDrag(event, "end")}
+										style={{ left: `${selectionEndPercent}%` }}
+										type="button"
+									>
+										<span
+											className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
+											data-testid="selection-end-handle-rail"
+										/>
+									</button>
+								</>
+							)}
 							<button
 								aria-label="Playhead handle"
 								className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}

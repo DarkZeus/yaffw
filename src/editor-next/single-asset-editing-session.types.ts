@@ -1,5 +1,8 @@
 import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis";
-import type { GeneratedMedia } from "@/editor-core/model";
+import type {
+	AudioTrackChannelMode,
+	GeneratedMedia,
+} from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 import type { DefaultExportRunner } from "./default-export-runner";
@@ -12,6 +15,12 @@ export type SingleAssetEditingSessionCommands = {
 	moveSelectionRange: (deltaUs: number) => void;
 	requestCloseFile: () => void;
 	resetSelection: () => void;
+	setAudioTrackChannelMode: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	setAudioTrackIncluded: (trackId: string, include: boolean) => void;
+	setAudioTrackVolumePercent: (trackId: string, volumePercent: number) => void;
 	setSelectionEndFromPlayhead: (playheadUs: number) => void;
 	setSelectionStartFromPlayhead: (playheadUs: number) => void;
 	startDefaultExport: () => Promise<void>;

@@ -4,6 +4,7 @@ import { planDefaultExportCapability } from "@/editor-core/export-capability";
 import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
+	AudioTrackChannelMode,
 	GeneratedMedia,
 	ReadyMediaAsset,
 	Selection,
@@ -147,6 +148,7 @@ export function useSingleAssetEditingSession({
 		try {
 			const result = await defaultExportRunner.run({
 				asset: session.asset,
+				audioMix: session.audioMix,
 				onProgress: (progress) => {
 					dispatch({
 						jobId,
@@ -285,6 +287,33 @@ export function useSingleAssetEditingSession({
 		});
 	}
 
+	function setAudioTrackIncluded(trackId: string, include: boolean) {
+		dispatch({
+			include,
+			trackId,
+			type: "audio.track.include.set",
+		});
+	}
+
+	function setAudioTrackChannelMode(
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) {
+		dispatch({
+			channelMode,
+			trackId,
+			type: "audio.track.channelMode.set",
+		});
+	}
+
+	function setAudioTrackVolumePercent(trackId: string, volumePercent: number) {
+		dispatch({
+			trackId,
+			type: "audio.track.volume.set",
+			volumePercent,
+		});
+	}
+
 	return {
 		commands: {
 			cancelDefaultExport,
@@ -293,6 +322,9 @@ export function useSingleAssetEditingSession({
 			moveSelectionRange,
 			requestCloseFile,
 			resetSelection,
+			setAudioTrackChannelMode,
+			setAudioTrackIncluded,
+			setAudioTrackVolumePercent,
 			setSelectionEndFromPlayhead,
 			setSelectionStartFromPlayhead,
 			startDefaultExport,

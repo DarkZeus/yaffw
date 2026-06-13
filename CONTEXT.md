@@ -98,7 +98,7 @@ _Avoid_: timeline
 
 **Waveform lane**:
 A waveform display for one audio track, used as selection context.
-_Avoid_: audio mix control, editable track lane
+_Avoid_: editable track lane
 
 **Timeline zoom**:
 A UI scale control for inspecting media-time detail in the selection and waveform surface.
@@ -119,6 +119,14 @@ _Avoid_: frame, marker, waveform label
 **Audio mix decision**:
 A user choice that changes how an audio track contributes to exported media.
 _Avoid_: waveform setting, player volume
+
+**Track volume**:
+An audio mix decision describing how loud one audio track should be in the generated mix, shown as a percentage where 100% preserves the source level and 0% silences the track.
+_Avoid_: preview volume, gain
+
+**Preview audio monitoring**:
+A preview-only way to temporarily hear a subset of audio tracks without changing generated media.
+_Avoid_: audio mix decision, exported solo
 
 **Output settings**:
 Editing decisions that describe the intended generated media format and quality.
@@ -200,6 +208,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - The first slice targets video media with optional audio tracks; video-only media is supported, while audio-only media is deferred and should fail with a clear unsupported-file message.
 - **Asset analysis** records such as metadata, frame rate, track inventory, waveform data, and export capability belong around a **Media asset**; none of them replace it as the editor's central concept.
 - A **Single-asset editing session** owns the active **Media asset** and the **Editing decisions** for that asset.
+- A **Single-asset editing session** owns **Audio mix decisions** because they affect generated media.
 - Playback position, fullscreen state, loading progress, and analysis progress are not **Editing decisions**.
 - **Timeline zoom** is inspection state owned by the UI adapter, not an **Editing decision**.
 - **Playback speed** is preview state, not an **Editing decision**.
@@ -217,32 +226,66 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Frame timing** may be known from metadata or analysis, or estimated when exact frame timing is not yet available.
 - When **Frame timing** is unknown, frame stepping and minimum **Selection** duration may use an estimated 30 FPS until better metadata or frame analysis is available.
 - A **Ready media asset** starts with a **Selection** covering the full asset duration, represented as `[0, durationUs)`.
+- A **Ready media asset** starts with default **Audio mix decisions**: every audio track included, every **Track volume** at 100%, and no preview solo state.
 - Resetting **Selection** restores `[0, durationUs)` and does not move the **Playhead**.
+- Resetting **Selection** does not reset **Audio mix decisions** or preview audio monitoring.
 - The **Playhead** may be inside or outside the **Selection**, may equal `durationUs` as an end-position state, and never changes export output by itself.
 - First-slice **Keyboard shortcuts** include Space or K for play/pause, Left/Right for one-second seek, J/L for ten-second seek, Shift+Left/Shift+Right for frame stepping, and [/] for setting selection boundaries to the playhead.
 - Setting **Selection** boundaries with keyboard shortcuts uses the current **Playhead** position and does not move the playhead.
 - **Selection loop** does not have a keyboard shortcut in the first implementation.
 - **Keyboard shortcuts** work at the page level, but are disabled while typing into inputs, while a dialog is active, or while an export job is running.
 - First-slice selection editing uses handles, range-body drag, and keyboard commands; start/end timecode inputs are deferred.
+- Selection boundary drag may scrub the **Playhead** to the boundary being edited during preview, but the committed **Selection** changes when the boundary edit is completed.
+- The selection surface starts with one editable **Selection** affordance for the current **Selection**; a newly loaded **Ready media asset** therefore presents a full-duration selection affordance by default.
 - The first slice may show read-only **Selection** start, end, and duration labels in `HH:MM:SS.mmm` format.
 - A timeline control may display a **Waveform**, **Playhead**, and **Selection**, but "timeline" is not a domain object in the single-asset editor.
 - A **Media asset** contains zero or more **Media tracks**.
 - A **Subtitle track** is a kind of **Media track**, but subtitle support is deferred beyond the first slice.
 - A **Subtitle cue** is expressed in **Media time** and should be transformed by selection/export rules only when subtitle support is explicitly added.
 - An **Audio mix decision** is an **Editing decision** for one **Media track**.
-- The first slice may show audio track count, labels, and language metadata, but does not expose audio mix controls.
+- Audio-capable **Media tracks** are included in the mix by default so preview playback and generated media preserve all audible source context unless the user changes an **Audio mix decision**.
+- **Audio mix decisions** should affect both preview playback and generated media; what the user hears in preview should match what the export contains unless **Export review** explicitly says otherwise.
+- **Audio mix decisions** include whether an audio track is included in the generated mix and the **Track volume** used for that mix.
+- Preview mixing and export mixing should use the same **Track volume** interpretation so the same percentage produces matching loudness intent in preview and generated media.
+- Excluding an audio track from the generated mix is distinct from setting its **Track volume** to 0%; excluded tracks do not contribute to the generated audio, while included tracks at 0% contribute silence and remain part of the mix decision.
+- Excluding an audio track is a fast contribution decision and should preserve the track's remembered **Track volume** for later re-inclusion.
+- **Preview audio monitoring** may temporarily solo tracks during preview, but it does not change **Audio mix decisions** or generated media.
+- When preview solo is active, soloed tracks are audible in preview even if they are excluded from generated media; the UI should allow both states to be visible at once.
+- Preview solo changes which tracks are monitored, not their loudness; **Track volume** still applies to soloed preview tracks.
+- **Preview volume** and preview mute are global preview settings and do not change **Audio mix decisions** or generated media.
+- When a **Media asset** has audio tracks and preview can use a mix-capable multitrack adapter, that adapter should be the preview transport authority for play, pause, seeking, playback speed, and audio monitoring; the native video element should act as the visual renderer synchronized to the shared **Playhead**.
+- Mix-capable preview may expose each embedded audio **Media track** to the multitrack adapter through temporary playable audio sources derived from the source media; those preview resources are adapter-owned and must be disposed with the active **Media asset**.
+- Temporary audio sources should preserve the source track's encoded audio when it can be remuxed into a reliable browser-playable source; decoded fallback sources are used only when the encoded path is unavailable or unreliable.
+- Temporary audio source preparation should prepare every audio **Media track** for consistent mix-capable preview, even when some tracks are currently excluded by **Audio mix decisions**.
+- While temporary audio sources are being prepared for mix-capable preview, video may be visually previewable but audio monitoring controls should remain unavailable and native video audio should not be used as a temporary substitute.
+- If temporary audio source preparation fails for a **Media track**, audio monitoring should not silently omit that track; the failed track should expose a retry action that regenerates only that track's temporary preview audio source.
+- In mix-capable preview mode, the native video element should be muted so all audible preview output comes from the multitrack audio path.
+- In mix-capable preview mode, the multitrack audio clock is authoritative; if native video playback drifts from the shared **Playhead**, video should be corrected toward the multitrack time.
+- **Playback speed** applies to the whole preview; in mix-capable preview mode, the multitrack audio transport and synchronized video renderer should use the same speed value or explicitly reject unsupported speed values.
+- For video-only media, the native video element may remain the preview transport authority.
 - **Output settings** are **Editing decisions** even when the UI only supports default output.
 - The **Default output profile** prefers MP4 with H.264 video and AAC audio when the current **Runtime capability** supports it; browser-friendly alternatives such as WebM are fallbacks.
+- Under the **Default output profile**, included audio tracks are mixed into one generated AAC audio track; preserving separate audio tracks is a future advanced export behavior.
+- If all audio tracks are excluded by **Audio mix decisions**, export remains valid and produces generated media with no audio track.
 - The first-slice **Default output profile** does not include a user-defined target bitrate; source bitrate may only be used as an export-runner hint if the runtime needs one.
 - Custom **Output settings** such as target bitrate are future options and may require re-encoding the selected media.
 - A **Waveform** may be derived from a **Media track**, but it is not the track and is not required for readiness or export.
 - The first slice should load per-track **Waveform lanes** progressively for audio tracks when available because separate tracks may carry different selection context, such as desktop audio versus voice.
-- First-slice **Waveform lanes** do not imply audio mix controls.
-- **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context.
+- A **Waveform lane** may expose minimal **Audio mix decision** controls for the same audio track, but the lane remains visual selection context rather than becoming an editable track lane.
+- **Waveform lane** audio controls should be compact and colocated with track identity in the lane header, so track contribution decisions stay visually tied to the waveform they affect.
+- **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context without a selection affordance.
 - The first slice shows all available **Waveform lanes** and uses vertical scrolling if the lanes exceed the available viewport.
 - All **Waveform lanes** align to the same **Media time** ruler and share one **Selection** and **Playhead** overlay.
+- When the waveform adapter can preserve existing behavior, the **Waveform**, mirrored **Selection** affordances, **Playhead** cursor, time ruler, and **Timeline zoom**/scroll should be rendered by the same media-time surface rather than split across independent overlays.
+- The selection and waveform surface should keep explicit editor zoom controls; wheel or pinch zoom is a progressive interaction enhancement, not a requirement for the first Wavesurfer adapter.
+- The selection and waveform surface should preserve the explicit keep-**Playhead**-centered control; when enabled, the waveform adapter may use its native auto-scroll and auto-center behavior, and when disabled it should avoid auto-centering.
+- If **Waveform lanes** present per-lane selection affordances, those affordances mirror and edit the same **Selection**; they do not create track-specific selections.
+- Editing the selection affordance from any **Waveform lane** updates the shared **Selection** and synchronizes the mirrored selection affordance in every other lane.
+- During active selection dragging, all ready-lane selection affordances should mirror the draft range as local draft UI on `requestAnimationFrame`, while the session-owned **Selection** is committed only after the drag completes.
+- A loading or failed **Waveform lane** does not show a mirrored selection affordance; when a lane finishes loading, its selection affordance is synchronized to the current shared **Selection**.
+- If a **Waveform lane** finishes loading while another lane is actively editing a draft selection, the newly loaded lane waits for the committed **Selection** before showing its mirrored selection affordance.
 - Clicking a **Waveform lane** seeks the shared **Playhead** to that media time.
-- Dragging a **Waveform lane** does not create or change **Selection** in the first slice; selection changes use handles, range body drag, or keyboard commands.
+- Dragging empty **Waveform lane** space does not create or replace **Selection**; selection changes use the existing selection affordance edges/body or keyboard commands.
 - The first slice includes minimal **Timeline zoom** with horizontal scrolling while keeping waveform lanes, selection, and playhead aligned.
 - An **Export job** consumes one **Media asset** and the session's **Editing decisions**.
 - An **Export job** runs from a snapshot of the **Media asset** and **Editing decisions** captured when the job starts.
@@ -255,6 +298,8 @@ _Avoid_: first-slice requirement, automatic fallback
 - The first-slice **Export review** should make export strategy and precision visible without introducing custom output controls.
 - **Export review** should describe export strategies in product language such as fast export or precision export, while implementation labels may remain technical.
 - The first-slice **Export review** shows the chosen export strategy; it does not let the user manually choose between strategies.
+- **Export review** should summarize the generated audio mix from **Audio mix decisions**, such as how many audio tracks are included and that included tracks are mixed to AAC under the **Default output profile**.
+- **Export review** should not treat preview-only solo state as part of the generated audio mix.
 - **Smart rendering** is a future **Export capability**, not a requirement for the first local-file editor slice.
 - An **Export job** produces **Generated media**; saving or downloading that result is a separate delivery concern.
 - The first slice should require an explicit **Delivery action** such as download after export succeeds; auto-download can be a later preference.

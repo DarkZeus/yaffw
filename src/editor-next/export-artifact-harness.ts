@@ -1,15 +1,16 @@
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import {
-	planDefaultExportCapability,
 	type ExportCapabilityReview,
+	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import {
-	classifyExportRangeAccuracy,
 	type ExportRangeAccuracyReport,
 	type GeneratedMediaInspection,
+	classifyExportRangeAccuracy,
 } from "@/editor-core/export-correctness";
 import {
-	analyzeLocalMediaAssetDraft,
 	type LocalMediaAssetInspector,
+	analyzeLocalMediaAssetDraft,
 } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
@@ -19,14 +20,14 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import {
-	detectRuntimeSupport,
 	type RuntimeSupport,
+	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
 
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
 import {
-	browserDefaultExportRunner,
 	type DefaultExportRunner,
+	browserDefaultExportRunner,
 } from "./default-export-runner";
 import {
 	EXPORT_CORRECTNESS_FIXTURES,
@@ -290,6 +291,7 @@ async function runExportArtifactHarness({
 	try {
 		exportResult = await runner.run({
 			asset: analysis.asset,
+			audioMix: createDefaultAudioMix(analysis.asset),
 			onProgress: (event) => {
 				progress.push(event);
 			},

@@ -23,17 +23,37 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type MultiTrack from "wavesurfer-multitrack";
+import type { TrackOptions } from "wavesurfer-multitrack";
 
 import { Button } from "@/components/ui/button";
+import {
+	audioTrackVolumePercentToGain,
+	createDefaultAudioMix,
+} from "@/editor-core/audio-mix";
 import type {
+	AudioMix,
+	AudioTrackChannelMode,
 	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
 import { SelectionTimeline } from "./selection-timeline";
+import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 
 type NativePreviewPlayerProps = {
 	asset: ReadyMediaAsset;
+	audioMix?: AudioMix;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onAudioTrackVolumePercentChange?: (
+		trackId: string,
+		volumePercent: number,
+	) => void;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;
@@ -54,6 +74,10 @@ const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 export function NativePreviewPlayer({
 	asset,
+	audioMix = createDefaultAudioMix(asset),
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onAudioTrackVolumePercentChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
 	onSelectionResetRequested,
@@ -65,8 +89,11 @@ export function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
+	const multitrackRef = useRef<MultiTrack | null>(null);
 	const previewSurfaceRef = useRef<HTMLElement | null>(null);
 	const playheadRef = useRef<MediaTimeUs>(0);
+	const playbackRateRef = useRef(1);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const selectionLoopEnteredRef = useRef(false);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -77,6 +104,10 @@ export function NativePreviewPlayer({
 		useState<PreviewSurfaceSize | null>(null);
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
+	const [multitrackReady, setMultitrackReady] = useState(false);
+	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
+		null,
+	);
 	const [volume, setVolume] = useState(1);
 
 	useEffect(() => {
@@ -86,12 +117,22 @@ export function NativePreviewPlayer({
 		selectionLoopEnteredRef.current = false;
 		setPlayheadUsState(0);
 		setIsPlaying(false);
+		setSoloedAudioTrackId(null);
 		setSelectionLoopEnabled(false);
 
 		return () => {
 			URL.revokeObjectURL(objectUrl);
 		};
 	}, [source]);
+
+	const audioPreviewSources = useBrowserAudioPreviewSources({
+		audioMix,
+		asset,
+		enabled: canUseBrowserAudioPreviewTransport(asset),
+		source,
+	});
+	const audioTransportReady =
+		audioPreviewSources.status === "ready" && multitrackReady;
 
 	const setPlayheadUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
@@ -107,6 +148,22 @@ export function NativePreviewPlayer({
 		[asset.durationUs],
 	);
 
+	const setPreviewTransportTime = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const nextTimeSeconds = nextPlayheadUs / 1_000_000;
+			const video = videoRef.current;
+
+			if (video) {
+				video.currentTime = nextTimeSeconds;
+			}
+
+			if (audioTransportReady) {
+				multitrackRef.current?.setTime(nextTimeSeconds);
+			}
+		},
+		[audioTransportReady],
+	);
+
 	const updateSelectionLoopEntryFromPlayhead = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
 			selectionLoopEnteredRef.current =
@@ -118,21 +175,22 @@ export function NativePreviewPlayer({
 
 	const seekToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
-			const video = videoRef.current;
 			const clampedPlayheadUs = clampMediaTime(
 				Math.round(nextPlayheadUs),
 				0,
 				asset.durationUs,
 			);
 
-			if (video) {
-				video.currentTime = clampedPlayheadUs / 1_000_000;
-			}
-
+			setPreviewTransportTime(clampedPlayheadUs);
 			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
 		},
-		[asset.durationUs, setPlayheadUs, updateSelectionLoopEntryFromPlayhead],
+		[
+			asset.durationUs,
+			setPlayheadUs,
+			setPreviewTransportTime,
+			updateSelectionLoopEntryFromPlayhead,
+		],
 	);
 
 	const seekByUs = useCallback(
@@ -144,6 +202,7 @@ export function NativePreviewPlayer({
 
 	const stepFrame = useCallback(
 		(direction: -1 | 1) => {
+			multitrackRef.current?.pause();
 			videoRef.current?.pause();
 			setIsPlaying(false);
 			seekByUs(direction * asset.frameTiming.frameDurationUs);
@@ -159,18 +218,27 @@ export function NativePreviewPlayer({
 		}
 
 		if (isPlaying) {
+			multitrackRef.current?.pause();
 			video.pause();
 			setIsPlaying(false);
 			return;
 		}
 
 		try {
+			if (audioTransportReady) {
+				video.muted = true;
+				multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
+			}
 			await video.play();
+			if (audioTransportReady) {
+				multitrackRef.current?.play();
+			}
 			setIsPlaying(true);
 		} catch {
+			multitrackRef.current?.pause();
 			setIsPlaying(false);
 		}
-	}, [isPlaying]);
+	}, [audioTransportReady, isPlaying]);
 
 	const updatePlaybackRate = useCallback(
 		(event: ChangeEvent<HTMLSelectElement>) => {
@@ -181,6 +249,8 @@ export function NativePreviewPlayer({
 				video.playbackRate = nextPlaybackRate;
 			}
 
+			setMultitrackPreviewPlaybackRate(multitrackRef.current, nextPlaybackRate);
+			playbackRateRef.current = nextPlaybackRate;
 			setPlaybackRate(nextPlaybackRate);
 		},
 		[],
@@ -208,6 +278,124 @@ export function NativePreviewPlayer({
 		setMuted(nextMuted);
 	}, [muted]);
 
+	useEffect(() => {
+		const container = multitrackContainerRef.current;
+
+		if (
+			audioPreviewSources.status !== "ready" ||
+			audioPreviewSources.sources.length === 0 ||
+			!container
+		) {
+			multitrackRef.current?.destroy();
+			multitrackRef.current = null;
+			setMultitrackReady(false);
+			container?.replaceChildren();
+			return;
+		}
+
+		let disposed = false;
+		let multitrack: MultiTrack | null = null;
+		let unsubscribeCanPlay: (() => void) | undefined;
+
+		setMultitrackReady(false);
+		container.replaceChildren();
+
+		void import("wavesurfer-multitrack")
+			.then(({ default: Multitrack }) => {
+				if (disposed) {
+					return;
+				}
+
+				multitrack = Multitrack.create(
+					createMultitrackPreviewTracks(audioPreviewSources.sources),
+					{
+						container,
+						cursorColor: "transparent",
+						cursorWidth: 0,
+						minPxPerSec: 1,
+						trackBackground: "transparent",
+						trackBorderColor: "transparent",
+					},
+				);
+				multitrackRef.current = multitrack;
+				unsubscribeCanPlay = multitrack.on("canplay", () => {
+					if (disposed) {
+						return;
+					}
+
+					multitrack?.setTime(playheadRef.current / 1_000_000);
+					setMultitrackPreviewPlaybackRate(multitrack, playbackRateRef.current);
+					setMultitrackReady(true);
+				});
+			})
+			.catch(() => {
+				if (!disposed) {
+					multitrackRef.current = null;
+					setMultitrackReady(false);
+				}
+			});
+
+		return () => {
+			disposed = true;
+			unsubscribeCanPlay?.();
+			if (multitrackRef.current === multitrack) {
+				multitrackRef.current = null;
+			}
+			multitrack?.destroy();
+			setMultitrackReady(false);
+			container.replaceChildren();
+		};
+	}, [audioPreviewSources]);
+
+	useEffect(() => {
+		if (
+			audioPreviewSources.status !== "ready" ||
+			!audioTransportReady ||
+			!multitrackRef.current
+		) {
+			return;
+		}
+
+		applyMultitrackPreviewVolumes({
+			audioMix,
+			multitrack: multitrackRef.current,
+			muted,
+			soloedAudioTrackId,
+			sources: audioPreviewSources.sources,
+			volume,
+		});
+	}, [
+		audioMix,
+		audioPreviewSources,
+		audioTransportReady,
+		muted,
+		soloedAudioTrackId,
+		volume,
+	]);
+
+	useEffect(() => {
+		const video = videoRef.current;
+
+		if (!video) {
+			return;
+		}
+
+		video.muted = audioTransportReady || muted;
+	}, [audioTransportReady, muted]);
+
+	useEffect(() => {
+		if (!audioTransportReady || !isPlaying) {
+			return;
+		}
+
+		const video = videoRef.current;
+		if (video) {
+			video.muted = true;
+		}
+		multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
+		multitrackRef.current?.play();
+	}, [audioTransportReady, isPlaying]);
+
 	const toggleSelectionLoop = useCallback(() => {
 		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
 			const nextSelectionLoopEnabled = !currentSelectionLoopEnabled;
@@ -231,7 +419,19 @@ export function NativePreviewPlayer({
 		}
 
 		const previousPlayheadUs = playheadRef.current;
-		const nativePlayheadUs = secondsToMicroseconds(video.currentTime);
+		const transportTimeSeconds =
+			audioTransportReady && multitrackRef.current
+				? multitrackRef.current.getCurrentTime()
+				: video.currentTime;
+		const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
+
+		if (
+			audioTransportReady &&
+			Number.isFinite(transportTimeSeconds) &&
+			Math.abs(video.currentTime - transportTimeSeconds) > 0.25
+		) {
+			video.currentTime = transportTimeSeconds;
+		}
 
 		if (!isPlaying) {
 			updateSelectionLoopEntryFromPlayhead(nativePlayheadUs);
@@ -249,7 +449,7 @@ export function NativePreviewPlayer({
 			})
 		) {
 			selectionLoopEnteredRef.current = true;
-			video.currentTime = selection.startUs / 1_000_000;
+			setPreviewTransportTime(selection.startUs);
 			setPlayheadUs(selection.startUs);
 			return;
 		}
@@ -267,10 +467,12 @@ export function NativePreviewPlayer({
 
 		setPlayheadUs(nativePlayheadUs);
 	}, [
+		audioTransportReady,
 		isPlaying,
 		selection,
 		selectionLoopEnabled,
 		setPlayheadUs,
+		setPreviewTransportTime,
 		updateSelectionLoopEntryFromPlayhead,
 	]);
 
@@ -323,23 +525,29 @@ export function NativePreviewPlayer({
 			selectionLoopEnteredRef.current &&
 			selection.endUs >= asset.durationUs
 		) {
-			video.currentTime = selection.startUs / 1_000_000;
+			setPreviewTransportTime(selection.startUs);
 			setPlayheadUs(selection.startUs);
 			setIsPlaying(true);
 			void video.play().catch(() => {
 				setIsPlaying(false);
 			});
+			if (audioTransportReady) {
+				multitrackRef.current?.play();
+			}
 			return;
 		}
 
+		multitrackRef.current?.pause();
 		setIsPlaying(false);
 		setPlayheadUs(asset.durationUs);
 	}, [
+		audioTransportReady,
 		asset.durationUs,
 		selection.endUs,
 		selection.startUs,
 		selectionLoopEnabled,
 		setPlayheadUs,
+		setPreviewTransportTime,
 	]);
 
 	const handleKeyDown = useCallback(
@@ -515,7 +723,10 @@ export function NativePreviewPlayer({
 								aria-label={`Preview for ${asset.label}`}
 								className="h-full w-full bg-black object-contain"
 								onEnded={handleEnded}
-								onPause={() => setIsPlaying(false)}
+								onPause={() => {
+									multitrackRef.current?.pause();
+									setIsPlaying(false);
+								}}
 								onPlay={() => setIsPlaying(true)}
 								onSeeked={syncPlayheadWithNativeVideo}
 								onTimeUpdate={syncPlayheadWithNativeVideo}
@@ -526,6 +737,12 @@ export function NativePreviewPlayer({
 							>
 								<track kind="captions" />
 							</video>
+							<div
+								aria-hidden="true"
+								className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden opacity-0"
+								data-testid="multitrack-preview-transport"
+								ref={multitrackContainerRef}
+							/>
 						</section>
 					</section>
 				</section>
@@ -674,8 +891,13 @@ export function NativePreviewPlayer({
 				className="min-h-[22rem] overflow-x-hidden overscroll-contain xl:col-span-3 xl:row-start-3 xl:min-h-0 xl:overflow-y-auto xl:border-t xl:border-workbench-border-strong xl:bg-workbench-timeline"
 			>
 				<SelectionTimeline
+					audioMix={audioMix}
 					asset={asset}
+					onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+					onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
 					onPlayheadSeekRequested={seekToUs}
+					onSoloedAudioTrackChange={setSoloedAudioTrackId}
 					onSelectionEndCommitRequested={onSelectionEndRequested}
 					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 					onSelectionResetRequested={onSelectionResetRequested}
@@ -684,6 +906,7 @@ export function NativePreviewPlayer({
 					playheadUpdatesAreLive={isPlaying}
 					selection={selection}
 					selectionEditingDisabled={selectionEditingDisabled}
+					soloedAudioTrackId={soloedAudioTrackId}
 					source={source}
 				/>
 			</section>
@@ -695,6 +918,127 @@ type PreviewSurfaceSize = {
 	height: number;
 	width: number;
 };
+
+export function canUseBrowserAudioPreviewTransport(asset: ReadyMediaAsset) {
+	return (
+		asset.tracks.audio.length > 0 &&
+		typeof window !== "undefined" &&
+		typeof AudioContext !== "undefined" &&
+		typeof HTMLAudioElement !== "undefined" &&
+		typeof URL.createObjectURL === "function"
+	);
+}
+
+export function createMultitrackPreviewTracks(
+	sources: BrowserAudioPreviewSource[],
+): TrackOptions[] {
+	return sources.map((source) => ({
+		id: source.trackId,
+		options: {
+			barGap: 0,
+			barWidth: 1,
+			height: 0,
+			progressColor: "transparent",
+			waveColor: "transparent",
+		},
+		startPosition: source.startPositionSeconds,
+		url: source.url,
+		volume: 0,
+	}));
+}
+
+export function previewVolumeForAudioTrackSource({
+	audioMix,
+	muted,
+	soloedAudioTrackId,
+	source,
+	volume,
+}: {
+	audioMix: AudioMix;
+	muted: boolean;
+	soloedAudioTrackId?: string | null;
+	source: BrowserAudioPreviewSource;
+	volume: number;
+}) {
+	const decision = audioMix.tracks[source.trackId];
+
+	if (muted) {
+		return 0;
+	}
+
+	if (soloedAudioTrackId && source.trackId !== soloedAudioTrackId) {
+		return 0;
+	}
+
+	if (!soloedAudioTrackId && decision?.include === false) {
+		return 0;
+	}
+
+	return (
+		clampPreviewVolume(volume) *
+		audioTrackVolumePercentToGain(decision?.volumePercent ?? 100)
+	);
+}
+
+function applyMultitrackPreviewVolumes({
+	audioMix,
+	multitrack,
+	muted,
+	soloedAudioTrackId,
+	sources,
+	volume,
+}: {
+	audioMix: AudioMix;
+	multitrack: MultiTrack;
+	muted: boolean;
+	soloedAudioTrackId?: string | null;
+	sources: BrowserAudioPreviewSource[];
+	volume: number;
+}) {
+	sources.forEach((source, sourceIndex) => {
+		multitrack.setTrackVolume(
+			sourceIndex,
+			previewVolumeForAudioTrackSource({
+				audioMix,
+				muted,
+				soloedAudioTrackId,
+				source,
+				volume,
+			}),
+		);
+	});
+}
+
+function setMultitrackPreviewPlaybackRate(
+	multitrack: MultiTrack | null,
+	playbackRate: number,
+) {
+	if (!multitrack) {
+		return;
+	}
+
+	const transport = multitrack as unknown as {
+		audios?: Array<{ playbackRate: number }>;
+		setAudioRate?: (rate: number) => void;
+	};
+
+	if (typeof transport.setAudioRate === "function") {
+		transport.setAudioRate(playbackRate);
+		return;
+	}
+
+	for (const audio of transport.audios ?? []) {
+		audio.playbackRate = playbackRate;
+	}
+}
+
+function clampPreviewVolume(volume: number) {
+	if (!Number.isFinite(volume)) {
+		return 1;
+	}
+
+	return Math.max(0, Math.min(volume, 1));
+}
 
 function getPreviewAspectRatio(asset: ReadyMediaAsset): number {
 	const primaryVideo = asset.tracks.video[0];

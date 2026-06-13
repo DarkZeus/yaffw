@@ -11,6 +11,7 @@
     "serve": "vite preview",
     "server": "node server.js",
     "server:watch": "node --watch server.js",
+    "prototype:audio-bridge": "vite --host 127.0.0.1 --port 4174 --open /src/editor-next/prototypes/audio-source-bridge.prototype.html",
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",
@@ -55,6 +56,7 @@
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.6",
     "tailwindcss-animate": "^1.0.7",
+    "wavesurfer-multitrack": "^0.4.12",
     "wavesurfer.js": "^7.11.1"
   },
   "devDependencies": {

@@ -59,6 +59,28 @@ export type AudioMediaTrack = {
 	sampleRate?: number;
 };
 
+export type AudioTrackChannelMode =
+	| "auto-one-sided-stereo"
+	| "average-to-mono"
+	| "duplicate-left-to-stereo"
+	| "duplicate-right-to-stereo"
+	| "preserve"
+	| "use-left-as-mono"
+	| "use-right-as-mono";
+
+export type AudioMixTrackDecision = {
+	channelMode: AudioTrackChannelMode;
+	include: boolean;
+	trackId: string;
+	volumePercent: number;
+};
+
+export type AudioMix = {
+	finalPeakGuardDb: number;
+	outputChannels: 2;
+	tracks: Record<string, AudioMixTrackDecision>;
+};
+
 export type DefaultOutputProfile = {
 	audioCodec: "aac";
 	container: "mp4";

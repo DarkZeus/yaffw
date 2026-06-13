@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { Headphones, Volume2, VolumeX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { AudioTrackChannelMode } from "@/editor-core/model";
 
 import type {
 	WaveformLaneIdentityInput,
@@ -13,10 +15,38 @@ import type {
 	WaveformLaneProps,
 } from "./selection-waveform-lane.types";
 import type { WaveformLaneState } from "./selection-waveform-lanes.types";
+import { WaveformSurface } from "./selection-waveform-surface";
+
+const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
+	label: string;
+	value: AudioTrackChannelMode;
+}> = [
+	{ label: "Auto-fix quiet side", value: "auto-one-sided-stereo" },
+	{ label: "Keep as recorded", value: "preserve" },
+	{ label: "Center left-side audio", value: "use-left-as-mono" },
+	{ label: "Center right-side audio", value: "use-right-as-mono" },
+	{ label: "Center both sides", value: "average-to-mono" },
+	{ label: "Copy left to both", value: "duplicate-left-to-stereo" },
+	{ label: "Copy right to both", value: "duplicate-right-to-stereo" },
+];
 
 export function WaveformLane({
+	audioDecision,
+	durationUs,
 	lane,
+	minimumSelectionDurationUs,
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onAudioTrackVolumePercentChange,
+	onPlayheadSeekRequested,
 	onPointerDown,
+	onSelectionCommitRequested,
+	onSelectionPreviewRequested,
+	onSoloedAudioTrackChange,
+	selection,
+	selectionEditingDisabled,
+	selectionEditInProgress,
+	soloedAudioTrackId = null,
 	trackIndex,
 }: WaveformLaneProps) {
 	const identity = createWaveformLaneIdentityViewModel({
@@ -24,13 +54,129 @@ export function WaveformLane({
 		track: lane.track,
 		trackIndex,
 	});
+	const audioIncluded = audioDecision?.include ?? true;
+	const channelMode = audioDecision?.channelMode ?? "preserve";
+	const soloActive = soloedAudioTrackId === lane.track.id;
+	const volumePercent = clampVolumePercent(audioDecision?.volumePercent ?? 100);
+	const audioControlsDisabled =
+		selectionEditingDisabled ||
+		(!onAudioTrackIncludedChange && !onAudioTrackVolumePercentChange);
 
 	return (
 		<div className="relative border-b border-workbench-border bg-workbench-lane">
 			<div
-				className="pointer-events-none relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
+				className="relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
+				<div className="mr-1 flex shrink-0 flex-wrap items-center gap-1">
+					<Button
+						aria-label={
+							audioIncluded
+								? `Exclude ${identity.title} from mix`
+								: `Include ${identity.title} in mix`
+						}
+						aria-pressed={!audioIncluded}
+						className={`size-7 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+							audioIncluded
+								? "text-workbench-lane-foreground"
+								: "text-muted-foreground"
+						}`}
+						disabled={selectionEditingDisabled || !onAudioTrackIncludedChange}
+						onClick={(event) => {
+							event.stopPropagation();
+							onAudioTrackIncludedChange?.(lane.track.id, !audioIncluded);
+						}}
+						onPointerDown={(event) => event.stopPropagation()}
+						size="icon"
+						type="button"
+						variant="outline"
+					>
+						{audioIncluded ? (
+							<Volume2 data-icon="inline-start" />
+						) : (
+							<VolumeX data-icon="inline-start" />
+						)}
+					</Button>
+					<Button
+						aria-label={
+							soloActive ? `Unsolo ${identity.title}` : `Solo ${identity.title}`
+						}
+						aria-pressed={soloActive}
+						className={`size-7 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+							soloActive
+								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
+								: "text-muted-foreground"
+						}`}
+						disabled={!onSoloedAudioTrackChange}
+						onClick={(event) => {
+							event.stopPropagation();
+							onSoloedAudioTrackChange?.(soloActive ? null : lane.track.id);
+						}}
+						onPointerDown={(event) => event.stopPropagation()}
+						size="icon"
+						type="button"
+						variant="outline"
+					>
+						<Headphones data-icon="inline-start" />
+					</Button>
+					<label
+						className={`flex items-center gap-1 ${
+							audioIncluded ? "opacity-100" : "opacity-55"
+						}`}
+					>
+						<span className="sr-only">{identity.title} volume</span>
+						<input
+							aria-label={`${identity.title} volume`}
+							className="h-5 w-20 accent-primary"
+							disabled={
+								audioControlsDisabled || !onAudioTrackVolumePercentChange
+							}
+							max="100"
+							min="0"
+							onChange={(event) => {
+								onAudioTrackVolumePercentChange?.(
+									lane.track.id,
+									Number.parseInt(event.currentTarget.value, 10),
+								);
+							}}
+							onClick={(event) => event.stopPropagation()}
+							onPointerDown={(event) => event.stopPropagation()}
+							type="range"
+							value={volumePercent}
+						/>
+						<span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
+							{volumePercent}%
+						</span>
+					</label>
+					<label
+						className={`flex items-center ${
+							audioIncluded ? "opacity-100" : "opacity-55"
+						}`}
+					>
+						<span className="sr-only">{identity.title} channel fix</span>
+						<select
+							aria-label={`${identity.title} channel fix`}
+							className="h-7 w-44 rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[11px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
+							disabled={
+								selectionEditingDisabled || !onAudioTrackChannelModeChange
+							}
+							onChange={(event) => {
+								onAudioTrackChannelModeChange?.(
+									lane.track.id,
+									event.currentTarget.value as AudioTrackChannelMode,
+								);
+							}}
+							onPointerDown={(event) => event.stopPropagation()}
+							value={channelMode}
+						>
+							{AUDIO_CHANNEL_MODE_OPTIONS.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</label>
+				</div>
 				<span className="mr-1 truncate text-sm font-medium text-workbench-lane-foreground">
 					{identity.title}
 				</span>
@@ -45,34 +191,61 @@ export function WaveformLane({
 				))}
 				<LaneStatus lane={lane} status={identity.status} />
 			</div>
-			<button
-				aria-label={`Seek ${identity.title} waveform lane`}
-				className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
-				onMouseDown={(event) => {
-					if (typeof window.PointerEvent === "undefined") {
-						onPointerDown(event);
-					}
-				}}
-				onPointerDown={onPointerDown}
-				type="button"
-			>
-				<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
-				{lane.status === "ready" ? (
-					<WaveformCanvas label={identity.title} samples={lane.samples} />
-				) : null}
-				{lane.status === "loading" ? (
-					<div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
-						Loading waveform
-					</div>
-				) : null}
-				{lane.status === "unavailable" ? (
-					<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
-						Waveform generation failed
-					</div>
-				) : null}
-			</button>
+			{lane.status === "ready" ? (
+				<button
+					aria-label={`Seek ${identity.title} waveform lane`}
+					className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
+					type="button"
+				>
+					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
+					<WaveformSurface
+						durationUs={durationUs}
+						label={identity.title}
+						minimumSelectionDurationUs={minimumSelectionDurationUs}
+						onPlayheadSeekRequested={onPlayheadSeekRequested}
+						onSelectionCommitRequested={onSelectionCommitRequested}
+						onSelectionPreviewRequested={onSelectionPreviewRequested}
+						samples={lane.samples}
+						selection={selection}
+						selectionEditingDisabled={selectionEditingDisabled}
+						selectionEditInProgress={selectionEditInProgress}
+					/>
+				</button>
+			) : (
+				<button
+					aria-label={`Seek ${identity.title} waveform lane`}
+					className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
+					onMouseDown={(event) => {
+						if (typeof window.PointerEvent === "undefined") {
+							onPointerDown(event);
+						}
+					}}
+					onPointerDown={onPointerDown}
+					type="button"
+				>
+					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
+					{lane.status === "loading" ? (
+						<div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
+							Loading waveform
+						</div>
+					) : null}
+					{lane.status === "unavailable" ? (
+						<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
+							Waveform generation failed
+						</div>
+					) : null}
+				</button>
+			)}
 		</div>
 	);
+}
+
+function clampVolumePercent(volumePercent: number) {
+	if (!Number.isFinite(volumePercent)) {
+		return 100;
+	}
+
+	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }
 
 function LaneStatus({
@@ -168,107 +341,4 @@ function formatWaveformLaneStatus(
 				tone: "unavailable",
 			};
 	}
-}
-
-function WaveformCanvas({
-	label,
-	samples,
-}: {
-	label: string;
-	samples: number[];
-}) {
-	const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-	useEffect(() => {
-		const canvas = canvasRef.current;
-
-		if (!canvas) {
-			return;
-		}
-
-		const currentCanvas = canvas;
-
-		function drawWaveform() {
-			const context = currentCanvas.getContext("2d");
-
-			if (!context) {
-				return;
-			}
-
-			const rect = currentCanvas.getBoundingClientRect();
-			const pixelRatio = window.devicePixelRatio || 1;
-			const width = Math.max(1, Math.round(rect.width * pixelRatio));
-			const height = Math.max(1, Math.round(rect.height * pixelRatio));
-			const centerY = height / 2;
-
-			currentCanvas.width = width;
-			currentCanvas.height = height;
-			context.clearRect(0, 0, width, height);
-			context.fillStyle = canvasTokenColor(
-				currentCanvas,
-				"--workbench-waveform-guide",
-				"CanvasText",
-			);
-			context.fillRect(0, centerY - 1, width, 2);
-			context.fillStyle = canvasTokenColor(
-				currentCanvas,
-				"--workbench-waveform",
-				"CanvasText",
-			);
-
-			for (let x = 0; x < width; x += 1) {
-				const sampleIndex = Math.min(
-					samples.length - 1,
-					Math.floor((x / width) * samples.length),
-				);
-				const nextSampleIndex = Math.min(
-					samples.length - 1,
-					Math.ceil(((x + 1) / width) * samples.length),
-				);
-				let peak = 0;
-
-				for (let index = sampleIndex; index <= nextSampleIndex; index += 1) {
-					peak = Math.max(peak, samples[index] ?? 0);
-				}
-
-				const barHeight = Math.max(1, peak * (height - 8));
-				context.fillRect(x, centerY - barHeight / 2, 1, barHeight);
-			}
-		}
-
-		drawWaveform();
-
-		if (typeof ResizeObserver === "undefined") {
-			window.addEventListener("resize", drawWaveform);
-			return () => {
-				window.removeEventListener("resize", drawWaveform);
-			};
-		}
-
-		const observer = new ResizeObserver(drawWaveform);
-		observer.observe(currentCanvas);
-
-		return () => {
-			observer.disconnect();
-		};
-	}, [samples]);
-
-	return (
-		<canvas
-			aria-label={`${label} waveform detail`}
-			className="absolute inset-x-0 top-3 bottom-3 h-[calc(100%-1.5rem)] w-full"
-			data-sample-count={samples.length}
-			ref={canvasRef}
-		/>
-	);
-}
-
-function canvasTokenColor(
-	element: HTMLElement,
-	tokenName: string,
-	fallback: string,
-) {
-	return (
-		getComputedStyle(element).getPropertyValue(tokenName).trim() || fallback
-	);
 }

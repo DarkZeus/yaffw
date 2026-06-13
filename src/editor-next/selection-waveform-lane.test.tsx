@@ -1,8 +1,16 @@
 /* @vitest-environment jsdom */
 
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createWaveformLaneIdentityViewModel } from "./selection-waveform-lane";
+import {
+	WaveformLane,
+	createWaveformLaneIdentityViewModel,
+} from "./selection-waveform-lane";
+
+afterEach(() => {
+	cleanup();
+});
 
 describe("createWaveformLaneIdentityViewModel", () => {
 	it("formats waveform lane identity from media-track facts and lane status", () => {
@@ -68,5 +76,77 @@ describe("createWaveformLaneIdentityViewModel", () => {
 			},
 			title: "Desktop",
 		});
+	});
+
+	it("emits compact audio mix and preview controls from the lane header", () => {
+		const onAudioTrackChannelModeChange = vi.fn();
+		const onAudioTrackIncludedChange = vi.fn();
+		const onAudioTrackVolumePercentChange = vi.fn();
+		const onSoloedAudioTrackChange = vi.fn();
+
+		render(
+			<WaveformLane
+				audioDecision={{
+					channelMode: "preserve",
+					include: true,
+					trackId: "audio-voice",
+					volumePercent: 64,
+				}}
+				durationUs={12_000_000}
+				lane={{
+					status: "loading",
+					track: {
+						channels: 2,
+						codec: "aac",
+						id: "audio-voice",
+						kind: "audio",
+						label: "Voice",
+					},
+				}}
+				minimumSelectionDurationUs={33_333}
+				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
+				onPlayheadSeekRequested={() => {}}
+				onPointerDown={() => {}}
+				onSelectionCommitRequested={() => {}}
+				onSelectionPreviewRequested={() => {}}
+				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+				selection={{
+					endUs: 12_000_000,
+					startUs: 0,
+				}}
+				selectionEditingDisabled={false}
+				selectionEditInProgress={false}
+				trackIndex={0}
+			/>,
+		);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+		);
+		expect(onAudioTrackIncludedChange).toHaveBeenCalledWith(
+			"audio-voice",
+			false,
+		);
+
+		fireEvent.change(screen.getByLabelText("Voice volume"), {
+			target: { value: "37" },
+		});
+		expect(onAudioTrackVolumePercentChange).toHaveBeenCalledWith(
+			"audio-voice",
+			37,
+		);
+		expect(screen.getByText("Keep as recorded")).toBeTruthy();
+		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
+			target: { value: "auto-one-sided-stereo" },
+		});
+		expect(onAudioTrackChannelModeChange).toHaveBeenCalledWith(
+			"audio-voice",
+			"auto-one-sided-stereo",
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
+		expect(onSoloedAudioTrackChange).toHaveBeenCalledWith("audio-voice");
+		expect(screen.getByText("64%")).toBeTruthy();
 	});
 });

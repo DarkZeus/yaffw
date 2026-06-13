@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("SelectionTimeline", () => {
-	it("loads every audio lane progressively, exposes unavailable lanes, and avoids mix controls", async () => {
+	it("loads every audio lane progressively, exposes unavailable lanes, and shows compact audio controls", async () => {
 		renderTimeline({
 			waveformLaneLoader: async ({ trackIndex }) =>
 				trackIndex === 0
@@ -51,24 +51,11 @@ describe("SelectionTimeline", () => {
 		});
 		expect(screen.queryByText("Waveform ready")).toBeNull();
 		expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
-		expect(screen.getByLabelText("Move selection range").parentElement).toBe(
-			screen.getByTestId("selection-timeline-lane-surface"),
-		);
+		expect(screen.queryByLabelText("Move selection range")).toBeNull();
 		expect(
 			screen.getByTestId("waveform-lane-header-audio-1").nextElementSibling,
 		).toBe(screen.getByLabelText("Seek Voice waveform lane"));
-		expect(screen.getByTestId("selection-range-outline").className).toContain(
-			"bg-transparent",
-		);
-		expect(screen.getByTestId("selection-range-outline").className).toContain(
-			"border-y-2",
-		);
-		expect(screen.getByTestId("selection-range-outline").className).toContain(
-			"transition-[left,width]",
-		);
-		expect(screen.getByTestId("selection-range-outline").className).toContain(
-			"ease-out",
-		);
+		expect(screen.queryByTestId("selection-range-outline")).toBeNull();
 		expect(screen.getByLabelText("Playhead handle").className).toContain(
 			"transition-[left]",
 		);
@@ -81,15 +68,12 @@ describe("SelectionTimeline", () => {
 		expect(
 			screen.getByRole("button", { name: "Keep playhead centered" }),
 		).toBeTruthy();
-		expect(screen.getByLabelText("Move selection range").className).toContain(
-			"bg-transparent",
-		);
-		expect(
-			screen.getByTestId("selection-start-handle-rail").className,
-		).toContain("w-0.5");
-		expect(screen.getByTestId("selection-end-handle-rail").className).toContain(
-			"w-0.5",
-		);
+		expect(screen.queryByTestId("selection-start-handle-rail")).toBeNull();
+		expect(screen.queryByTestId("selection-end-handle-rail")).toBeNull();
+		expect(screen.getByRole("button", { name: "Exclude Voice from mix" }));
+		expect(screen.getByLabelText("Voice volume"));
+		expect(screen.getByLabelText("Voice channel fix"));
+		expect(screen.getByRole("button", { name: "Solo Voice" }));
 
 		expect(screen.queryByText("Mute")).toBeNull();
 		expect(screen.queryByText("Solo")).toBeNull();
@@ -138,6 +122,10 @@ describe("SelectionTimeline", () => {
 				endUs: 6_000_000,
 				startUs: 2_000_000,
 			},
+			waveformLaneLoader: async () => ({
+				reason: "Decode failed",
+				status: "unavailable",
+			}),
 		});
 
 		fireEvent.mouseDown(screen.getByLabelText("Seek Voice waveform lane"), {
