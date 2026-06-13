@@ -13,10 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
-import {
-	NativePreviewPlayer,
-	isPreviewShortcutSuppressed,
-} from "./native-preview-player";
+import { NativePreviewPlayer } from "./native-preview-player";
 
 const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
@@ -420,42 +417,6 @@ describe("NativePreviewPlayer", () => {
 			shiftKey: true,
 		});
 		expect(video.currentTime).toBeCloseTo(10.033333, 5);
-	});
-
-	it("suppresses shortcuts while typing or when shortcut dispatch is disabled", () => {
-		const input = document.createElement("input");
-		const dialog = document.createElement("div");
-		dialog.setAttribute("role", "dialog");
-		document.body.append(input);
-
-		expect(
-			isPreviewShortcutSuppressed({
-				event: new KeyboardEvent("keydown", { key: " " }),
-				shortcutsDisabled: true,
-			}),
-		).toBe(true);
-
-		input.focus();
-
-		expect(
-			isPreviewShortcutSuppressed({
-				event: new KeyboardEvent("keydown", { key: " " }),
-				shortcutsDisabled: false,
-			}),
-		).toBe(true);
-
-		input.blur();
-		document.body.append(dialog);
-
-		expect(
-			isPreviewShortcutSuppressed({
-				event: new KeyboardEvent("keydown", { key: " " }),
-				shortcutsDisabled: false,
-			}),
-		).toBe(true);
-
-		dialog.remove();
-		input.remove();
 	});
 });
 

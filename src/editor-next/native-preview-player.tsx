@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import {
 	type ChangeEvent,
-	type KeyboardEvent as ReactKeyboardEvent,
 	type ReactNode,
 	useCallback,
 	useEffect,
@@ -40,6 +39,7 @@ import {
 	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
+import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { SelectionTimeline } from "./selection-timeline";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
@@ -65,11 +65,6 @@ type NativePreviewPlayerProps = {
 	selectionEditingDisabled?: boolean;
 	shortcutsDisabled?: boolean;
 	source: Blob;
-};
-
-type ShortcutSuppressionOptions = {
-	event: KeyboardEvent;
-	shortcutsDisabled: boolean;
 };
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -269,53 +264,17 @@ export function NativePreviewPlayer({
 		void videoRef.current?.requestFullscreen?.();
 	}, []);
 
-	const handleKeyDown = useCallback(
-		(event: KeyboardEvent) => {
-			if (
-				isPreviewShortcutSuppressed({
-					event,
-					shortcutsDisabled,
-				})
-			) {
-				return;
-			}
-
-			const handled = handlePreviewShortcut(event, {
-				onFrameBack: () => stepFrame(-1),
-				onFrameForward: () => stepFrame(1),
-				onSeekBackward: () => seekByUs(-1_000_000),
-				onSeekBackwardLarge: () => seekByUs(-10_000_000),
-				onSeekForward: () => seekByUs(1_000_000),
-				onSeekForwardLarge: () => seekByUs(10_000_000),
-				onSelectionEnd: () => onSelectionEndRequested(getPlayheadUs()),
-				onSelectionStart: () => onSelectionStartRequested(getPlayheadUs()),
-				onTogglePlayback: () => {
-					void togglePlayback();
-				},
-			});
-
-			if (handled) {
-				event.preventDefault();
-			}
+	usePreviewKeyboardShortcuts({
+		getPlayheadUs,
+		onFrameStep: stepFrame,
+		onSeekBy: seekByUs,
+		onSelectionEndRequested,
+		onSelectionStartRequested,
+		onTogglePlayback: () => {
+			void togglePlayback();
 		},
-		[
-			onSelectionEndRequested,
-			onSelectionStartRequested,
-			getPlayheadUs,
-			seekByUs,
-			shortcutsDisabled,
-			stepFrame,
-			togglePlayback,
-		],
-	);
-
-	useEffect(() => {
-		window.addEventListener("keydown", handleKeyDown);
-
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-		};
-	}, [handleKeyDown]);
+		shortcutsDisabled,
+	});
 
 	const canFullscreen =
 		typeof videoRef.current?.requestFullscreen === "function" ||
@@ -626,86 +585,4 @@ function PreviewToggleButton({
 			{children}
 		</Button>
 	);
-}
-
-type PreviewShortcutHandlers = {
-	onFrameBack: () => void;
-	onFrameForward: () => void;
-	onSeekBackward: () => void;
-	onSeekBackwardLarge: () => void;
-	onSeekForward: () => void;
-	onSeekForwardLarge: () => void;
-	onSelectionEnd: () => void;
-	onSelectionStart: () => void;
-	onTogglePlayback: () => void;
-};
-
-function handlePreviewShortcut(
-	event: KeyboardEvent | ReactKeyboardEvent,
-	handlers: PreviewShortcutHandlers,
-): boolean {
-	if (event.shiftKey && event.code === "ArrowLeft") {
-		handlers.onFrameBack();
-		return true;
-	}
-
-	if (event.shiftKey && event.code === "ArrowRight") {
-		handlers.onFrameForward();
-		return true;
-	}
-
-	switch (event.code) {
-		case "ArrowLeft":
-			handlers.onSeekBackward();
-			return true;
-		case "ArrowRight":
-			handlers.onSeekForward();
-			return true;
-		case "BracketLeft":
-			handlers.onSelectionStart();
-			return true;
-		case "BracketRight":
-			handlers.onSelectionEnd();
-			return true;
-		case "KeyJ":
-			handlers.onSeekBackwardLarge();
-			return true;
-		case "KeyK":
-		case "Space":
-			handlers.onTogglePlayback();
-			return true;
-		case "KeyL":
-			handlers.onSeekForwardLarge();
-			return true;
-		default:
-			return false;
-	}
-}
-
-export function isPreviewShortcutSuppressed({
-	event,
-	shortcutsDisabled,
-}: ShortcutSuppressionOptions): boolean {
-	if (shortcutsDisabled || event.defaultPrevented) {
-		return true;
-	}
-
-	const target =
-		event.target instanceof Element ? event.target : document.activeElement;
-
-	if (target?.isConnected && isEditableTarget(target)) {
-		return true;
-	}
-
-	return document.querySelector('[role="dialog"]') !== null;
-}
-
-function isEditableTarget(target: Element): boolean {
-	if (target.closest('[contenteditable="true"]')) {
-		return true;
-	}
-
-	const tagName = target.tagName.toLowerCase();
-
-	return tagName === "input" || tagName === "textarea" || tagName === "select";
 }
