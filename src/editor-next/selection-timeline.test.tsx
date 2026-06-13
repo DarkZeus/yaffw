@@ -25,6 +25,7 @@ afterEach(() => {
 describe("SelectionTimeline", () => {
 	it("loads every audio lane progressively, exposes unavailable lanes, and shows compact audio controls", async () => {
 		renderTimeline({
+			audioPreviewPreparingTrackIds: new Set(["audio-1"]),
 			waveformLaneLoader: async ({ trackIndex }) =>
 				trackIndex === 0
 					? {
@@ -74,6 +75,7 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByLabelText("Voice volume"));
 		expect(screen.getByLabelText("Voice channel fix"));
 		expect(screen.getByRole("button", { name: "Solo Voice" }));
+		expect(screen.getByText("Preparing audio")).toBeTruthy();
 
 		expect(screen.queryByText("Mute")).toBeNull();
 		expect(screen.queryByText("Solo")).toBeNull();

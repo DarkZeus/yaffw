@@ -20,6 +20,7 @@ export type WaveformLanePointerEvent =
 
 export type WaveformLaneProps = {
 	audioDecision?: AudioMixTrackDecision;
+	audioPreviewPreparing: boolean;
 	durationUs: MediaTimeUs;
 	lane: WaveformLaneState;
 	minimumSelectionDurationUs: MediaTimeUs;

@@ -92,6 +92,7 @@ describe("createWaveformLaneIdentityViewModel", () => {
 					trackId: "audio-voice",
 					volumePercent: 64,
 				}}
+				audioPreviewPreparing={true}
 				durationUs={12_000_000}
 				lane={{
 					status: "loading",
@@ -138,6 +139,9 @@ describe("createWaveformLaneIdentityViewModel", () => {
 			37,
 		);
 		expect(screen.getByText("Keep as recorded")).toBeTruthy();
+		expect(screen.getByText("Preparing audio")).toBeTruthy();
+		expect(screen.queryByText("Copy left to both")).toBeNull();
+		expect(screen.queryByText("Copy right to both")).toBeNull();
 		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
 			target: { value: "auto-one-sided-stereo" },
 		});

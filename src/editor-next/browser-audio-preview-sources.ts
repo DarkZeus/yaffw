@@ -72,6 +72,7 @@ type BrowserAudioPreviewSourcesRequest = {
 	revokeObjectURL?: (url: string) => void;
 	signal: AbortSignal;
 	source: Blob;
+	trackIds?: ReadonlySet<string>;
 };
 
 type InputAudioTrack = Awaited<ReturnType<Input["getAudioTracks"]>>[number];
@@ -98,6 +99,7 @@ export async function prepareBrowserAudioPreviewSources({
 	revokeObjectURL = URL.revokeObjectURL,
 	signal,
 	source,
+	trackIds,
 }: BrowserAudioPreviewSourcesRequest): Promise<BrowserAudioPreviewSourcesResult> {
 	throwIfAborted(signal);
 
@@ -120,6 +122,10 @@ export async function prepareBrowserAudioPreviewSources({
 
 		for (const [trackIndex, assetTrack] of asset.tracks.audio.entries()) {
 			throwIfAborted(signal);
+
+			if (trackIds && !trackIds.has(assetTrack.id)) {
+				continue;
+			}
 
 			const inputTrack =
 				inputTracks.find((track) => String(track.id) === assetTrack.id) ??

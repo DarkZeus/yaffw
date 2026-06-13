@@ -24,13 +24,9 @@ import {
 	useState,
 } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
-import type { TrackOptions } from "wavesurfer-multitrack";
 
 import { Button } from "@/components/ui/button";
-import {
-	audioTrackVolumePercentToGain,
-	createDefaultAudioMix,
-} from "@/editor-core/audio-mix";
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
 	AudioTrackChannelMode,
@@ -38,7 +34,12 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
+import {
+	applyMultitrackPreviewVolumes,
+	canUseBrowserAudioPreviewTransport,
+	createMultitrackPreviewTracks,
+	setMultitrackPreviewPlaybackRate,
+} from "./native-preview-audio-transport";
 import { SelectionTimeline } from "./selection-timeline";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 
@@ -71,6 +72,7 @@ type ShortcutSuppressionOptions = {
 };
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 
 export function NativePreviewPlayer({
 	asset,
@@ -131,6 +133,10 @@ export function NativePreviewPlayer({
 		enabled: canUseBrowserAudioPreviewTransport(asset),
 		source,
 	});
+	const audioPreviewPreparingTrackIds =
+		audioPreviewSources.status === "loading"
+			? audioPreviewSources.preparingTrackIds
+			: EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS;
 	const audioTransportReady =
 		audioPreviewSources.status === "ready" && multitrackReady;
 
@@ -892,6 +898,7 @@ export function NativePreviewPlayer({
 			>
 				<SelectionTimeline
 					audioMix={audioMix}
+					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 					asset={asset}
 					onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
@@ -918,127 +925,6 @@ type PreviewSurfaceSize = {
 	height: number;
 	width: number;
 };
-
-export function canUseBrowserAudioPreviewTransport(asset: ReadyMediaAsset) {
-	return (
-		asset.tracks.audio.length > 0 &&
-		typeof window !== "undefined" &&
-		typeof AudioContext !== "undefined" &&
-		typeof HTMLAudioElement !== "undefined" &&
-		typeof URL.createObjectURL === "function"
-	);
-}
-
-export function createMultitrackPreviewTracks(
-	sources: BrowserAudioPreviewSource[],
-): TrackOptions[] {
-	return sources.map((source) => ({
-		id: source.trackId,
-		options: {
-			barGap: 0,
-			barWidth: 1,
-			height: 0,
-			progressColor: "transparent",
-			waveColor: "transparent",
-		},
-		startPosition: source.startPositionSeconds,
-		url: source.url,
-		volume: 0,
-	}));
-}
-
-export function previewVolumeForAudioTrackSource({
-	audioMix,
-	muted,
-	soloedAudioTrackId,
-	source,
-	volume,
-}: {
-	audioMix: AudioMix;
-	muted: boolean;
-	soloedAudioTrackId?: string | null;
-	source: BrowserAudioPreviewSource;
-	volume: number;
-}) {
-	const decision = audioMix.tracks[source.trackId];
-
-	if (muted) {
-		return 0;
-	}
-
-	if (soloedAudioTrackId && source.trackId !== soloedAudioTrackId) {
-		return 0;
-	}
-
-	if (!soloedAudioTrackId && decision?.include === false) {
-		return 0;
-	}
-
-	return (
-		clampPreviewVolume(volume) *
-		audioTrackVolumePercentToGain(decision?.volumePercent ?? 100)
-	);
-}
-
-function applyMultitrackPreviewVolumes({
-	audioMix,
-	multitrack,
-	muted,
-	soloedAudioTrackId,
-	sources,
-	volume,
-}: {
-	audioMix: AudioMix;
-	multitrack: MultiTrack;
-	muted: boolean;
-	soloedAudioTrackId?: string | null;
-	sources: BrowserAudioPreviewSource[];
-	volume: number;
-}) {
-	sources.forEach((source, sourceIndex) => {
-		multitrack.setTrackVolume(
-			sourceIndex,
-			previewVolumeForAudioTrackSource({
-				audioMix,
-				muted,
-				soloedAudioTrackId,
-				source,
-				volume,
-			}),
-		);
-	});
-}
-
-function setMultitrackPreviewPlaybackRate(
-	multitrack: MultiTrack | null,
-	playbackRate: number,
-) {
-	if (!multitrack) {
-		return;
-	}
-
-	const transport = multitrack as unknown as {
-		audios?: Array<{ playbackRate: number }>;
-		setAudioRate?: (rate: number) => void;
-	};
-
-	if (typeof transport.setAudioRate === "function") {
-		transport.setAudioRate(playbackRate);
-		return;
-	}
-
-	for (const audio of transport.audios ?? []) {
-		audio.playbackRate = playbackRate;
-	}
-}
-
-function clampPreviewVolume(volume: number) {
-	if (!Number.isFinite(volume)) {
-		return 1;
-	}
-
-	return Math.max(0, Math.min(volume, 1));
-}
 
 function getPreviewAspectRatio(asset: ReadyMediaAsset): number {
 	const primaryVideo = asset.tracks.video[0];

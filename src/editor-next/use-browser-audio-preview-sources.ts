@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type {
 	AudioMix,
@@ -17,6 +17,8 @@ export type BrowserAudioPreviewSourcesState =
 			status: "disabled";
 	  }
 	| {
+			preparingTrackIds: ReadonlySet<string>;
+			sources: BrowserAudioPreviewSource[];
 			status: "loading";
 	  }
 	| {
@@ -41,6 +43,11 @@ export function useBrowserAudioPreviewSources({
 	enabled: boolean;
 	source: Blob;
 }): BrowserAudioPreviewSourcesState {
+	const sourceCacheRef = useRef(new Map<string, BrowserAudioPreviewSource>());
+	const sourceCacheOwnerRef = useRef<{
+		asset: ReadyMediaAsset;
+		source: Blob;
+	} | null>(null);
 	const [state, setState] = useState<BrowserAudioPreviewSourcesState>({
 		status: "disabled",
 	});
@@ -48,16 +55,60 @@ export function useBrowserAudioPreviewSources({
 	const finalPeakGuardDb = audioMix.finalPeakGuardDb;
 
 	useEffect(() => {
+		return () => {
+			revokeAudioPreviewSourceCache(sourceCacheRef.current);
+		};
+	}, []);
+
+	useEffect(() => {
+		const sourceCache = sourceCacheRef.current;
+		const cacheOwner = sourceCacheOwnerRef.current;
+
+		if (cacheOwner?.asset !== asset || cacheOwner.source !== source) {
+			revokeAudioPreviewSourceCache(sourceCache);
+			sourceCacheOwnerRef.current = { asset, source };
+		}
+
 		if (!enabled) {
+			revokeAudioPreviewSourceCache(sourceCache);
+			sourceCacheOwnerRef.current = null;
 			setState({ status: "disabled" });
 			return;
 		}
 
 		const abortController = new AbortController();
 		let cancelled = false;
-		let liveSources: BrowserAudioPreviewSource[] = [];
+		const sourceRequests = createAudioPreviewSourceRequests({
+			asset,
+			channelModeKey,
+			finalPeakGuardDb,
+		});
+		const missingSourceRequests = sourceRequests.filter(
+			(request) => !sourceCache.has(request.cacheKey),
+		);
+		const cachedSources = collectCachedAudioPreviewSources({
+			sourceCache,
+			sourceRequests,
+		});
 
-		setState({ status: "loading" });
+		if (missingSourceRequests.length === 0) {
+			setState({
+				failures: [],
+				sources: cachedSources,
+				status: "ready",
+			});
+			return;
+		}
+
+		const missingTrackIds = new Set(
+			missingSourceRequests.map((request) => request.trackId),
+		);
+
+		setState({
+			preparingTrackIds: missingTrackIds,
+			sources: cachedSources,
+			status: "loading",
+		});
 
 		void prepareBrowserAudioPreviewSources({
 			audioMix: createAudioPreviewMixSnapshot({
@@ -68,6 +119,7 @@ export function useBrowserAudioPreviewSources({
 			asset,
 			signal: abortController.signal,
 			source,
+			trackIds: missingTrackIds,
 		})
 			.then((result) => {
 				if (cancelled) {
@@ -75,12 +127,36 @@ export function useBrowserAudioPreviewSources({
 					return;
 				}
 
-				liveSources = result.sources;
+				const sourceRequestsByTrackId = new Map(
+					sourceRequests.map((request) => [request.trackId, request]),
+				);
 
-				if (result.sources.length > 0) {
+				for (const source of result.sources) {
+					const request = sourceRequestsByTrackId.get(source.trackId);
+
+					if (!request) {
+						revokeBrowserAudioPreviewSources({ sources: [source] });
+						continue;
+					}
+
+					const currentSource = sourceCache.get(request.cacheKey);
+
+					if (currentSource && currentSource !== source) {
+						revokeBrowserAudioPreviewSources({ sources: [currentSource] });
+					}
+
+					sourceCache.set(request.cacheKey, source);
+				}
+
+				const sources = collectCachedAudioPreviewSources({
+					sourceCache,
+					sourceRequests,
+				});
+
+				if (sources.length > 0) {
 					setState({
 						failures: result.failures,
-						sources: result.sources,
+						sources,
 						status: "ready",
 					});
 					return;
@@ -109,11 +185,67 @@ export function useBrowserAudioPreviewSources({
 		return () => {
 			cancelled = true;
 			abortController.abort();
-			revokeBrowserAudioPreviewSources({ sources: liveSources });
 		};
 	}, [asset, channelModeKey, enabled, finalPeakGuardDb, source]);
 
 	return state;
+}
+
+type AudioPreviewSourceRequest = {
+	cacheKey: string;
+	trackId: string;
+};
+
+function revokeAudioPreviewSourceCache(
+	sourceCache: Map<string, BrowserAudioPreviewSource>,
+) {
+	if (sourceCache.size === 0) {
+		return;
+	}
+
+	revokeBrowserAudioPreviewSources({
+		sources: Array.from(sourceCache.values()),
+	});
+	sourceCache.clear();
+}
+
+function createAudioPreviewSourceRequests({
+	asset,
+	channelModeKey,
+	finalPeakGuardDb,
+}: {
+	asset: ReadyMediaAsset;
+	channelModeKey: string;
+	finalPeakGuardDb: number;
+}): AudioPreviewSourceRequest[] {
+	const channelModes = new Map(
+		JSON.parse(channelModeKey) as Array<[string, AudioTrackChannelMode]>,
+	);
+
+	return asset.tracks.audio.map((track) => {
+		const channelMode = channelModes.get(track.id) ?? "preserve";
+		const peakGuardKey =
+			channelMode === "preserve" ? "source" : String(finalPeakGuardDb);
+
+		return {
+			cacheKey: `${track.id}:${channelMode}:${peakGuardKey}`,
+			trackId: track.id,
+		};
+	});
+}
+
+function collectCachedAudioPreviewSources({
+	sourceCache,
+	sourceRequests,
+}: {
+	sourceCache: ReadonlyMap<string, BrowserAudioPreviewSource>;
+	sourceRequests: AudioPreviewSourceRequest[];
+}) {
+	return sourceRequests.flatMap((request) => {
+		const source = sourceCache.get(request.cacheKey);
+
+		return source ? [source] : [];
+	});
 }
 
 function createAudioPreviewChannelModeKey(

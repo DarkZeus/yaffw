@@ -1,4 +1,4 @@
-import { Headphones, Volume2, VolumeX } from "lucide-react";
+import { Headphones, Loader2, Volume2, VolumeX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,11 @@ const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
 	{ label: "Center left-side audio", value: "use-left-as-mono" },
 	{ label: "Center right-side audio", value: "use-right-as-mono" },
 	{ label: "Center both sides", value: "average-to-mono" },
-	{ label: "Copy left to both", value: "duplicate-left-to-stereo" },
-	{ label: "Copy right to both", value: "duplicate-right-to-stereo" },
 ];
 
 export function WaveformLane({
 	audioDecision,
+	audioPreviewPreparing,
 	durationUs,
 	lane,
 	minimumSelectionDurationUs,
@@ -189,6 +188,15 @@ export function WaveformLane({
 						{metadata}
 					</Badge>
 				))}
+				{audioPreviewPreparing ? (
+					<Badge
+						className="gap-1 border-workbench-progress/45 bg-workbench-progress/15 text-workbench-progress"
+						variant="outline"
+					>
+						<Loader2 className="size-3 animate-spin" />
+						Preparing audio
+					</Badge>
+				) : null}
 				<LaneStatus lane={lane} status={identity.status} />
 			</div>
 			{lane.status === "ready" ? (

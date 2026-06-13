@@ -56,6 +56,7 @@ import type { WaveformRegionSelectionChange } from "./selection-waveform-surface
 type SelectionTimelineProps = {
 	asset: ReadyMediaAsset;
 	audioMix?: AudioMix;
+	audioPreviewPreparingTrackIds?: ReadonlySet<string>;
 	onAudioTrackChannelModeChange?: (
 		trackId: string,
 		channelMode: AudioTrackChannelMode,
@@ -98,9 +99,12 @@ type DragState =
 			type: "start";
 	  };
 
+const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
+
 export function SelectionTimeline({
 	asset,
 	audioMix = createDefaultAudioMix(asset),
+	audioPreviewPreparingTrackIds = EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS,
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
@@ -705,6 +709,9 @@ export function SelectionTimeline({
 									asset.tracks.audio.map((track, trackIndex) => (
 										<WaveformLane
 											audioDecision={audioMix.tracks[track.id]}
+											audioPreviewPreparing={audioPreviewPreparingTrackIds.has(
+												track.id,
+											)}
 											durationUs={asset.durationUs}
 											key={track.id}
 											lane={
