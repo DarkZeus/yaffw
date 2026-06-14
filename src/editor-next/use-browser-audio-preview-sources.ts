@@ -15,6 +15,7 @@ import type {
 } from "./use-browser-audio-preview-sources.types";
 
 export function useBrowserAudioPreviewSources({
+	activeMediaAssetCleanupScope,
 	audioMix,
 	asset,
 	enabled,
@@ -38,6 +39,24 @@ export function useBrowserAudioPreviewSources({
 			sourceCacheRef.current?.dispose();
 		};
 	}, []);
+
+	useEffect(() => {
+		const sourceCache = sourceCacheRef.current;
+
+		if (!sourceCache || !activeMediaAssetCleanupScope) {
+			return;
+		}
+
+		const cleanupRegistration = activeMediaAssetCleanupScope.registerCleanup(
+			() => {
+				sourceCache.dispose();
+			},
+		);
+
+		return () => {
+			cleanupRegistration.dispose();
+		};
+	}, [activeMediaAssetCleanupScope]);
 
 	useEffect(() => {
 		const sourceCache = sourceCacheRef.current;

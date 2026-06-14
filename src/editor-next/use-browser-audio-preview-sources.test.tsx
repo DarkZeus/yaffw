@@ -11,6 +11,10 @@ import type {
 } from "@/editor-core/model";
 
 import {
+	type ActiveMediaAssetCleanupScope,
+	createActiveMediaAssetCleanupScopeController,
+} from "./active-media-asset-cleanup-scope";
+import {
 	prepareBrowserAudioPreviewSources,
 	revokeBrowserAudioPreviewSources,
 } from "./browser-audio-preview-sources";
@@ -124,14 +128,131 @@ describe("useBrowserAudioPreviewSources", () => {
 		expect(prepareRuns).toHaveLength(2);
 		expect(revokeBrowserAudioPreviewSourcesMock).not.toHaveBeenCalled();
 	});
+
+	it("revokes cached sources when the active Media asset cleanup scope is disposed", async () => {
+		const controller = createActiveMediaAssetCleanupScopeController();
+		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
+
+		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
+			createPreparedSourcesResult(request),
+		);
+
+		render(
+			<AudioPreviewSourcesProbe
+				activeMediaAssetCleanupScope={cleanupScope}
+				audioMix={createAudioMix()}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+			);
+		});
+
+		cleanupScope.dispose();
+
+		expect(revokeBrowserAudioPreviewSourcesMock).toHaveBeenCalledWith({
+			sources: [
+				expect.objectContaining({ url: "blob:audio-1:preserve" }),
+				expect.objectContaining({ url: "blob:audio-2:preserve" }),
+			],
+		});
+	});
+
+	it("revokes stale prepared sources after media asset replacement", async () => {
+		const prepareRuns: Array<{
+			deferred: Deferred<BrowserAudioPreviewSourcesResult>;
+			request: PrepareRequest;
+		}> = [];
+		const controller = createActiveMediaAssetCleanupScopeController();
+		const firstScope = controller.replaceCurrentScope(readyAsset.id);
+		const nextAsset = {
+			...readyAsset,
+			id: "asset-2",
+			label: "next.mp4",
+			provenance: {
+				...readyAsset.provenance,
+				fileName: "next.mp4",
+			},
+		} satisfies ReadyMediaAsset;
+		const nextSource = new File(["next"], "next.mp4", { type: "video/mp4" });
+
+		prepareBrowserAudioPreviewSourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<BrowserAudioPreviewSourcesResult>();
+			prepareRuns.push({ deferred, request });
+
+			return deferred.promise;
+		});
+
+		const { rerender } = render(
+			<AudioPreviewSourcesProbe
+				activeMediaAssetCleanupScope={firstScope}
+				audioMix={createAudioMix()}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(readState()).toBe("loading|preparing:audio-1,audio-2|sources:");
+		});
+
+		const nextScope = controller.replaceCurrentScope(nextAsset.id);
+		rerender(
+			<AudioPreviewSourcesProbe
+				activeMediaAssetCleanupScope={nextScope}
+				asset={nextAsset}
+				audioMix={createAudioMix({}, nextAsset)}
+				source={nextSource}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+
+		prepareRuns[0].deferred.resolve(
+			createPreparedSourcesResult(prepareRuns[0].request),
+		);
+
+		await waitFor(() => {
+			expect(revokeBrowserAudioPreviewSourcesMock).toHaveBeenCalledWith({
+				sources: [
+					expect.objectContaining({ url: "blob:audio-1:preserve" }),
+					expect.objectContaining({ url: "blob:audio-2:preserve" }),
+				],
+			});
+		});
+		expect(readState()).toBe("loading|preparing:audio-1,audio-2|sources:");
+
+		prepareRuns[1].deferred.resolve(
+			createPreparedSourcesResult(prepareRuns[1].request),
+		);
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+			);
+		});
+	});
 });
 
-function AudioPreviewSourcesProbe({ audioMix }: { audioMix: AudioMix }) {
+function AudioPreviewSourcesProbe({
+	activeMediaAssetCleanupScope,
+	asset = readyAsset,
+	audioMix,
+	source: sourceBlob = source,
+}: {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
+	asset?: ReadyMediaAsset;
+	audioMix: AudioMix;
+	source?: Blob;
+}) {
 	const state = useBrowserAudioPreviewSources({
-		asset: readyAsset,
+		activeMediaAssetCleanupScope,
+		asset,
 		audioMix,
 		enabled: true,
-		source,
+		source: sourceBlob,
 	});
 
 	return <output aria-label="audio preview state">{formatState(state)}</output>;
@@ -164,11 +285,11 @@ function createPreparedSourcesResult(
 ): BrowserAudioPreviewSourcesResult {
 	const trackIds =
 		request.trackIds ??
-		new Set(readyAsset.tracks.audio.map((track) => track.id));
+		new Set(request.asset.tracks.audio.map((track) => track.id));
 
 	return {
 		failures: [],
-		sources: readyAsset.tracks.audio
+		sources: request.asset.tracks.audio
 			.filter((track) => trackIds.has(track.id))
 			.map((track, trackIndex) =>
 				createPreviewSource({
@@ -209,8 +330,9 @@ function createPreviewSource({
 
 function createAudioMix(
 	channelModes: Partial<Record<string, AudioTrackChannelMode>> = {},
+	asset: ReadyMediaAsset = readyAsset,
 ) {
-	const audioMix = createDefaultAudioMix(readyAsset);
+	const audioMix = createDefaultAudioMix(asset);
 
 	for (const [trackId, channelMode] of Object.entries(channelModes)) {
 		const decision = audioMix.tracks[trackId];

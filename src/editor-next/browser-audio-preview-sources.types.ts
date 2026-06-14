@@ -7,6 +7,7 @@ import type {
 	AudioTrackChannelMode,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
+import type { DisposableMediaWorkScope } from "./disposable-media-work-scope";
 
 export type BrowserAudioPreviewSource = {
 	blob: Blob;
@@ -70,7 +71,9 @@ export type AudioPreviewTrackSourceOptions = {
 	assetTrack: AudioMediaTrack;
 	createObjectURL: (blob: Blob) => string;
 	metadata: AudioPreviewTrackMetadata;
+	revokeObjectURL: (url: string) => void;
 	signal: AbortSignal;
+	scope: DisposableMediaWorkScope;
 	track: InputAudioTrack;
 	trackIndex: number;
 };
@@ -108,6 +111,8 @@ export type CreateAudioPreviewSourceOptions = {
 	downloadName: string;
 	metadata: AudioPreviewTrackMetadata;
 	mimeType: string;
+	revokeObjectURL: (url: string) => void;
+	scope: DisposableMediaWorkScope;
 	strategy: BrowserAudioPreviewSource["strategy"];
 	trackIndex: number;
 };

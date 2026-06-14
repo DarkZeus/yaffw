@@ -4,6 +4,7 @@ import type {
 	BrowserAudioPreviewSource,
 	BrowserAudioPreviewSourceFailure,
 } from "./browser-audio-preview-sources.types";
+import type { ActiveMediaAssetCleanupScope } from "./active-media-asset-cleanup-scope";
 
 export type BrowserAudioPreviewSourcesState =
 	| {
@@ -26,6 +27,7 @@ export type BrowserAudioPreviewSourcesState =
 	  };
 
 export type UseBrowserAudioPreviewSourcesOptions = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix: AudioMix;
 	asset: ReadyMediaAsset;
 	enabled: boolean;

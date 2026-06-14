@@ -120,6 +120,47 @@ describe("BrowserAudioPreviewSourceCache", () => {
 				.cachedSources.map((source) => source.url),
 		).toEqual([]);
 	});
+
+	it("revokes only the superseded source when replacing a prepared variant", () => {
+		const revokeSources = vi.fn();
+		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
+		const preservePlanKey = createBrowserAudioPreviewSourcePlanKey({
+			asset: readyAsset,
+			audioMix: createAudioMix(),
+		});
+		const preservePlan = cache.plan({
+			asset: readyAsset,
+			planKey: preservePlanKey,
+		});
+
+		cache.resetForMediaAssetSource({ asset: readyAsset, source });
+		cache.storePreparedSources({
+			plan: preservePlan,
+			sources: [
+				createPreviewSource("audio-1", "preserve"),
+				createPreviewSource("audio-2", "preserve"),
+			],
+		});
+
+		const replacement = {
+			...createPreviewSource("audio-1", "preserve"),
+			url: "blob:audio-1:preserve:replacement",
+		};
+
+		cache.storePreparedSources({
+			plan: preservePlan,
+			sources: [replacement],
+		});
+
+		expect(revokeSources).toHaveBeenCalledWith({
+			sources: [expect.objectContaining({ url: "blob:audio-1:preserve" })],
+		});
+		expect(
+			cache
+				.plan({ asset: readyAsset, planKey: preservePlanKey })
+				.cachedSources.map((source) => source.url),
+		).toEqual(["blob:audio-1:preserve:replacement", "blob:audio-2:preserve"]);
+	});
 });
 
 function createPreviewSource(

@@ -67,6 +67,7 @@ export function NativePreviewPlayer({
 	}, [activeMediaAssetCleanupScope, source]);
 
 	const audioPreviewSources = useBrowserAudioPreviewSources({
+		activeMediaAssetCleanupScope,
 		audioMix,
 		asset,
 		enabled: canUseBrowserAudioPreviewTransport(asset),

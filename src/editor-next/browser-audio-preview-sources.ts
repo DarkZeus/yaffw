@@ -43,6 +43,12 @@ import type {
 	RemuxAudioPreviewTrackOptions,
 	RemuxCandidate,
 } from "./browser-audio-preview-sources.types";
+import {
+	type DisposableMediaCleanup,
+	type DisposableMediaWorkScope,
+	createDisposableMediaCleanup,
+	withDisposableMediaWorkScope,
+} from "./disposable-media-work-scope";
 
 export async function prepareBrowserAudioPreviewSources({
 	audioMix,
@@ -53,84 +59,91 @@ export async function prepareBrowserAudioPreviewSources({
 	source,
 	trackIds,
 }: BrowserAudioPreviewSourcesRequest): Promise<BrowserAudioPreviewSourcesResult> {
-	throwIfAborted(signal);
+	return withDisposableMediaWorkScope(async (scope) => {
+		throwIfAborted(signal);
 
-	if (asset.tracks.audio.length === 0) {
-		return {
-			failures: [],
-			sources: [],
-		};
-	}
+		if (asset.tracks.audio.length === 0) {
+			return {
+				failures: [],
+				sources: [],
+			};
+		}
 
-	const input = new Input({
-		formats: ALL_FORMATS,
-		source: new BlobSource(source),
-	});
-	const sources: BrowserAudioPreviewSource[] = [];
-	const failures: BrowserAudioPreviewSourceFailure[] = [];
+		const input = scope.registerDisposable(
+			new Input({
+				formats: ALL_FORMATS,
+				source: new BlobSource(source),
+			}),
+		);
+		const sources: BrowserAudioPreviewSource[] = [];
+		const failures: BrowserAudioPreviewSourceFailure[] = [];
 
-	try {
-		const inputTracks = await input.getAudioTracks();
+		try {
+			const inputTracks = await input.getAudioTracks();
 
-		for (const [trackIndex, assetTrack] of asset.tracks.audio.entries()) {
-			throwIfAborted(signal);
+			for (const [trackIndex, assetTrack] of asset.tracks.audio.entries()) {
+				throwIfAborted(signal);
 
-			if (trackIds && !trackIds.has(assetTrack.id)) {
-				continue;
-			}
+				if (trackIds && !trackIds.has(assetTrack.id)) {
+					continue;
+				}
 
-			const inputTrack =
-				inputTracks.find((track) => String(track.id) === assetTrack.id) ??
-				inputTracks[trackIndex];
+				const inputTrack =
+					inputTracks.find((track) => String(track.id) === assetTrack.id) ??
+					inputTracks[trackIndex];
 
-			if (!inputTrack) {
+				if (!inputTrack) {
+					failures.push({
+						reason: "The analyzed audio track is no longer available.",
+						track: assetTrack,
+						trackId: assetTrack.id,
+						trackIndex,
+					});
+					continue;
+				}
+
+				const metadata = await describeAudioPreviewTrack(
+					inputTrack,
+					trackIndex,
+				);
+				const preparedSource = await prepareAudioPreviewTrackSource({
+					assetTrack,
+					createObjectURL,
+					decision: audioMix.tracks[assetTrack.id],
+					finalPeakGuardDb: audioMix.finalPeakGuardDb,
+					metadata,
+					revokeObjectURL,
+					scope,
+					signal,
+					track: inputTrack,
+					trackIndex,
+				});
+
+				if (preparedSource.status === "ready") {
+					sources.push(preparedSource.source);
+					continue;
+				}
+
 				failures.push({
-					reason: "The analyzed audio track is no longer available.",
+					reason: preparedSource.reason,
 					track: assetTrack,
 					trackId: assetTrack.id,
 					trackIndex,
 				});
-				continue;
 			}
 
-			const metadata = await describeAudioPreviewTrack(inputTrack, trackIndex);
-			const preparedSource = await prepareAudioPreviewTrackSource({
-				assetTrack,
-				createObjectURL,
-				decision: audioMix.tracks[assetTrack.id],
-				finalPeakGuardDb: audioMix.finalPeakGuardDb,
-				metadata,
-				signal,
-				track: inputTrack,
-				trackIndex,
+			return {
+				failures,
+				sources,
+			};
+		} catch (error) {
+			revokeBrowserAudioPreviewSources({
+				revokeObjectURL,
+				sources,
 			});
-
-			if (preparedSource.status === "ready") {
-				sources.push(preparedSource.source);
-				continue;
-			}
-
-			failures.push({
-				reason: preparedSource.reason,
-				track: assetTrack,
-				trackId: assetTrack.id,
-				trackIndex,
-			});
+			throw error;
 		}
-
-		return {
-			failures,
-			sources,
-		};
-	} catch (error) {
-		revokeBrowserAudioPreviewSources({
-			revokeObjectURL,
-			sources,
-		});
-		throw error;
-	} finally {
-		input.dispose();
-	}
+	});
 }
 
 export function revokeBrowserAudioPreviewSources({
@@ -238,6 +251,8 @@ async function prepareAudioPreviewTrackSource({
 	decision,
 	finalPeakGuardDb,
 	metadata,
+	revokeObjectURL,
+	scope,
 	signal,
 	track,
 	trackIndex,
@@ -253,6 +268,8 @@ async function prepareAudioPreviewTrackSource({
 				createObjectURL,
 				finalPeakGuardDb,
 				metadata,
+				revokeObjectURL,
+				scope,
 				signal,
 				track,
 				trackIndex,
@@ -276,6 +293,8 @@ async function prepareAudioPreviewTrackSource({
 				candidate,
 				createObjectURL,
 				metadata,
+				revokeObjectURL,
+				scope,
 				signal,
 				track,
 				trackIndex,
@@ -295,6 +314,8 @@ async function prepareAudioPreviewTrackSource({
 			assetTrack,
 			createObjectURL,
 			metadata,
+			revokeObjectURL,
+			scope,
 			signal,
 			track,
 			trackIndex,
@@ -320,6 +341,8 @@ async function createTransformedAudioPreviewTrackSource({
 	createObjectURL,
 	finalPeakGuardDb,
 	metadata,
+	revokeObjectURL,
+	scope,
 	signal,
 	track,
 	trackIndex,
@@ -330,6 +353,7 @@ async function createTransformedAudioPreviewTrackSource({
 
 	const decoded = await decodeAudioPreviewTrackToBuffer({
 		metadata,
+		scope,
 		signal,
 		track,
 	});
@@ -350,7 +374,11 @@ async function createTransformedAudioPreviewTrackSource({
 		channelCompensated,
 		finalPeakGuardDb,
 	);
-	const encoded = await encodeTransformedAudioPreviewBlob(peakSafe, metadata);
+	const encoded = await encodeTransformedAudioPreviewBlob(
+		peakSafe,
+		metadata,
+		scope,
+	);
 
 	return createAudioPreviewSource({
 		assetTrack,
@@ -359,6 +387,8 @@ async function createTransformedAudioPreviewTrackSource({
 		downloadName: `track-${metadata.number}-${channelMode}${encoded.extension}`,
 		metadata,
 		mimeType: encoded.mimeType,
+		revokeObjectURL,
+		scope,
 		strategy: encoded.strategy,
 		trackIndex,
 	});
@@ -366,10 +396,12 @@ async function createTransformedAudioPreviewTrackSource({
 
 async function decodeAudioPreviewTrackToBuffer({
 	metadata,
+	scope,
 	signal,
 	track,
 }: {
 	metadata: AudioPreviewTrackMetadata;
+	scope: DisposableMediaWorkScope;
 	signal: AbortSignal;
 	track: InputAudioTrack;
 }): Promise<AudioBuffer> {
@@ -381,6 +413,7 @@ async function decodeAudioPreviewTrackToBuffer({
 
 	for await (const sample of sink.samples()) {
 		throwIfAborted(signal);
+		const closeSample = registerClosableCleanup(scope, sample);
 
 		try {
 			const buffer = sample.toAudioBuffer();
@@ -402,7 +435,7 @@ async function decodeAudioPreviewTrackToBuffer({
 				timestamp: sample.timestamp,
 			});
 		} finally {
-			sample.close();
+			await closeSample();
 		}
 	}
 
@@ -446,6 +479,7 @@ async function decodeAudioPreviewTrackToBuffer({
 async function encodeTransformedAudioPreviewBlob(
 	audioBuffer: AudioBuffer,
 	metadata: AudioPreviewTrackMetadata,
+	scope: DisposableMediaWorkScope,
 ): Promise<{
 	blob: Blob;
 	extension: string;
@@ -456,30 +490,34 @@ async function encodeTransformedAudioPreviewBlob(
 	>;
 }> {
 	try {
-		return await encodeAudioBufferToM4aBlob(audioBuffer, metadata);
+		return await encodeAudioBufferToM4aBlob(audioBuffer, metadata, scope);
 	} catch {
-		return encodeAudioBufferToWavBlob(audioBuffer, metadata);
+		return encodeAudioBufferToWavBlob(audioBuffer, metadata, scope);
 	}
 }
 
 async function encodeAudioBufferToM4aBlob(
 	audioBuffer: AudioBuffer,
 	metadata: AudioPreviewTrackMetadata,
+	scope: DisposableMediaWorkScope,
 ) {
 	const target = new BufferTarget();
 	const output = new Output({
 		format: new Mp4OutputFormat({ fastStart: "in-memory" }),
 		target,
 	});
+	const outputCleanup = registerCancellableUntilSettled(scope, output);
 	const source = new AudioBufferSource({
 		bitrate: 192_000,
 		codec: "aac",
 	});
+	const closeSource = registerClosableCleanup(scope, source);
 	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
 	await output.start();
 	await source.add(audioBuffer);
-	source.close();
+	await closeSource();
 	await output.finalize();
+	outputCleanup.markSettled();
 
 	if (!target.buffer) {
 		throw new Error("M4A output produced no buffer.");
@@ -496,18 +534,22 @@ async function encodeAudioBufferToM4aBlob(
 async function encodeAudioBufferToWavBlob(
 	audioBuffer: AudioBuffer,
 	metadata: AudioPreviewTrackMetadata,
+	scope: DisposableMediaWorkScope,
 ) {
 	const target = new BufferTarget();
 	const output = new Output({
 		format: new WavOutputFormat(),
 		target,
 	});
+	const outputCleanup = registerCancellableUntilSettled(scope, output);
 	const source = new AudioBufferSource({ codec: "pcm-s16" });
+	const closeSource = registerClosableCleanup(scope, source);
 	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
 	await output.start();
 	await source.add(audioBuffer);
-	source.close();
+	await closeSource();
 	await output.finalize();
+	outputCleanup.markSettled();
 
 	if (!target.buffer) {
 		throw new Error("WAV output produced no buffer.");
@@ -526,6 +568,8 @@ async function remuxAudioPreviewTrack({
 	candidate,
 	createObjectURL,
 	metadata,
+	revokeObjectURL,
+	scope,
 	signal,
 	track,
 	trackIndex,
@@ -541,7 +585,9 @@ async function remuxAudioPreviewTrack({
 
 	const target = new BufferTarget();
 	const output = new Output({ format, target });
+	const outputCleanup = registerCancellableUntilSettled(scope, output);
 	const source = new EncodedAudioPacketSource(metadata.codec);
+	const closeSource = registerClosableCleanup(scope, source);
 	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
 	await output.start();
 
@@ -566,8 +612,9 @@ async function remuxAudioPreviewTrack({
 		});
 	}
 
-	source.close();
+	await closeSource();
 	await output.finalize();
+	outputCleanup.markSettled();
 
 	if (!target.buffer) {
 		throw new Error("Remux output produced no buffer.");
@@ -580,6 +627,8 @@ async function remuxAudioPreviewTrack({
 		downloadName: `track-${metadata.number}-${candidate.label}${candidate.extension}`,
 		metadata,
 		mimeType: candidate.mimeType,
+		revokeObjectURL,
+		scope,
 		strategy: "same-codec-remux",
 		trackIndex,
 	});
@@ -589,6 +638,8 @@ async function createWavAudioPreviewFallback({
 	assetTrack,
 	createObjectURL,
 	metadata,
+	revokeObjectURL,
+	scope,
 	signal,
 	track,
 	trackIndex,
@@ -602,7 +653,9 @@ async function createWavAudioPreviewFallback({
 		format: new WavOutputFormat(),
 		target,
 	});
+	const outputCleanup = registerCancellableUntilSettled(scope, output);
 	const sampleSource = new AudioSampleSource({ codec: "pcm-s16" });
+	const closeSampleSource = registerClosableCleanup(scope, sampleSource);
 	output.addAudioTrack(sampleSource, audioTrackOutputMetadata(metadata));
 	await output.start();
 
@@ -613,29 +666,36 @@ async function createWavAudioPreviewFallback({
 
 	for await (const sample of sink.samples()) {
 		throwIfAborted(signal);
-
-		if (shiftSeconds === 0) {
-			try {
-				await sampleSource.add(sample);
-			} finally {
-				sample.close();
-			}
-			continue;
-		}
-
-		const normalizedSample = sample.clone();
-		normalizedSample.setTimestamp(Math.max(0, sample.timestamp - shiftSeconds));
+		const closeSample = registerClosableCleanup(scope, sample);
 
 		try {
-			await sampleSource.add(normalizedSample);
+			if (shiftSeconds === 0) {
+				await sampleSource.add(sample);
+				continue;
+			}
+
+			const normalizedSample = sample.clone();
+			const closeNormalizedSample = registerClosableCleanup(
+				scope,
+				normalizedSample,
+			);
+			normalizedSample.setTimestamp(
+				Math.max(0, sample.timestamp - shiftSeconds),
+			);
+
+			try {
+				await sampleSource.add(normalizedSample);
+			} finally {
+				await closeNormalizedSample();
+			}
 		} finally {
-			normalizedSample.close();
-			sample.close();
+			await closeSample();
 		}
 	}
 
-	sampleSource.close();
+	await closeSampleSource();
 	await output.finalize();
+	outputCleanup.markSettled();
 
 	if (!target.buffer) {
 		throw new Error("WAV output produced no buffer.");
@@ -648,6 +708,8 @@ async function createWavAudioPreviewFallback({
 		downloadName: `track-${metadata.number}-wav-fallback.wav`,
 		metadata,
 		mimeType: "audio/wav",
+		revokeObjectURL,
+		scope,
 		strategy: "decoded-wav-fallback",
 		trackIndex,
 	});
@@ -660,9 +722,22 @@ function createAudioPreviewSource({
 	downloadName,
 	metadata,
 	mimeType,
+	revokeObjectURL,
+	scope,
 	strategy,
 	trackIndex,
 }: CreateAudioPreviewSourceOptions): BrowserAudioPreviewSource {
+	const url = createObjectURL(blob);
+	let transferred = false;
+
+	scope.registerCleanup(() => {
+		if (!transferred) {
+			revokeObjectURL(url);
+		}
+	});
+
+	transferred = true;
+
 	return {
 		blob,
 		byteLength: blob.size,
@@ -673,7 +748,7 @@ function createAudioPreviewSource({
 		track: assetTrack,
 		trackId: assetTrack.id,
 		trackIndex,
-		url: createObjectURL(blob),
+		url,
 	};
 }
 
@@ -701,6 +776,43 @@ function audioTrackOutputMetadata(metadata: AudioPreviewTrackMetadata) {
 				? metadata.languageCode
 				: undefined,
 		name: metadata.name ?? undefined,
+	};
+}
+
+function registerClosableCleanup<T extends { close: () => void }>(
+	scope: DisposableMediaWorkScope,
+	resource: T,
+): DisposableMediaCleanup {
+	const close = createDisposableMediaCleanup(async () => {
+		resource.close();
+	});
+
+	scope.registerCleanup(close);
+
+	return close;
+}
+
+function registerCancellableUntilSettled<
+	T extends { cancel: () => Promise<unknown> | unknown },
+>(scope: DisposableMediaWorkScope, resource: T) {
+	let settled = false;
+	const cancel = createDisposableMediaCleanup(async () => {
+		await resource.cancel();
+	});
+
+	scope.registerCleanup(async () => {
+		if (settled) {
+			return;
+		}
+
+		await cancel();
+	});
+
+	return {
+		cancel,
+		markSettled() {
+			settled = true;
+		},
 	};
 }
 
