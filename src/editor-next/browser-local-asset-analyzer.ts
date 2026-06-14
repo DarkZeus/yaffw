@@ -3,7 +3,10 @@ import type {
 	LocalMediaAssetInspector,
 } from "@/editor-core/local-file-analysis";
 import type { FrameTiming } from "@/editor-core/model";
-import type { Quality } from "mediabunny";
+import type {
+	BrowserVideoTrack,
+	CanEncodeDefaultProfileOptions,
+} from "./browser-local-asset-analyzer.types";
 
 export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 	async (draft) => {
@@ -83,41 +86,6 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 			input.dispose();
 		}
 	};
-
-type BrowserVideoTrack = {
-	computePacketStats: (targetPacketCount?: number) => Promise<{
-		averagePacketRate: number;
-	}>;
-	displayHeight: number;
-	displayWidth: number;
-};
-
-type BrowserAudioTrack = {
-	numberOfChannels: number;
-	sampleRate: number;
-};
-
-type CanEncodeDefaultProfileOptions = {
-	audioTracks: BrowserAudioTrack[];
-	canEncodeAudio: (
-		codec: "aac",
-		options: {
-			bitrate: number;
-			numberOfChannels: number;
-			sampleRate: number;
-		},
-	) => Promise<boolean>;
-	canEncodeVideo: (
-		codec: "avc",
-		options: {
-			bitrate: number | Quality;
-			height: number;
-			width: number;
-		},
-	) => Promise<boolean>;
-	qualityHigh: Quality;
-	videoTracks: BrowserVideoTrack[];
-};
 
 async function canExportDefaultProfile({
 	audioTracks,

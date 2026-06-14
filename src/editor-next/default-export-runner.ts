@@ -13,35 +13,12 @@ import {
 } from "mediabunny";
 
 import { audioMixHasIncludedTracks } from "@/editor-core/audio-mix";
-import type {
-	AudioMix,
-	ExportProgress,
-	ReadyMediaAsset,
-	Selection,
-} from "@/editor-core/model";
 import { renderBrowserAudioMix } from "./browser-audio-mix";
-
-export type DefaultExportRunnerRequest = {
-	asset: ReadyMediaAsset;
-	audioMix: AudioMix;
-	onProgress: (progress: ExportProgress) => void;
-	selection: Selection;
-	signal: AbortSignal;
-	source: Blob;
-};
-
-export type DefaultExportRunnerResult = {
-	blob: Blob;
-	fileName?: string;
-	mimeType?: string;
-};
-
-export type DefaultExportRunner = {
-	cancelSupported: boolean;
-	run: (
-		request: DefaultExportRunnerRequest,
-	) => Promise<DefaultExportRunnerResult>;
-};
+import type {
+	DefaultExportRunner,
+	DefaultExportRunnerRequest,
+	DefaultExportRunnerResult,
+} from "./default-export-runner.types";
 
 export class DefaultExportCancelledError extends Error {
 	constructor() {

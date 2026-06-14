@@ -5,8 +5,8 @@ import type {
 } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
-import type { DefaultExportRunner } from "./default-export-runner";
-import type { GeneratedMediaDeliveryRequest } from "./generated-media-delivery";
+import type { DefaultExportRunner } from "./default-export-runner.types";
+import type { GeneratedMediaDeliveryRequest } from "./generated-media-delivery.types";
 
 export type SingleAssetEditingSessionCommands = {
 	cancelDefaultExport: () => void;

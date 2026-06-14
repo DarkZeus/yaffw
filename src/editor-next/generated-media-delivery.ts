@@ -1,9 +1,4 @@
-import type { GeneratedMedia } from "@/editor-core/model";
-
-export type GeneratedMediaDeliveryRequest = {
-	blob: Blob;
-	generatedMedia: GeneratedMedia;
-};
+import type { GeneratedMediaDeliveryRequest } from "./generated-media-delivery.types";
 
 export function deliverBrowserGeneratedMedia({
 	blob,

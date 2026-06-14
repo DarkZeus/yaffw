@@ -1,30 +1,10 @@
 import { useCallback, useEffect } from "react";
 
-import type { MediaTimeUs } from "@/editor-core/model";
-
-type UsePreviewKeyboardShortcutsOptions = {
-	getPlayheadUs: () => MediaTimeUs;
-	onFrameStep: (direction: -1 | 1) => void;
-	onSeekBy: (deltaUs: MediaTimeUs) => void;
-	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
-	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
-	onTogglePlayback: () => void;
-	shortcutsDisabled?: boolean;
-};
-
-type PreviewShortcutSuppressionOptions = {
-	event: KeyboardEvent;
-	shortcutsDisabled?: boolean;
-};
-
-type PreviewShortcutHandlers = {
-	getPlayheadUs: () => MediaTimeUs;
-	onFrameStep: (direction: -1 | 1) => void;
-	onSeekBy: (deltaUs: MediaTimeUs) => void;
-	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
-	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
-	onTogglePlayback: () => void;
-};
+import type {
+	PreviewShortcutHandlers,
+	PreviewShortcutSuppressionOptions,
+	UsePreviewKeyboardShortcutsOptions,
+} from "./preview-keyboard-shortcuts.types";
 
 const SHORT_SEEK_DELTA_US = 1_000_000;
 const LARGE_SEEK_DELTA_US = 10_000_000;

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 import {
 	createMultitrackPreviewTracks,
 	previewVolumeForAudioTrackSource,

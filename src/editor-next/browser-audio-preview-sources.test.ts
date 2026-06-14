@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-	type BrowserAudioPreviewSource,
 	remuxCandidatesForAudioPreviewCodec,
 	revokeBrowserAudioPreviewSources,
 	shouldPrepareTransformedAudioPreviewSource,
 } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 
 describe("remuxCandidatesForAudioPreviewCodec", () => {
 	it("prefers fast browser-playable audio containers by codec", () => {

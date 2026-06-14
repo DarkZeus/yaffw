@@ -4,42 +4,17 @@ import type {
 	ReadyMediaAsset,
 } from "@/editor-core/model";
 
-import {
-	type BrowserAudioPreviewSource,
-	revokeBrowserAudioPreviewSources,
-} from "./browser-audio-preview-sources";
-
-export type BrowserAudioPreviewSourceRequest = {
-	cacheKey: string;
-	trackId: string;
-};
-
-export type BrowserAudioPreviewSourcePlan = {
-	audioMix: AudioMix;
-	cachedSources: BrowserAudioPreviewSource[];
-	missingTrackIds: ReadonlySet<string>;
-	sourceRequests: BrowserAudioPreviewSourceRequest[];
-};
-
-export type BrowserAudioPreviewSourcePlanKey = string;
-
-type BrowserAudioPreviewSourcePlanData = {
-	finalPeakGuardDb: number;
-	tracks: Array<[string, AudioTrackChannelMode]>;
-};
-
-type BrowserAudioPreviewSourceCacheOwner = {
-	assetId: string;
-	source: Blob;
-};
-
-type BrowserAudioPreviewSourceCacheOptions = {
-	revokeSources?: typeof revokeBrowserAudioPreviewSources;
-};
-
-export type BrowserAudioPreviewSourceCache = ReturnType<
-	typeof createBrowserAudioPreviewSourceCache
->;
+import type {
+	BrowserAudioPreviewSourceCacheOptions,
+	BrowserAudioPreviewSourceCacheOwner,
+	BrowserAudioPreviewSourcePlan,
+	BrowserAudioPreviewSourcePlanData,
+	BrowserAudioPreviewSourcePlanInput,
+	BrowserAudioPreviewSourcePlanKey,
+	BrowserAudioPreviewSourceRequest,
+} from "./browser-audio-preview-source-cache.types";
+import { revokeBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 
 export function createBrowserAudioPreviewSourcePlanKey({
 	asset,
@@ -88,10 +63,7 @@ export function createBrowserAudioPreviewSourceCache({
 		plan({
 			asset,
 			planKey,
-		}: {
-			asset: ReadyMediaAsset;
-			planKey: BrowserAudioPreviewSourcePlanKey;
-		}): BrowserAudioPreviewSourcePlan {
+		}: BrowserAudioPreviewSourcePlanInput): BrowserAudioPreviewSourcePlan {
 			const sourceRequests = createAudioPreviewSourceRequests({
 				asset,
 				planKey,

@@ -1,29 +1,9 @@
 import { CircleDot, Maximize2 } from "lucide-react";
-import type { CSSProperties, ReactEventHandler, RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 
 import { formatMediaTime } from "./media-time-presentation";
-
-type PreviewViewerRegionProps = {
-	asset: ReadyMediaAsset;
-	canFullscreen: boolean;
-	isPlaying: boolean;
-	multitrackContainerRef: RefObject<HTMLDivElement | null>;
-	onEnded: ReactEventHandler<HTMLVideoElement>;
-	onNativePause: ReactEventHandler<HTMLVideoElement>;
-	onNativePlay: ReactEventHandler<HTMLVideoElement>;
-	onRequestFullscreen: () => void;
-	onSyncPlayhead: ReactEventHandler<HTMLVideoElement>;
-	playbackRate: number;
-	playheadUs: MediaTimeUs;
-	previewApertureStyle: CSSProperties;
-	previewPosterSrc?: string;
-	previewSurfaceRef: RefObject<HTMLElement | null>;
-	previewUrl: string;
-	videoRef: RefObject<HTMLVideoElement | null>;
-};
+import type { PreviewViewerRegionProps } from "./preview-viewer-region.types";
 
 export function PreviewViewerRegion({
 	asset,

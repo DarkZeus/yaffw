@@ -15,18 +15,11 @@ import {
 	Mp4OutputFormat,
 	OggOutputFormat,
 	Output,
-	type OutputFormat,
 	WavOutputFormat,
 	WebMOutputFormat,
 } from "mediabunny";
 
-import type {
-	AudioMediaTrack,
-	AudioMix,
-	AudioMixTrackDecision,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { AudioTrackChannelMode } from "@/editor-core/model";
 import {
 	createAudioBuffer,
 	createChannelCompensatedAudioBuffer,
@@ -35,62 +28,21 @@ import {
 	outputChannelCountForMode,
 	resolveChannelTransform,
 } from "./browser-audio-mix";
-
-export type BrowserAudioPreviewSource = {
-	blob: Blob;
-	byteLength: number;
-	downloadName: string;
-	mimeType: string;
-	startPositionSeconds: number;
-	strategy:
-		| "decoded-channel-transform-aac-m4a"
-		| "decoded-channel-transform-wav"
-		| "decoded-wav-fallback"
-		| "same-codec-remux";
-	track: AudioMediaTrack;
-	trackId: string;
-	trackIndex: number;
-	url: string;
-};
-
-export type BrowserAudioPreviewSourceFailure = {
-	reason: string;
-	track: AudioMediaTrack;
-	trackId: string;
-	trackIndex: number;
-};
-
-export type BrowserAudioPreviewSourcesResult = {
-	failures: BrowserAudioPreviewSourceFailure[];
-	sources: BrowserAudioPreviewSource[];
-};
-
-type BrowserAudioPreviewSourcesRequest = {
-	audioMix: AudioMix;
-	asset: ReadyMediaAsset;
-	createObjectURL?: (blob: Blob) => string;
-	revokeObjectURL?: (url: string) => void;
-	signal: AbortSignal;
-	source: Blob;
-	trackIds?: ReadonlySet<string>;
-};
-
-type InputAudioTrack = Awaited<ReturnType<Input["getAudioTracks"]>>[number];
-
-type AudioPreviewTrackMetadata = {
-	codec: AudioCodec | null;
-	firstTimestampSeconds: number | null;
-	languageCode: string | null;
-	name: string | null;
-	number: number;
-};
-
-type RemuxCandidate = {
-	createFormat: () => OutputFormat;
-	extension: string;
-	label: string;
-	mimeType: string;
-};
+import type {
+	AudioPreviewTrackMetadata,
+	AudioPreviewTrackSourceOptions,
+	BrowserAudioPreviewSource,
+	BrowserAudioPreviewSourceFailure,
+	BrowserAudioPreviewSourcesRequest,
+	BrowserAudioPreviewSourcesResult,
+	CreateAudioPreviewSourceOptions,
+	CreateTransformedAudioPreviewTrackSourceOptions,
+	InputAudioTrack,
+	PrepareAudioPreviewTrackSourceOptions,
+	PrepareAudioPreviewTrackSourceResult,
+	RemuxAudioPreviewTrackOptions,
+	RemuxCandidate,
+} from "./browser-audio-preview-sources.types";
 
 export async function prepareBrowserAudioPreviewSources({
 	audioMix,
@@ -289,25 +241,7 @@ async function prepareAudioPreviewTrackSource({
 	signal,
 	track,
 	trackIndex,
-}: {
-	assetTrack: AudioMediaTrack;
-	createObjectURL: (blob: Blob) => string;
-	decision: AudioMixTrackDecision | undefined;
-	finalPeakGuardDb: number;
-	metadata: AudioPreviewTrackMetadata;
-	signal: AbortSignal;
-	track: InputAudioTrack;
-	trackIndex: number;
-}): Promise<
-	| {
-			source: BrowserAudioPreviewSource;
-			status: "ready";
-	  }
-	| {
-			reason: string;
-			status: "failed";
-	  }
-> {
+}: PrepareAudioPreviewTrackSourceOptions): Promise<PrepareAudioPreviewTrackSourceResult> {
 	const reasons: string[] = [];
 	const channelMode = decision?.channelMode ?? "preserve";
 
@@ -389,16 +323,7 @@ async function createTransformedAudioPreviewTrackSource({
 	signal,
 	track,
 	trackIndex,
-}: {
-	assetTrack: AudioMediaTrack;
-	channelMode: Exclude<AudioTrackChannelMode, "preserve">;
-	createObjectURL: (blob: Blob) => string;
-	finalPeakGuardDb: number;
-	metadata: AudioPreviewTrackMetadata;
-	signal: AbortSignal;
-	track: InputAudioTrack;
-	trackIndex: number;
-}): Promise<BrowserAudioPreviewSource> {
+}: CreateTransformedAudioPreviewTrackSourceOptions): Promise<BrowserAudioPreviewSource> {
 	if (!(await track.canDecode())) {
 		throw new Error("Track is not decodable in this browser.");
 	}
@@ -604,15 +529,7 @@ async function remuxAudioPreviewTrack({
 	signal,
 	track,
 	trackIndex,
-}: {
-	assetTrack: AudioMediaTrack;
-	candidate: RemuxCandidate;
-	createObjectURL: (blob: Blob) => string;
-	metadata: AudioPreviewTrackMetadata;
-	signal: AbortSignal;
-	track: InputAudioTrack;
-	trackIndex: number;
-}): Promise<BrowserAudioPreviewSource> {
+}: RemuxAudioPreviewTrackOptions): Promise<BrowserAudioPreviewSource> {
 	if (!metadata.codec) {
 		throw new Error("Track codec is unknown.");
 	}
@@ -675,14 +592,7 @@ async function createWavAudioPreviewFallback({
 	signal,
 	track,
 	trackIndex,
-}: {
-	assetTrack: AudioMediaTrack;
-	createObjectURL: (blob: Blob) => string;
-	metadata: AudioPreviewTrackMetadata;
-	signal: AbortSignal;
-	track: InputAudioTrack;
-	trackIndex: number;
-}): Promise<BrowserAudioPreviewSource> {
+}: AudioPreviewTrackSourceOptions): Promise<BrowserAudioPreviewSource> {
 	if (!(await track.canDecode())) {
 		throw new Error("Track is not decodable in this browser.");
 	}
@@ -752,16 +662,7 @@ function createAudioPreviewSource({
 	mimeType,
 	strategy,
 	trackIndex,
-}: {
-	assetTrack: AudioMediaTrack;
-	blob: Blob;
-	createObjectURL: (blob: Blob) => string;
-	downloadName: string;
-	metadata: AudioPreviewTrackMetadata;
-	mimeType: string;
-	strategy: BrowserAudioPreviewSource["strategy"];
-	trackIndex: number;
-}): BrowserAudioPreviewSource {
+}: CreateAudioPreviewSourceOptions): BrowserAudioPreviewSource {
 	return {
 		blob,
 		byteLength: blob.size,

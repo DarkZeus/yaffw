@@ -1,16 +1,10 @@
 import { type ChangeEvent, type DragEvent, useMemo } from "react";
 
-import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis";
-import {
-	type RuntimeSupport,
-	detectRuntimeSupport,
-} from "@/editor-core/runtime-capabilities";
+import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
+import type { EditorNextRouteProps } from "./EditorNextRoute.types";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
-import {
-	type DefaultExportRunner,
-	browserDefaultExportRunner,
-} from "./default-export-runner";
+import { browserDefaultExportRunner } from "./default-export-runner";
 import {
 	EditorSessionShell,
 	EditorWorkbenchFrame,
@@ -22,27 +16,10 @@ import {
 	shouldUseEditorWorkbenchVisualFixtureFromUrl,
 } from "./editor-workbench-visual-fixture";
 import { ExportInspectorPanel } from "./export-inspector";
-import {
-	type GeneratedMediaDeliveryRequest,
-	deliverBrowserGeneratedMedia,
-} from "./generated-media-delivery";
+import { deliverBrowserGeneratedMedia } from "./generated-media-delivery";
 import { MediaAssetContextPanel } from "./media-asset-context";
 import { NativePreviewPlayer } from "./native-preview-player";
 import { useSingleAssetEditingSession } from "./use-single-asset-editing-session";
-
-type EditorNextRouteProps = {
-	confirmCloseFile?: (message: string) => boolean;
-	createAssetId?: () => string;
-	createDraftId?: () => string;
-	createExportJobId?: () => string;
-	createGeneratedMediaId?: () => string;
-	defaultExportRunner?: DefaultExportRunner;
-	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
-	initialRuntime?: RuntimeSupport;
-	inspectLocalAsset?: LocalMediaAssetInspector;
-	mockUploadedMediaState?: boolean;
-	now?: () => number;
-};
 
 export function EditorNextRoute({
 	confirmCloseFile,

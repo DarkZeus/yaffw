@@ -10,7 +10,7 @@ import {
 	createBrowserAudioPreviewSourceCache,
 	createBrowserAudioPreviewSourcePlanKey,
 } from "./browser-audio-preview-source-cache";
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 
 describe("BrowserAudioPreviewSourceCache", () => {
 	it("plans only missing track variants and reuses cached preserve sources", () => {

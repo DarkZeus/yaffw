@@ -4,10 +4,14 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type { AudioMix, MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import type {
+	AudioMix,
+	MediaTimeUs,
+	ReadyMediaAsset,
+} from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 
 const createMultitrackMock = vi.fn();
@@ -151,9 +155,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			.getByTestId("audio-monitoring-container")
 			.append(document.createElement("wave"));
 
-		rerender(
-			<PreviewAudioMonitoringProbe state={failedAudioSourcesState()} />,
-		);
+		rerender(<PreviewAudioMonitoringProbe state={failedAudioSourcesState()} />);
 
 		await waitFor(() => {
 			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(

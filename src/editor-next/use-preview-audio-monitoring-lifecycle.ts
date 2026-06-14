@@ -1,33 +1,15 @@
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
-
-import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
 
 import {
 	applyMultitrackPreviewVolumes,
 	createMultitrackPreviewTracks,
 	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources";
-
-type UsePreviewAudioMonitoringLifecycleOptions = {
-	audioMix: AudioMix;
-	audioPreviewSources: BrowserAudioPreviewSourcesState;
-	getPlaybackRate: () => number;
-	getPlayheadUs: () => MediaTimeUs;
-	multitrackContainerRef?: RefObject<HTMLDivElement | null>;
-	multitrackRef?: RefObject<MultiTrack | null>;
-	muted: boolean;
-	onReadyChange?: (ready: boolean) => void;
-	soloedAudioTrackId?: string | null;
-	volume: number;
-};
-
-type PreviewAudioMonitoringLifecycle = {
-	multitrackContainerRef: RefObject<HTMLDivElement | null>;
-	multitrackRef: RefObject<MultiTrack | null>;
-	ready: boolean;
-};
+import type {
+	PreviewAudioMonitoringLifecycle,
+	UsePreviewAudioMonitoringLifecycleOptions,
+} from "./use-preview-audio-monitoring-lifecycle.types";
 
 export function usePreviewAudioMonitoringLifecycle({
 	audioMix,
@@ -132,23 +114,29 @@ export function usePreviewAudioMonitoringLifecycle({
 	]);
 
 	useEffect(() => {
-		if (
-			audioPreviewSources.status !== "ready" ||
-			!ready ||
-			!multitrackRef.current
-		) {
+		const multitrack = multitrackRef.current;
+
+		if (audioPreviewSources.status !== "ready" || !ready || !multitrack) {
 			return;
 		}
 
 		applyMultitrackPreviewVolumes({
 			audioMix,
-			multitrack: multitrackRef.current,
+			multitrack,
 			muted,
 			soloedAudioTrackId,
 			sources: audioPreviewSources.sources,
 			volume,
 		});
-	}, [audioMix, audioPreviewSources, muted, ready, soloedAudioTrackId, volume]);
+	}, [
+		audioMix,
+		audioPreviewSources,
+		multitrackRef,
+		muted,
+		ready,
+		soloedAudioTrackId,
+		volume,
+	]);
 
 	return {
 		multitrackContainerRef,

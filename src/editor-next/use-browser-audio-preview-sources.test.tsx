@@ -11,15 +11,15 @@ import type {
 } from "@/editor-core/model";
 
 import {
-	type BrowserAudioPreviewSource,
-	type BrowserAudioPreviewSourcesResult,
 	prepareBrowserAudioPreviewSources,
 	revokeBrowserAudioPreviewSources,
 } from "./browser-audio-preview-sources";
-import {
-	type BrowserAudioPreviewSourcesState,
-	useBrowserAudioPreviewSources,
-} from "./use-browser-audio-preview-sources";
+import type {
+	BrowserAudioPreviewSource,
+	BrowserAudioPreviewSourcesResult,
+} from "./browser-audio-preview-sources.types";
+import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
+import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
 
 vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
 	const actual =

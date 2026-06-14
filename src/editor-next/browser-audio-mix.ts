@@ -5,23 +5,16 @@ import {
 	audioTrackVolumePercentToGain,
 } from "@/editor-core/audio-mix";
 import type {
-	AudioMix,
 	AudioMixTrackDecision,
 	AudioTrackChannelMode,
-	Selection,
 } from "@/editor-core/model";
 
-type BrowserAudioMixRequest = {
-	audioMix: AudioMix;
-	selection: Selection;
-	signal: AbortSignal;
-	source: Blob;
-};
-
-export type BrowserAudioMixResult = {
-	audioBuffer: AudioBuffer;
-	includedTrackCount: number;
-};
+import type {
+	BrowserAudioMixRequest,
+	BrowserAudioMixResult,
+	ChannelAnalysis,
+	ResolvedChannelTransform,
+} from "./browser-audio-mix.types";
 
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
@@ -217,18 +210,6 @@ async function decodeAudioTrackRange({
 
 	return output;
 }
-
-export type ChannelAnalysis = {
-	channels: { peak: number; rms: number }[];
-	oneSidedStereo: "left-active" | "right-active" | null;
-	reason: string;
-};
-
-export type ResolvedChannelTransform = {
-	analysis: ChannelAnalysis;
-	requestedMode: AudioTrackChannelMode;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-};
 
 export function resolveChannelTransform(
 	audioBuffer: AudioBuffer,

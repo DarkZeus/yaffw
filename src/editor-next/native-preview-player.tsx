@@ -2,14 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	MediaTimeUs,
-	ReadyMediaAsset,
-	Selection,
-} from "@/editor-core/model";
+import type { MediaTimeUs } from "@/editor-core/model";
 import { canUseBrowserAudioPreviewTransport } from "./native-preview-audio-transport";
+import type { NativePreviewPlayerProps } from "./native-preview-player.types";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
 import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { PreviewSelectionWaveformRegion } from "./preview-selection-waveform-region";
@@ -18,29 +13,6 @@ import { PreviewViewerRegion } from "./preview-viewer-region";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
-
-type NativePreviewPlayerProps = {
-	asset: ReadyMediaAsset;
-	audioMix?: AudioMix;
-	onAudioTrackChannelModeChange?: (
-		trackId: string,
-		channelMode: AudioTrackChannelMode,
-	) => void;
-	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
-	onAudioTrackVolumePercentChange?: (
-		trackId: string,
-		volumePercent: number,
-	) => void;
-	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
-	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
-	onSelectionResetRequested: () => void;
-	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
-	previewPosterSrc?: string;
-	selection: Selection;
-	selectionEditingDisabled?: boolean;
-	shortcutsDisabled?: boolean;
-	source: Blob;
-};
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 

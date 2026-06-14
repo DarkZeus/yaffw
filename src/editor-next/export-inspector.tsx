@@ -13,13 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { GeneratedMedia } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
-import {
-	type ExportInspectorActionViewModel,
-	type ExportInspectorCapabilityViewModel,
-	type ExportInspectorRuntimeCheckViewModel,
-	type ExportInspectorStatusViewModel,
-	createExportInspectorViewModel,
-} from "./export-inspector-presenter";
+import { createExportInspectorViewModel } from "./export-inspector-presenter";
+import type {
+	ExportInspectorActionViewModel,
+	ExportInspectorCapabilityViewModel,
+	ExportInspectorRuntimeCheckViewModel,
+	ExportInspectorStatusViewModel,
+} from "./export-inspector-presenter.types";
 import type { ExportInspectorPanelProps } from "./export-inspector.types";
 
 type PanelIconElement = ReactElement<{

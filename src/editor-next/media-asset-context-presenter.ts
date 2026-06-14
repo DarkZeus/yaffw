@@ -4,34 +4,12 @@ import type {
 	Selection,
 	VideoMediaTrack,
 } from "@/editor-core/model";
+import type {
+	MediaAssetContextFact,
+	MediaAssetContextOptions,
+	MediaAssetContextViewModel,
+} from "./media-asset-context-presenter.types";
 import { formatMediaTime } from "./media-time-presentation";
-
-export type MediaAssetContextFact = {
-	label: string;
-	value: string;
-};
-
-export type MediaAssetContextViewModel = {
-	audioFacts: MediaAssetContextFact[];
-	closeFile: {
-		disabled: boolean;
-		label: "Close file";
-	};
-	identity: {
-		assetId: string;
-		name: string;
-		summary: string;
-	};
-	provenanceFacts: MediaAssetContextFact[];
-	selectionFacts: MediaAssetContextFact[];
-	videoFacts: MediaAssetContextFact[];
-};
-
-type MediaAssetContextOptions = {
-	asset: ReadyMediaAsset;
-	closeDisabled: boolean;
-	selection: Selection;
-};
 
 export function createMediaAssetContextViewModel({
 	asset,

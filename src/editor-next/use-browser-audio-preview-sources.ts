@@ -1,49 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
 import {
-	type BrowserAudioPreviewSourceCache,
 	createBrowserAudioPreviewSourceCache,
 	createBrowserAudioPreviewSourcePlanKey,
 } from "./browser-audio-preview-source-cache";
+import type { BrowserAudioPreviewSourceCache } from "./browser-audio-preview-source-cache.types";
 import {
-	type BrowserAudioPreviewSource,
-	type BrowserAudioPreviewSourceFailure,
 	prepareBrowserAudioPreviewSources,
 	revokeBrowserAudioPreviewSources,
 } from "./browser-audio-preview-sources";
-
-export type BrowserAudioPreviewSourcesState =
-	| {
-			status: "disabled";
-	  }
-	| {
-			preparingTrackIds: ReadonlySet<string>;
-			sources: BrowserAudioPreviewSource[];
-			status: "loading";
-	  }
-	| {
-			failures: BrowserAudioPreviewSourceFailure[];
-			sources: BrowserAudioPreviewSource[];
-			status: "ready";
-	  }
-	| {
-			failures: BrowserAudioPreviewSourceFailure[];
-			reason: string;
-			status: "failed";
-	  };
+import type {
+	BrowserAudioPreviewSourcesState,
+	UseBrowserAudioPreviewSourcesOptions,
+} from "./use-browser-audio-preview-sources.types";
 
 export function useBrowserAudioPreviewSources({
 	audioMix,
 	asset,
 	enabled,
 	source,
-}: {
-	audioMix: AudioMix;
-	asset: ReadyMediaAsset;
-	enabled: boolean;
-	source: Blob;
-}): BrowserAudioPreviewSourcesState {
+}: UseBrowserAudioPreviewSourcesOptions): BrowserAudioPreviewSourcesState {
 	const sourceCacheRef = useRef<BrowserAudioPreviewSourceCache | null>(null);
 	const [state, setState] = useState<BrowserAudioPreviewSourcesState>({
 		status: "disabled",

@@ -1,25 +1,9 @@
-import {
-	type RefObject,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
-import type MultiTrack from "wavesurfer-multitrack";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
 import { setMultitrackPreviewPlaybackRate } from "./native-preview-audio-transport";
-
-type UseNativePreviewTransportOptions = {
-	audioTransportReady: boolean;
-	durationUs: MediaTimeUs;
-	frameDurationUs: MediaTimeUs;
-	multitrackRef: RefObject<MultiTrack | null>;
-	selection: Selection;
-	source: Blob;
-	videoRef: RefObject<HTMLVideoElement | null>;
-};
+import type { UseNativePreviewTransportOptions } from "./use-native-preview-transport.types";
 
 export function useNativePreviewTransport({
 	audioTransportReady,

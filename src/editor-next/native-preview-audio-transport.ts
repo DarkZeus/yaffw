@@ -4,7 +4,7 @@ import type { TrackOptions } from "wavesurfer-multitrack";
 import { audioTrackVolumePercentToGain } from "@/editor-core/audio-mix";
 import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 
 export function canUseBrowserAudioPreviewTransport(asset: ReadyMediaAsset) {
 	return (

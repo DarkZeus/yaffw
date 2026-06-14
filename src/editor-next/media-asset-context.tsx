@@ -4,10 +4,8 @@ import { type ReactElement, type ReactNode, cloneElement } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
-import {
-	type MediaAssetContextFact,
-	createMediaAssetContextViewModel,
-} from "./media-asset-context-presenter";
+import { createMediaAssetContextViewModel } from "./media-asset-context-presenter";
+import type { MediaAssetContextFact } from "./media-asset-context-presenter.types";
 import type { MediaAssetContextPanelProps } from "./media-asset-context.types";
 import { formatMediaTime } from "./media-time-presentation";
 
