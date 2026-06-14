@@ -17,6 +17,7 @@ import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitori
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 
 export function NativePreviewPlayer({
+	activeMediaAssetCleanupScope,
 	asset,
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackChannelModeChange,
@@ -47,13 +48,23 @@ export function NativePreviewPlayer({
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
+		const cleanupRegistration = activeMediaAssetCleanupScope?.registerCleanup(
+			() => {
+				URL.revokeObjectURL(objectUrl);
+			},
+		);
 		setPreviewUrl(objectUrl);
 		setSoloedAudioTrackId(null);
 
 		return () => {
+			if (cleanupRegistration) {
+				cleanupRegistration.dispose();
+				return;
+			}
+
 			URL.revokeObjectURL(objectUrl);
 		};
-	}, [source]);
+	}, [activeMediaAssetCleanupScope, source]);
 
 	const audioPreviewSources = useBrowserAudioPreviewSources({
 		audioMix,

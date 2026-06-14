@@ -5,8 +5,10 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import type { ActiveMediaAssetCleanupScope } from "./active-media-asset-cleanup-scope";
 
 export type NativePreviewPlayerProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	audioMix?: AudioMix;
 	onAudioTrackChannelModeChange?: (

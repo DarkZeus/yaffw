@@ -15,6 +15,11 @@ import {
 	editorSessionReducer,
 	shouldProtectEditorBeforeUnload,
 } from "@/editor-core/session";
+import {
+	createActiveMediaAssetCleanupScopeController,
+	type ActiveMediaAssetCleanupScope,
+	type ActiveMediaAssetCleanupScopeController,
+} from "./active-media-asset-cleanup-scope";
 import { isDefaultExportCancelledError } from "./default-export-runner";
 import type {
 	SingleAssetEditingSession,
@@ -41,7 +46,11 @@ export function useSingleAssetEditingSession({
 		runtime,
 		createInitialEditorSession,
 	);
+	const activeMediaAssetCleanupControllerRef =
+		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
+	const [activeMediaAssetCleanupScope, setActiveMediaAssetCleanupScope] =
+		useState<ActiveMediaAssetCleanupScope | null>(null);
 	const [generatedMediaBlobs, setGeneratedMediaBlobs] = useState<
 		Record<string, Blob>
 	>({});
@@ -70,12 +79,15 @@ export function useSingleAssetEditingSession({
 		return () => {
 			activeExportAbortControllerRef.current?.abort();
 			activeExportAbortControllerRef.current = null;
+			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
 		};
 	}, []);
 
 	function clearSessionLocalResources() {
 		activeExportAbortControllerRef.current?.abort();
 		activeExportAbortControllerRef.current = null;
+		getActiveMediaAssetCleanupController().disposeCurrentScope();
+		setActiveMediaAssetCleanupScope(null);
 		setGeneratedMediaBlobs({});
 		setPreviewSource(null);
 	}
@@ -103,6 +115,11 @@ export function useSingleAssetEditingSession({
 		});
 
 		if (result.status === "ready") {
+			const cleanupScope =
+				getActiveMediaAssetCleanupController().replaceCurrentScope(
+					result.asset.id,
+				);
+			setActiveMediaAssetCleanupScope(cleanupScope);
 			setPreviewSource(file);
 			dispatch({
 				asset: result.asset,
@@ -260,6 +277,15 @@ export function useSingleAssetEditingSession({
 		});
 	}
 
+	function getActiveMediaAssetCleanupController() {
+		if (!activeMediaAssetCleanupControllerRef.current) {
+			activeMediaAssetCleanupControllerRef.current =
+				createActiveMediaAssetCleanupScopeController();
+		}
+
+		return activeMediaAssetCleanupControllerRef.current;
+	}
+
 	function setSelectionStartFromPlayhead(playheadUs: number) {
 		dispatch({
 			playheadUs,
@@ -315,6 +341,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	return {
+		activeMediaAssetCleanupScope,
 		commands: {
 			cancelDefaultExport,
 			downloadGeneratedMedia,

@@ -511,6 +511,84 @@ describe("EditorNextRoute", () => {
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 	});
 
+	it("re-imports after Close file without retaining the previous preview resource", async () => {
+		const createObjectURLMock = vi.mocked(URL.createObjectURL);
+		createObjectURLMock
+			.mockReturnValueOnce("blob:first-preview")
+			.mockReturnValueOnce("blob:second-preview");
+		const confirmClose = vi.spyOn(window, "confirm").mockReturnValue(true);
+		const assetIds = ["asset-reimport-first", "asset-reimport-second"];
+		const draftIds = ["draft-reimport-first", "draft-reimport-second"];
+		let nextAssetId = 0;
+		let nextDraftId = 0;
+
+		const view = render(
+			<EditorNextRoute
+				createAssetId={() => assetIds[nextAssetId++] ?? "asset-reimport-extra"}
+				createDraftId={() => draftIds[nextDraftId++] ?? "draft-reimport-extra"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [
+					new File(["first video"], "reimport-first.mp4", {
+						type: "video/mp4",
+					}),
+				],
+			},
+		});
+
+		await waitFor(() => {
+			expect(
+				screen.getByLabelText("Preview for reimport-first.mp4"),
+			).toBeTruthy();
+		});
+		expect(
+			screen
+				.getByLabelText("Preview for reimport-first.mp4")
+				.getAttribute("src"),
+		).toBe("blob:first-preview");
+
+		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Local video file")).toBeTruthy();
+		});
+		expect(confirmClose).toHaveBeenCalledTimes(1);
+		expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first-preview");
+
+		fireEvent.change(screen.getByLabelText("Local video file"), {
+			target: {
+				files: [
+					new File(["second video"], "reimport-second.mp4", {
+						type: "video/mp4",
+					}),
+				],
+			},
+		});
+
+		await waitFor(() => {
+			expect(
+				screen.getByLabelText("Preview for reimport-second.mp4"),
+			).toBeTruthy();
+		});
+		expect(
+			screen
+				.getByLabelText("Preview for reimport-second.mp4")
+				.getAttribute("src"),
+		).toBe("blob:second-preview");
+		expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+
+		view.unmount();
+
+		expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:second-preview");
+	});
+
 	it("disables close while an export job is running", async () => {
 		const exportStarted = createDeferred<{ blob: Blob }>();
 

@@ -38,7 +38,13 @@ export function EditorNextRoute({
 		() => initialRuntime ?? detectRuntimeSupport(),
 		[initialRuntime],
 	);
-	const { commands, localFileInputKey, previewSource, session } =
+	const {
+		activeMediaAssetCleanupScope,
+		commands,
+		localFileInputKey,
+		previewSource,
+		session,
+	} =
 		useSingleAssetEditingSession({
 			confirmCloseFile,
 			createAssetId,
@@ -107,6 +113,11 @@ export function EditorNextRoute({
 	const readyPreviewPlayer =
 		displayedSession.status === "ready" && displayedPreviewSource ? (
 			<NativePreviewPlayer
+				activeMediaAssetCleanupScope={
+					visualFixtureActive
+						? undefined
+						: (activeMediaAssetCleanupScope ?? undefined)
+				}
 				asset={displayedSession.asset}
 				audioMix={displayedSession.audioMix}
 				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}

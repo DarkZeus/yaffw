@@ -5,6 +5,7 @@ import type {
 } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
+import type { ActiveMediaAssetCleanupScope } from "./active-media-asset-cleanup-scope";
 import type { DefaultExportRunner } from "./default-export-runner.types";
 import type { GeneratedMediaDeliveryRequest } from "./generated-media-delivery.types";
 
@@ -27,6 +28,7 @@ export type SingleAssetEditingSessionCommands = {
 };
 
 export type SingleAssetEditingSession = {
+	activeMediaAssetCleanupScope: ActiveMediaAssetCleanupScope | null;
 	commands: SingleAssetEditingSessionCommands;
 	localFileInputKey: number;
 	previewSource: Blob | null;

@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
+import { createActiveMediaAssetCleanupScopeController } from "./active-media-asset-cleanup-scope";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 const createObjectURL = vi.fn(() => "blob:preview-source");
@@ -56,6 +57,23 @@ describe("NativePreviewPlayer", () => {
 
 		unmount();
 
+		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
+	});
+
+	it("registers the preview object URL with the active Media asset cleanup scope", () => {
+		const controller = createActiveMediaAssetCleanupScopeController();
+		const activeMediaAssetCleanupScope = controller.replaceCurrentScope(
+			readyAsset.id,
+		);
+
+		renderPlayer({ activeMediaAssetCleanupScope });
+
+		expect(createObjectURL).toHaveBeenCalledWith(previewSource);
+
+		controller.disposeCurrentScope();
+		controller.disposeCurrentScope();
+
+		expect(revokeObjectURL).toHaveBeenCalledTimes(1);
 		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
 	});
 
