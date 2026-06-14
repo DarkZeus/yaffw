@@ -186,6 +186,20 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
 	});
 
+	it("ignores late async multitrack imports after cleanup", async () => {
+		const { unmount } = render(
+			<PreviewAudioMonitoringProbe
+				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+			/>,
+		);
+
+		unmount();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(createMultitrackMock).not.toHaveBeenCalled();
+	});
+
 	it("applies preview volume, audio mix volume, include decisions, mute, and preview-only solo inside the lifecycle", async () => {
 		const audioMix = createAudioMix({
 			"audio-1": {

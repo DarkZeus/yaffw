@@ -12,12 +12,14 @@ const mockState = vi.hoisted(() => ({
 	regionsPlugins: [] as Array<{
 		addRegion: (options: Record<string, unknown>) => MockRegion;
 		emit: (event: string, ...args: unknown[]) => void;
+		listenerCount: (event: string) => number;
 		regions: MockRegion[];
 	}>,
 	wavesurfers: [] as Array<{
 		destroy: () => void;
 		destroyed: boolean;
 		emit: (event: string, ...args: unknown[]) => void;
+		listenerCount: (event: string) => number;
 	}>,
 }));
 
@@ -47,6 +49,10 @@ vi.mock("wavesurfer.js", () => {
 			for (const listener of this.listeners.get(event) ?? []) {
 				listener(...args);
 			}
+		}
+
+		listenerCount(event: string) {
+			return this.listeners.get(event)?.size ?? 0;
 		}
 
 		destroyed = false;
@@ -84,6 +90,10 @@ vi.mock("wavesurfer.js/plugins/regions", () => {
 			for (const listener of this.listeners.get(event) ?? []) {
 				listener(...args);
 			}
+		}
+
+		listenerCount(event: string) {
+			return this.listeners.get(event)?.size ?? 0;
 		}
 
 		addRegion(options: Record<string, unknown>) {
@@ -305,5 +315,86 @@ describe("createWavesurferPeaksFromSamples", () => {
 
 		expect(mockState.wavesurfers).toHaveLength(1);
 		expect(mockState.wavesurfers[0]?.destroyed).toBe(false);
+	});
+
+	it("cleans up renderer events, pending previews, and hidden container content when waveform data changes", async () => {
+		const cancelAnimationFrame = vi.fn();
+		vi.stubGlobal("requestAnimationFrame", () => 41);
+		vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+		const onSelectionPreviewRequested = vi.fn();
+		const props = {
+			durationUs: 12_000_000,
+			label: "Voice",
+			minimumSelectionDurationUs: 33_333,
+			onPlayheadSeekRequested: vi.fn(),
+			onSelectionCommitRequested: vi.fn(),
+			onSelectionPreviewRequested,
+			selection: {
+				endUs: 6_000_000,
+				startUs: 2_000_000,
+			},
+			selectionEditingDisabled: false,
+			selectionEditInProgress: false,
+		};
+		const { container, rerender } = render(
+			<WaveformSurface {...props} samples={[0.2, 0.7, 0.4]} />,
+		);
+
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+		act(() => {
+			mockState.wavesurfers[0]?.emit("redrawcomplete");
+		});
+		await waitFor(() => {
+			expect(mockState.regionsPlugins[0]?.regions).toHaveLength(1);
+		});
+		const hiddenContainer = container.querySelector("[aria-hidden='true']");
+		hiddenContainer?.append(document.createElement("wave"));
+		const regionsPlugin = mockState.regionsPlugins[0];
+		const region = regionsPlugin?.regions[0];
+
+		if (!regionsPlugin || !region) {
+			throw new Error("Expected mocked waveform region.");
+		}
+
+		region.end = 7;
+		act(() => {
+			regionsPlugin.emit("region-update", region, "end");
+		});
+		expect(onSelectionPreviewRequested).not.toHaveBeenCalled();
+
+		rerender(<WaveformSurface {...props} samples={[0.4, 0.9, 0.1]} />);
+
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(2));
+		expect(cancelAnimationFrame).toHaveBeenCalledWith(41);
+		expect(mockState.wavesurfers[0]?.destroyed).toBe(true);
+		expect(mockState.wavesurfers[0]?.listenerCount("click")).toBe(0);
+		expect(mockState.regionsPlugins[0]?.listenerCount("region-update")).toBe(0);
+		expect(hiddenContainer?.childElementCount).toBe(0);
+	});
+
+	it("does not create a Wavesurfer renderer when async imports resolve after unmount", async () => {
+		const { unmount } = render(
+			<WaveformSurface
+				durationUs={12_000_000}
+				label="Voice"
+				minimumSelectionDurationUs={33_333}
+				onPlayheadSeekRequested={vi.fn()}
+				onSelectionCommitRequested={vi.fn()}
+				onSelectionPreviewRequested={vi.fn()}
+				samples={[0.2, 0.7, 0.4]}
+				selection={{
+					endUs: 6_000_000,
+					startUs: 2_000_000,
+				}}
+				selectionEditingDisabled={false}
+				selectionEditInProgress={false}
+			/>,
+		);
+
+		unmount();
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(mockState.wavesurfers).toHaveLength(0);
 	});
 });

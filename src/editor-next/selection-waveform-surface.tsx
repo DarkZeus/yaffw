@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import type WaveSurfer from "wavesurfer.js";
 import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
 import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
 
 import type { Selection } from "@/editor-core/model";
+import { createPreviewAdapterLifecycle } from "./preview-adapter-lifecycle";
 import type {
 	WaveformRegionSelectionChange,
 	WaveformRegionUpdateSide,
@@ -137,89 +137,102 @@ function useWavesurferWaveform({
 
 	useEffect(() => {
 		const container = containerRef.current;
+		const lifecycle = createPreviewAdapterLifecycle();
+		let regionPreviewFrameCleanup: { dispose: () => void } | null = null;
 
 		if (!container) {
 			setRendererStatus("fallback");
 			return;
 		}
 
-		let disposed = false;
-		let wavesurfer: WaveSurfer | null = null;
-		let regions: RegionsPlugin | null = null;
-		let unsubscribeError: (() => void) | undefined;
-		let unsubscribeRedrawComplete: (() => void) | undefined;
-		let unsubscribeClick: (() => void) | undefined;
-		let unsubscribeRegionClicked: (() => void) | undefined;
-		let unsubscribeRegionUpdate: (() => void) | undefined;
-		let unsubscribeRegionUpdated: (() => void) | undefined;
-
 		setRendererStatus("loading");
-		container.replaceChildren();
+		lifecycle.registerContainerClear(container);
+		lifecycle.registerCleanup(() => {
+			clearScheduledRegionPreviewFrame();
+			pendingRegionChangeRef.current = null;
+			selectionRegionRef.current = null;
+			regionsRef.current = null;
+		});
 
 		void Promise.all([
 			import("wavesurfer.js"),
 			import("wavesurfer.js/plugins/regions"),
 		])
 			.then(([{ default: WaveSurferFactory }, { default: RegionsFactory }]) => {
-				if (disposed) {
+				if (lifecycle.isDisposed()) {
 					return;
 				}
 
 				const style = getComputedStyle(container);
-				regions = RegionsFactory.create();
-
-				wavesurfer = WaveSurferFactory.create({
-					barGap: 0,
-					barRadius: 0,
-					barWidth: 1,
-					backend: typeof AudioContext === "undefined" ? "WebAudio" : undefined,
-					container,
-					cursorWidth: 0,
-					duration: durationSeconds,
-					fillParent: true,
-					height: WAVEFORM_HEIGHT_PX,
-					hideScrollbar: true,
-					interact: true,
-					normalize: true,
-					peaks: [peaks],
-					plugins: [regions],
-					progressColor: cssTokenColor(
-						style,
-						"--workbench-waveform",
-						WAVEFORM_COLOR_FALLBACK,
-					),
-					waveColor: cssTokenColor(
-						style,
-						"--workbench-waveform",
-						WAVEFORM_COLOR_FALLBACK,
-					),
-				});
+				const regions = RegionsFactory.create();
 				regionsRef.current = regions;
-				unsubscribeError = wavesurfer.on("error", () => {
-					if (!disposed) {
-						setRendererStatus("fallback");
+				lifecycle.registerCleanup(() => {
+					if (regionsRef.current === regions) {
+						regionsRef.current = null;
 					}
 				});
-				unsubscribeRedrawComplete = wavesurfer.on("redrawcomplete", () => {
-					if (!disposed) {
-						setRendererStatus("wavesurfer");
-					}
-				});
-				unsubscribeClick = wavesurfer.on("click", (relativeX) => {
-					if (!disposed) {
-						callLatestCallback(
-							onPlayheadSeekRequestedRef,
-							secondsToMediaTimeUs(relativeX * durationSeconds),
-						);
-					}
-				});
-				unsubscribeRegionClicked = regions.on("region-clicked", (_, event) => {
-					event.stopPropagation();
-				});
-				unsubscribeRegionUpdate = regions.on(
-					"region-update",
-					(region, side) => {
-						if (disposed || syncingRegionRef.current) {
+
+				const wavesurfer = lifecycle.registerDestroyable(
+					WaveSurferFactory.create({
+						barGap: 0,
+						barRadius: 0,
+						barWidth: 1,
+						backend:
+							typeof AudioContext === "undefined" ? "WebAudio" : undefined,
+						container,
+						cursorWidth: 0,
+						duration: durationSeconds,
+						fillParent: true,
+						height: WAVEFORM_HEIGHT_PX,
+						hideScrollbar: true,
+						interact: true,
+						normalize: true,
+						peaks: [peaks],
+						plugins: [regions],
+						progressColor: cssTokenColor(
+							style,
+							"--workbench-waveform",
+							WAVEFORM_COLOR_FALLBACK,
+						),
+						waveColor: cssTokenColor(
+							style,
+							"--workbench-waveform",
+							WAVEFORM_COLOR_FALLBACK,
+						),
+					}),
+				);
+				lifecycle.registerUnsubscribe(
+					wavesurfer.on("error", () => {
+						if (!lifecycle.isDisposed()) {
+							setRendererStatus("fallback");
+						}
+					}),
+				);
+				lifecycle.registerUnsubscribe(
+					wavesurfer.on("redrawcomplete", () => {
+						if (!lifecycle.isDisposed()) {
+							setRendererStatus("wavesurfer");
+						}
+					}),
+				);
+				lifecycle.registerUnsubscribe(
+					wavesurfer.on("click", (relativeX) => {
+						if (!lifecycle.isDisposed()) {
+							callLatestCallback(
+								onPlayheadSeekRequestedRef,
+								secondsToMediaTimeUs(relativeX * durationSeconds),
+							);
+						}
+					}),
+				);
+				lifecycle.registerUnsubscribe(
+					regions.on("region-clicked", (_, event) => {
+						event.stopPropagation();
+					}),
+				);
+				lifecycle.registerUnsubscribe(
+					regions.on("region-update", (region, side) => {
+						if (lifecycle.isDisposed() || syncingRegionRef.current) {
 							return;
 						}
 
@@ -235,12 +248,11 @@ function useWavesurferWaveform({
 						});
 						regionUpdateInitialSelectionRef.current = change.initialSelection;
 						scheduleRegionPreview(change);
-					},
+					}),
 				);
-				unsubscribeRegionUpdated = regions.on(
-					"region-updated",
-					(region, side) => {
-						if (disposed || syncingRegionRef.current) {
+				lifecycle.registerUnsubscribe(
+					regions.on("region-updated", (region, side) => {
+						if (lifecycle.isDisposed() || syncingRegionRef.current) {
 							return;
 						}
 
@@ -257,11 +269,13 @@ function useWavesurferWaveform({
 						flushRegionPreview(change);
 						callLatestCallback(onSelectionCommitRequestedRef, change);
 						regionUpdateInitialSelectionRef.current = null;
-					},
+					}),
 				);
 			})
 			.catch(() => {
-				if (!disposed) {
+				if (!lifecycle.isDisposed()) {
+					regionsRef.current = null;
+					selectionRegionRef.current = null;
 					setRendererStatus("fallback");
 				}
 			});
@@ -273,7 +287,12 @@ function useWavesurferWaveform({
 				return;
 			}
 
-			regionPreviewFrameRef.current = requestWaveformFrame(() => {
+			let frameFired = false;
+			let frameId: number | null = null;
+			frameId = requestWaveformFrame(() => {
+				frameFired = true;
+				regionPreviewFrameCleanup?.dispose();
+				regionPreviewFrameCleanup = null;
 				regionPreviewFrameRef.current = null;
 				const pendingChange = pendingRegionChangeRef.current;
 				pendingRegionChangeRef.current = null;
@@ -282,35 +301,39 @@ function useWavesurferWaveform({
 					callLatestCallback(onSelectionPreviewRequestedRef, pendingChange);
 				}
 			});
+
+			const scheduledFrameId = frameId;
+			if (!frameFired && scheduledFrameId !== null) {
+				regionPreviewFrameRef.current = scheduledFrameId;
+				regionPreviewFrameCleanup = lifecycle.registerAnimationFrame(
+					scheduledFrameId,
+					cancelWaveformFrame,
+				);
+			}
 		}
 
 		function flushRegionPreview(change: WaveformRegionSelectionChange) {
-			if (regionPreviewFrameRef.current !== null) {
-				cancelWaveformFrame(regionPreviewFrameRef.current);
-				regionPreviewFrameRef.current = null;
-			}
-
+			clearScheduledRegionPreviewFrame();
 			pendingRegionChangeRef.current = null;
 			callLatestCallback(onSelectionPreviewRequestedRef, change);
 		}
 
-		return () => {
-			disposed = true;
-			unsubscribeError?.();
-			unsubscribeRedrawComplete?.();
-			unsubscribeClick?.();
-			unsubscribeRegionClicked?.();
-			unsubscribeRegionUpdate?.();
-			unsubscribeRegionUpdated?.();
+		function clearScheduledRegionPreviewFrame() {
+			if (regionPreviewFrameCleanup) {
+				regionPreviewFrameCleanup.dispose();
+				regionPreviewFrameCleanup = null;
+				regionPreviewFrameRef.current = null;
+				return;
+			}
+
 			if (regionPreviewFrameRef.current !== null) {
 				cancelWaveformFrame(regionPreviewFrameRef.current);
 				regionPreviewFrameRef.current = null;
 			}
-			pendingRegionChangeRef.current = null;
-			selectionRegionRef.current = null;
-			regionsRef.current = null;
-			wavesurfer?.destroy();
-			container.replaceChildren();
+		}
+
+		return () => {
+			lifecycle.dispose();
 		};
 	}, [
 		containerRef,

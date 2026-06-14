@@ -6,6 +6,7 @@ import {
 	createMultitrackPreviewTracks,
 	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
+import { createPreviewAdapterLifecycle } from "./preview-adapter-lifecycle";
 import type {
 	PreviewAudioMonitoringLifecycle,
 	UsePreviewAudioMonitoringLifecycleOptions,
@@ -39,6 +40,7 @@ export function usePreviewAudioMonitoringLifecycle({
 
 	useEffect(() => {
 		const container = multitrackContainerRef.current;
+		const lifecycle = createPreviewAdapterLifecycle();
 
 		if (
 			audioPreviewSources.status !== "ready" ||
@@ -52,57 +54,56 @@ export function usePreviewAudioMonitoringLifecycle({
 			return;
 		}
 
-		let disposed = false;
-		let multitrack: MultiTrack | null = null;
-		let unsubscribeCanPlay: (() => void) | undefined;
-
 		setMonitoringReady(false);
-		container.replaceChildren();
+		lifecycle.registerContainerClear(container);
+		lifecycle.registerCleanup(() => setMonitoringReady(false));
 
 		void import("wavesurfer-multitrack")
 			.then(({ default: Multitrack }) => {
-				if (disposed) {
+				if (lifecycle.isDisposed()) {
 					return;
 				}
 
-				multitrack = Multitrack.create(
-					createMultitrackPreviewTracks(audioPreviewSources.sources),
-					{
-						container,
-						cursorColor: "transparent",
-						cursorWidth: 0,
-						minPxPerSec: 1,
-						trackBackground: "transparent",
-						trackBorderColor: "transparent",
-					},
+				const multitrack = lifecycle.registerDestroyable(
+					Multitrack.create(
+						createMultitrackPreviewTracks(audioPreviewSources.sources),
+						{
+							container,
+							cursorColor: "transparent",
+							cursorWidth: 0,
+							minPxPerSec: 1,
+							trackBackground: "transparent",
+							trackBorderColor: "transparent",
+						},
+					),
 				);
 				multitrackRef.current = multitrack;
-				unsubscribeCanPlay = multitrack.on("canplay", () => {
-					if (disposed) {
-						return;
+				lifecycle.registerCleanup(() => {
+					if (multitrackRef.current === multitrack) {
+						multitrackRef.current = null;
 					}
-
-					multitrack?.setTime(getPlayheadUs() / 1_000_000);
-					setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
-					setMonitoringReady(true);
 				});
+				lifecycle.registerUnsubscribe(
+					multitrack.on("canplay", () => {
+						if (lifecycle.isDisposed()) {
+							return;
+						}
+
+						multitrack.setTime(getPlayheadUs() / 1_000_000);
+						setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
+						setMonitoringReady(true);
+					}),
+				);
 			})
 			.catch(() => {
-				if (!disposed) {
+				if (!lifecycle.isDisposed()) {
 					multitrackRef.current = null;
 					setMonitoringReady(false);
 				}
 			});
 
 		return () => {
-			disposed = true;
-			unsubscribeCanPlay?.();
-			if (multitrackRef.current === multitrack) {
-				multitrackRef.current = null;
-			}
-			multitrack?.destroy();
-			setMonitoringReady(false);
-			container.replaceChildren();
+			lifecycle.dispose();
 		};
 	}, [
 		audioPreviewSources,
