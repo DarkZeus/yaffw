@@ -20,6 +20,10 @@ import {
 	type ActiveMediaAssetCleanupScope,
 	type ActiveMediaAssetCleanupScopeController,
 } from "./active-media-asset-cleanup-scope";
+import {
+	createCancellableMediaTaskController,
+	type CancellableMediaTaskController,
+} from "./cancellable-media-task-controller";
 import { isDefaultExportCancelledError } from "./default-export-runner";
 import {
 	createGeneratedMediaArtifactStore,
@@ -52,6 +56,8 @@ export function useSingleAssetEditingSession({
 	);
 	const activeMediaAssetCleanupControllerRef =
 		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
+	const activeImportAnalysisTaskControllerRef =
+		useRef<CancellableMediaTaskController | null>(null);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
 	const generatedMediaArtifactStoreRef =
 		useRef<GeneratedMediaArtifactStore | null>(null);
@@ -80,6 +86,7 @@ export function useSingleAssetEditingSession({
 
 	useEffect(() => {
 		return () => {
+			activeImportAnalysisTaskControllerRef.current?.cancelCurrentTask();
 			activeExportAbortControllerRef.current?.abort();
 			activeExportAbortControllerRef.current = null;
 			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
@@ -88,6 +95,7 @@ export function useSingleAssetEditingSession({
 	}, []);
 
 	function clearSessionLocalResources() {
+		activeImportAnalysisTaskControllerRef.current?.cancelCurrentTask();
 		activeExportAbortControllerRef.current?.abort();
 		activeExportAbortControllerRef.current = null;
 		getActiveMediaAssetCleanupController().disposeCurrentScope();
@@ -112,33 +120,43 @@ export function useSingleAssetEditingSession({
 			type: "import.started",
 		});
 
-		const result = await analyzeLocalMediaAssetDraft(draft, {
-			createAssetId,
-			inspect: inspectLocalAsset,
-			runtime,
-		});
+		const analysisTask = getActiveImportAnalysisTaskController().startTask();
 
-		if (result.status === "ready") {
-			const cleanupScope =
-				getActiveMediaAssetCleanupController().replaceCurrentScope(
-					result.asset.id,
-				);
-			setActiveMediaAssetCleanupScope(cleanupScope);
-			setPreviewSource(file);
-			dispatch({
-				asset: result.asset,
-				selection: result.selection,
-				type: "asset.ready",
+		try {
+			const result = await analyzeLocalMediaAssetDraft(draft, {
+				createAssetId,
+				inspect: inspectLocalAsset,
+				runtime,
 			});
-			return;
-		}
 
-		setPreviewSource(null);
-		dispatch({
-			message: result.failure.message,
-			technicalDetails: result.failure.technicalDetails,
-			type: "session.failed",
-		});
+			if (!analysisTask.isCurrent()) {
+				return;
+			}
+
+			if (result.status === "ready") {
+				const cleanupScope =
+					getActiveMediaAssetCleanupController().replaceCurrentScope(
+						result.asset.id,
+					);
+				setActiveMediaAssetCleanupScope(cleanupScope);
+				setPreviewSource(file);
+				dispatch({
+					asset: result.asset,
+					selection: result.selection,
+					type: "asset.ready",
+				});
+				return;
+			}
+
+			setPreviewSource(null);
+			dispatch({
+				message: result.failure.message,
+				technicalDetails: result.failure.technicalDetails,
+				type: "session.failed",
+			});
+		} finally {
+			analysisTask.finish();
+		}
 	}
 
 	async function startDefaultExport(): Promise<void> {
@@ -287,6 +305,15 @@ export function useSingleAssetEditingSession({
 		}
 
 		return activeMediaAssetCleanupControllerRef.current;
+	}
+
+	function getActiveImportAnalysisTaskController() {
+		if (!activeImportAnalysisTaskControllerRef.current) {
+			activeImportAnalysisTaskControllerRef.current =
+				createCancellableMediaTaskController();
+		}
+
+		return activeImportAnalysisTaskControllerRef.current;
 	}
 
 	function setSelectionStartFromPlayhead(playheadUs: number) {

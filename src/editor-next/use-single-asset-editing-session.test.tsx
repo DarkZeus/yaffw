@@ -15,6 +15,85 @@ afterEach(() => {
 });
 
 describe("useSingleAssetEditingSession", () => {
+	it("ignores stale failed asset analysis after a newer Media asset is ready", async () => {
+		const inspections: Array<{
+			deferred: Deferred<LocalMediaAssetInspection>;
+			fileName: string;
+		}> = [];
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		let assetId = 0;
+		let draftId = 0;
+
+		render(
+			<SingleAssetEditingSessionProbe
+				createAssetId={() => `asset-${++assetId}`}
+				createDraftId={() => `draft-${++draftId}`}
+				inspectLocalAsset={(draft) => {
+					const deferred = createDeferred<LocalMediaAssetInspection>();
+					inspections.push({
+						deferred,
+						fileName: draft.provenance.fileName,
+					});
+
+					return deferred.promise;
+				}}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		let firstImport: Promise<void> | undefined;
+		let secondImport: Promise<void> | undefined;
+
+		act(() => {
+			firstImport = sessionRef.current?.commands.importLocalFile(
+				new File(["first video"], "first.mp4", { type: "video/mp4" }),
+			);
+			secondImport = sessionRef.current?.commands.importLocalFile(
+				new File(["second video"], "second.mp4", { type: "video/mp4" }),
+			);
+		});
+
+		await waitFor(() => {
+			expect(inspections.map((inspection) => inspection.fileName)).toEqual([
+				"first.mp4",
+				"second.mp4",
+			]);
+		});
+
+		await act(async () => {
+			inspections[1]?.deferred.resolve(supportedInspection);
+			await secondImport;
+		});
+
+		await waitFor(() => {
+			const session = sessionRef.current?.session;
+			expect(session?.status).toBe("ready");
+			if (session?.status !== "ready") {
+				return;
+			}
+			expect(session.asset.label).toBe("second.mp4");
+		});
+
+		await act(async () => {
+			inspections[0]?.deferred.resolve({
+				...supportedInspection,
+				previewable: false,
+			});
+			await firstImport;
+		});
+
+		await waitFor(() => {
+			const session = sessionRef.current?.session;
+			expect(session?.status).toBe("ready");
+			if (session?.status !== "ready") {
+				return;
+			}
+			expect(session.asset.label).toBe("second.mp4");
+		});
+	});
+
 	it("invalidates retained Generated media blobs when editing decisions reset the export result", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
 		const deliverGeneratedMedia = vi.fn();
@@ -79,28 +158,36 @@ describe("useSingleAssetEditingSession", () => {
 });
 
 function SingleAssetEditingSessionProbe({
-	deliverGeneratedMedia,
+	createAssetId = () => "asset-1",
+	createDraftId = () => "draft-1",
+	deliverGeneratedMedia = () => {},
 	generatedBlob,
+	inspectLocalAsset = async () => supportedInspection,
 	sessionRef,
 }: {
-	deliverGeneratedMedia: SingleAssetEditingSessionOptions["deliverGeneratedMedia"];
-	generatedBlob: Blob;
+	createAssetId?: SingleAssetEditingSessionOptions["createAssetId"];
+	createDraftId?: SingleAssetEditingSessionOptions["createDraftId"];
+	deliverGeneratedMedia?: SingleAssetEditingSessionOptions["deliverGeneratedMedia"];
+	generatedBlob?: Blob;
+	inspectLocalAsset?: SingleAssetEditingSessionOptions["inspectLocalAsset"];
 	sessionRef: { current: SingleAssetEditingSession | null };
 }) {
 	sessionRef.current = useSingleAssetEditingSession({
 		confirmCloseFile: () => true,
-		createAssetId: () => "asset-1",
-		createDraftId: () => "draft-1",
+		createAssetId,
+		createDraftId,
 		createExportJobId: () => "export-1",
 		createGeneratedMediaId: () => "generated-1",
 		defaultExportRunner: {
 			cancelSupported: true,
 			run: async () => ({
-				blob: generatedBlob,
+				blob:
+					generatedBlob ??
+					new Blob(["generated media"], { type: "video/mp4" }),
 			}),
 		},
 		deliverGeneratedMedia,
-		inspectLocalAsset: async () => supportedInspection,
+		inspectLocalAsset,
 		now: () => 1_717_171_717,
 		runtime: supportedRuntime,
 	});
@@ -125,6 +212,23 @@ function readGeneratedMedia(
 type SingleAssetEditingSessionOptions = Parameters<
 	typeof useSingleAssetEditingSession
 >[0];
+
+type Deferred<T> = {
+	promise: Promise<T>;
+	resolve: (value: T) => void;
+};
+
+function createDeferred<T>(): Deferred<T> {
+	let resolve: (value: T) => void = () => {};
+	const promise = new Promise<T>((promiseResolve) => {
+		resolve = promiseResolve;
+	});
+
+	return {
+		promise,
+		resolve,
+	};
+}
 
 const supportedRuntime = evaluateRuntimeSupport({
 	fileApi: true,
