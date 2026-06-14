@@ -188,6 +188,70 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
+	it("keeps Playhead seek, Selection commit, and Selection range move channels separate in the lower region", () => {
+		const onSelectionEndRequested = vi.fn();
+		const onSelectionRangeMoveRequested = vi.fn();
+		const onSelectionStartRequested = vi.fn();
+		const getBoundingClientRect = vi
+			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+			.mockImplementation(function getElementRect(this: HTMLElement) {
+				if (this.dataset.testid === "selection-timeline-track") {
+					return createTestDomRect({ height: 80, width: 1200 });
+				}
+
+				return createTestDomRect({ height: 0, width: 0 });
+			});
+
+		try {
+			renderPlayer({
+				onSelectionEndRequested,
+				onSelectionRangeMoveRequested,
+				onSelectionStartRequested,
+				selection: {
+					endUs: 8_000_000,
+					startUs: 2_000_000,
+				},
+			});
+
+			const video = screen.getByLabelText(
+				"Preview for clip.mp4",
+			) as HTMLVideoElement;
+
+			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
+				clientX: 600,
+			});
+			expect(video.currentTime).toBe(6);
+			expect(onSelectionStartRequested).not.toHaveBeenCalled();
+			expect(onSelectionEndRequested).not.toHaveBeenCalled();
+			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
+
+			fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
+				clientX: 200,
+			});
+			fireEvent.mouseUp(window, { clientX: 300 });
+			expect(video.currentTime).toBe(3);
+			expect(onSelectionStartRequested).toHaveBeenCalledWith(3_000_000);
+			expect(onSelectionEndRequested).not.toHaveBeenCalled();
+			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
+
+			fireEvent.mouseDown(screen.getByLabelText("Selection end handle"), {
+				clientX: 800,
+			});
+			fireEvent.mouseUp(window, { clientX: 900 });
+			expect(video.currentTime).toBe(9);
+			expect(onSelectionEndRequested).toHaveBeenCalledWith(9_000_000);
+			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
+
+			fireEvent.mouseDown(screen.getByLabelText("Move selection range"), {
+				clientX: 200,
+			});
+			fireEvent.mouseUp(window, { clientX: 500 });
+			expect(onSelectionRangeMoveRequested).toHaveBeenCalledWith(3_000_000);
+		} finally {
+			getBoundingClientRect.mockRestore();
+		}
+	});
+
 	it("loops inside the selection only after playback enters the selected range", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
