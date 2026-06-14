@@ -1,18 +1,26 @@
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
 
-import type { MediaTimeUs } from "@/editor-core/model";
+import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
 
 import {
+	applyMultitrackPreviewVolumes,
 	createMultitrackPreviewTracks,
 	setMultitrackPreviewPlaybackRate,
 } from "./native-preview-audio-transport";
 import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources";
 
 type UsePreviewAudioMonitoringLifecycleOptions = {
+	audioMix: AudioMix;
 	audioPreviewSources: BrowserAudioPreviewSourcesState;
 	getPlaybackRate: () => number;
 	getPlayheadUs: () => MediaTimeUs;
+	multitrackContainerRef?: RefObject<HTMLDivElement | null>;
+	multitrackRef?: RefObject<MultiTrack | null>;
+	muted: boolean;
+	onReadyChange?: (ready: boolean) => void;
+	soloedAudioTrackId?: string | null;
+	volume: number;
 };
 
 type PreviewAudioMonitoringLifecycle = {
@@ -22,13 +30,30 @@ type PreviewAudioMonitoringLifecycle = {
 };
 
 export function usePreviewAudioMonitoringLifecycle({
+	audioMix,
 	audioPreviewSources,
 	getPlaybackRate,
 	getPlayheadUs,
+	multitrackContainerRef: providedMultitrackContainerRef,
+	multitrackRef: providedMultitrackRef,
+	muted,
+	onReadyChange,
+	soloedAudioTrackId = null,
+	volume,
 }: UsePreviewAudioMonitoringLifecycleOptions): PreviewAudioMonitoringLifecycle {
-	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
-	const multitrackRef = useRef<MultiTrack | null>(null);
+	const ownedMultitrackContainerRef = useRef<HTMLDivElement | null>(null);
+	const ownedMultitrackRef = useRef<MultiTrack | null>(null);
+	const multitrackContainerRef =
+		providedMultitrackContainerRef ?? ownedMultitrackContainerRef;
+	const multitrackRef = providedMultitrackRef ?? ownedMultitrackRef;
 	const [ready, setReady] = useState(false);
+	const setMonitoringReady = useCallback(
+		(nextReady: boolean) => {
+			setReady(nextReady);
+			onReadyChange?.(nextReady);
+		},
+		[onReadyChange],
+	);
 
 	useEffect(() => {
 		const container = multitrackContainerRef.current;
@@ -40,7 +65,7 @@ export function usePreviewAudioMonitoringLifecycle({
 		) {
 			multitrackRef.current?.destroy();
 			multitrackRef.current = null;
-			setReady(false);
+			setMonitoringReady(false);
 			container?.replaceChildren();
 			return;
 		}
@@ -49,7 +74,7 @@ export function usePreviewAudioMonitoringLifecycle({
 		let multitrack: MultiTrack | null = null;
 		let unsubscribeCanPlay: (() => void) | undefined;
 
-		setReady(false);
+		setMonitoringReady(false);
 		container.replaceChildren();
 
 		void import("wavesurfer-multitrack")
@@ -77,13 +102,13 @@ export function usePreviewAudioMonitoringLifecycle({
 
 					multitrack?.setTime(getPlayheadUs() / 1_000_000);
 					setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
-					setReady(true);
+					setMonitoringReady(true);
 				});
 			})
 			.catch(() => {
 				if (!disposed) {
 					multitrackRef.current = null;
-					setReady(false);
+					setMonitoringReady(false);
 				}
 			});
 
@@ -94,10 +119,36 @@ export function usePreviewAudioMonitoringLifecycle({
 				multitrackRef.current = null;
 			}
 			multitrack?.destroy();
-			setReady(false);
+			setMonitoringReady(false);
 			container.replaceChildren();
 		};
-	}, [audioPreviewSources, getPlaybackRate, getPlayheadUs]);
+	}, [
+		audioPreviewSources,
+		getPlaybackRate,
+		getPlayheadUs,
+		multitrackContainerRef,
+		multitrackRef,
+		setMonitoringReady,
+	]);
+
+	useEffect(() => {
+		if (
+			audioPreviewSources.status !== "ready" ||
+			!ready ||
+			!multitrackRef.current
+		) {
+			return;
+		}
+
+		applyMultitrackPreviewVolumes({
+			audioMix,
+			multitrack: multitrackRef.current,
+			muted,
+			soloedAudioTrackId,
+			sources: audioPreviewSources.sources,
+			volume,
+		});
+	}, [audioMix, audioPreviewSources, muted, ready, soloedAudioTrackId, volume]);
 
 	return {
 		multitrackContainerRef,

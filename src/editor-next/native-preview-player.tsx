@@ -20,6 +20,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type MultiTrack from "wavesurfer-multitrack";
 
 import { Button } from "@/components/ui/button";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -31,10 +32,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import { formatMediaTime } from "./media-time-presentation";
-import {
-	applyMultitrackPreviewVolumes,
-	canUseBrowserAudioPreviewTransport,
-} from "./native-preview-audio-transport";
+import { canUseBrowserAudioPreviewTransport } from "./native-preview-audio-transport";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
@@ -85,8 +83,11 @@ export function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
+	const multitrackRef = useRef<MultiTrack | null>(null);
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
+	const [audioMonitoringReady, setAudioMonitoringReady] = useState(false);
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
@@ -122,13 +123,8 @@ export function NativePreviewPlayer({
 		() => getPlayheadUsRef.current(),
 		[],
 	);
-	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
-		audioPreviewSources,
-		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
-		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
-	});
 	const audioTransportReady =
-		audioPreviewSources.status === "ready" && audioMonitoring.ready;
+		audioPreviewSources.status === "ready" && audioMonitoringReady;
 
 	const {
 		getPlaybackRate,
@@ -155,13 +151,26 @@ export function NativePreviewPlayer({
 		audioTransportReady,
 		durationUs: asset.durationUs,
 		frameDurationUs: asset.frameTiming.frameDurationUs,
-		multitrackRef: audioMonitoring.multitrackRef,
+		multitrackRef,
 		selection,
 		source,
 		videoRef,
 	});
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
+
+	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
+		audioMix,
+		audioPreviewSources,
+		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
+		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
+		multitrackContainerRef,
+		multitrackRef,
+		muted,
+		onReadyChange: setAudioMonitoringReady,
+		soloedAudioTrackId,
+		volume,
+	});
 
 	const updatePlaybackRate = useCallback(
 		(event: ChangeEvent<HTMLSelectElement>) => {
@@ -176,33 +185,6 @@ export function NativePreviewPlayer({
 		},
 		[setPreviewVolume],
 	);
-
-	useEffect(() => {
-		if (
-			audioPreviewSources.status !== "ready" ||
-			!audioTransportReady ||
-			!audioMonitoring.multitrackRef.current
-		) {
-			return;
-		}
-
-		applyMultitrackPreviewVolumes({
-			audioMix,
-			multitrack: audioMonitoring.multitrackRef.current,
-			muted,
-			soloedAudioTrackId,
-			sources: audioPreviewSources.sources,
-			volume,
-		});
-	}, [
-		audioMix,
-		audioMonitoring.multitrackRef,
-		audioPreviewSources,
-		audioTransportReady,
-		muted,
-		soloedAudioTrackId,
-		volume,
-	]);
 
 	const requestFullscreen = useCallback(() => {
 		void videoRef.current?.requestFullscreen?.();

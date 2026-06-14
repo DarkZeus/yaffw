@@ -3,7 +3,8 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MediaTimeUs } from "@/editor-core/model";
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
+import type { AudioMix, MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 
 import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources";
 import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources";
@@ -11,6 +12,8 @@ import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitori
 
 const createMultitrackMock = vi.fn();
 const createdMultitracks: MultitrackSpy[] = [];
+const DEFAULT_GET_PLAYBACK_RATE = () => 1;
+const DEFAULT_GET_PLAYHEAD_US = () => 0;
 
 vi.mock("wavesurfer-multitrack", () => ({
 	default: {
@@ -144,21 +147,98 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(createdMultitracks[0].unsubscribeCanPlay).toHaveBeenCalledTimes(1);
 		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
 	});
+
+	it("applies preview volume, audio mix volume, include decisions, mute, and preview-only solo inside the lifecycle", async () => {
+		const audioMix = createAudioMix({
+			"audio-1": {
+				include: true,
+				volumePercent: 50,
+			},
+			"audio-2": {
+				include: false,
+				volumePercent: 25,
+			},
+		});
+		const sources = [
+			createAudioPreviewSource("audio-1"),
+			createAudioPreviewSource("audio-2"),
+		];
+		const readySources = readyAudioSourcesState(sources);
+
+		const { rerender } = render(
+			<PreviewAudioMonitoringProbe
+				audioMix={audioMix}
+				state={readySources}
+				volume={0.8}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+		});
+		createdMultitracks[0].emitCanPlay();
+
+		await waitFor(() => {
+			expect(createdMultitracks[0].setTrackVolume).toHaveBeenCalledWith(0, 0.2);
+		});
+		expect(createdMultitracks[0].setTrackVolume).toHaveBeenCalledWith(1, 0);
+
+		rerender(
+			<PreviewAudioMonitoringProbe
+				audioMix={audioMix}
+				muted={true}
+				state={readySources}
+				volume={0.8}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(0);
+			expect(lastTrackVolume(createdMultitracks[0], 1)).toBe(0);
+		});
+
+		rerender(
+			<PreviewAudioMonitoringProbe
+				audioMix={audioMix}
+				soloedAudioTrackId="audio-2"
+				state={readySources}
+				volume={0.8}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(0);
+			expect(lastTrackVolume(createdMultitracks[0], 1)).toBeCloseTo(0.05);
+		});
+		expect(audioMix.tracks["audio-2"]?.include).toBe(false);
+	});
 });
 
 function PreviewAudioMonitoringProbe({
-	getPlaybackRate = () => 1,
-	getPlayheadUs = () => 0,
+	audioMix = createDefaultAudioMix(readyAssetWithAudio),
+	getPlaybackRate = DEFAULT_GET_PLAYBACK_RATE,
+	getPlayheadUs = DEFAULT_GET_PLAYHEAD_US,
+	muted = false,
+	soloedAudioTrackId = null,
 	state,
+	volume = 1,
 }: {
+	audioMix?: AudioMix;
 	getPlaybackRate?: () => number;
 	getPlayheadUs?: () => MediaTimeUs;
+	muted?: boolean;
+	soloedAudioTrackId?: string | null;
 	state: BrowserAudioPreviewSourcesState;
+	volume?: number;
 }) {
 	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
+		audioMix,
 		audioPreviewSources: state,
 		getPlaybackRate,
 		getPlayheadUs,
+		muted,
+		soloedAudioTrackId,
+		volume,
 	});
 
 	return (
@@ -192,6 +272,25 @@ function loadingAudioSourcesState(): BrowserAudioPreviewSourcesState {
 	};
 }
 
+function createAudioMix(
+	decisions: Record<string, { include: boolean; volumePercent: number }>,
+) {
+	const audioMix = createDefaultAudioMix(readyAssetWithAudio);
+
+	for (const [trackId, decision] of Object.entries(decisions)) {
+		const audioDecision = audioMix.tracks[trackId];
+
+		if (!audioDecision) {
+			throw new Error(`Expected ${trackId} audio mix decision.`);
+		}
+
+		audioDecision.include = decision.include;
+		audioDecision.volumePercent = decision.volumePercent;
+	}
+
+	return audioMix;
+}
+
 function createAudioPreviewSource(trackId: string): BrowserAudioPreviewSource {
 	return {
 		blob: new Blob(["audio"], { type: "audio/mp4" }),
@@ -210,7 +309,74 @@ function createAudioPreviewSource(trackId: string): BrowserAudioPreviewSource {
 	};
 }
 
+const readyAsset = {
+	durationUs: 12_000_000,
+	exportCapability: {
+		profile: {
+			audioCodec: "aac",
+			container: "mp4",
+			videoCodec: "h264",
+		},
+		supported: true,
+	},
+	frameTiming: {
+		fps: 30,
+		frameDurationUs: 33_333,
+		source: "known",
+	},
+	id: "asset-1",
+	label: "clip.mp4",
+	provenance: {
+		fileName: "clip.mp4",
+		mimeType: "video/mp4",
+		sizeBytes: 1_024,
+	},
+	tracks: {
+		audio: [],
+		video: [
+			{
+				id: "video-1",
+				kind: "video",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
+const readyAssetWithAudio = {
+	...readyAsset,
+	tracks: {
+		...readyAsset.tracks,
+		audio: [
+			{
+				codec: "aac",
+				id: "audio-1",
+				kind: "audio",
+				label: "Voice",
+			},
+			{
+				codec: "aac",
+				id: "audio-2",
+				kind: "audio",
+				label: "Desktop",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
 type MultitrackSpy = ReturnType<typeof createMultitrackSpy>;
+
+function lastTrackVolume(multitrack: MultitrackSpy, trackIndex: number) {
+	const calls = multitrack.setTrackVolume.mock.calls.filter(
+		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
+	);
+	const lastCall = calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error(`No volume call found for track ${trackIndex}.`);
+	}
+
+	return lastCall[1];
+}
 
 function createMultitrackSpy() {
 	let canPlayHandler: (() => void) | undefined;
@@ -230,6 +396,7 @@ function createMultitrackSpy() {
 		}),
 		setAudioRate: vi.fn(),
 		setTime: vi.fn(),
+		setTrackVolume: vi.fn(),
 		unsubscribeCanPlay,
 	};
 }
