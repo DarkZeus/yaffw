@@ -66,6 +66,21 @@ describe("disposable media work scope", () => {
 		expect(dispose).toHaveBeenCalledTimes(1);
 	});
 
+	it("preserves the work failure when cleanup also fails", async () => {
+		const failure = new Error("Encode failed");
+		const cleanupFailure = new Error("Cleanup failed");
+
+		await expect(
+			withDisposableMediaWorkScope((scope) => {
+				scope.registerCleanup(() => {
+					throw cleanupFailure;
+				});
+
+				throw failure;
+			}),
+		).rejects.toBe(failure);
+	});
+
 	it("allows cancellation-style cleanup before work returns", async () => {
 		const dispose = vi.fn();
 

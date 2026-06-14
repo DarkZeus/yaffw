@@ -1,6 +1,6 @@
 type Awaitable<T> = T | Promise<T>;
 
-type DisposableMediaCleanup = () => Awaitable<void>;
+export type DisposableMediaCleanup = () => Awaitable<void>;
 
 export type DisposableMediaWorkScope = {
 	dispose: () => Promise<void>;
@@ -22,7 +22,9 @@ export function createDisposableMediaWorkScope(): DisposableMediaWorkScope {
 
 	function registerCleanup(cleanup: DisposableMediaCleanup) {
 		if (disposed) {
-			throw new Error("Cannot register cleanup on a disposed media work scope.");
+			throw new Error(
+				"Cannot register cleanup on a disposed media work scope.",
+			);
 		}
 
 		cleanups.push(cleanup);
@@ -87,14 +89,38 @@ export function createDisposableMediaWorkScope(): DisposableMediaWorkScope {
 	};
 }
 
+export function createDisposableMediaCleanup(
+	cleanup: DisposableMediaCleanup,
+): DisposableMediaCleanup {
+	let disposed = false;
+
+	return async () => {
+		if (disposed) {
+			return;
+		}
+
+		disposed = true;
+		await cleanup();
+	};
+}
+
 export async function withDisposableMediaWorkScope<T>(
 	work: (scope: DisposableMediaWorkScope) => Awaitable<T>,
 ): Promise<T> {
 	const scope = createDisposableMediaWorkScope();
 
 	try {
-		return await work(scope);
-	} finally {
+		const result = await work(scope);
 		await scope.dispose();
+
+		return result;
+	} catch (error) {
+		try {
+			await scope.dispose();
+		} catch {
+			// Preserve the original media work failure.
+		}
+
+		throw error;
 	}
 }

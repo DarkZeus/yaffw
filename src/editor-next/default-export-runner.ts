@@ -19,6 +19,12 @@ import type {
 	DefaultExportRunnerRequest,
 	DefaultExportRunnerResult,
 } from "./default-export-runner.types";
+import {
+	type DisposableMediaCleanup,
+	type DisposableMediaWorkScope,
+	createDisposableMediaCleanup,
+	withDisposableMediaWorkScope,
+} from "./disposable-media-work-scope";
 
 export class DefaultExportCancelledError extends Error {
 	constructor() {
@@ -107,17 +113,19 @@ async function runBrowserVideoOnlyExport({
 	DefaultExportRunnerRequest,
 	"onProgress" | "selection" | "signal" | "source"
 >): Promise<DefaultExportRunnerResult> {
-	const input = new Input({
-		formats: ALL_FORMATS,
-		source: new BlobSource(source),
-	});
-	const target = new BufferTarget();
-	const output = new Output({
-		format: new Mp4OutputFormat(),
-		target,
-	});
-
-	try {
+	return withDisposableMediaWorkScope(async (scope) => {
+		const input = scope.registerDisposable(
+			new Input({
+				formats: ALL_FORMATS,
+				source: new BlobSource(source),
+			}),
+		);
+		const target = new BufferTarget();
+		const output = new Output({
+			format: new Mp4OutputFormat(),
+			target,
+		});
+		const outputCleanup = registerCancellableUntilSettled(scope, output);
 		const conversion = await Conversion.init({
 			audio: {
 				discard: true,
@@ -133,9 +141,13 @@ async function runBrowserVideoOnlyExport({
 				codec: "avc",
 			},
 		});
+		const conversionCleanup = registerCancellableUntilSettled(
+			scope,
+			conversion,
+		);
 
 		if (signal.aborted) {
-			await conversion.cancel();
+			await conversionCleanup.cancel();
 			throw new DefaultExportCancelledError();
 		}
 
@@ -147,8 +159,10 @@ async function runBrowserVideoOnlyExport({
 		};
 
 		await raceWithAbort(conversion.execute(), signal, () =>
-			conversion.cancel(),
+			conversionCleanup.cancel(),
 		);
+		conversionCleanup.markSettled();
+		outputCleanup.markSettled();
 
 		onProgress({
 			completedRatio: 1,
@@ -165,9 +179,7 @@ async function runBrowserVideoOnlyExport({
 			blob: new Blob([target.buffer], { type: "video/mp4" }),
 			mimeType: "video/mp4",
 		};
-	} finally {
-		input.dispose();
-	}
+	});
 }
 
 async function muxVideoOnlyExportWithMixedAudio({
@@ -183,26 +195,36 @@ async function muxVideoOnlyExportWithMixedAudio({
 		throw new DefaultExportCancelledError();
 	}
 
-	const input = new Input({
-		formats: ALL_FORMATS,
-		source: new BlobSource(videoOnlyBlob),
-	});
-	const target = new BufferTarget();
-	const output = new Output({
-		format: new Mp4OutputFormat({ fastStart: "in-memory" }),
-		target,
-	});
-
-	try {
+	return withDisposableMediaWorkScope(async (scope) => {
+		const input = scope.registerDisposable(
+			new Input({
+				formats: ALL_FORMATS,
+				source: new BlobSource(videoOnlyBlob),
+			}),
+		);
+		const target = new BufferTarget();
+		const output = new Output({
+			format: new Mp4OutputFormat({ fastStart: "in-memory" }),
+			target,
+		});
+		const outputCleanup = registerCancellableUntilSettled(scope, output);
 		const videoTracks = await input.getVideoTracks();
-		const videoSources = videoTracks.map((track) => ({
-			source: new EncodedVideoPacketSource(requiredVideoCodec(track.codec)),
-			track,
-		}));
+		const videoSources = videoTracks.map((track) => {
+			const source = new EncodedVideoPacketSource(
+				requiredVideoCodec(track.codec),
+			);
+
+			return {
+				closeSource: registerClosableCleanup(scope, source),
+				source,
+				track,
+			};
+		});
 		const audioSource = new AudioBufferSource({
 			bitrate: 192_000,
 			codec: "aac",
 		});
+		const closeAudioSource = registerClosableCleanup(scope, audioSource);
 
 		for (const { source } of videoSources) {
 			output.addVideoTrack(source);
@@ -215,8 +237,9 @@ async function muxVideoOnlyExportWithMixedAudio({
 
 		await raceWithAbort(
 			Promise.all([
-				...videoSources.map(({ source, track }) =>
+				...videoSources.map(({ closeSource, source, track }) =>
 					copyEncodedVideoTrackToSource({
+						closeSource,
 						signal,
 						source,
 						track,
@@ -224,24 +247,26 @@ async function muxVideoOnlyExportWithMixedAudio({
 				),
 				addMixedAudioBufferToSource({
 					audioBuffer,
+					closeSource: closeAudioSource,
 					signal,
 					source: audioSource,
 				}),
 			]),
 			signal,
-			() => output.cancel(),
+			() => outputCleanup.cancel(),
 		);
 
-		await output.finalize();
+		await raceWithAbort(output.finalize(), signal, () =>
+			outputCleanup.cancel(),
+		);
+		outputCleanup.markSettled();
 
 		if (!target.buffer) {
 			throw new Error("Default export mux failed before producing media.");
 		}
 
 		return new Blob([target.buffer], { type: "video/mp4" });
-	} finally {
-		input.dispose();
-	}
+	});
 }
 
 function requiredVideoCodec(codec: VideoCodec | null | undefined): VideoCodec {
@@ -253,10 +278,12 @@ function requiredVideoCodec(codec: VideoCodec | null | undefined): VideoCodec {
 }
 
 async function copyEncodedVideoTrackToSource({
+	closeSource,
 	signal,
 	source,
 	track,
 }: {
+	closeSource: DisposableMediaCleanup;
 	signal: AbortSignal;
 	source: EncodedVideoPacketSource;
 	track: Awaited<ReturnType<Input["getVideoTracks"]>>[number];
@@ -283,15 +310,17 @@ async function copyEncodedVideoTrackToSource({
 		});
 	}
 
-	source.close();
+	await closeSource();
 }
 
 async function addMixedAudioBufferToSource({
 	audioBuffer,
+	closeSource,
 	signal,
 	source,
 }: {
 	audioBuffer: AudioBuffer;
+	closeSource: DisposableMediaCleanup;
 	signal: AbortSignal;
 	source: AudioBufferSource;
 }) {
@@ -300,13 +329,13 @@ async function addMixedAudioBufferToSource({
 	}
 
 	await source.add(audioBuffer);
-	source.close();
+	await closeSource();
 }
 
 function raceWithAbort<T>(
 	work: Promise<T>,
 	signal: AbortSignal,
-	cancel: () => Promise<unknown>,
+	cancel: DisposableMediaCleanup,
 ): Promise<T> {
 	if (signal.aborted) {
 		void cancel();
@@ -325,4 +354,41 @@ function raceWithAbort<T>(
 			signal.removeEventListener("abort", handleAbort);
 		});
 	});
+}
+
+function registerClosableCleanup<T extends { close: () => void }>(
+	scope: DisposableMediaWorkScope,
+	resource: T,
+) {
+	const close = createDisposableMediaCleanup(async () => {
+		resource.close();
+	});
+
+	scope.registerCleanup(close);
+
+	return close;
+}
+
+function registerCancellableUntilSettled<
+	T extends { cancel: () => Promise<unknown> },
+>(scope: DisposableMediaWorkScope, resource: T) {
+	let settled = false;
+	const cancel = createDisposableMediaCleanup(async () => {
+		await resource.cancel();
+	});
+
+	scope.registerCleanup(async () => {
+		if (settled) {
+			return;
+		}
+
+		await cancel();
+	});
+
+	return {
+		cancel,
+		markSettled() {
+			settled = true;
+		},
+	};
 }

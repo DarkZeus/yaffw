@@ -15,6 +15,11 @@ import type {
 	ChannelAnalysis,
 	ResolvedChannelTransform,
 } from "./browser-audio-mix.types";
+import {
+	type DisposableMediaWorkScope,
+	createDisposableMediaCleanup,
+	withDisposableMediaWorkScope,
+} from "./disposable-media-work-scope";
 
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
@@ -26,14 +31,15 @@ export async function renderBrowserAudioMix({
 	signal,
 	source,
 }: BrowserAudioMixRequest): Promise<BrowserAudioMixResult | null> {
-	throwIfAborted(signal);
+	return withDisposableMediaWorkScope(async (scope) => {
+		throwIfAborted(signal);
 
-	const input = new Input({
-		formats: ALL_FORMATS,
-		source: new BlobSource(source),
-	});
-
-	try {
+		const input = scope.registerDisposable(
+			new Input({
+				formats: ALL_FORMATS,
+				source: new BlobSource(source),
+			}),
+		);
 		const inputTracks = await input.getAudioTracks();
 		const selectedTracks = inputTracks
 			.map((track, trackIndex) => ({
@@ -64,6 +70,7 @@ export async function renderBrowserAudioMix({
 			const decoded = await decodeAudioTrackRange({
 				endSeconds,
 				signal,
+				scope,
 				startSeconds,
 				track,
 			});
@@ -132,19 +139,19 @@ export async function renderBrowserAudioMix({
 			audioBuffer: peakSafe,
 			includedTrackCount: decodedTracks.length,
 		};
-	} finally {
-		input.dispose();
-	}
+	});
 }
 
 async function decodeAudioTrackRange({
 	endSeconds,
 	signal,
+	scope,
 	startSeconds,
 	track,
 }: {
 	endSeconds: number;
 	signal: AbortSignal;
+	scope: DisposableMediaWorkScope;
 	startSeconds: number;
 	track: {
 		numberOfChannels: number;
@@ -166,46 +173,52 @@ async function decodeAudioTrackRange({
 
 	for await (const sample of sink.samples(startSeconds, endSeconds)) {
 		throwIfAborted(signal);
-		const sampleBuffer = sample.toAudioBuffer();
-
-		if (sampleBuffer.sampleRate !== sampleRate) {
+		const closeSample = createDisposableMediaCleanup(async () => {
 			sample.close();
-			throw new Error(
-				`Decoded sample rate changed from ${sampleRate}Hz to ${sampleBuffer.sampleRate}Hz.`,
+		});
+		scope.registerCleanup(closeSample);
+
+		try {
+			const sampleBuffer = sample.toAudioBuffer();
+
+			if (sampleBuffer.sampleRate !== sampleRate) {
+				throw new Error(
+					`Decoded sample rate changed from ${sampleRate}Hz to ${sampleBuffer.sampleRate}Hz.`,
+				);
+			}
+
+			const sourceStartFrame = Math.max(
+				0,
+				Math.floor((startSeconds - sample.timestamp) * sampleRate),
 			);
+			const targetStartFrame = Math.max(
+				0,
+				Math.round(
+					(sample.timestamp + sourceStartFrame / sampleRate - startSeconds) *
+						sampleRate,
+				),
+			);
+			const frameCount = Math.max(
+				0,
+				Math.min(
+					sampleBuffer.length - sourceStartFrame,
+					output.length - targetStartFrame,
+				),
+			);
+
+			for (
+				let channel = 0;
+				channel <
+				Math.min(output.numberOfChannels, sampleBuffer.numberOfChannels);
+				channel += 1
+			) {
+				const channelData = new Float32Array(frameCount);
+				sampleBuffer.copyFromChannel(channelData, channel, sourceStartFrame);
+				output.copyToChannel(channelData, channel, targetStartFrame);
+			}
+		} finally {
+			await closeSample();
 		}
-
-		const sourceStartFrame = Math.max(
-			0,
-			Math.floor((startSeconds - sample.timestamp) * sampleRate),
-		);
-		const targetStartFrame = Math.max(
-			0,
-			Math.round(
-				(sample.timestamp + sourceStartFrame / sampleRate - startSeconds) *
-					sampleRate,
-			),
-		);
-		const frameCount = Math.max(
-			0,
-			Math.min(
-				sampleBuffer.length - sourceStartFrame,
-				output.length - targetStartFrame,
-			),
-		);
-
-		for (
-			let channel = 0;
-			channel <
-			Math.min(output.numberOfChannels, sampleBuffer.numberOfChannels);
-			channel += 1
-		) {
-			const channelData = new Float32Array(frameCount);
-			sampleBuffer.copyFromChannel(channelData, channel, sourceStartFrame);
-			output.copyToChannel(channelData, channel, targetStartFrame);
-		}
-
-		sample.close();
 	}
 
 	return output;
