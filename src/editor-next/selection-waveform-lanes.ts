@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
+import { withDisposableMediaWorkScope } from "./disposable-media-work-scope";
 import type {
 	WaveformLaneLoader,
 	WaveformLaneRequest,
@@ -89,79 +90,83 @@ export async function loadBrowserWaveformLane({
 	source,
 	trackIndex,
 }: WaveformLaneRequest): Promise<WaveformLaneResult> {
-	try {
-		const input = new Input({
-			formats: ALL_FORMATS,
-			source: new BlobSource(source),
-		});
-		const tracks = await input.getAudioTracks();
-		const track = tracks[trackIndex];
+	return withDisposableMediaWorkScope(async (scope) => {
+		try {
+			const input = scope.registerDisposable(
+				new Input({
+					formats: ALL_FORMATS,
+					source: new BlobSource(source),
+				}),
+			);
+			const tracks = await input.getAudioTracks();
+			const track = tracks[trackIndex];
 
-		if (!track) {
+			if (!track) {
+				return {
+					reason: "The analyzed audio track is no longer available.",
+					status: "unavailable",
+				};
+			}
+
+			if (!(await track.canDecode())) {
+				return {
+					reason: "This browser cannot decode the audio track for waveform use.",
+					status: "unavailable",
+				};
+			}
+
+			const assetDurationSeconds = assetDurationUs / 1_000_000;
+			const trackEndTimestamp = await track.computeDuration();
+
+			if (
+				!Number.isFinite(assetDurationSeconds) ||
+				assetDurationSeconds <= 0 ||
+				!Number.isFinite(trackEndTimestamp) ||
+				trackEndTimestamp <= 0
+			) {
+				return {
+					reason: "The audio track duration could not be measured.",
+					status: "unavailable",
+				};
+			}
+
+			const sink = new AudioBufferSink(track);
+			const buckets = new Array<number>(WAVEFORM_SAMPLE_COUNT).fill(0);
+			let framesRead = 0;
+			let sampleRate = 0;
+
+			for await (const { buffer, timestamp } of sink.buffers(
+				0,
+				Math.min(assetDurationSeconds, trackEndTimestamp),
+			)) {
+				sampleRate = buffer.sampleRate;
+				addAudioBufferToBuckets({
+					buffer,
+					buckets,
+					mediaDurationSeconds: assetDurationSeconds,
+					timestampSeconds: timestamp,
+				});
+				framesRead += buffer.length;
+			}
+
+			if (framesRead === 0 || sampleRate === 0) {
+				return {
+					reason: "No audio samples were decoded for this track.",
+					status: "unavailable",
+				};
+			}
+
 			return {
-				reason: "The analyzed audio track is no longer available.",
+				samples: normalizeBuckets(buckets),
+				status: "ready",
+			};
+		} catch (error) {
+			return {
+				reason: errorToMessage(error),
 				status: "unavailable",
 			};
 		}
-
-		if (!(await track.canDecode())) {
-			return {
-				reason: "This browser cannot decode the audio track for waveform use.",
-				status: "unavailable",
-			};
-		}
-
-		const assetDurationSeconds = assetDurationUs / 1_000_000;
-		const trackEndTimestamp = await track.computeDuration();
-
-		if (
-			!Number.isFinite(assetDurationSeconds) ||
-			assetDurationSeconds <= 0 ||
-			!Number.isFinite(trackEndTimestamp) ||
-			trackEndTimestamp <= 0
-		) {
-			return {
-				reason: "The audio track duration could not be measured.",
-				status: "unavailable",
-			};
-		}
-
-		const sink = new AudioBufferSink(track);
-		const buckets = new Array<number>(WAVEFORM_SAMPLE_COUNT).fill(0);
-		let framesRead = 0;
-		let sampleRate = 0;
-
-		for await (const { buffer, timestamp } of sink.buffers(
-			0,
-			Math.min(assetDurationSeconds, trackEndTimestamp),
-		)) {
-			sampleRate = buffer.sampleRate;
-			addAudioBufferToBuckets({
-				buffer,
-				buckets,
-				mediaDurationSeconds: assetDurationSeconds,
-				timestampSeconds: timestamp,
-			});
-			framesRead += buffer.length;
-		}
-
-		if (framesRead === 0 || sampleRate === 0) {
-			return {
-				reason: "No audio samples were decoded for this track.",
-				status: "unavailable",
-			};
-		}
-
-		return {
-			samples: normalizeBuckets(buckets),
-			status: "ready",
-		};
-	} catch (error) {
-		return {
-			reason: errorToMessage(error),
-			status: "unavailable",
-		};
-	}
+	});
 }
 
 export function addAudioBufferToBuckets({

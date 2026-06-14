@@ -1,12 +1,62 @@
 /* @vitest-environment jsdom */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mediabunnyMock = vi.hoisted(() => ({
+	audioTracks: [] as object[],
+	buffersByTrack: new Map<object, Array<{ buffer: AudioBuffer; timestamp: number }>>(),
+	getAudioTracksError: undefined as Error | undefined,
+	inputInstances: [] as Array<{
+		dispose: ReturnType<typeof vi.fn>;
+		getAudioTracks: ReturnType<typeof vi.fn>;
+	}>,
+}));
+
+vi.mock("mediabunny", () => {
+	class BlobSource {
+		constructor(readonly source: Blob) {}
+	}
+
+	class AudioBufferSink {
+		constructor(readonly track: object) {}
+
+		async *buffers() {
+			for (const chunk of mediabunnyMock.buffersByTrack.get(this.track) ?? []) {
+				yield chunk;
+			}
+		}
+	}
+
+	const Input = vi.fn().mockImplementation(() => {
+		const input = {
+			dispose: vi.fn(),
+			getAudioTracks: vi.fn(async () => {
+				if (mediabunnyMock.getAudioTracksError) {
+					throw mediabunnyMock.getAudioTracksError;
+				}
+
+				return mediabunnyMock.audioTracks;
+			}),
+		};
+		mediabunnyMock.inputInstances.push(input);
+
+		return input;
+	});
+
+	return {
+		ALL_FORMATS: {},
+		AudioBufferSink,
+		BlobSource,
+		Input,
+	};
+});
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import {
 	addAudioBufferToBuckets,
+	loadBrowserWaveformLane,
 	useWaveformLaneStates,
 } from "./selection-waveform-lanes";
 import type {
@@ -15,9 +65,16 @@ import type {
 	WaveformLaneState,
 } from "./selection-waveform-lanes.types";
 
+beforeEach(() => {
+	mediabunnyMock.audioTracks = [];
+	mediabunnyMock.buffersByTrack = new Map();
+	mediabunnyMock.getAudioTracksError = undefined;
+	mediabunnyMock.inputInstances = [];
+});
+
 afterEach(() => {
 	cleanup();
-	vi.restoreAllMocks();
+	vi.clearAllMocks();
 });
 
 describe("useWaveformLaneStates", () => {
@@ -79,6 +136,65 @@ describe("useWaveformLaneStates", () => {
 				},
 			});
 		});
+	});
+});
+
+describe("loadBrowserWaveformLane", () => {
+	it("disposes the media input after loading a ready waveform lane", async () => {
+		const audioTrack = createMockAudioTrack();
+		mediabunnyMock.audioTracks = [audioTrack];
+		mediabunnyMock.buffersByTrack.set(audioTrack, [
+			{
+				buffer: createAudioBufferLike([[0.5, 1]], 2),
+				timestamp: 0,
+			},
+		]);
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result.status).toBe("ready");
+		if (result.status === "ready") {
+			expect(result.samples).toHaveLength(8192);
+			expect(Math.max(...result.samples)).toBe(1);
+		}
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
+	it("disposes the media input when the requested audio track is unavailable", async () => {
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result).toEqual({
+			reason: "The analyzed audio track is no longer available.",
+			status: "unavailable",
+		});
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
+	it("disposes the media input when waveform loading throws", async () => {
+		mediabunnyMock.getAudioTracksError = new Error("Input failed");
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result).toEqual({
+			reason: "Input failed",
+			status: "unavailable",
+		});
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -177,6 +293,29 @@ function createDeferred<T>() {
 		promise,
 		reject,
 		resolve,
+	};
+}
+
+function lastMediaInput() {
+	const input = mediabunnyMock.inputInstances.at(-1);
+
+	if (!input) {
+		throw new Error("Expected a Mediabunny input to be created.");
+	}
+
+	return input;
+}
+
+function createMockAudioTrack({
+	canDecode = true,
+	durationSeconds = 12,
+}: {
+	canDecode?: boolean;
+	durationSeconds?: number;
+} = {}) {
+	return {
+		canDecode: vi.fn(async () => canDecode),
+		computeDuration: vi.fn(async () => durationSeconds),
 	};
 }
 
