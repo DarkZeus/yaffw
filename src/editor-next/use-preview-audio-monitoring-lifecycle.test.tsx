@@ -131,6 +131,42 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		).toBe(0);
 	});
 
+	it("cleans up the adapter and hidden container when audio source preparation fails", async () => {
+		const { rerender } = render(
+			<PreviewAudioMonitoringProbe
+				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+		});
+		createdMultitracks[0].emitCanPlay();
+		await waitFor(() => {
+			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
+				"ready",
+			);
+		});
+		screen
+			.getByTestId("audio-monitoring-container")
+			.append(document.createElement("wave"));
+
+		rerender(
+			<PreviewAudioMonitoringProbe state={failedAudioSourcesState()} />,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
+				"not-ready",
+			);
+		});
+		expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
+		expect(
+			screen.getByTestId("audio-monitoring-container").childElementCount,
+		).toBe(0);
+	});
+
 	it("unsubscribes readiness listeners and destroys the adapter on cleanup", async () => {
 		const { unmount } = render(
 			<PreviewAudioMonitoringProbe
@@ -269,6 +305,24 @@ function loadingAudioSourcesState(): BrowserAudioPreviewSourcesState {
 		preparingTrackIds: new Set(["audio-1"]),
 		sources: [],
 		status: "loading",
+	};
+}
+
+function failedAudioSourcesState(): BrowserAudioPreviewSourcesState {
+	return {
+		failures: [
+			{
+				reason: "The analyzed audio track is no longer available.",
+				track: {
+					id: "audio-1",
+					kind: "audio",
+				},
+				trackId: "audio-1",
+				trackIndex: 0,
+			},
+		],
+		reason: "The analyzed audio track is no longer available.",
+		status: "failed",
 	};
 }
 
