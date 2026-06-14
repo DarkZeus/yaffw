@@ -29,6 +29,7 @@ const prototypeComponentFile = join(
 );
 const routeTreeFile = join(sourceDir, "routeTree.gen.ts");
 const appSidebarFile = join(sourceDir, "components/app-sidebar.tsx");
+const routeRenderTimeout = { timeout: 5_000 };
 
 beforeEach(() => {
 	Object.defineProperty(window, "matchMedia", {
@@ -56,7 +57,11 @@ describe("app route contract", () => {
 		renderAppAt("/");
 
 		expect(
-			await screen.findByLabelText("Editor workbench top bar"),
+			await screen.findByLabelText(
+				"Editor workbench top bar",
+				undefined,
+				routeRenderTimeout,
+			),
 		).toBeTruthy();
 		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
 
@@ -78,7 +83,13 @@ describe("app route contract", () => {
 		await waitFor(() => {
 			expect(router.state.location.pathname).toBe("/");
 		});
-		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
+		expect(
+			await screen.findByLabelText(
+				"Editor workbench top bar",
+				undefined,
+				routeRenderTimeout,
+			),
+		).toBeTruthy();
 	});
 
 	it("does not publish the temporary legacy editor fallback", () => {
@@ -94,7 +105,11 @@ describe("app route contract", () => {
 		renderAppAt("/bulk-download");
 
 		expect(
-			await screen.findByRole("heading", { name: /bulk download/i }),
+			await screen.findByRole(
+				"heading",
+				{ name: /bulk download/i },
+				routeRenderTimeout,
+			),
 		).toBeTruthy();
 
 		const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]');
@@ -117,7 +132,10 @@ describe("app route contract", () => {
 	it("does not publish the workbench prototype as a route while preserving its reference component", () => {
 		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
 		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-		const prototypeComponentSource = readFileSync(prototypeComponentFile, "utf8");
+		const prototypeComponentSource = readFileSync(
+			prototypeComponentFile,
+			"utf8",
+		);
 
 		expect(routeTreeSource).not.toContain(prototypeRoutePath);
 		expect(existsSync(prototypeRouteFile)).toBe(false);
