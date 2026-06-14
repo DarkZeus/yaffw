@@ -21,6 +21,10 @@ import {
 	type ActiveMediaAssetCleanupScopeController,
 } from "./active-media-asset-cleanup-scope";
 import { isDefaultExportCancelledError } from "./default-export-runner";
+import {
+	createGeneratedMediaArtifactStore,
+	type GeneratedMediaArtifactStore,
+} from "./generated-media-artifact-store";
 import type {
 	SingleAssetEditingSession,
 	UseSingleAssetEditingSessionOptions,
@@ -49,11 +53,10 @@ export function useSingleAssetEditingSession({
 	const activeMediaAssetCleanupControllerRef =
 		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
+	const generatedMediaArtifactStoreRef =
+		useRef<GeneratedMediaArtifactStore | null>(null);
 	const [activeMediaAssetCleanupScope, setActiveMediaAssetCleanupScope] =
 		useState<ActiveMediaAssetCleanupScope | null>(null);
-	const [generatedMediaBlobs, setGeneratedMediaBlobs] = useState<
-		Record<string, Blob>
-	>({});
 	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
 	const [localFileInputKey, setLocalFileInputKey] = useState(0);
 	const protectBeforeUnload = shouldProtectEditorBeforeUnload(session);
@@ -80,6 +83,7 @@ export function useSingleAssetEditingSession({
 			activeExportAbortControllerRef.current?.abort();
 			activeExportAbortControllerRef.current = null;
 			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
+			generatedMediaArtifactStoreRef.current?.clear();
 		};
 	}, []);
 
@@ -88,7 +92,7 @@ export function useSingleAssetEditingSession({
 		activeExportAbortControllerRef.current = null;
 		getActiveMediaAssetCleanupController().disposeCurrentScope();
 		setActiveMediaAssetCleanupScope(null);
-		setGeneratedMediaBlobs({});
+		getGeneratedMediaArtifactStore().clear();
 		setPreviewSource(null);
 	}
 
@@ -196,10 +200,10 @@ export function useSingleAssetEditingSession({
 				selection: session.selection,
 			});
 
-			setGeneratedMediaBlobs((currentBlobs) => ({
-				...currentBlobs,
-				[generatedMedia.id]: result.blob,
-			}));
+			getGeneratedMediaArtifactStore().retain({
+				blob: result.blob,
+				generatedMedia,
+			});
 			dispatch({
 				generatedMedia,
 				jobId,
@@ -243,16 +247,15 @@ export function useSingleAssetEditingSession({
 	}
 
 	function downloadGeneratedMedia(generatedMedia: GeneratedMedia) {
-		const blob = generatedMediaBlobs[generatedMedia.id];
+		const delivered = getGeneratedMediaArtifactStore().deliver({
+			deliver: deliverGeneratedMedia,
+			generatedMedia,
+		});
 
-		if (!blob) {
+		if (!delivered) {
 			return;
 		}
 
-		deliverGeneratedMedia({
-			blob,
-			generatedMedia,
-		});
 		dispatch({
 			generatedMediaId: generatedMedia.id,
 			type: "generated-media.delivered",
@@ -287,6 +290,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setSelectionStartFromPlayhead(playheadUs: number) {
+		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			playheadUs,
 			type: "selection.start.setFromPlayhead",
@@ -294,6 +298,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setSelectionEndFromPlayhead(playheadUs: number) {
+		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			playheadUs,
 			type: "selection.end.setFromPlayhead",
@@ -301,6 +306,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	function moveSelectionRange(deltaUs: number) {
+		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			deltaUs,
 			type: "selection.range.moved",
@@ -308,12 +314,14 @@ export function useSingleAssetEditingSession({
 	}
 
 	function resetSelection() {
+		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			type: "selection.reset",
 		});
 	}
 
 	function setAudioTrackIncluded(trackId: string, include: boolean) {
+		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			include,
 			trackId,
@@ -325,6 +333,7 @@ export function useSingleAssetEditingSession({
 		trackId: string,
 		channelMode: AudioTrackChannelMode,
 	) {
+		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			channelMode,
 			trackId,
@@ -333,11 +342,39 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setAudioTrackVolumePercent(trackId: string, volumePercent: number) {
+		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			trackId,
 			type: "audio.track.volume.set",
 			volumePercent,
 		});
+	}
+
+	function getGeneratedMediaArtifactStore() {
+		if (!generatedMediaArtifactStoreRef.current) {
+			generatedMediaArtifactStoreRef.current =
+				createGeneratedMediaArtifactStore();
+		}
+
+		return generatedMediaArtifactStoreRef.current;
+	}
+
+	function invalidateCurrentGeneratedMediaArtifact() {
+		if (session.status !== "ready" || session.export.status !== "succeeded") {
+			return;
+		}
+
+		getGeneratedMediaArtifactStore().invalidate(session.export.generatedMedia.id);
+	}
+
+	function invalidateCurrentGeneratedMediaArtifactForAudioTrack(
+		trackId: string,
+	) {
+		if (session.status !== "ready" || !session.audioMix.tracks[trackId]) {
+			return;
+		}
+
+		invalidateCurrentGeneratedMediaArtifact();
 	}
 
 	return {
