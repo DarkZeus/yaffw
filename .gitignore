@@ -548,6 +548,7 @@ benchmarks/results/
 # Documentation build
 docs/build/
 docs/.docusaurus/
+docs
 
 # API documentation
 api-docs/
