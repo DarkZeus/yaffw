@@ -1,5 +1,6 @@
 import {
 	AudioWaveform,
+	Film,
 	LocateFixed,
 	RotateCcw,
 	ZoomIn,
@@ -8,6 +9,7 @@ import {
 import {
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -43,6 +45,18 @@ import type {
 	DragState,
 	SelectionTimelineProps,
 } from "./selection-timeline.types";
+import {
+	VIDEO_STRIP_THUMBNAIL_COUNT,
+	VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
+	createVideoStripThumbnailWindow,
+	loadBrowserVideoStripThumbnails,
+	useVideoStripThumbnails,
+} from "./selection-video-strip";
+import type {
+	VideoStripThumbnailState,
+	VideoStripThumbnailViewFrame,
+	VideoStripThumbnailViewport,
+} from "./selection-video-strip.types";
 import { WaveformLane } from "./selection-waveform-lane";
 import {
 	loadBrowserWaveformLane,
@@ -51,6 +65,10 @@ import {
 import type { WaveformRegionSelectionChange } from "./selection-waveform-surface.types";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
+const VIDEO_STRIP_PLACEHOLDER_KEYS = Array.from(
+	{ length: VIDEO_STRIP_THUMBNAIL_COUNT },
+	(_, index) => `video-strip-placeholder-${index}`,
+);
 
 export function SelectionTimeline({
 	asset,
@@ -71,6 +89,7 @@ export function SelectionTimeline({
 	selectionEditingDisabled = false,
 	soloedAudioTrackId = null,
 	source,
+	videoStripThumbnailLoader = loadBrowserVideoStripThumbnails,
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
 	const trackRef = useRef<HTMLDivElement | null>(null);
@@ -85,10 +104,32 @@ export function SelectionTimeline({
 	const [playheadFollowEnabled, setPlayheadFollowEnabled] = useState(false);
 	const [regionSelectionEditing, setRegionSelectionEditing] = useState(false);
 	const [zoom, setZoom] = useState(1);
+	const timelineViewport = useTimelineViewport({
+		scrollContainerRef,
+		trackRef,
+		zoom,
+	});
+	const videoStripThumbnailWindow = useMemo(
+		() =>
+			timelineViewport
+				? createVideoStripThumbnailWindow({
+						assetDurationUs: asset.durationUs,
+						frameDurationUs: asset.frameTiming.frameDurationUs,
+						viewport: timelineViewport,
+					})
+				: null,
+		[asset.durationUs, asset.frameTiming.frameDurationUs, timelineViewport],
+	);
 	const laneStates = useWaveformLaneStates({
 		asset,
 		source,
 		waveformLaneLoader,
+	});
+	const videoStripState = useVideoStripThumbnails({
+		asset,
+		source,
+		thumbnailWindow: videoStripThumbnailWindow,
+		videoStripThumbnailLoader,
 	});
 	const visibleSelection = draftSelection ?? selection;
 	const selectionEditInProgress = dragState !== null || regionSelectionEditing;
@@ -655,6 +696,16 @@ export function SelectionTimeline({
 							className="relative min-h-0 flex-1"
 							data-testid="selection-timeline-lane-surface"
 						>
+							<VideoThumbnailStrip
+								durationUs={asset.durationUs}
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										seekFromLanePointer(event);
+									}
+								}}
+								onPointerDown={seekFromLanePointer}
+								state={videoStripState}
+							/>
 							<div className="relative max-h-72 overflow-y-auto">
 								{asset.tracks.audio.length > 0 ? (
 									asset.tracks.audio.map((track, trackIndex) => (
@@ -784,6 +835,328 @@ export function SelectionTimeline({
 	);
 }
 
+function useTimelineViewport({
+	scrollContainerRef,
+	trackRef,
+	zoom,
+}: {
+	scrollContainerRef: RefObject<HTMLDivElement | null>;
+	trackRef: RefObject<HTMLDivElement | null>;
+	zoom: number;
+}) {
+	const [viewport, setViewport] = useState<VideoStripThumbnailViewport | null>(
+		null,
+	);
+
+	useEffect(() => {
+		const scrollContainerElement = scrollContainerRef.current;
+		const trackElement = trackRef.current;
+
+		if (!scrollContainerElement || !trackElement) {
+			return;
+		}
+
+		const scrollContainer = scrollContainerElement;
+		const track = trackElement;
+		let animationFrameId: number | null = null;
+
+		function measureViewport(): VideoStripThumbnailViewport {
+			const scrollRect = scrollContainer.getBoundingClientRect();
+			const trackRect = track.getBoundingClientRect();
+			const measuredViewportWidth =
+				scrollContainer.clientWidth || scrollRect.width || 0;
+			const measuredTrackWidth =
+				trackRect.width || scrollContainer.scrollWidth || 0;
+			const trackWidthPx = Math.max(
+				1,
+				measuredTrackWidth,
+				scrollContainer.scrollWidth,
+				measuredViewportWidth * Math.max(1, zoom),
+			);
+			const viewportWidthPx = Math.max(
+				1,
+				measuredViewportWidth || trackWidthPx / Math.max(1, zoom),
+			);
+			const maxScrollLeftPx = Math.max(0, trackWidthPx - viewportWidthPx);
+
+			return {
+				scrollLeftPx: clampTimelineNumber(
+					scrollContainer.scrollLeft,
+					0,
+					maxScrollLeftPx,
+				),
+				trackWidthPx,
+				viewportWidthPx: Math.min(viewportWidthPx, trackWidthPx),
+			};
+		}
+
+		function publishViewport() {
+			animationFrameId = null;
+			const nextViewport = measureViewport();
+			setViewport((currentViewport) =>
+				currentViewport && timelineViewportEquals(currentViewport, nextViewport)
+					? currentViewport
+					: nextViewport,
+			);
+		}
+
+		function scheduleViewportMeasure() {
+			if (animationFrameId !== null) {
+				return;
+			}
+
+			animationFrameId = requestTimelineFrame(publishViewport);
+		}
+
+		const resizeObserver =
+			typeof ResizeObserver === "undefined"
+				? null
+				: new ResizeObserver(scheduleViewportMeasure);
+
+		publishViewport();
+		scrollContainer.addEventListener("scroll", scheduleViewportMeasure, {
+			passive: true,
+		});
+		resizeObserver?.observe(scrollContainer);
+		resizeObserver?.observe(track);
+
+		return () => {
+			scrollContainer.removeEventListener("scroll", scheduleViewportMeasure);
+			resizeObserver?.disconnect();
+
+			if (animationFrameId !== null) {
+				cancelTimelineFrame(animationFrameId);
+			}
+		};
+	}, [scrollContainerRef, trackRef, zoom]);
+
+	return viewport;
+}
+
+function VideoThumbnailStrip({
+	onMouseDown,
+	onPointerDown,
+	durationUs,
+	state,
+}: {
+	durationUs: MediaTimeUs;
+	onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+	onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+	state: VideoStripThumbnailState;
+}) {
+	const thumbnailHeightPx =
+		state.status === "ready" || state.status === "loading"
+			? (state.thumbnailHeightPx ?? VIDEO_STRIP_THUMBNAIL_HEIGHT_PX)
+			: VIDEO_STRIP_THUMBNAIL_HEIGHT_PX;
+	const laneHeightPx = Math.max(64, thumbnailHeightPx + 10);
+	const frames =
+		state.status === "ready" || state.status === "loading" ? state.frames : [];
+	const timestampsUs =
+		state.status === "ready" || state.status === "loading"
+			? (state.timestampsUs ?? [])
+			: [];
+	const expectedFrameCount =
+		state.status === "ready"
+			? timestampsUs.length
+			: state.status === "loading"
+				? (state.thumbnailCount ?? timestampsUs.length)
+				: 0;
+	const frameSlots = createVideoThumbnailStripFrameSlots({
+		durationUs,
+		expectedFrameCount,
+		frameStepUs:
+			state.status === "ready" || state.status === "loading"
+				? state.frameStepUs
+				: undefined,
+		frames,
+		timestampsUs,
+	});
+	const hasFrameGrid = state.status === "ready" || frames.length > 0;
+
+	return (
+		<div
+			className="relative border-b border-workbench-border bg-workbench-lane"
+			data-testid="video-thumbnail-lane"
+		>
+			<div
+				className="relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
+				data-testid="video-thumbnail-lane-header"
+			>
+				<Film
+					aria-hidden="true"
+					className="size-4 shrink-0 text-workbench-selected"
+				/>
+				<span className="mr-1 truncate text-sm font-medium text-workbench-lane-foreground">
+					Video
+				</span>
+				<VideoThumbnailStripStatus
+					expectedFrameCount={expectedFrameCount}
+					frameCount={frames.length}
+					state={state}
+				/>
+			</div>
+			<button
+				aria-label="Seek video thumbnail strip"
+				className="relative block w-full cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt p-1 text-left"
+				onMouseDown={onMouseDown}
+				onPointerDown={onPointerDown}
+				style={{ height: `${laneHeightPx}px` }}
+				type="button"
+			>
+				<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
+				{hasFrameGrid ? (
+					<div
+						className="relative h-full min-w-full bg-black/60"
+						data-testid="video-thumbnail-grid"
+					>
+						{frameSlots.map((slot) => (
+							<div
+								aria-hidden="true"
+								className="absolute inset-y-0 overflow-hidden border border-workbench-selected/45 bg-workbench-selected/10 shadow-inner"
+								data-testid={slot.frame ? "video-strip-thumbnail" : undefined}
+								key={slot.key}
+								style={{
+									left: `${slot.leftPercent}%`,
+									width: `${slot.widthPercent}%`,
+								}}
+							>
+								<div className="absolute inset-x-0 top-0 z-10 h-1 bg-workbench-selected/75" />
+								{slot.frame ? (
+									<>
+										<img
+											alt=""
+											className="h-full w-full object-cover opacity-90 saturate-[0.95]"
+											draggable={false}
+											src={slot.frame.url}
+										/>
+										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 font-mono text-[10px] leading-none text-workbench-selected-foreground">
+											{formatVideoThumbnailTime(slot.timestampUs)}
+										</span>
+									</>
+								) : (
+									<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)] opacity-45" />
+								)}
+							</div>
+						))}
+					</div>
+				) : (
+					<VideoThumbnailStripPlaceholder state={state} />
+				)}
+			</button>
+		</div>
+	);
+}
+
+function VideoThumbnailStripStatus({
+	expectedFrameCount,
+	frameCount,
+	state,
+}: {
+	expectedFrameCount: number;
+	frameCount: number;
+	state: VideoStripThumbnailState;
+}) {
+	if (state.status === "ready") {
+		return (
+			<span className="rounded border border-workbench-border-strong px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+				{frameCount} frames
+			</span>
+		);
+	}
+
+	if (state.status === "loading") {
+		return (
+			<span className="rounded border border-workbench-progress/45 bg-workbench-progress/15 px-1.5 py-0.5 font-mono text-[11px] text-workbench-progress">
+				{frameCount > 0
+					? `${frameCount}/${expectedFrameCount} frames`
+					: "Loading frames"}
+			</span>
+		);
+	}
+
+	return (
+		<span
+			className="rounded border border-destructive/45 bg-destructive/15 px-1.5 py-0.5 font-mono text-[11px] text-destructive"
+			title={state.reason}
+		>
+			Frames unavailable
+		</span>
+	);
+}
+
+function formatVideoThumbnailTime(timeUs: number) {
+	const formattedTime = formatMediaTime(timeUs);
+
+	return formattedTime.startsWith("00:")
+		? formattedTime.slice(3)
+		: formattedTime;
+}
+
+function createVideoThumbnailStripFrameSlots({
+	durationUs,
+	expectedFrameCount,
+	frameStepUs,
+	frames,
+	timestampsUs,
+}: {
+	durationUs: MediaTimeUs;
+	expectedFrameCount: number;
+	frameStepUs?: MediaTimeUs;
+	frames: VideoStripThumbnailViewFrame[];
+	timestampsUs: MediaTimeUs[];
+}) {
+	if (expectedFrameCount <= 0 || durationUs <= 0) {
+		return [];
+	}
+
+	const framesByIndex = new Map(frames.map((frame) => [frame.index, frame]));
+	const safeFrameStepUs = Math.max(1, frameStepUs ?? durationUs);
+
+	return Array.from({ length: expectedFrameCount }, (_, index) => {
+		const timestampUs =
+			timestampsUs[index] ?? Math.min(index * safeFrameStepUs, durationUs);
+		const slotEndUs = Math.min(durationUs, timestampUs + safeFrameStepUs);
+		const leftPercent = mediaTimeToPercent(timestampUs, durationUs);
+		const rightPercent = mediaTimeToPercent(slotEndUs, durationUs);
+
+		return {
+			frame: framesByIndex.get(index) ?? null,
+			key: `video-thumbnail-slot-${index}-${timestampUs}`,
+			leftPercent,
+			timestampUs,
+			widthPercent: Math.max(0.05, rightPercent - leftPercent),
+		};
+	});
+}
+
+function VideoThumbnailStripPlaceholder({
+	state,
+}: { state: Exclude<VideoStripThumbnailState, { status: "ready" }> }) {
+	return (
+		<div
+			className="relative grid h-full gap-px bg-black/60"
+			style={{
+				gridTemplateColumns: `repeat(${VIDEO_STRIP_THUMBNAIL_COUNT}, minmax(0px, 1fr))`,
+			}}
+			title={state.status === "unavailable" ? state.reason : undefined}
+		>
+			{VIDEO_STRIP_PLACEHOLDER_KEYS.map((key) => (
+				<div
+					aria-hidden="true"
+					className="relative overflow-hidden border border-workbench-border bg-workbench-viewer"
+					key={key}
+				>
+					<div className="absolute inset-x-0 top-0 h-1 bg-workbench-border-strong/70" />
+					<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)] opacity-45" />
+				</div>
+			))}
+			<span className="absolute inset-0 grid place-items-center bg-black/20 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+				{state.status === "loading" ? "Loading frames" : "Frames unavailable"}
+			</span>
+		</div>
+	);
+}
+
 function requestTimelineFrame(callback: () => void): number {
 	if (typeof window.requestAnimationFrame === "function") {
 		return window.requestAnimationFrame(callback);
@@ -799,6 +1172,22 @@ function cancelTimelineFrame(frameId: number) {
 	}
 
 	window.clearTimeout(frameId);
+}
+
+function timelineViewportEquals(
+	currentViewport: VideoStripThumbnailViewport,
+	nextViewport: VideoStripThumbnailViewport,
+) {
+	return (
+		Math.abs(currentViewport.scrollLeftPx - nextViewport.scrollLeftPx) < 0.5 &&
+		Math.abs(currentViewport.trackWidthPx - nextViewport.trackWidthPx) < 0.5 &&
+		Math.abs(currentViewport.viewportWidthPx - nextViewport.viewportWidthPx) <
+			0.5
+	);
+}
+
+function clampTimelineNumber(value: number, min: number, max: number) {
+	return Math.min(Math.max(value, min), max);
 }
 
 function timeMarkerLabelClassName(placement: SelectionTimelineMarkerPlacement) {

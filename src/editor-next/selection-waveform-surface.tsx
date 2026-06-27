@@ -5,6 +5,7 @@ import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
 
 import type { Selection } from "@/editor-core/model";
 import { createPreviewAdapterLifecycle } from "./preview-adapter-lifecycle";
+import type { WaveformSamples } from "./selection-waveform-lanes.types";
 import type {
 	WaveformRegionSelectionChange,
 	WaveformRegionUpdateSide,
@@ -72,7 +73,7 @@ export function WaveformSurface({
 	);
 }
 
-export function createWavesurferPeaksFromSamples(samples: number[]) {
+export function createWavesurferPeaksFromSamples(samples: WaveformSamples) {
 	if (samples.length === 0) {
 		return new Float32Array([0]);
 	}
@@ -402,7 +403,7 @@ function useLatestValueRef<T>(value: T) {
 	return valueRef;
 }
 
-function WaveformCanvasFallback({ samples }: { samples: number[] }) {
+function WaveformCanvasFallback({ samples }: { samples: WaveformSamples }) {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
 	useEffect(() => {

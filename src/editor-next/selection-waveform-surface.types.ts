@@ -1,4 +1,5 @@
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
+import type { WaveformSamples } from "./selection-waveform-lanes.types";
 
 export type WaveformRegionUpdateSide = "end" | "range" | "start";
 
@@ -15,7 +16,7 @@ export type WaveformSurfaceProps = {
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
 	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
-	samples: number[];
+	samples: WaveformSamples;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
 	selectionEditInProgress: boolean;

@@ -12,9 +12,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
 import { SelectionTimeline } from "./selection-timeline";
+import type { VideoStripThumbnailRequest } from "./selection-video-strip.types";
 
 beforeEach(() => {
 	mockTimelineGeometry();
+	mockThumbnailObjectUrls();
 });
 
 afterEach(() => {
@@ -39,6 +41,13 @@ describe("SelectionTimeline", () => {
 		});
 
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
+		expect(screen.getByLabelText("Seek video thumbnail strip")).toBeTruthy();
+		await waitFor(() => {
+			expect(screen.getAllByTestId("video-strip-thumbnail")).toHaveLength(3);
+		});
+		expect(screen.getByTestId("video-thumbnail-grid").textContent).toContain(
+			"00:00.000",
+		);
 		expect(screen.getByText("Voice")).toBeTruthy();
 		expect(screen.getByText("Game audio")).toBeTruthy();
 		expect(screen.queryByText(/Language/)).toBeNull();
@@ -114,6 +123,122 @@ describe("SelectionTimeline", () => {
 		});
 	});
 
+	it("requests denser video thumbnails when timeline zoom increases", async () => {
+		const videoStripThumbnailLoader = vi.fn(
+			async ({ timestampsUs }: VideoStripThumbnailRequest) => ({
+				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${timestampUs}-${index}`], {
+						type: "image/jpeg",
+					}),
+					index,
+					timestampUs,
+				})),
+				status: "ready" as const,
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			}),
+		);
+		renderTimeline({ videoStripThumbnailLoader });
+
+		await waitFor(() => {
+			const latestRequest = videoStripThumbnailLoader.mock.calls.at(-1)?.[0];
+			expect(latestRequest?.timestampsUs.length).toBeGreaterThan(1);
+		});
+		const firstRequest =
+			videoStripThumbnailLoader.mock.calls.at(-1)?.[0] ?? null;
+		if (!firstRequest) {
+			throw new Error("Expected initial video thumbnail request.");
+		}
+		const firstStepUs =
+			firstRequest.timestampsUs[1] - firstRequest.timestampsUs[0];
+
+		fireEvent.click(screen.getByRole("button", { name: "Zoom in timeline" }));
+
+		await waitFor(() => {
+			const lastRequest = videoStripThumbnailLoader.mock.calls.at(-1)?.[0];
+			expect(lastRequest).not.toBe(firstRequest);
+			expect(
+				lastRequest
+					? lastRequest.timestampsUs[1] - lastRequest.timestampsUs[0]
+					: firstStepUs,
+			).toBeLessThan(firstStepUs);
+		});
+	});
+
+	it("keeps thumbnail generation stable during tiny playback-follow scrolls", async () => {
+		const videoStripThumbnailLoader = vi.fn(
+			async ({ timestampsUs }: VideoStripThumbnailRequest) => ({
+				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${timestampUs}-${index}`], {
+						type: "image/jpeg",
+					}),
+					index,
+					timestampUs,
+				})),
+				status: "ready" as const,
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			}),
+		);
+		renderTimeline({ videoStripThumbnailLoader });
+
+		await waitFor(() => {
+			expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(1);
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Zoom in timeline" }));
+
+		await waitFor(() => {
+			expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(2);
+		});
+
+		const scrollContainer = screen.getByTestId("selection-timeline-scroll");
+		scrollContainer.scrollLeft = 1;
+		fireEvent.scroll(scrollContainer);
+
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(2);
+	});
+
+	it("renders thumbnail slots on the same media-time scale as the timeline", async () => {
+		const videoStripThumbnailLoader = vi.fn(
+			async ({ timestampsUs }: VideoStripThumbnailRequest) => ({
+				frames: timestampsUs.map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${timestampUs}`], {
+						type: "image/jpeg",
+					}),
+					index,
+					timestampUs,
+				})),
+				status: "ready" as const,
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			}),
+		);
+		renderTimeline({
+			videoStripThumbnailLoader,
+		});
+
+		let requestedFrameCount = 0;
+		await waitFor(() => {
+			requestedFrameCount =
+				videoStripThumbnailLoader.mock.calls.at(-1)?.[0].timestampsUs.length ??
+				0;
+			expect(screen.getAllByTestId("video-strip-thumbnail")).toHaveLength(
+				requestedFrameCount,
+			);
+		});
+		const firstThumbnail = screen.getAllByTestId(
+			"video-strip-thumbnail",
+		)[0] as HTMLElement;
+		expect(firstThumbnail.style.left).toBe("0%");
+		expect(firstThumbnail.style.width).not.toBe("");
+		expect(
+			screen.getByTestId("video-thumbnail-grid").style.gridTemplateColumns,
+		).toBe("");
+	});
+
 	it("seeks from waveform clicks, commits range drags as deltas, and zooms with horizontal width", () => {
 		const onPlayheadSeekRequested = vi.fn();
 		const onSelectionRangeMoveRequested = vi.fn();
@@ -139,6 +264,11 @@ describe("SelectionTimeline", () => {
 			clientX: 600,
 		});
 		expect(onPlayheadSeekRequested).toHaveBeenCalledWith(6_000_000);
+
+		fireEvent.mouseDown(screen.getByLabelText("Seek video thumbnail strip"), {
+			clientX: 120,
+		});
+		expect(onPlayheadSeekRequested).toHaveBeenCalledWith(1_200_000);
 
 		fireEvent.mouseDown(screen.getByLabelText("Playhead handle"), {
 			clientX: 0,
@@ -181,6 +311,16 @@ function renderTimeline(
 			playheadUs={0}
 			selection={selection}
 			source={source}
+			videoStripThumbnailLoader={async ({ timestampsUs }) => ({
+				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${index}`], { type: "image/jpeg" }),
+					index,
+					timestampUs,
+				})),
+				status: "ready",
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			})}
 			waveformLaneLoader={async () => ({
 				samples: [0.4, 0.7, 0.2],
 				status: "ready",
@@ -254,14 +394,19 @@ function mockTimelineGeometry() {
 				this instanceof HTMLElement &&
 				this.dataset.testid === "selection-timeline-track"
 			) {
+				const minWidthPercent = Number.parseFloat(this.style.minWidth);
+				const width = Number.isFinite(minWidthPercent)
+					? (1_200 * minWidthPercent) / 100
+					: 1_200;
+
 				return {
 					bottom: 80,
 					height: 80,
 					left: 0,
-					right: 1200,
+					right: width,
 					toJSON: () => ({}),
 					top: 0,
-					width: 1200,
+					width,
 					x: 0,
 					y: 0,
 				};
@@ -280,6 +425,22 @@ function mockTimelineGeometry() {
 			};
 		},
 	);
+}
+
+function mockThumbnailObjectUrls() {
+	let objectUrlIndex = 0;
+
+	Object.defineProperty(URL, "createObjectURL", {
+		configurable: true,
+		value: vi.fn(() => {
+			objectUrlIndex += 1;
+			return `blob:thumbnail-${objectUrlIndex}`;
+		}),
+	});
+	Object.defineProperty(URL, "revokeObjectURL", {
+		configurable: true,
+		value: vi.fn(),
+	});
 }
 
 function mockTimelineScroll(

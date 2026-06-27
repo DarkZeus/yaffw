@@ -6,6 +6,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 
+import type { VideoStripThumbnailLoader } from "./selection-video-strip.types";
 import type { WaveformLaneLoader } from "./selection-waveform-lanes.types";
 
 export type SelectionTimelineProps = {
@@ -33,6 +34,7 @@ export type SelectionTimelineProps = {
 	selectionEditingDisabled?: boolean;
 	soloedAudioTrackId?: string | null;
 	source: Blob;
+	videoStripThumbnailLoader?: VideoStripThumbnailLoader;
 	waveformLaneLoader?: WaveformLaneLoader;
 };
 

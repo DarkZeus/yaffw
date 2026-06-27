@@ -5,12 +5,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
 	audioTracks: [] as object[],
-	buffersByTrack: new Map<object, Array<{ buffer: AudioBuffer; timestamp: number }>>(),
+	buffersByTrack: new Map<
+		object,
+		Array<{ buffer: AudioBuffer; timestamp: number }>
+	>(),
 	getAudioTracksError: undefined as Error | undefined,
 	inputInstances: [] as Array<{
 		dispose: ReturnType<typeof vi.fn>;
 		getAudioTracks: ReturnType<typeof vi.fn>;
 	}>,
+}));
+
+const waveformWorkerMock = vi.hoisted(() => ({
+	deferResponse: false,
+	errorMessage: "",
+	instances: [] as Array<{
+		addEventListener: ReturnType<typeof vi.fn>;
+		postMessage: ReturnType<typeof vi.fn>;
+		postedMessages: unknown[];
+		removeEventListener: ReturnType<typeof vi.fn>;
+		terminate: ReturnType<typeof vi.fn>;
+	}>,
+	result: {
+		samples: new Float32Array([0.25, 1]),
+		status: "ready",
+	} as unknown,
 }));
 
 vi.mock("mediabunny", () => {
@@ -52,10 +71,71 @@ vi.mock("mediabunny", () => {
 	};
 });
 
+vi.mock("./selection-waveform-lanes.worker?worker", () => {
+	class MockWaveformLaneWorker {
+		private listeners = new Map<string, Set<(event: unknown) => void>>();
+		postedMessages: unknown[] = [];
+
+		addEventListener = vi.fn(
+			(type: string, listener: (event: unknown) => void) => {
+				const listeners = this.listeners.get(type) ?? new Set();
+				listeners.add(listener);
+				this.listeners.set(type, listeners);
+			},
+		);
+
+		removeEventListener = vi.fn(
+			(type: string, listener: (event: unknown) => void) => {
+				this.listeners.get(type)?.delete(listener);
+			},
+		);
+
+		postMessage = vi.fn((message: { requestId: number }) => {
+			this.postedMessages.push(message);
+
+			if (waveformWorkerMock.deferResponse) {
+				return;
+			}
+
+			queueMicrotask(() => {
+				if (waveformWorkerMock.errorMessage) {
+					this.dispatch("error", { message: waveformWorkerMock.errorMessage });
+					return;
+				}
+
+				this.dispatch("message", {
+					data: {
+						requestId: message.requestId,
+						result: waveformWorkerMock.result,
+						type: "done",
+					},
+				});
+			});
+		});
+
+		terminate = vi.fn();
+
+		constructor() {
+			waveformWorkerMock.instances.push(this);
+		}
+
+		private dispatch(type: string, event: unknown) {
+			for (const listener of this.listeners.get(type) ?? []) {
+				listener(event);
+			}
+		}
+	}
+
+	return {
+		default: MockWaveformLaneWorker,
+	};
+});
+
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import {
 	addAudioBufferToBuckets,
+	clearWaveformLaneCache,
 	loadBrowserWaveformLane,
 	useWaveformLaneStates,
 } from "./selection-waveform-lanes";
@@ -66,15 +146,25 @@ import type {
 } from "./selection-waveform-lanes.types";
 
 beforeEach(() => {
+	clearWaveformLaneCache();
 	mediabunnyMock.audioTracks = [];
 	mediabunnyMock.buffersByTrack = new Map();
 	mediabunnyMock.getAudioTracksError = undefined;
 	mediabunnyMock.inputInstances = [];
+	waveformWorkerMock.deferResponse = false;
+	waveformWorkerMock.errorMessage = "";
+	waveformWorkerMock.instances = [];
+	waveformWorkerMock.result = {
+		samples: new Float32Array([0.25, 1]),
+		status: "ready",
+	};
+	vi.stubGlobal("Worker", undefined);
 });
 
 afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("useWaveformLaneStates", () => {
@@ -102,12 +192,14 @@ describe("useWaveformLaneStates", () => {
 
 		expect(waveformLaneLoader).toHaveBeenNthCalledWith(1, {
 			assetDurationUs: readyAsset.durationUs,
+			signal: expect.any(AbortSignal),
 			source,
 			track: readyAsset.tracks.audio[0],
 			trackIndex: 0,
 		});
 		expect(waveformLaneLoader).toHaveBeenNthCalledWith(2, {
 			assetDurationUs: readyAsset.durationUs,
+			signal: expect.any(AbortSignal),
 			source,
 			track: readyAsset.tracks.audio[1],
 			trackIndex: 1,
@@ -159,6 +251,7 @@ describe("loadBrowserWaveformLane", () => {
 
 		expect(result.status).toBe("ready");
 		if (result.status === "ready") {
+			expect(result.samples).toBeInstanceOf(Float32Array);
 			expect(result.samples).toHaveLength(8192);
 			expect(Math.max(...result.samples)).toBe(1);
 		}
@@ -195,6 +288,112 @@ describe("loadBrowserWaveformLane", () => {
 			status: "unavailable",
 		});
 		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
+	it("caches completed waveform lanes for the same source and track", async () => {
+		const audioTrack = createMockAudioTrack();
+		mediabunnyMock.audioTracks = [audioTrack];
+		mediabunnyMock.buffersByTrack.set(audioTrack, [
+			{
+				buffer: createAudioBufferLike([[0.5, 1]], 2),
+				timestamp: 0,
+			},
+		]);
+
+		const firstResult = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+		const secondResult = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(firstResult.status).toBe("ready");
+		expect(secondResult).toBe(firstResult);
+		expect(mediabunnyMock.inputInstances).toHaveLength(1);
+	});
+
+	it("loads waveform lanes through a worker when available", async () => {
+		vi.stubGlobal("Worker", vi.fn());
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result.status).toBe("ready");
+		if (result.status !== "ready") {
+			throw new Error("Expected ready waveform result.");
+		}
+		expect(result.samples).toBeInstanceOf(Float32Array);
+		expect(Array.from(result.samples)).toEqual([0.25, 1]);
+		expect(mediabunnyMock.inputInstances).toHaveLength(0);
+		expect(waveformWorkerMock.instances).toHaveLength(1);
+		expect(waveformWorkerMock.instances[0]?.postedMessages[0]).toEqual({
+			request: {
+				assetDurationUs: readyAsset.durationUs,
+				source,
+				trackIndex: 0,
+			},
+			requestId: expect.any(Number),
+			type: "generate",
+		});
+		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+	});
+
+	it("falls back to the current thread when the worker cannot produce a waveform", async () => {
+		vi.stubGlobal("Worker", vi.fn());
+		waveformWorkerMock.result = {
+			reason: "Worker cannot decode this audio track.",
+			status: "unavailable",
+		};
+		const audioTrack = createMockAudioTrack();
+		mediabunnyMock.audioTracks = [audioTrack];
+		mediabunnyMock.buffersByTrack.set(audioTrack, [
+			{
+				buffer: createAudioBufferLike([[0.5, 1]], 2),
+				timestamp: 0,
+			},
+		]);
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result.status).toBe("ready");
+		expect(waveformWorkerMock.instances).toHaveLength(1);
+		expect(mediabunnyMock.inputInstances).toHaveLength(1);
+	});
+
+	it("terminates the worker when waveform loading is aborted", async () => {
+		vi.stubGlobal("Worker", vi.fn());
+		waveformWorkerMock.deferResponse = true;
+		const abortController = new AbortController();
+
+		const result = loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			signal: abortController.signal,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+		abortController.abort();
+
+		await expect(result).rejects.toMatchObject({
+			name: "AbortError",
+		});
+		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.inputInstances).toHaveLength(0);
 	});
 });
 
@@ -257,7 +456,7 @@ function serializeLaneStates(laneStates: Record<string, WaveformLaneState>) {
 					laneId,
 					{
 						...base,
-						samples: lane.samples,
+						samples: Array.from(lane.samples),
 					},
 				];
 			}
