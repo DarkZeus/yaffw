@@ -6,6 +6,11 @@ export type ExportCorrectnessFixture = {
 		audioTrackCount: number;
 		durationUs: number;
 		mimeTypePrefix: string;
+		syncEventDurationUs?: number;
+		syncEventsUs?: Array<{
+			audioClickUs: number;
+			visualFlashUs: number;
+		}>;
 		videoTrackCount: number;
 	};
 	fileName: string;
@@ -19,6 +24,46 @@ export type ExportCorrectnessFixture = {
 };
 
 const TWO_SECONDS_US = 2_000_000;
+const TEN_SECONDS_US = 10_000_000;
+const SYNC_FLASH_CLICK_EVENT_DURATION_US = 100_000;
+const SYNC_FLASH_CLICK_EVENTS_US = [
+	{
+		audioClickUs: 1_000_000,
+		visualFlashUs: 1_000_000,
+	},
+	{
+		audioClickUs: 2_000_000,
+		visualFlashUs: 2_000_000,
+	},
+	{
+		audioClickUs: 3_000_000,
+		visualFlashUs: 3_000_000,
+	},
+	{
+		audioClickUs: 4_000_000,
+		visualFlashUs: 4_000_000,
+	},
+	{
+		audioClickUs: 5_000_000,
+		visualFlashUs: 5_000_000,
+	},
+	{
+		audioClickUs: 6_000_000,
+		visualFlashUs: 6_000_000,
+	},
+	{
+		audioClickUs: 7_000_000,
+		visualFlashUs: 7_000_000,
+	},
+	{
+		audioClickUs: 8_000_000,
+		visualFlashUs: 8_000_000,
+	},
+	{
+		audioClickUs: 9_000_000,
+		visualFlashUs: 9_000_000,
+	},
+];
 
 export const EXPORT_CORRECTNESS_FIXTURES = [
 	{
@@ -87,6 +132,31 @@ export const EXPORT_CORRECTNESS_FIXTURES = [
 			selectedRange: {
 				endUs: 1_500_000,
 				startUs: 500_000,
+			},
+		},
+	},
+	{
+		container: "mp4",
+		expected: {
+			audioTrackCount: 1,
+			durationUs: TEN_SECONDS_US,
+			mimeTypePrefix: "video/mp4",
+			syncEventDurationUs: SYNC_FLASH_CLICK_EVENT_DURATION_US,
+			syncEventsUs: SYNC_FLASH_CLICK_EVENTS_US,
+			videoTrackCount: 1,
+		},
+		fileName: "sync-flash-click.mp4",
+		id: "mp4-sync-flash-click",
+		label: "Sync flash/click MP4",
+		publicPath: "/export-correctness-fixtures/sync-flash-click.mp4",
+		selections: {
+			full: {
+				endUs: TEN_SECONDS_US,
+				startUs: 0,
+			},
+			selectedRange: {
+				endUs: 8_000_000,
+				startUs: 2_000_000,
 			},
 		},
 	},

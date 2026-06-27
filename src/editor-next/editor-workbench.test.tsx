@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("Editor workbench", () => {
-	it("renders the workbench top bar, active asset summary, and non-interactive rail", () => {
+	it("renders the workbench top bar, active asset summary, and content without a redundant rail", () => {
 		render(
 			<EditorWorkbenchFrame
 				activeAsset={readyAsset}
@@ -51,14 +51,12 @@ describe("Editor workbench", () => {
 		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
 		expect(topBarAssetSummary.textContent).toContain("30 fps");
 
-		const rail = screen.getByLabelText("Editor workbench rail");
-		expect(rail).toBeTruthy();
-		expect(rail.tagName).toBe("ASIDE");
-		expect(rail.parentElement?.className).toContain(
+		const workbenchChild = screen.getByText("Workbench child");
+		expect(workbenchChild).toBeTruthy();
+		expect(workbenchChild.parentElement?.className).not.toContain(
 			"grid-cols-[4rem_minmax(0,1fr)]",
 		);
-		expect(within(rail).queryAllByRole("button")).toHaveLength(0);
-		expect(within(rail).queryAllByRole("link")).toHaveLength(0);
+		expect(screen.queryByLabelText("Editor workbench rail")).toBeNull();
 		expect(
 			screen.queryByRole("navigation", { name: "Editor workbench rail" }),
 		).toBeNull();
@@ -168,7 +166,7 @@ describe("Editor workbench", () => {
 		).toBe(true);
 	});
 
-	it("places ready-state media, preview, and inspector slots in workbench regions", () => {
+	it("places ready-state media and export slots in one left tabbed inspector region", () => {
 		render(
 			<EditorSessionShell
 				exportInspector={
@@ -188,39 +186,56 @@ describe("Editor workbench", () => {
 		);
 
 		const readyWorkbench = screen.getByLabelText("Editor workbench session");
-		expect(readyWorkbench.className).toContain("grid-cols-1");
 		expect(readyWorkbench.className).toContain("xl:h-full");
-		expect(readyWorkbench.className).toContain(
-			"xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem]",
-		);
-		expect(readyWorkbench.className).toContain(
-			"xl:grid-rows-[minmax(0,1fr)_2.75rem_38%]",
-		);
-		expect(readyWorkbench.className).toContain("xl:gap-0");
 		expect(readyWorkbench.className).toContain("xl:overflow-hidden");
 
-		const mediaAssetRegion = screen.getByLabelText(
-			"Workbench media asset region",
+		const readyLayout = within(readyWorkbench).getByLabelText(
+			"Ready workbench layout",
 		);
-		expect(mediaAssetRegion.className).toContain("overflow-x-hidden");
-		expect(mediaAssetRegion.className).toContain("xl:col-start-1");
-		expect(mediaAssetRegion.className).toContain("xl:row-start-1");
-		expect(mediaAssetRegion.className).toContain("xl:overflow-y-auto");
-		expect(mediaAssetRegion.className).toContain("xl:border-r");
-		expect(mediaAssetRegion.className).toContain("overscroll-contain");
-		expect(mediaAssetRegion.className).toContain("xl:[contain:layout_paint]");
+		expect(readyLayout.getAttribute("data-panel-group-direction")).toBe(
+			"horizontal",
+		);
+		expect(readyLayout.className).toContain("xl:flex-row");
+		expect(readyLayout.className).toContain("xl:gap-0");
+		expect(readyLayout.className).toContain("xl:overflow-hidden");
 		expect(
-			within(mediaAssetRegion).getByLabelText("Media asset context"),
-		).toBeTruthy();
+			within(readyWorkbench).getByLabelText("Resize inspector panel").className,
+		).toContain("xl:flex");
+
+		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
 
 		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
-		expect(inspectorRegion.className).toContain("overflow-x-hidden");
-		expect(inspectorRegion.className).toContain("xl:col-start-3");
-		expect(inspectorRegion.className).toContain("xl:row-start-1");
-		expect(inspectorRegion.className).toContain("xl:overflow-y-auto");
-		expect(inspectorRegion.className).toContain("xl:border-l");
+		expect(inspectorRegion.className).toContain("xl:h-full");
+		expect(inspectorRegion.className).toContain("xl:overflow-hidden");
 		expect(inspectorRegion.className).toContain("overscroll-contain");
 		expect(inspectorRegion.className).toContain("xl:[contain:layout_paint]");
+		expect(
+			within(inspectorRegion).getByRole("tablist", {
+				name: "Workbench inspector tabs",
+			}),
+		).toBeTruthy();
+		expect(
+			within(inspectorRegion).getByRole("tablist", {
+				name: "Workbench inspector tabs",
+			}).className,
+		).toContain("bg-transparent");
+		expect(
+			within(inspectorRegion).getByRole("tab", { name: "Media" }).className,
+		).toContain("border-r");
+		expect(
+			within(inspectorRegion).getByRole("tab", { name: "Media" }).className,
+		).toContain("rounded-none");
+		expect(
+			within(inspectorRegion)
+				.getByRole("tab", { name: "Media" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(
+			within(inspectorRegion).getByLabelText("Media asset context"),
+		).toBeTruthy();
+
+		activateTab(within(inspectorRegion).getByRole("tab", { name: "Export" }));
+
 		expect(
 			within(inspectorRegion).getByLabelText("Export inspector"),
 		).toBeTruthy();
@@ -307,3 +322,8 @@ const loadingSession = {
 	runtime: supportedRuntime,
 	status: "loading",
 } satisfies Extract<EditorSessionState, { status: "loading" }>;
+
+function activateTab(tab: HTMLElement) {
+	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+	fireEvent.click(tab);
+}

@@ -66,6 +66,7 @@ describe("editor-next export recovery", () => {
 			expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
 		});
 
+		openExportTab();
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
@@ -141,6 +142,7 @@ describe("editor-next export recovery", () => {
 			expect(screen.getByLabelText("Preview for cancel.mp4")).toBeTruthy();
 		});
 
+		openExportTab();
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
@@ -211,4 +213,13 @@ function restoreObjectUrl(
 	}
 
 	delete URL[key];
+}
+
+function openExportTab() {
+	activateTab(screen.getByRole("tab", { name: "Export" }));
+}
+
+function activateTab(tab: HTMLElement) {
+	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+	fireEvent.click(tab);
 }

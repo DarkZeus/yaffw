@@ -1,12 +1,5 @@
-import {
-	BadgeCheck,
-	Download,
-	Gauge,
-	PackageCheck,
-	PlayCircle,
-	Square,
-} from "lucide-react";
-import { type ReactElement, type ReactNode, cloneElement } from "react";
+import { BadgeCheck, Download, Gauge, PlayCircle, Square } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,11 +14,6 @@ import type {
 	ExportInspectorStatusViewModel,
 } from "./export-inspector-presenter.types";
 import type { ExportInspectorPanelProps } from "./export-inspector.types";
-
-type PanelIconElement = ReactElement<{
-	"aria-hidden"?: boolean;
-	className?: string;
-}>;
 
 export function ExportInspectorPanel({
 	asset,
@@ -50,28 +38,13 @@ export function ExportInspectorPanel({
 			aria-label="Export inspector"
 			className="flex min-w-0 flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector shadow-sm xl:min-h-full xl:rounded-none xl:border-0 xl:shadow-none"
 		>
-			<PanelHeader
-				icon={<PackageCheck />}
-				title="Export"
-				trailing={
-					<Badge
-						className="shrink-0"
-						variant={
-							viewModel.badge.tone === "ready" ? "secondary" : "destructive"
-						}
-					>
-						{viewModel.badge.label}
-					</Badge>
-				}
-			/>
-
 			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
 				<section
 					aria-label="Export review"
 					className="overflow-visible rounded border border-workbench-selected/35 bg-workbench-hover/45 p-2.5"
 				>
 					<div className="mb-2 flex items-start justify-between gap-3">
-						<div>
+						<div className="min-w-0">
 							<h3 className="text-sm font-semibold text-foreground">
 								Export settings
 							</h3>
@@ -79,6 +52,14 @@ export function ExportInspectorPanel({
 								Current settings
 							</div>
 						</div>
+						<Badge
+							className="shrink-0"
+							variant={
+								viewModel.badge.tone === "ready" ? "secondary" : "destructive"
+							}
+						>
+							{viewModel.badge.label}
+						</Badge>
 					</div>
 					<div className="space-y-2">
 						<InspectorLine
@@ -128,29 +109,6 @@ export function ExportInspectorPanel({
 				)}
 			</div>
 		</section>
-	);
-}
-
-function PanelHeader({
-	icon,
-	trailing,
-	title,
-}: {
-	icon: PanelIconElement;
-	trailing?: ReactNode;
-	title: string;
-}) {
-	return (
-		<div className="flex h-[42px] shrink-0 items-center justify-between border-b border-workbench-border px-3">
-			<div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
-				{cloneElement(icon, {
-					"aria-hidden": true,
-					className: "size-4 text-workbench-selected",
-				})}
-				<span className="truncate">{title}</span>
-			</div>
-			{trailing ? <div className="shrink-0">{trailing}</div> : null}
-		</div>
 	);
 }
 

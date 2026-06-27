@@ -47,7 +47,7 @@ export function PreviewTransportRegion({
 	return (
 		<section
 			aria-label="Workbench transport region"
-			className="min-h-10 rounded-md border border-workbench-border bg-workbench-transport xl:col-span-3 xl:row-start-2 xl:min-h-0 xl:overflow-hidden xl:rounded-none xl:border-x-0"
+			className="min-h-10 rounded-md border border-workbench-border bg-workbench-transport xl:min-h-0 xl:overflow-hidden xl:rounded-none xl:border-x-0"
 		>
 			<div
 				aria-label="Preview transport controls"

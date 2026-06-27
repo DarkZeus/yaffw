@@ -23,6 +23,7 @@ export type NativePreviewPlayerProps = {
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;
+	onSelectionReplaceRequested?: (selection: Selection) => void;
 	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
 	previewPosterSrc?: string;
 	selection: Selection;

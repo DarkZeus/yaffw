@@ -16,18 +16,18 @@ import {
 	shouldProtectEditorBeforeUnload,
 } from "@/editor-core/session";
 import {
-	createActiveMediaAssetCleanupScopeController,
 	type ActiveMediaAssetCleanupScope,
 	type ActiveMediaAssetCleanupScopeController,
+	createActiveMediaAssetCleanupScopeController,
 } from "./active-media-asset-cleanup-scope";
 import {
-	createCancellableMediaTaskController,
 	type CancellableMediaTaskController,
+	createCancellableMediaTaskController,
 } from "./cancellable-media-task-controller";
 import { isDefaultExportCancelledError } from "./default-export-runner";
 import {
-	createGeneratedMediaArtifactStore,
 	type GeneratedMediaArtifactStore,
+	createGeneratedMediaArtifactStore,
 } from "./generated-media-artifact-store";
 import type {
 	SingleAssetEditingSession,
@@ -340,6 +340,14 @@ export function useSingleAssetEditingSession({
 		});
 	}
 
+	function setSelectionRange(selection: Selection) {
+		invalidateCurrentGeneratedMediaArtifact();
+		dispatch({
+			selection,
+			type: "selection.replaced",
+		});
+	}
+
 	function resetSelection() {
 		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
@@ -391,7 +399,9 @@ export function useSingleAssetEditingSession({
 			return;
 		}
 
-		getGeneratedMediaArtifactStore().invalidate(session.export.generatedMedia.id);
+		getGeneratedMediaArtifactStore().invalidate(
+			session.export.generatedMedia.id,
+		);
 	}
 
 	function invalidateCurrentGeneratedMediaArtifactForAudioTrack(
@@ -417,6 +427,7 @@ export function useSingleAssetEditingSession({
 			setAudioTrackIncluded,
 			setAudioTrackVolumePercent,
 			setSelectionEndFromPlayhead,
+			setSelectionRange,
 			setSelectionStartFromPlayhead,
 			startDefaultExport,
 		},

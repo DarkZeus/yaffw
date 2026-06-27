@@ -74,6 +74,7 @@ describe("EditorNextRoute", () => {
 			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
 		).toBeGreaterThan(0);
 		expect(screen.getByText("Selection and waveform")).toBeTruthy();
+		openExportTab();
 		expect(screen.getByText("Export file")).toBeTruthy();
 	});
 
@@ -153,6 +154,8 @@ describe("EditorNextRoute", () => {
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local video file")).toBeNull();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
+
+		openExportTab();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		expect(screen.getByLabelText("Export inspector")).toBeTruthy();
 
@@ -193,6 +196,8 @@ describe("EditorNextRoute", () => {
 		});
 
 		const centerRegion = screen.getByLabelText("Workbench center region");
+		const readyLayout = screen.getByLabelText("Ready workbench layout");
+		const previewLayout = screen.getByLabelText("Preview and selection layout");
 		const transportRegion = screen.getByLabelText("Workbench transport region");
 		const transportControls = within(transportRegion).getByLabelText(
 			"Preview transport controls",
@@ -211,14 +216,18 @@ describe("EditorNextRoute", () => {
 		expect(
 			within(centerRegion).queryByLabelText("Preview transport controls"),
 		).toBeNull();
-		expect(centerRegion.className).toContain("xl:col-start-2");
-		expect(centerRegion.className).toContain("xl:row-start-1");
+		expect(readyLayout.getAttribute("data-panel-group-direction")).toBe(
+			"horizontal",
+		);
+		expect(previewLayout.getAttribute("data-panel-group-direction")).toBe(
+			"vertical",
+		);
+		expect(screen.getByLabelText("Resize inspector panel")).toBeTruthy();
+		expect(screen.getByLabelText("Resize selection region")).toBeTruthy();
+		expect(centerRegion.className).toContain("xl:h-full");
 		expect(centerRegion.className).toContain("xl:rounded-none");
-		expect(transportRegion.className).toContain("xl:col-span-3");
-		expect(transportRegion.className).toContain("xl:row-start-2");
 		expect(transportRegion.className).toContain("xl:rounded-none");
-		expect(selectionRegion.className).toContain("xl:col-span-3");
-		expect(selectionRegion.className).toContain("xl:row-start-3");
+		expect(selectionRegion.className).toContain("xl:min-h-0");
 		expect(selectionRegion.className).toContain("xl:border-t");
 		expect(
 			within(selectionRegion).getByLabelText("Selection timeline"),
@@ -269,6 +278,7 @@ describe("EditorNextRoute", () => {
 				within(transportRegion).getAllByText("00:00:10.000").length,
 			).toBeGreaterThan(0);
 		});
+		openExportTab();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 		expect(within(centerRegion).queryByLabelText("Export review")).toBeNull();
 	});
@@ -355,8 +365,10 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByLabelText("Export review")).toBeTruthy();
+			expect(screen.getByLabelText("Preview for picked.mp4")).toBeTruthy();
 		});
+		openExportTab();
+		expect(screen.getByLabelText("Export review")).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
@@ -482,8 +494,12 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
+			expect(
+				screen.getByLabelText("Preview for close-confirmed.mp4"),
+			).toBeTruthy();
 		});
+		openExportTab();
+		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
@@ -491,6 +507,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByText("Export complete")).toBeTruthy();
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
@@ -623,8 +640,10 @@ describe("EditorNextRoute", () => {
 				.disabled,
 		).toBe(false);
 
+		openExportTab();
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
+		openMediaTab();
 		await waitFor(() => {
 			expect(
 				(
@@ -741,8 +760,12 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
+			expect(
+				screen.getByLabelText("Preview for uncancellable.mp4"),
+			).toBeTruthy();
 		});
+		openExportTab();
+		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
@@ -928,6 +951,19 @@ function restoreObjectUrl(
 	}
 
 	delete URL[key];
+}
+
+function openExportTab() {
+	activateTab(screen.getByRole("tab", { name: "Export" }));
+}
+
+function openMediaTab() {
+	activateTab(screen.getByRole("tab", { name: "Media" }));
+}
+
+function activateTab(tab: HTMLElement) {
+	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+	fireEvent.click(tab);
 }
 
 function mockTimelineGeometry() {

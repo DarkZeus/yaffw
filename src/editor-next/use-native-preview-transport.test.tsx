@@ -76,6 +76,58 @@ describe("useNativePreviewTransport", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Toggle mute" }));
 		expect(video.muted).toBe(true);
 		expect(readState()).toContain("muted:true");
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle mute" }));
+		expect(video.muted).toBe(true);
+		expect(readState()).toContain("muted:false");
+	});
+
+	it("waits for native video playback before starting multitrack preview audio", async () => {
+		const playStarted = createDeferred<void>();
+		const multitrack = createMultitrackSpy();
+		play.mockReturnValueOnce(playStarted.promise);
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(play).toHaveBeenCalledTimes(1);
+		});
+		expect(multitrack.setTime).toHaveBeenCalledWith(0);
+		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:false");
+
+		await act(async () => {
+			playStarted.resolve();
+			await playStarted.promise;
+		});
+
+		await waitFor(() => {
+			expect(multitrack.play).toHaveBeenCalledTimes(1);
+			expect(readState()).toContain("playing:true");
+		});
+	});
+
+	it("does not chase small custom-audio clock drift with native video seeks during playback", async () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 2.06,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+
+		video.currentTime = 2.12;
+		fireEvent.timeUpdate(video);
+
+		expect(video.currentTime).toBe(2.12);
+		expect(readState()).toContain("playhead:2060000");
 	});
 
 	it("loops only after playback enters the selection", async () => {
@@ -206,9 +258,13 @@ function NativePreviewTransportProbe({
 	);
 }
 
-function createMultitrackSpy() {
+function createMultitrackSpy({
+	currentTimeSeconds = 0,
+}: {
+	currentTimeSeconds?: number;
+} = {}) {
 	return {
-		getCurrentTime: vi.fn(() => 0),
+		getCurrentTime: vi.fn(() => currentTimeSeconds),
 		pause: vi.fn(),
 		play: vi.fn(),
 		setAudioRate: vi.fn(),
@@ -241,6 +297,21 @@ function runNextPreviewFrame(frameCallbacks: FrameRequestCallback[]) {
 	act(() => {
 		frameCallbacks.shift()?.(16);
 	});
+}
+
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+
+	return {
+		promise,
+		reject,
+		resolve,
+	};
 }
 
 const previewSource = new File(["video"], "clip.mp4", { type: "video/mp4" });

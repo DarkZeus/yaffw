@@ -9,12 +9,166 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
+type MockMediaPlayerProps = Record<string, unknown> & {
+	children?: ReactNode;
+	className?: string;
+	crossOrigin?: boolean;
+	src?: unknown;
+};
+
+vi.mock("@vidstack/react", async () => {
+	const React = await import("react");
+	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
+		function MockMediaPlayer(
+			{
+				children,
+				className,
+				crossOrigin,
+				onProviderChange: _onProviderChange,
+				src,
+				title: _title,
+				viewType: _viewType,
+				...props
+			},
+			ref,
+		) {
+			return React.createElement(
+				"div",
+				{
+					className,
+					"data-testid": "mock-vidstack-player",
+				},
+				React.createElement("video", {
+					...props,
+					className: "h-full w-full bg-black object-contain",
+					crossOrigin: crossOrigin ? "" : undefined,
+					ref,
+					src: normalizeMockPlayerSrc(src),
+				}),
+				children as ReactNode,
+			);
+		},
+	);
+
+	return {
+		MediaPlayer,
+		MediaProvider: ({ children }: { children?: React.ReactNode }) =>
+			React.createElement(React.Fragment, null, children),
+		Menu: {
+			Button: ({
+				children,
+				...props
+			}: React.PropsWithChildren<Record<string, unknown>>) =>
+				React.createElement("button", props, children),
+			Items: ({
+				children,
+				...props
+			}: React.PropsWithChildren<Record<string, unknown>>) =>
+				React.createElement("div", props, children),
+			Radio: ({
+				children,
+				onSelect,
+				...props
+			}: React.PropsWithChildren<{
+				onSelect?: (event: Event) => void;
+				[key: string]: unknown;
+			}>) =>
+				React.createElement(
+					"button",
+					{
+						...props,
+						onClick: (event: React.MouseEvent<HTMLButtonElement>) =>
+							onSelect?.(event.nativeEvent),
+					},
+					children,
+				),
+			RadioGroup: ({
+				children,
+				...props
+			}: React.PropsWithChildren<Record<string, unknown>>) =>
+				React.createElement("div", props, children),
+			Root: ({
+				children,
+				...props
+			}: React.PropsWithChildren<Record<string, unknown>>) =>
+				React.createElement("div", props, children),
+		},
+		Poster: (props: Record<string, unknown>) =>
+			React.createElement("img", props),
+		isHLSProvider: () => false,
+		useChapterOptions: () => Object.assign([], { selectedValue: undefined }),
+		useMediaStore: () => ({ duration: 0 }),
+	};
+});
+
+vi.mock("@vidstack/react/player/layouts/default", async () => {
+	const React = await import("react");
+	const Chapters = (props: Record<string, unknown>) =>
+		React.createElement("svg", props);
+
+	return {
+		DefaultTooltip: ({ children }: { children?: React.ReactNode }) =>
+			React.createElement(React.Fragment, null, children),
+		DefaultVideoLayout: ({
+			slots,
+		}: {
+			slots?: Record<string, unknown>;
+		}) =>
+			React.createElement("div", {
+				"data-large-mute-button-hidden": String(
+					(slots?.largeLayout as Record<string, unknown> | undefined)
+						?.muteButton === null,
+				),
+				"data-large-volume-slider-hidden": String(
+					(slots?.largeLayout as Record<string, unknown> | undefined)
+						?.volumeSlider === null,
+				),
+				"data-mute-button-hidden": String(slots?.muteButton === null),
+				"data-small-mute-button-hidden": String(
+					(slots?.smallLayout as Record<string, unknown> | undefined)
+						?.muteButton === null,
+				),
+				"data-small-volume-slider-hidden": String(
+					(slots?.smallLayout as Record<string, unknown> | undefined)
+						?.volumeSlider === null,
+				),
+				"data-testid": "mock-default-video-layout",
+				"data-volume-slider-hidden": String(slots?.volumeSlider === null),
+			}),
+		defaultLayoutIcons: {
+			Menu: {
+				Chapters,
+			},
+		},
+		useDefaultLayoutContext: () => ({ showMenuDelay: 0 }),
+	};
+});
+
 import { createActiveMediaAssetCleanupScopeController } from "./active-media-asset-cleanup-scope";
 import { NativePreviewPlayer } from "./native-preview-player";
+
+function normalizeMockPlayerSrc(src: unknown): string | undefined {
+	if (typeof src === "string") {
+		return src;
+	}
+
+	if (Array.isArray(src)) {
+		return normalizeMockPlayerSrc(src[0]);
+	}
+
+	if (src && typeof src === "object" && "src" in src) {
+		const nestedSrc = (src as { src?: unknown }).src;
+
+		return typeof nestedSrc === "string" ? nestedSrc : undefined;
+	}
+
+	return undefined;
+}
 
 const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
@@ -91,6 +245,17 @@ describe("NativePreviewPlayer", () => {
 		try {
 			renderPlayer();
 
+			const previewLayout = screen.getByLabelText(
+				"Preview and selection layout",
+			);
+			expect(previewLayout.getAttribute("data-panel-group-direction")).toBe(
+				"vertical",
+			);
+			expect(previewLayout.className).toContain("xl:h-full");
+			expect(
+				screen.getByLabelText("Resize selection region").className,
+			).toContain("bg-workbench-border-strong");
+
 			const centerRegion = screen.getByLabelText("Workbench center region");
 			const nativePreview = within(centerRegion).getByLabelText(
 				"Native preview player",
@@ -119,6 +284,9 @@ describe("NativePreviewPlayer", () => {
 			);
 
 			expect(centerRegion.className).toContain("bg-workbench-viewer");
+			expect(nativePreview.className).toContain("h-full");
+			expect(nativePreview.className).toContain("min-h-0");
+			expect(nativePreview.className).not.toContain("min-h-full");
 			expect(viewerHeader.className).toContain("border-workbench-border");
 			expect(viewerHeader.textContent).not.toContain("clip.mp4");
 			expect(
@@ -128,6 +296,7 @@ describe("NativePreviewPlayer", () => {
 			expect(viewerSurface.className).toContain("bg-workbench-viewer");
 			expect(aperture.className).toContain("border-workbench-border-strong");
 			expect(aperture.className).toContain("max-h-full");
+			expect(aperture.className).not.toContain("max-w-5xl");
 			expect(aperture.style.aspectRatio).toBe(String(16 / 9));
 			await waitFor(() => {
 				expect(aperture.style.width).toBe("533.333333px");
@@ -140,6 +309,8 @@ describe("NativePreviewPlayer", () => {
 				within(aperture).getByLabelText("Preview for clip.mp4").className,
 			).not.toContain("object-cover");
 			expect(transportRegion.className).toContain("bg-workbench-transport");
+			expect(transportRegion.className).not.toContain("xl:row-start-2");
+			expect(transportRegion.className).not.toContain("xl:col-span-2");
 			expect(transportControls.className).toContain("grid");
 			expect(primaryControls.className).toContain("justify-center");
 			expect(
@@ -152,6 +323,39 @@ describe("NativePreviewPlayer", () => {
 			expect(
 				within(centerRegion).queryByLabelText("Preview transport controls"),
 			).toBeNull();
+			expect(
+				screen.getByLabelText("Workbench selection region").className,
+			).not.toContain("xl:row-start-3");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-mute-button-hidden"),
+			).toBe("true");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-volume-slider-hidden"),
+			).toBe("true");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-large-mute-button-hidden"),
+			).toBe("true");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-large-volume-slider-hidden"),
+			).toBe("true");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-small-mute-button-hidden"),
+			).toBe("true");
+			expect(
+				within(centerRegion)
+					.getByTestId("mock-default-video-layout")
+					.getAttribute("data-small-volume-slider-hidden"),
+			).toBe("true");
 			expect(
 				within(viewerHeader).getByRole("button", {
 					name: "Open fullscreen preview",

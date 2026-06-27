@@ -1,6 +1,12 @@
+import type { MediaPlayerInstance } from "@vidstack/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
 
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { MediaTimeUs } from "@/editor-core/model";
 import { canUseBrowserAudioPreviewTransport } from "./native-preview-audio-transport";
@@ -25,6 +31,7 @@ export function NativePreviewPlayer({
 	onAudioTrackVolumePercentChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
+	onSelectionReplaceRequested,
 	onSelectionResetRequested,
 	onSelectionStartRequested,
 	previewPosterSrc,
@@ -33,7 +40,7 @@ export function NativePreviewPlayer({
 	shortcutsDisabled = false,
 	source,
 }: NativePreviewPlayerProps) {
-	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const videoRef = useRef<MediaPlayerInstance | null>(null);
 	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
 	const multitrackRef = useRef<MultiTrack | null>(null);
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
@@ -135,7 +142,19 @@ export function NativePreviewPlayer({
 	});
 
 	const requestFullscreen = useCallback(() => {
-		void videoRef.current?.requestFullscreen?.();
+		const player = videoRef.current;
+
+		if (player?.enterFullscreen) {
+			void player.enterFullscreen();
+			return;
+		}
+
+		const nativeFullscreenTarget = player as
+			| (MediaPlayerInstance & {
+					requestFullscreen?: () => Promise<void>;
+			  })
+			| null;
+		void nativeFullscreenTarget?.requestFullscreen?.();
 	}, []);
 
 	usePreviewKeyboardShortcuts({
@@ -151,68 +170,109 @@ export function NativePreviewPlayer({
 	});
 
 	const canFullscreen =
-		typeof videoRef.current?.requestFullscreen === "function" ||
-		typeof HTMLVideoElement.prototype.requestFullscreen === "function";
+		typeof videoRef.current?.enterFullscreen === "function" ||
+		typeof (
+			videoRef.current as
+				| (MediaPlayerInstance & {
+						requestFullscreen?: () => Promise<void>;
+				  })
+				| null
+		)?.requestFullscreen === "function" ||
+		(typeof HTMLVideoElement !== "undefined" &&
+			typeof HTMLVideoElement.prototype.requestFullscreen === "function") ||
+		(typeof document !== "undefined" &&
+			typeof document.documentElement.requestFullscreen === "function");
 
 	return (
-		<>
-			<PreviewViewerRegion
-				asset={asset}
-				canFullscreen={canFullscreen}
-				isPlaying={isPlaying}
-				multitrackContainerRef={audioMonitoring.multitrackContainerRef}
-				onEnded={handleEnded}
-				onNativePause={handleNativePause}
-				onNativePlay={handleNativePlay}
-				onRequestFullscreen={requestFullscreen}
-				onSyncPlayhead={syncPlayheadWithNativeVideo}
-				playbackRate={playbackRate}
-				playheadUs={playheadUs}
-				previewApertureStyle={previewApertureStyle}
-				previewPosterSrc={previewPosterSrc}
-				previewSurfaceRef={previewSurfaceRef}
-				previewUrl={previewUrl}
-				videoRef={videoRef}
+		<ResizablePanelGroup
+			aria-label="Preview and selection layout"
+			autoSaveId="editor-next-preview-layout"
+			className="min-h-[46rem] min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden"
+			direction="vertical"
+		>
+			<ResizablePanel
+				className="min-h-0 min-w-0"
+				defaultSize={62}
+				id="editor-next-viewer-pane"
+				minSize={35}
+				order={1}
+			>
+				<PreviewViewerRegion
+					asset={asset}
+					canFullscreen={canFullscreen}
+					isPlaying={isPlaying}
+					mediaMuted={audioTransportReady || muted}
+					multitrackContainerRef={audioMonitoring.multitrackContainerRef}
+					onChapterSelectionRequested={
+						selectionEditingDisabled ? undefined : onSelectionReplaceRequested
+					}
+					onEnded={handleEnded}
+					onNativePause={handleNativePause}
+					onNativePlay={handleNativePlay}
+					onRequestFullscreen={requestFullscreen}
+					onSyncPlayhead={syncPlayheadWithNativeVideo}
+					playbackRate={playbackRate}
+					playheadUs={playheadUs}
+					previewApertureStyle={previewApertureStyle}
+					previewPosterSrc={previewPosterSrc}
+					previewSourceMimeType={source.type}
+					previewSurfaceRef={previewSurfaceRef}
+					previewUrl={previewUrl}
+					videoRef={videoRef}
+				/>
+			</ResizablePanel>
+
+			<ResizableHandle
+				aria-label="Resize selection region"
+				className="bg-workbench-border-strong"
 			/>
 
-			<PreviewTransportRegion
-				durationUs={asset.durationUs}
-				isPlaying={isPlaying}
-				muted={muted}
-				onPlaybackRateChange={setPreviewPlaybackRate}
-				onSeekByUs={seekByUs}
-				onStepFrame={stepFrame}
-				onToggleMuted={toggleMuted}
-				onTogglePlayback={togglePlayback}
-				onToggleSelectionLoop={toggleSelectionLoop}
-				onVolumeChange={setPreviewVolume}
-				playbackRate={playbackRate}
-				playheadUs={playheadUs}
-				selectionDurationUs={selection.endUs - selection.startUs}
-				selectionLoopEnabled={selectionLoopEnabled}
-				volume={volume}
-			/>
+			<ResizablePanel
+				className="grid min-h-0 min-w-0 grid-rows-[2.75rem_minmax(0,1fr)] overflow-hidden"
+				defaultSize={38}
+				id="editor-next-selection-pane"
+				minSize={24}
+				order={2}
+			>
+				<PreviewTransportRegion
+					durationUs={asset.durationUs}
+					isPlaying={isPlaying}
+					muted={muted}
+					onPlaybackRateChange={setPreviewPlaybackRate}
+					onSeekByUs={seekByUs}
+					onStepFrame={stepFrame}
+					onToggleMuted={toggleMuted}
+					onTogglePlayback={togglePlayback}
+					onToggleSelectionLoop={toggleSelectionLoop}
+					onVolumeChange={setPreviewVolume}
+					playbackRate={playbackRate}
+					playheadUs={playheadUs}
+					selectionDurationUs={selection.endUs - selection.startUs}
+					selectionLoopEnabled={selectionLoopEnabled}
+					volume={volume}
+				/>
 
-			<PreviewSelectionWaveformRegion
-				audioMix={audioMix}
-				audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
-				asset={asset}
-				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
-				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
-				onPlayheadSeekRequested={seekToUs}
-				onSoloedAudioTrackChange={setSoloedAudioTrackId}
-				onSelectionEndCommitRequested={onSelectionEndRequested}
-				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
-				onSelectionResetRequested={onSelectionResetRequested}
-				onSelectionStartCommitRequested={onSelectionStartRequested}
-				playheadUs={playheadUs}
-				playheadUpdatesAreLive={isPlaying}
-				selection={selection}
-				selectionEditingDisabled={selectionEditingDisabled}
-				soloedAudioTrackId={soloedAudioTrackId}
-				source={source}
-			/>
-		</>
+				<PreviewSelectionWaveformRegion
+					audioMix={audioMix}
+					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
+					asset={asset}
+					onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+					onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
+					onPlayheadSeekRequested={seekToUs}
+					onSoloedAudioTrackChange={setSoloedAudioTrackId}
+					onSelectionEndCommitRequested={onSelectionEndRequested}
+					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
+					onSelectionResetRequested={onSelectionResetRequested}
+					onSelectionStartCommitRequested={onSelectionStartRequested}
+					playheadUs={playheadUs}
+					playheadUpdatesAreLive={isPlaying}
+					selection={selection}
+					selectionEditingDisabled={selectionEditingDisabled}
+					soloedAudioTrackId={soloedAudioTrackId}
+					source={source}
+				/>
+			</ResizablePanel>
+		</ResizablePanelGroup>
 	);
 }

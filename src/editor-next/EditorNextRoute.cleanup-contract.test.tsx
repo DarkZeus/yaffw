@@ -192,6 +192,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			expect(adapterMockState.wavesurfers).toHaveLength(1);
 		});
 
+		openExportTab();
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
 		await waitFor(() => {
@@ -214,6 +215,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			}),
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
@@ -414,8 +416,12 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
+			expect(
+				screen.getByLabelText("Preview for generated-invalidation.mp4"),
+			).toBeTruthy();
 		});
+		openExportTab();
+		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 
@@ -524,6 +530,19 @@ function restoreObjectUrl(
 	}
 
 	delete URL[key];
+}
+
+function openExportTab() {
+	activateTab(screen.getByRole("tab", { name: "Export" }));
+}
+
+function openMediaTab() {
+	activateTab(screen.getByRole("tab", { name: "Media" }));
+}
+
+function activateTab(tab: HTMLElement) {
+	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+	fireEvent.click(tab);
 }
 
 type Deferred<T> = {

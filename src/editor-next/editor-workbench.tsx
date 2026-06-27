@@ -1,29 +1,27 @@
 import {
 	AlertTriangle,
-	BarChart3,
 	FileVideo,
-	Monitor,
 	PackageCheck,
-	PlayCircle,
 	Scissors,
 	ShieldCheck,
 } from "lucide-react";
-import { type ReactElement, cloneElement } from "react";
+import type { ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EditorSessionState } from "@/editor-core/session";
 import type {
 	EditorSessionShellProps,
 	EditorWorkbenchFrameProps,
 	UnsupportedRuntimeStateProps,
 } from "./editor-workbench.types";
-
-type AnalyticsIconElement = ReactElement<{
-	"aria-hidden"?: boolean;
-	className?: string;
-}>;
 
 type NonReadyEditorSession = Exclude<
 	EditorSessionShellProps["session"],
@@ -76,15 +74,12 @@ export function EditorWorkbenchFrame({
 						</div>
 					</div>
 				</header>
-				<div className="grid min-h-0 grid-cols-[4rem_minmax(0,1fr)]">
-					<EditorWorkbenchRail status={status} />
-					<div
-						className={`min-h-0 min-w-0 overflow-auto overscroll-contain bg-workbench p-3 md:p-4 ${
-							status === "ready" ? "xl:overflow-hidden xl:p-0" : ""
-						}`}
-					>
-						{children}
-					</div>
+				<div
+					className={`min-h-0 min-w-0 overflow-auto overscroll-contain bg-workbench p-3 md:p-4 ${
+						status === "ready" ? "xl:overflow-hidden xl:p-0" : ""
+					}`}
+				>
+					{children}
 				</div>
 			</div>
 		</main>
@@ -162,24 +157,106 @@ export function EditorSessionShell({
 	return (
 		<section
 			aria-label="Editor workbench session"
-			className="grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-3 xl:h-full xl:min-h-0 xl:grid-cols-[16.25rem_minmax(30rem,1fr)_19.75rem] xl:grid-rows-[minmax(0,1fr)_2.75rem_38%] xl:gap-0 xl:overflow-hidden"
+			className="min-h-[calc(100vh-5rem)] xl:h-full xl:min-h-0 xl:overflow-hidden"
 		>
-			<section
-				aria-label="Workbench media asset region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-workbench-border-strong xl:bg-workbench-inspector xl:[contain:layout_paint]"
+			<ResizablePanelGroup
+				aria-label="Ready workbench layout"
+				autoSaveId="editor-next-ready-workbench"
+				className="min-h-[calc(100vh-5rem)] min-w-0 flex-col gap-3 xl:h-full xl:min-h-0 xl:flex-row xl:gap-0 xl:overflow-hidden"
+				direction="horizontal"
 			>
-				{mediaAssetContext}
-			</section>
+				<ResizablePanel
+					className="min-w-0 xl:min-h-0"
+					defaultSize={24}
+					id="editor-next-inspector-pane"
+					maxSize={42}
+					minSize={18}
+					order={1}
+				>
+					<WorkbenchInspectorTabs
+						exportInspector={exportInspector}
+						mediaAssetContext={mediaAssetContext}
+					/>
+				</ResizablePanel>
 
-			{previewPlayer}
+				<ResizableHandle
+					aria-label="Resize inspector panel"
+					className="hidden bg-workbench-border-strong xl:flex"
+				/>
 
-			<aside
-				aria-label="Workbench inspector region"
-				className="flex min-w-0 flex-col overflow-x-hidden overscroll-contain xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:border-l xl:border-workbench-border-strong xl:bg-workbench-inspector xl:[contain:layout_paint]"
-			>
-				{exportInspector}
-			</aside>
+				<ResizablePanel
+					className="min-w-0 xl:min-h-0"
+					defaultSize={76}
+					id="editor-next-preview-pane"
+					minSize={50}
+					order={2}
+				>
+					{previewPlayer}
+				</ResizablePanel>
+			</ResizablePanelGroup>
 		</section>
+	);
+}
+
+function WorkbenchInspectorTabs({
+	exportInspector,
+	mediaAssetContext,
+}: Pick<EditorSessionShellProps, "exportInspector" | "mediaAssetContext">) {
+	return (
+		<aside
+			aria-label="Workbench inspector region"
+			className="flex min-w-0 flex-col overflow-visible overscroll-contain xl:h-full xl:min-h-0 xl:overflow-hidden xl:bg-workbench-inspector xl:[contain:layout_paint]"
+		>
+			<Tabs
+				className="flex min-h-0 flex-1 flex-col gap-0 xl:h-full"
+				defaultValue="media"
+			>
+				<div className="flex h-8 min-w-0 shrink-0 items-center justify-between border-b border-workbench-border bg-workbench">
+					<TabsList
+						aria-label="Workbench inspector tabs"
+						className="flex h-full min-w-0 items-stretch justify-start rounded-none bg-transparent p-0"
+					>
+						<WorkbenchInspectorTabTrigger value="media">
+							<FileVideo data-icon="inline-start" />
+							<span>Media</span>
+						</WorkbenchInspectorTabTrigger>
+						<WorkbenchInspectorTabTrigger value="export">
+							<PackageCheck data-icon="inline-start" />
+							<span>Export</span>
+						</WorkbenchInspectorTabTrigger>
+					</TabsList>
+				</div>
+				<TabsContent
+					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+					value="media"
+				>
+					{mediaAssetContext}
+				</TabsContent>
+				<TabsContent
+					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+					value="export"
+				>
+					{exportInspector}
+				</TabsContent>
+			</Tabs>
+		</aside>
+	);
+}
+
+function WorkbenchInspectorTabTrigger({
+	children,
+	value,
+}: {
+	children: ReactNode;
+	value: string;
+}) {
+	return (
+		<TabsTrigger
+			className="h-full min-w-0 touch-none rounded-none border-y-0 border-l-0 border-r border-workbench-border bg-workbench px-2 text-[11px] font-medium text-muted-foreground shadow-none hover:bg-workbench-hover hover:text-foreground data-[state=active]:bg-workbench-hover data-[state=active]:text-foreground data-[state=active]:shadow-none [&_svg]:size-3.5 [&_svg]:text-workbench-selected [&_svg]:opacity-70 data-[state=active]:[&_svg]:opacity-100"
+			value={value}
+		>
+			{children}
+		</TabsTrigger>
 	);
 }
 
@@ -213,70 +290,6 @@ function TopBarMediaAssetSummary({
 			<span className="whitespace-nowrap">
 				{formatTopBarFrameTiming(activeAsset)}
 			</span>
-		</div>
-	);
-}
-
-function EditorWorkbenchRail({
-	status,
-}: { status: EditorSessionState["status"] }) {
-	return (
-		<aside
-			aria-label="Editor workbench rail"
-			className="flex min-h-0 flex-col items-center gap-2 border-r border-workbench-border-strong bg-workbench-rail px-2 py-3"
-		>
-			<WorkbenchRailItem
-				active={status !== "unsupported-runtime"}
-				icon={<FileVideo />}
-				label="Media asset"
-			/>
-			<WorkbenchRailItem
-				active={status === "ready"}
-				icon={<PlayCircle />}
-				label="Preview"
-			/>
-			<WorkbenchRailItem
-				active={status === "ready"}
-				icon={<BarChart3 />}
-				label="Selection"
-			/>
-			<WorkbenchRailItem
-				active={status === "ready"}
-				icon={<PackageCheck />}
-				label="Export"
-			/>
-			<WorkbenchRailItem
-				active={status === "unsupported-runtime"}
-				icon={<Monitor />}
-				label="Runtime"
-			/>
-		</aside>
-	);
-}
-
-function WorkbenchRailItem({
-	active,
-	icon,
-	label,
-}: {
-	active: boolean;
-	icon: AnalyticsIconElement;
-	label: string;
-}) {
-	return (
-		<div
-			aria-label={label}
-			className={`flex size-9 items-center justify-center rounded-md border text-muted-foreground ${
-				active
-					? "border-workbench-border-strong bg-workbench-hover text-foreground"
-					: "border-transparent bg-transparent"
-			}`}
-			title={label}
-		>
-			{cloneElement(icon, {
-				"aria-hidden": true,
-				className: "size-4",
-			})}
 		</div>
 	);
 }

@@ -16,6 +16,7 @@ import type {
 import type { RuntimeSupport } from "./runtime-capabilities";
 import {
 	moveSelectionRangeByDelta,
+	replaceSelection,
 	resetSelection,
 	setSelectionEndFromPlayhead,
 	setSelectionStartFromPlayhead,
@@ -140,6 +141,10 @@ export type EditorSessionAction =
 	| {
 			deltaUs: MediaTimeUs;
 			type: "selection.range.moved";
+	  }
+	| {
+			selection: Selection;
+			type: "selection.replaced";
 	  }
 	| {
 			type: "selection.reset";
@@ -300,6 +305,19 @@ export function editorSessionReducer(
 				...state,
 				export: resetExportReviewAfterEditingDecision(state.export),
 				selection: moveSelectionRangeByDelta(state.selection, action.deltaUs, {
+					durationUs: state.asset.durationUs,
+					frameTiming: state.asset.frameTiming,
+				}),
+			};
+		case "selection.replaced":
+			if (!canChangeEditingDecisions(state)) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
+				selection: replaceSelection(action.selection, {
 					durationUs: state.asset.durationUs,
 					frameTiming: state.asset.frameTiming,
 				}),

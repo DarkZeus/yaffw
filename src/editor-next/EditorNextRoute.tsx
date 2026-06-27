@@ -44,19 +44,18 @@ export function EditorNextRoute({
 		localFileInputKey,
 		previewSource,
 		session,
-	} =
-		useSingleAssetEditingSession({
-			confirmCloseFile,
-			createAssetId,
-			createDraftId,
-			createExportJobId,
-			createGeneratedMediaId,
-			defaultExportRunner,
-			deliverGeneratedMedia,
-			inspectLocalAsset,
-			now,
-			runtime,
-		});
+	} = useSingleAssetEditingSession({
+		confirmCloseFile,
+		createAssetId,
+		createDraftId,
+		createExportJobId,
+		createGeneratedMediaId,
+		defaultExportRunner,
+		deliverGeneratedMedia,
+		inspectLocalAsset,
+		now,
+		runtime,
+	});
 	const visualFixture = useMemo(
 		() => createEditorWorkbenchVisualFixture(runtime),
 		[runtime],
@@ -125,6 +124,7 @@ export function EditorNextRoute({
 				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
 				onSelectionEndRequested={commands.setSelectionEndFromPlayhead}
 				onSelectionRangeMoveRequested={commands.moveSelectionRange}
+				onSelectionReplaceRequested={commands.setSelectionRange}
 				onSelectionResetRequested={commands.resetSelection}
 				onSelectionStartRequested={commands.setSelectionStartFromPlayhead}
 				previewPosterSrc={displayedPreviewPosterSrc}

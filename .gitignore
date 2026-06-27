@@ -233,6 +233,7 @@ dist
 # Upload directories and video files
 uploads/
 *.mp4
+!public/export-correctness-fixtures/*.mp4
 *.avi
 *.mov
 *.mkv

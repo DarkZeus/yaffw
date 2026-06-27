@@ -1,4 +1,4 @@
-import { AudioLines, FileVideo, Film, X } from "lucide-react";
+import { AudioLines, Film, X } from "lucide-react";
 import { type ReactElement, type ReactNode, cloneElement } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -39,32 +39,28 @@ export function MediaAssetContextPanel({
 			aria-label="Media asset context"
 			className="flex min-w-0 max-w-full flex-col overflow-hidden overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:h-full xl:min-h-0 xl:rounded-none xl:border-0"
 		>
-			<PanelHeader
-				icon={<FileVideo />}
-				title="Media asset"
-				trailing={
-					<Button
-						aria-label={viewModel.closeFile.label}
-						className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-						disabled={viewModel.closeFile.disabled}
-						onClick={onCloseFileRequested}
-						size="icon"
-						title={viewModel.closeFile.label}
-						type="button"
-						variant="outline"
-					>
-						<X data-icon="inline-start" />
-					</Button>
-				}
-			/>
 			<div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
 				<SectionLabel>Source</SectionLabel>
 				<div
 					aria-label="Loaded media asset"
 					className="mb-3 space-y-1 rounded border border-workbench-border bg-workbench-lane p-2"
 				>
-					<div className="truncate text-sm font-medium text-foreground">
-						{viewModel.identity.name}
+					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+						<div className="truncate text-sm font-medium text-foreground">
+							{viewModel.identity.name}
+						</div>
+						<Button
+							aria-label={viewModel.closeFile.label}
+							className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+							disabled={viewModel.closeFile.disabled}
+							onClick={onCloseFileRequested}
+							size="icon"
+							title={viewModel.closeFile.label}
+							type="button"
+							variant="outline"
+						>
+							<X data-icon="inline-start" />
+						</Button>
 					</div>
 					<div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
 						<CompactMetric
@@ -154,29 +150,6 @@ export function MediaAssetContextPanel({
 				/>
 			</div>
 		</section>
-	);
-}
-
-function PanelHeader({
-	icon,
-	trailing,
-	title,
-}: {
-	icon: PanelIconElement;
-	trailing?: ReactNode;
-	title: string;
-}) {
-	return (
-		<div className="flex h-[42px] shrink-0 items-center justify-between border-b border-workbench-border px-3">
-			<div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
-				{cloneElement(icon, {
-					"aria-hidden": true,
-					className: "size-4 text-workbench-selected",
-				})}
-				<span className="truncate">{title}</span>
-			</div>
-			{trailing ? <div className="shrink-0">{trailing}</div> : null}
-		</div>
 	);
 }
 

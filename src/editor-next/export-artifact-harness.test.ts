@@ -139,11 +139,11 @@ describe("fixture catalog export artifact harness", () => {
 		});
 
 		expect(catalog.summary).toEqual({
-			exported: 2,
-			total: 3,
+			exported: 3,
+			total: 4,
 			unsupported: 1,
 		});
-		expect(run).toHaveBeenCalledTimes(2);
+		expect(run).toHaveBeenCalledTimes(3);
 
 		const videoOnly = exportedCatalogResult(catalog, "mp4-video-only");
 		expect(videoOnly.report.inspection.container).toBe("mp4");
@@ -154,6 +154,31 @@ describe("fixture catalog export artifact harness", () => {
 		expect(withAudio.report.inspection.container).toBe("mp4");
 		expect(withAudio.report.inspection.tracks.video).toHaveLength(1);
 		expect(withAudio.report.inspection.tracks.audio).toHaveLength(1);
+
+		const syncFixture = exportedCatalogResult(catalog, "mp4-sync-flash-click");
+		expect(syncFixture.report.inspection.container).toBe("mp4");
+		expect(syncFixture.report.inspection.tracks.video).toHaveLength(1);
+		expect(syncFixture.report.inspection.tracks.audio).toHaveLength(1);
+		expect(
+			EXPORT_CORRECTNESS_FIXTURES.find(
+				(candidate) => candidate.id === "mp4-sync-flash-click",
+			)?.expected,
+		).toEqual(
+			expect.objectContaining({
+				syncEventDurationUs: 100_000,
+				syncEventsUs: [
+					{ audioClickUs: 1_000_000, visualFlashUs: 1_000_000 },
+					{ audioClickUs: 2_000_000, visualFlashUs: 2_000_000 },
+					{ audioClickUs: 3_000_000, visualFlashUs: 3_000_000 },
+					{ audioClickUs: 4_000_000, visualFlashUs: 4_000_000 },
+					{ audioClickUs: 5_000_000, visualFlashUs: 5_000_000 },
+					{ audioClickUs: 6_000_000, visualFlashUs: 6_000_000 },
+					{ audioClickUs: 7_000_000, visualFlashUs: 7_000_000 },
+					{ audioClickUs: 8_000_000, visualFlashUs: 8_000_000 },
+					{ audioClickUs: 9_000_000, visualFlashUs: 9_000_000 },
+				],
+			}),
+		);
 
 		const webm = unsupportedCatalogResult(catalog, "webm-video-only");
 		expect(webm.failure.stage).toBe("asset-capability");

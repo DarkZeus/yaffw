@@ -3,6 +3,15 @@ import type MultiTrack from "wavesurfer-multitrack";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
+export type PreviewMediaTransportHandle = {
+	currentTime: number;
+	muted: boolean;
+	pause: () => Promise<void> | void;
+	play: () => Promise<void>;
+	playbackRate: number;
+	volume: number;
+};
+
 export type UseNativePreviewTransportOptions = {
 	audioTransportReady: boolean;
 	durationUs: MediaTimeUs;
@@ -10,5 +19,5 @@ export type UseNativePreviewTransportOptions = {
 	multitrackRef: RefObject<MultiTrack | null>;
 	selection: Selection;
 	source: Blob;
-	videoRef: RefObject<HTMLVideoElement | null>;
+	videoRef: RefObject<PreviewMediaTransportHandle | null>;
 };

@@ -74,6 +74,28 @@ export function moveSelectionRangeByDelta(
 	};
 }
 
+export function replaceSelection(
+	selection: Selection,
+	context: SelectionCommandContext,
+): Selection {
+	const minimumDurationUs = minimumSelectionDurationUs(context);
+	const startUs = clampMediaTime(
+		Math.round(selection.startUs),
+		0,
+		Math.max(0, context.durationUs - minimumDurationUs),
+	);
+	const endUs = clampMediaTime(
+		Math.round(selection.endUs),
+		startUs + minimumDurationUs,
+		context.durationUs,
+	);
+
+	return {
+		endUs,
+		startUs,
+	};
+}
+
 export function resetSelection(context: SelectionCommandContext): Selection {
 	return {
 		endUs: context.durationUs,

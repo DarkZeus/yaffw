@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -38,6 +40,9 @@ export default defineConfig({
     port: 3000,
     open: true,
     host: true,
+  },
+  test: {
+    setupFiles: ['./src/vitest.setup.ts'],
   },
   resolve: {
     alias: {

@@ -121,6 +121,8 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(
 			screen.getByRole("button", { name: "Zoom in timeline" }),
 		).toBeTruthy();
+
+		openExportTab();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
 
 		expect(screen.getByText("Format")).toBeTruthy();
@@ -183,6 +185,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 			}),
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
@@ -305,6 +308,19 @@ function dispatchBeforeUnload() {
 	window.dispatchEvent(event);
 
 	return event.defaultPrevented;
+}
+
+function openExportTab() {
+	activateTab(screen.getByRole("tab", { name: "Export" }));
+}
+
+function openMediaTab() {
+	activateTab(screen.getByRole("tab", { name: "Media" }));
+}
+
+function activateTab(tab: HTMLElement) {
+	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
+	fireEvent.click(tab);
 }
 
 function createDeferred<T>() {

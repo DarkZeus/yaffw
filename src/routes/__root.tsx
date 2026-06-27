@@ -25,7 +25,9 @@ function RootComponent() {
 		select: (location) => location.pathname,
 	});
 	const editorWorkbenchRoute =
-		pathname === "/" || pathname.startsWith("/editor-next");
+		pathname === "/" ||
+		pathname.startsWith("/editor-next") ||
+		pathname === "/editor-layout-prototype";
 	const sidebarInsetClassName = editorWorkbenchRoute
 		? "min-h-svh overflow-hidden bg-transparent md:peer-data-[variant=inset]:!m-0 md:peer-data-[variant=inset]:!rounded-none md:peer-data-[variant=inset]:!shadow-none md:peer-data-[variant=inset]:peer-data-[state=collapsed]:!ml-0"
 		: undefined;

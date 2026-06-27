@@ -16,6 +16,30 @@ _Avoid_: downloader, FFmpeg wrapper
 A dense editor surface organized around continuous preview, selection, waveform context, and export review for one active media asset.
 _Avoid_: dashboard, document page, project workspace, multi-asset NLE
 
+**Customizable workbench layout**:
+A user-adjustable in-frame arrangement of workbench panels that can resize, collapse, dock, tab, and be recalled without changing the single-asset editing model.
+_Avoid_: project workspace, app mode, multi-asset NLE workspace, floating window, tear-off panel, external monitor workspace
+
+**Workbench panel**:
+A smallest user-movable unit of editor workbench UI that presents one coherent editing concern.
+_Avoid_: floating window, app page, route, panel section
+
+**Dock target**:
+A valid in-frame landing location for placing a workbench panel while customizing the editor workbench.
+_Avoid_: slot, drop zone, window target
+
+**Panel tab group**:
+An in-frame container where two or more workbench panels share the same placement and are selected by tabs.
+_Avoid_: merged panel, window group
+
+**Workbench layout preset**:
+A named or portable saved arrangement of workbench panels, dock targets, and panel tab groups.
+_Avoid_: project file, editing session, media asset metadata
+
+**Default workbench layout**:
+The built-in panel arrangement YAFFW shows before the user customizes the editor workbench.
+_Avoid_: required layout, locked layout
+
 **Media asset**:
 A media item available to the editor as the subject of preview, selection, analysis, and export.
 _Avoid_: upload, download result, server file, file path
@@ -75,6 +99,14 @@ _Avoid_: guaranteed FPS, frame identity
 **Playhead**:
 The current preview position within the active media asset.
 _Avoid_: current time, cursor
+
+**Preview transport panel**:
+The workbench panel for preview playback controls, current and total media time, selection commands, global preview volume, global mute, and playback speed.
+_Avoid_: timeline panel, export controls, audio mix panel
+
+**Preview viewer panel**:
+The workbench panel that visually renders the active media asset for preview.
+_Avoid_: source monitor, program monitor, canvas
 
 **Playback speed**:
 A preview setting that changes playback rate without changing exported media.
@@ -180,16 +212,33 @@ _Avoid_: first-slice requirement, automatic fallback
 
 - YAFFW edits one active **Media asset** at a time.
 - Editor-next may use an **Editor workbench** UI inspired by professional media editors, but the product model remains a **Single-asset editing session**, not a multi-asset project or composition.
-- The **Editor workbench** frame, including the narrow status rail, is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the left media-asset panel and right export inspector are shown only after a **Ready media asset** exists.
-- The long-run **Editor workbench** direction should favor an Edit-page-style layout: central preview, prominent selection/waveform surface, and inspector-style panels for asset facts, export review, and delivery.
-- In the long-run **Editor workbench**, the left side should answer what media asset is loaded, the center should answer what selection is being chosen, and the right inspector should answer what generated media will be produced.
-- The left **Editor workbench** panel should present compact source, media-track, and **Selection** context for the active **Media asset**; runtime checks, export capability, **Export review**, and **Generated media** status belong together in the inspector side of the workbench.
+- The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector panel is shown only after a **Ready media asset** exists.
+- The **Default workbench layout** should favor an Edit-page-style arrangement: central preview, prominent selection/waveform surface, and inspector-style panels for asset facts, export review, and delivery.
+- In the **Default workbench layout**, the inspector tab group should answer what media asset is loaded and what generated media will be produced, while the center should answer what selection is being chosen.
+- In the **Default workbench layout**, the Media tab should present compact source, media-track, and **Selection** context for the active **Media asset**; the Export tab should keep runtime checks, export capability, **Export review**, and **Generated media** status together.
 - In the ready state, the **Editor workbench** should fit the viewport-height editor composition; overflow belongs inside workbench panels or the selection/waveform surface rather than in an outer page scroll.
-- The ready-state desktop **Editor workbench** should use the resolved workbench proportions: narrow status rail, compact left media-asset panel, central preview, compact right inspector, slim transport strip, and a lower selection/waveform surface around two-fifths of the viewport height.
+- The ready-state desktop **Default workbench layout** should use the resolved proportions: compact left inspector tab group, central preview, slim transport strip, and a lower selection/waveform surface around two-fifths of the viewport height.
+- The coded first slice of the **Default workbench layout** lets users resize the boundary between the left inspector tab group and preview area, and the boundary between the preview viewer and lower transport/selection area; resizing changes working room, not **Editing decisions**.
 - Surrounding **Editor workbench** chrome should use the scoped `.workbench` design tokens that carry the resolved prototype palette and border treatment.
 - The long-run **Editor workbench** should use a balanced Edit-page split: preview remains the visual anchor, while the selection and waveform surface gets enough height to support serious media-time inspection.
 - The **Selection** and **Waveform** interaction surface is a mature editor component; workbench visual-parity changes should preserve its established behavior and visual treatment while placing it in the lower workbench region.
-- The long-run **Editor workbench** should include a narrow status rail for major workbench areas without turning those areas into separate app modes or navigation destinations.
+- The long-run **Editor workbench** should not include a persistent icon/status rail unless the rail has a clear navigational or state-changing function; passive markers for visible regions are avoidable chrome.
+- A **Customizable workbench layout** changes how **Editor workbench** panels are arranged; it does not introduce bins, source monitors, clip stacks, multi-asset timelines, or project workspaces.
+- A **Customizable workbench layout** stays inside the **Editor workbench** frame; panels should not float outside the workbench, tear off into separate windows, or target external-monitor workflows.
+- A **Customizable workbench layout** may move any workbench panel to any in-frame region; panel identity and content carry meaning rather than the panel's side of the screen.
+- A **Customizable workbench layout** arranges **Workbench panels** in **Dock targets** and tab groups inside the **Editor workbench** frame.
+- The **Default workbench layout** exposes four initial **Dock targets**: left inspector tab group, preview viewer region, transport strip region, and selection/waveform region.
+- A **Workbench panel** may be hidden behind an inactive tab; hidden does not mean removed from the layout or unavailable to the user.
+- Dragging one **Workbench panel** onto another may create a **Panel tab group**, such as placing **Export review** and **Media asset** context in the same in-frame placement.
+- The **Preview transport panel** is a **Workbench panel** distinct from the preview viewer and waveform context.
+- The **Preview viewer panel** is a movable **Workbench panel** distinct from the **Preview transport panel** and waveform context.
+- The **Selection** and **Waveform** context is a separate movable **Workbench panel**, even though the **Default workbench layout** places it near the preview and transport controls.
+- The initial movable **Workbench panels** are media asset context, **Preview viewer panel**, **Preview transport panel**, **Selection**/**Waveform** context, and export inspector.
+- A **Customizable workbench layout** is a browser-local UI preference that may persist across refreshes and media assets without persisting the active **Single-asset editing session**.
+- A **Workbench layout preset** may be imported from or exported to JSON; it saves panel arrangement, not media assets or editing decisions.
+- The current coded ready-state arrangement is the **Default workbench layout** and is the fallback when a saved or imported layout cannot be applied.
+- When a **Workbench layout preset** can be partially recovered, known panels from the preset are placed first and missing current **Workbench panels** are distributed round-robin through the remaining unfilled **Dock targets**.
+- If a user releases a **Workbench panel** outside a **Dock target**, the panel returns to its previous placement.
 - **Waveform lane** identity should be embedded inside each lane row using media-track language such as voice or desktop, rather than using separate NLE-style track labels such as V1, A1, or A2.
 - A **Media asset** has **Asset identity** assigned by YAFFW; source details are provenance, not identity.
 - A **Preview resource** may be derived from a **Media asset**, but it is owned by an adapter layer and must be disposed explicitly.
@@ -315,3 +364,6 @@ _Avoid_: first-slice requirement, automatic fallback
 
 - "download" and "acquisition" were previously treated as core product areas. Resolved: acquisition is an **Import adapter** feeding **Media assets** into the **Local-first media editor**.
 - "project" and "timeline" imply multi-asset composition. Resolved: YAFFW's next architecture is a **Single-asset editing session**; multi-asset composition is out of scope until it earns its own model.
+- "Photoshop/Premiere-style panels" refers to **Customizable workbench layout** mechanics, not Premiere-style project concepts.
+- "slot" was used to mean a valid panel landing place. Resolved: use **Dock target** for user-facing layout mechanics.
+- "media asset inspector" was used informally for the current **Media asset** context panel. Resolved: keep **Media asset** context language unless the product deliberately renames that panel.

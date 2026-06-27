@@ -254,6 +254,32 @@ describe("editor-next session runtime gate", () => {
 		expect("playheadUs" in reset).toBe(false);
 	});
 
+	it("replaces the committed selection atomically for chapter jumps", () => {
+		const ready = createReadySession({
+			endUs: 500_000,
+			startUs: 100_000,
+		});
+
+		const replaced = editorSessionReducer(ready, {
+			selection: {
+				endUs: 900_000,
+				startUs: 700_000,
+			},
+			type: "selection.replaced",
+		});
+
+		expect(replaced.status).toBe("ready");
+		if (replaced.status !== "ready") {
+			throw new Error(`Expected ready, got ${replaced.status}`);
+		}
+
+		expect(replaced.selection).toEqual({
+			endUs: 900_000,
+			startUs: 700_000,
+		});
+		expect("playheadUs" in replaced).toBe(false);
+	});
+
 	it("starts a default export job from a valid review and captures a start-time snapshot", () => {
 		const ready = createReadySession({
 			endUs: 800_000,

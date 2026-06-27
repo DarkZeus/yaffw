@@ -5,6 +5,8 @@ import type { MediaTimeUs, Selection } from "@/editor-core/model";
 import { setMultitrackPreviewPlaybackRate } from "./native-preview-audio-transport";
 import type { UseNativePreviewTransportOptions } from "./use-native-preview-transport.types";
 
+const PREVIEW_AV_HARD_RESYNC_THRESHOLD_SECONDS = 0.25;
+
 export function useNativePreviewTransport({
 	audioTransportReady,
 	durationUs,
@@ -16,6 +18,7 @@ export function useNativePreviewTransport({
 }: UseNativePreviewTransportOptions) {
 	const playheadRef = useRef<MediaTimeUs>(0);
 	const playbackRateRef = useRef(1);
+	const multitrackPlaybackStartedRef = useRef(false);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const selectionLoopEnteredRef = useRef(false);
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -34,6 +37,7 @@ export function useNativePreviewTransport({
 		}
 
 		playheadRef.current = 0;
+		multitrackPlaybackStartedRef.current = false;
 		selectionLoopEnteredRef.current = false;
 		setPlayheadUsState(0);
 		setIsPlaying(false);
@@ -110,6 +114,7 @@ export function useNativePreviewTransport({
 		(direction: -1 | 1) => {
 			multitrackRef.current?.pause();
 			videoRef.current?.pause();
+			multitrackPlaybackStartedRef.current = false;
 			setIsPlaying(false);
 			seekByUs(direction * frameDurationUs);
 		},
@@ -126,6 +131,7 @@ export function useNativePreviewTransport({
 		if (isPlaying) {
 			multitrackRef.current?.pause();
 			video.pause();
+			multitrackPlaybackStartedRef.current = false;
 			setIsPlaying(false);
 			return;
 		}
@@ -138,10 +144,12 @@ export function useNativePreviewTransport({
 			await video.play();
 			if (audioTransportReady) {
 				multitrackRef.current?.play();
+				multitrackPlaybackStartedRef.current = true;
 			}
 			setIsPlaying(true);
 		} catch {
 			multitrackRef.current?.pause();
+			multitrackPlaybackStartedRef.current = false;
 			setIsPlaying(false);
 		}
 	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
@@ -179,11 +187,11 @@ export function useNativePreviewTransport({
 		const video = videoRef.current;
 
 		if (video) {
-			video.muted = nextMuted;
+			video.muted = audioTransportReady || nextMuted;
 		}
 
 		setMuted(nextMuted);
-	}, [muted, videoRef]);
+	}, [audioTransportReady, muted, videoRef]);
 
 	useEffect(() => {
 		const video = videoRef.current;
@@ -197,6 +205,11 @@ export function useNativePreviewTransport({
 
 	useEffect(() => {
 		if (!audioTransportReady || !isPlaying) {
+			multitrackPlaybackStartedRef.current = false;
+			return;
+		}
+
+		if (multitrackPlaybackStartedRef.current) {
 			return;
 		}
 
@@ -206,6 +219,7 @@ export function useNativePreviewTransport({
 		}
 		multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
 		multitrackRef.current?.play();
+		multitrackPlaybackStartedRef.current = true;
 	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
 
 	const toggleSelectionLoop = useCallback(() => {
@@ -236,7 +250,8 @@ export function useNativePreviewTransport({
 		if (
 			audioTransportReady &&
 			Number.isFinite(transportTimeSeconds) &&
-			Math.abs(video.currentTime - transportTimeSeconds) > 0.25
+			Math.abs(video.currentTime - transportTimeSeconds) >
+				PREVIEW_AV_HARD_RESYNC_THRESHOLD_SECONDS
 		) {
 			video.currentTime = transportTimeSeconds;
 		}
@@ -339,15 +354,18 @@ export function useNativePreviewTransport({
 			setPlayheadUs(selection.startUs);
 			setIsPlaying(true);
 			void video.play().catch(() => {
+				multitrackPlaybackStartedRef.current = false;
 				setIsPlaying(false);
 			});
 			if (audioTransportReady) {
 				multitrackRef.current?.play();
+				multitrackPlaybackStartedRef.current = true;
 			}
 			return;
 		}
 
 		multitrackRef.current?.pause();
+		multitrackPlaybackStartedRef.current = false;
 		setIsPlaying(false);
 		setPlayheadUs(durationUs);
 	}, [
@@ -364,6 +382,7 @@ export function useNativePreviewTransport({
 
 	const handleNativePause = useCallback(() => {
 		multitrackRef.current?.pause();
+		multitrackPlaybackStartedRef.current = false;
 		setIsPlaying(false);
 	}, [multitrackRef]);
 

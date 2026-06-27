@@ -12,6 +12,7 @@ The repeatable real-media fixtures live under
 - `tiny-video-only.mp4`: 2.0 seconds, 160x90 H.264 video, no audio.
 - `tiny-video-with-audio.mp4`: 2.0 seconds, 160x90 H.264 video, AAC audio.
 - `tiny-video-only.webm`: 2.0 seconds, 160x90 VP8 video, no audio.
+- `sync-flash-click.mp4`: 10.0 seconds, 160x90 H.264 video with AAC audio. It has full-frame white flashes and matching 100 ms, 1 kHz audio beeps once per second from 1.0s through 9.0s for manual preview A/V sync checks.
 
 The generated-media inspector reads these fixtures through Mediabunny and
 reports container, duration, track inventory, and primary video dimensions. The
@@ -62,14 +63,16 @@ because the requested Selection is `[0, durationUs)`. The tiny MP4 video-only
 fixture is inspected as a roughly 2-second MP4 with one video track and no audio
 track.
 
-Catalog measurement covers three registered 2-second fixtures. The current
-default MP4/H.264/AAC profile supports the MP4 video-only and MP4 video-with-AAC
-cases in the harness report shape, including generated track inventory checks:
-the video-only result has one generated video track and no generated audio
-tracks; the video-with-audio result has one generated video track and one
-generated audio track. The WebM video-only fixture is explicit rather than
-silent fallback: if the runtime cannot export it with the default profile, the
-catalog result is `unsupported` at the capability stage with technical details.
+Catalog measurement covers three registered 2-second fixtures plus one
+10-second sync fixture. The current
+default MP4/H.264/AAC profile supports the MP4 video-only, MP4 video-with-AAC,
+and MP4 sync flash/click cases in the harness report shape, including generated
+track inventory checks: the video-only result has one generated video track and
+no generated audio tracks; the video-with-audio and sync flash/click results
+each have one generated video track and one generated audio track. The WebM
+video-only fixture is explicit rather than silent fallback: if the runtime
+cannot export it with the default profile, the catalog result is `unsupported`
+at the capability stage with technical details.
 
 Selected-range fixture export is currently a harness shape, not a real-runner
 precision result. The registered selected range is `[500000, 1500000)`, a
@@ -109,9 +112,9 @@ The current committed baseline can guarantee:
   media-time microseconds when a runner supplies a generated artifact.
 - Fixture inspection can report duration and track inventory for tiny MP4 and
   WebM assets.
-- Catalog fixture export measurement can cover the tiny MP4 video-only and MP4
-  video-with-audio cases through the same artifact report shape, including
-  generated video/audio track inventory checks.
+- Catalog fixture export measurement can cover the tiny MP4 video-only, MP4
+  video-with-audio, and MP4 sync flash/click cases through the same artifact
+  report shape, including generated video/audio track inventory checks.
 - WebM fixture measurement is explicit: it either produces inspected Generated
   media through the current runtime or records an unsupported capability result
   with technical details. It does not silently change the default output

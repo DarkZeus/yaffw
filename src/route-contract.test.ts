@@ -13,6 +13,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppSidebar, getAppSidebarItems } from "./components/app-sidebar";
+import { SidebarProvider } from "./components/ui/sidebar";
 import { routeTree } from "./routeTree.gen";
 
 const prototypeRoutePath = "/editor-next-workbench-prototype";
@@ -53,7 +55,7 @@ afterEach(() => {
 });
 
 describe("app route contract", () => {
-	it("renders editor-next as the canonical root editor inside the collapsed sidebar shell", async () => {
+	it("renders editor-next as the canonical root editor inside the collapsed sidebar shell without a redundant editor rail", async () => {
 		renderAppAt("/");
 
 		expect(
@@ -63,7 +65,7 @@ describe("app route contract", () => {
 				routeRenderTimeout,
 			),
 		).toBeTruthy();
-		expect(screen.getByLabelText("Editor workbench rail")).toBeTruthy();
+		expect(screen.queryByLabelText("Editor workbench rail")).toBeNull();
 
 		const sidebar = document.querySelector('[data-slot="sidebar"]');
 		expect(sidebar?.getAttribute("data-state")).toBe("collapsed");
@@ -127,6 +129,36 @@ describe("app route contract", () => {
 		expect(screen.queryByRole("link", { name: "Editor Next" })).toBeNull();
 		expect(screen.queryByRole("link", { name: "Legacy Editor" })).toBeNull();
 		expect(screen.queryByText("Yet Another FFMPEG wrapper")).toBeNull();
+	});
+
+	it("keeps bulk download navigation local to localhost browser origins", () => {
+		expect(
+			getAppSidebarItems({ hostname: "localhost" }).map((item) => item.title),
+		).toEqual(["Editor", "Bulk download"]);
+		expect(
+			getAppSidebarItems({ hostname: "127.0.0.1" }).map((item) => item.title),
+		).toEqual(["Editor", "Bulk download"]);
+		expect(
+			getAppSidebarItems({ hostname: "yaffw.example" }).map(
+				(item) => item.title,
+			),
+		).toEqual(["Editor"]);
+	});
+
+	it("hides the retractable sidebar when only one navigation item is available", () => {
+		render(
+			createElement(
+				SidebarProvider,
+				{ defaultOpen: false },
+				createElement(AppSidebar, {
+					environment: { hostname: "yaffw.example" },
+				}),
+			),
+		);
+
+		expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
+		expect(screen.queryByLabelText("Toggle Sidebar")).toBeNull();
+		expect(screen.queryByRole("link", { name: "Bulk download" })).toBeNull();
 	});
 
 	it("does not publish the workbench prototype as a route while preserving its reference component", () => {
