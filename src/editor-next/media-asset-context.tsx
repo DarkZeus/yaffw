@@ -1,7 +1,6 @@
-import { AudioLines, Film, X } from "lucide-react";
+import { AudioLines, ChevronRight, Film, X } from "lucide-react";
 import { type ReactElement, type ReactNode, cloneElement } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 import { createMediaAssetContextViewModel } from "./media-asset-context-presenter";
@@ -14,7 +13,7 @@ type PanelIconElement = ReactElement<{
 	className?: string;
 }>;
 
-type AnalyticsFactGroup = {
+type AnalysisFactGroup = {
 	facts: MediaAssetContextFact[];
 	title: string;
 };
@@ -30,7 +29,7 @@ export function MediaAssetContextPanel({
 		closeDisabled: closeFileDisabled,
 		selection,
 	});
-	const sourceAnalyticsFacts = viewModel.provenanceFacts.filter(
+	const sourceAnalysisFacts = viewModel.provenanceFacts.filter(
 		(fact) => fact.label !== "Source file",
 	);
 
@@ -87,7 +86,6 @@ export function MediaAssetContextPanel({
 							key={track.id}
 							label={track.label ?? `Video ${trackIndex + 1}`}
 							meta={formatVideoTrackMeta(track)}
-							status="Preview"
 						/>
 					))}
 					{asset.tracks.audio.map((track, trackIndex) => (
@@ -103,7 +101,6 @@ export function MediaAssetContextPanel({
 							icon={<AudioLines />}
 							label="Audio"
 							meta="No audio tracks"
-							status="none"
 						/>
 					) : null}
 				</div>
@@ -128,10 +125,10 @@ export function MediaAssetContextPanel({
 					/>
 				</div>
 
-				<MediaAnalyticsSection
+				<MediaAnalysisSection
 					groups={[
 						{
-							facts: sourceAnalyticsFacts,
+							facts: sourceAnalysisFacts,
 							title: "Source context",
 						},
 						{
@@ -178,15 +175,13 @@ function CompactTrackRow({
 	icon,
 	label,
 	meta,
-	status,
 }: {
 	icon: PanelIconElement;
 	label: string;
 	meta: string;
-	status?: string;
 }) {
 	return (
-		<div className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded border border-workbench-border bg-workbench-lane px-2 py-1.5">
+		<div className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded border border-workbench-border bg-workbench-lane px-2 py-1.5">
 			<div className="text-muted-foreground">
 				{cloneElement(icon, {
 					"aria-hidden": true,
@@ -201,14 +196,6 @@ function CompactTrackRow({
 					{meta}
 				</div>
 			</div>
-			{status ? (
-				<Badge
-					className="border-workbench-border bg-workbench-hover text-[10px] text-workbench-progress"
-					variant="outline"
-				>
-					{status}
-				</Badge>
-			) : null}
 		</div>
 	);
 }
@@ -224,18 +211,29 @@ function CompactTimeBox({ label, value }: { label: string; value: string }) {
 	);
 }
 
-function MediaAnalyticsSection({ groups }: { groups: AnalyticsFactGroup[] }) {
+function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
+	const visibleGroups = groups.filter((group) => group.facts.length > 0);
+
+	if (visibleGroups.length === 0) {
+		return null;
+	}
+
 	return (
-		<section aria-label="Media analytics" className="mt-3 space-y-2 pb-1">
-			<SectionLabel>Analytics</SectionLabel>
-			<div className="space-y-2">
-				{groups.map((group) => (
-					<section
-						aria-label={group.title}
-						className="rounded border border-workbench-border bg-workbench-lane/65 p-2"
-						key={group.title}
-					>
-						<h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+		<details
+			aria-label="Media analysis"
+			className="group mt-3 rounded border border-workbench-border bg-workbench-lane/65 pb-1"
+		>
+			<summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-t px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:bg-workbench-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workbench-selected marker:hidden [&::-webkit-details-marker]:hidden">
+				<span>Analysis</span>
+				<ChevronRight
+					aria-hidden="true"
+					className="size-3 shrink-0 text-workbench-progress transition-transform group-open:rotate-90"
+				/>
+			</summary>
+			<div className="space-y-2 px-2 pb-2">
+				{visibleGroups.map((group) => (
+					<section aria-label={group.title} key={group.title}>
+						<h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
 							{group.title}
 						</h3>
 						<dl className="grid gap-1 text-[10px] leading-4">
@@ -259,7 +257,7 @@ function MediaAnalyticsSection({ groups }: { groups: AnalyticsFactGroup[] }) {
 					</section>
 				))}
 			</div>
-		</section>
+		</details>
 	);
 }
 

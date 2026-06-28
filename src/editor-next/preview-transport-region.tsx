@@ -14,13 +14,11 @@ import type { ChangeEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
-import { formatMediaTime } from "./media-time-presentation";
 import type { PreviewTransportRegionProps } from "./preview-transport-region.types";
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 export function PreviewTransportRegion({
-	durationUs,
 	isPlaying,
 	muted,
 	onPlaybackRateChange,
@@ -31,8 +29,6 @@ export function PreviewTransportRegion({
 	onToggleSelectionLoop,
 	onVolumeChange,
 	playbackRate,
-	playheadUs,
-	selectionDurationUs,
 	selectionLoopEnabled,
 	volume,
 }: PreviewTransportRegionProps) {
@@ -51,22 +47,11 @@ export function PreviewTransportRegion({
 		>
 			<div
 				aria-label="Preview transport controls"
-				className="grid min-h-10 min-w-0 grid-cols-1 items-center gap-2 px-3 py-1 text-[11px] text-muted-foreground md:grid-cols-[1fr_auto_1fr] xl:h-full xl:min-h-0 xl:overflow-hidden xl:py-0"
+				className="grid min-h-10 min-w-0 grid-cols-1 items-center gap-2 px-3 py-1 text-[11px] text-muted-foreground md:grid-cols-[auto_minmax(0,1fr)] xl:h-full xl:min-h-0 xl:overflow-hidden xl:py-0"
 			>
-				<dl
-					aria-label="Preview media-time readouts"
-					className="flex min-w-0 items-center gap-2 font-mono"
-				>
-					<dt className="sr-only">Playhead</dt>
-					<dd>{formatMediaTime(playheadUs)}</dd>
-					<span aria-hidden="true">/</span>
-					<dt className="sr-only">Duration</dt>
-					<dd>{formatMediaTime(durationUs)}</dd>
-				</dl>
-
 				<div
 					aria-label="Primary preview controls"
-					className="flex min-w-0 flex-wrap items-center justify-center gap-1 md:flex-nowrap"
+					className="flex min-w-0 flex-wrap items-center justify-start gap-1 md:flex-nowrap"
 				>
 					<Button
 						aria-label={isPlaying ? "Pause" : "Play"}
@@ -132,9 +117,6 @@ export function PreviewTransportRegion({
 					aria-label="Preview playback settings"
 					className="flex min-w-0 flex-wrap items-center justify-start gap-3 md:justify-end"
 				>
-					<span className="whitespace-nowrap font-mono text-foreground">
-						Selection {formatMediaTime(selectionDurationUs)}
-					</span>
 					<label className="flex items-center gap-1">
 						<Volume2 aria-hidden="true" className="size-3.5" />
 						<span className="sr-only">Preview volume</span>

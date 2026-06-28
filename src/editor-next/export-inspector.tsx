@@ -45,12 +45,7 @@ export function ExportInspectorPanel({
 				>
 					<div className="mb-2 flex items-start justify-between gap-3">
 						<div className="min-w-0">
-							<h3 className="text-sm font-semibold text-foreground">
-								Export settings
-							</h3>
-							<div className="text-[11px] text-muted-foreground">
-								Current settings
-							</div>
+							<h3 className="text-sm font-semibold text-foreground">Output</h3>
 						</div>
 						<Badge
 							className="shrink-0"
@@ -258,7 +253,7 @@ function ExportReviewActions({
 }) {
 	if (action.kind === "cancel") {
 		return (
-			<GeneratedMediaActionShell>
+			<ExportActionShell>
 				<Button
 					className="h-8 w-full"
 					onClick={onCancelExport}
@@ -268,13 +263,13 @@ function ExportReviewActions({
 					<Square data-icon="inline-start" />
 					Cancel export
 				</Button>
-			</GeneratedMediaActionShell>
+			</ExportActionShell>
 		);
 	}
 
 	if (action.kind === "download") {
 		return (
-			<GeneratedMediaActionShell>
+			<ExportActionShell>
 				<Button
 					className="h-8 w-full"
 					onClick={() => onDownloadGeneratedMedia(action.generatedMedia)}
@@ -283,7 +278,7 @@ function ExportReviewActions({
 					<Download data-icon="inline-start" />
 					{action.label}
 				</Button>
-			</GeneratedMediaActionShell>
+			</ExportActionShell>
 		);
 	}
 
@@ -292,7 +287,7 @@ function ExportReviewActions({
 	}
 
 	return (
-		<GeneratedMediaActionShell>
+		<ExportActionShell>
 			<Button
 				className="h-8 w-full bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
 				disabled={action.disabled}
@@ -302,23 +297,16 @@ function ExportReviewActions({
 				<PlayCircle data-icon="inline-start" />
 				{action.label}
 			</Button>
-		</GeneratedMediaActionShell>
+		</ExportActionShell>
 	);
 }
 
-function GeneratedMediaActionShell({ children }: { children: ReactNode }) {
+function ExportActionShell({ children }: { children: ReactNode }) {
 	return (
-		<section className="rounded border border-workbench-border bg-workbench-lane p-2.5">
-			<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-				<BadgeCheck
-					aria-hidden="true"
-					className="size-4 text-workbench-progress"
-				/>
-				Export file
-			</div>
-			<div className="mb-2 text-[11px] leading-4 text-muted-foreground">
-				No export yet.
-			</div>
+		<section
+			aria-label="Export action"
+			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
+		>
 			{children}
 		</section>
 	);

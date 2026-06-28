@@ -276,9 +276,6 @@ describe("NativePreviewPlayer", () => {
 			const primaryControls = within(transportControls).getByLabelText(
 				"Primary preview controls",
 			);
-			const mediaTimeReadouts = within(transportControls).getByLabelText(
-				"Preview media-time readouts",
-			);
 			const playbackSettings = within(transportControls).getByLabelText(
 				"Preview playback settings",
 			);
@@ -289,9 +286,9 @@ describe("NativePreviewPlayer", () => {
 			expect(nativePreview.className).not.toContain("min-h-full");
 			expect(viewerHeader.className).toContain("border-workbench-border");
 			expect(viewerHeader.textContent).not.toContain("clip.mp4");
+			expect(within(viewerHeader).queryByText("Program viewer")).toBeNull();
 			expect(
-				within(viewerHeader).getByText("Program viewer").parentElement
-					?.className,
+				within(viewerHeader).getByText("1x").parentElement?.className,
 			).toContain("whitespace-nowrap");
 			expect(viewerSurface.className).toContain("bg-workbench-viewer");
 			expect(aperture.className).toContain("border-workbench-border-strong");
@@ -312,13 +309,17 @@ describe("NativePreviewPlayer", () => {
 			expect(transportRegion.className).not.toContain("xl:row-start-2");
 			expect(transportRegion.className).not.toContain("xl:col-span-2");
 			expect(transportControls.className).toContain("grid");
-			expect(primaryControls.className).toContain("justify-center");
+			expect(primaryControls.className).toContain("justify-start");
 			expect(
 				within(primaryControls)
 					.getByRole("button", { name: "Loop selection" })
 					.getAttribute("aria-pressed"),
 			).toBe("false");
-			expect(mediaTimeReadouts.className).toContain("font-mono");
+			expect(
+				within(transportControls).queryByLabelText(
+					"Preview media-time readouts",
+				),
+			).toBeNull();
 			expect(playbackSettings.className).toContain("justify-end");
 			expect(
 				within(centerRegion).queryByLabelText("Preview transport controls"),
@@ -652,7 +653,7 @@ describe("NativePreviewPlayer", () => {
 		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
 			"00:00:01.250",
 		);
-		expect(screen.getAllByText("00:00:01.250").length).toBeGreaterThan(1);
+		expect(screen.getAllByText("00:00:01.250").length).toBe(1);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
 	});
 

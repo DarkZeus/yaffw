@@ -104,6 +104,7 @@ describe("createWaveformLaneIdentityViewModel", () => {
 						label: "Voice",
 					},
 				}}
+				laneHeaderWidthPx={168}
 				minimumSelectionDurationUs={33_333}
 				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}

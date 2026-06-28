@@ -1,5 +1,6 @@
 import {
 	AlertTriangle,
+	Brackets,
 	FileVideo,
 	PackageCheck,
 	Scissors,
@@ -22,6 +23,7 @@ import type {
 	EditorWorkbenchFrameProps,
 	UnsupportedRuntimeStateProps,
 } from "./editor-workbench.types";
+import { formatMediaTime } from "./media-time-presentation";
 
 type NonReadyEditorSession = Exclude<
 	EditorSessionShellProps["session"],
@@ -31,6 +33,7 @@ type NonReadyEditorSession = Exclude<
 export function EditorWorkbenchFrame({
 	activeAsset,
 	children,
+	previewStatus,
 	runtime,
 	status,
 }: EditorWorkbenchFrameProps) {
@@ -54,7 +57,10 @@ export function EditorWorkbenchFrame({
 							</p>
 						</div>
 					</div>
-					<TopBarMediaAssetSummary activeAsset={activeAsset} />
+					<TopBarMediaAssetSummary
+						activeAsset={activeAsset}
+						previewStatus={previewStatus}
+					/>
 					<div className="flex min-w-0 items-center justify-end gap-2">
 						<div className="flex h-7 min-w-0 items-center gap-1.5 rounded border border-workbench-border bg-workbench-inspector px-2 text-xs">
 							{runtime.supported ? (
@@ -262,7 +268,8 @@ function WorkbenchInspectorTabTrigger({
 
 function TopBarMediaAssetSummary({
 	activeAsset,
-}: Pick<EditorWorkbenchFrameProps, "activeAsset">) {
+	previewStatus,
+}: Pick<EditorWorkbenchFrameProps, "activeAsset" | "previewStatus">) {
 	if (!activeAsset) {
 		return (
 			<div
@@ -277,12 +284,45 @@ function TopBarMediaAssetSummary({
 		primaryVideo?.width && primaryVideo.height
 			? `${primaryVideo.width} x ${primaryVideo.height}`
 			: "Resolution unknown";
+	const playheadUs = previewStatus?.playheadUs ?? 0;
+	const selectionDurationUs =
+		previewStatus?.selectionDurationUs ?? activeAsset.durationUs;
 
 	return (
 		<div
 			aria-label="Top bar media asset summary"
-			className="hidden min-w-0 items-center justify-center gap-3 font-mono text-[11px] text-muted-foreground lg:flex"
+			className="hidden min-w-0 items-center justify-center gap-2 overflow-hidden font-mono text-[11px] text-muted-foreground lg:flex"
 		>
+			<dl
+				aria-label="Top bar media-time readouts"
+				className="flex min-w-0 items-center gap-2"
+			>
+				<dt className="sr-only">Playhead</dt>
+				<dd className="whitespace-nowrap text-foreground">
+					{formatMediaTime(playheadUs)}
+				</dd>
+				<span aria-hidden="true" className="text-workbench-border-strong">
+					/
+				</span>
+				<dt className="sr-only">Duration</dt>
+				<dd className="whitespace-nowrap">
+					{formatMediaTime(activeAsset.durationUs)}
+				</dd>
+				<span aria-hidden="true" className="text-workbench-border-strong">
+					|
+				</span>
+				<dt className="sr-only">Selection duration</dt>
+				<dd className="flex items-center gap-1.5 whitespace-nowrap text-foreground">
+					<Brackets
+						aria-hidden="true"
+						className="size-3.5 shrink-0 text-workbench-selected"
+					/>
+					{formatMediaTime(selectionDurationUs)}
+				</dd>
+			</dl>
+			<span aria-hidden="true" className="text-workbench-border-strong">
+				|
+			</span>
 			<span className="whitespace-nowrap">{resolution}</span>
 			<span aria-hidden="true" className="text-workbench-border-strong">
 				|

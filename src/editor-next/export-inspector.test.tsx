@@ -47,7 +47,8 @@ describe("ExportInspectorPanel", () => {
 		expect(screen.getByLabelText("Export review").className).toContain(
 			"overflow-visible",
 		);
-		expect(within(exportInspector).getByText("Export settings")).toBeTruthy();
+		expect(within(exportInspector).getByText("Output")).toBeTruthy();
+		expect(within(exportInspector).queryByText("Current settings")).toBeNull();
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
 		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
 		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();

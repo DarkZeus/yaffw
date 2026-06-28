@@ -114,7 +114,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(screen.getAllByText("End").length).toBeGreaterThan(0);
 		expect(
 			within(screen.getByLabelText("Workbench selection region")).getByText(
-				"Selection and waveform",
+				"Selection",
 			),
 		).toBeTruthy();
 		expect(screen.getByLabelText("Timeline zoom")).toBeTruthy();
@@ -223,7 +223,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 			screen.getByText("No audio tracks available for waveform lanes."),
 		).toBeTruthy();
 		expect(screen.getByText("No audio tracks")).toBeTruthy();
-		expect(screen.getByText("none")).toBeTruthy();
+		expect(screen.queryByText("none")).toBeNull();
 
 		unmount();
 

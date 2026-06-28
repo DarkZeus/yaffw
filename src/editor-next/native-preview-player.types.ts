@@ -20,6 +20,7 @@ export type NativePreviewPlayerProps = {
 		trackId: string,
 		volumePercent: number,
 	) => void;
+	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;

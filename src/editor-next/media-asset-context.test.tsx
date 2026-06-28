@@ -95,16 +95,16 @@ describe("MediaAssetContextPanel", () => {
 			within(mediaAssetContext).getAllByText("100%").length,
 		).toBeGreaterThanOrEqual(1);
 
-		const mediaAnalytics =
-			within(mediaAssetContext).getByLabelText("Media analytics");
-		expect(within(mediaAnalytics).getByText("Analytics")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Source context")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Video facts")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Audio facts")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Selection facts")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Asset identity")).toBeTruthy();
-		expect(within(mediaAnalytics).getByText("Asset coverage")).toBeTruthy();
-		expect(within(mediaAnalytics).queryByText("Source file")).toBeNull();
+		const mediaAnalysis =
+			within(mediaAssetContext).getByLabelText("Media analysis");
+		expect(within(mediaAnalysis).getByText("Analysis")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Source context")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Video facts")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Audio facts")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Selection facts")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Asset identity")).toBeTruthy();
+		expect(within(mediaAnalysis).getByText("Asset coverage")).toBeTruthy();
+		expect(within(mediaAnalysis).queryByText("Source file")).toBeNull();
 	});
 
 	it("updates selection readouts from the selection prop", () => {
@@ -175,7 +175,7 @@ describe("MediaAssetContextPanel", () => {
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
 		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("No audio tracks")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("none")).toBeTruthy();
+		expect(within(mediaAssetContext).queryByText("none")).toBeNull();
 	});
 });
 

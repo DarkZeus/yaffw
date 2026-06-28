@@ -69,6 +69,7 @@ const VIDEO_STRIP_PLACEHOLDER_KEYS = Array.from(
 	{ length: VIDEO_STRIP_THUMBNAIL_COUNT },
 	(_, index) => `video-strip-placeholder-${index}`,
 );
+const TIMELINE_LANE_HEADER_WIDTH_PX = 168;
 
 export function SelectionTimeline({
 	asset,
@@ -92,7 +93,7 @@ export function SelectionTimeline({
 	videoStripThumbnailLoader = loadBrowserVideoStripThumbnails,
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
-	const trackRef = useRef<HTMLDivElement | null>(null);
+	const trackRef = useRef<HTMLButtonElement | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const dragAnimationFrameRef = useRef<number | null>(null);
 	const latestDragClientXRef = useRef<number | null>(null);
@@ -105,6 +106,7 @@ export function SelectionTimeline({
 	const [regionSelectionEditing, setRegionSelectionEditing] = useState(false);
 	const [zoom, setZoom] = useState(1);
 	const timelineViewport = useTimelineViewport({
+		laneHeaderWidthPx: TIMELINE_LANE_HEADER_WIDTH_PX,
 		scrollContainerRef,
 		trackRef,
 		zoom,
@@ -511,16 +513,26 @@ export function SelectionTimeline({
 			const maxScrollLeft =
 				scrollContainer.scrollWidth - scrollContainer.clientWidth;
 
-			const trackWidth =
-				track.getBoundingClientRect().width ||
-				scrollContainer.clientWidth * zoom ||
-				scrollContainer.scrollWidth;
+			const trackWidth = Math.max(
+				1,
+				track.getBoundingClientRect().width,
+				scrollContainer.clientWidth * zoom - TIMELINE_LANE_HEADER_WIDTH_PX,
+				scrollContainer.scrollWidth - TIMELINE_LANE_HEADER_WIDTH_PX,
+			);
+			const viewportWidth = Math.max(
+				1,
+				scrollContainer.clientWidth -
+					Math.min(
+						TIMELINE_LANE_HEADER_WIDTH_PX,
+						Math.max(0, scrollContainer.clientWidth - 1),
+					),
+			);
 			const nextScrollLeft = centeredTimelineScrollLeft({
 				currentScrollLeft: scrollContainer.scrollLeft,
 				maxScrollLeft,
 				playheadPercent,
 				trackWidthPx: trackWidth,
-				viewportWidthPx: scrollContainer.clientWidth,
+				viewportWidthPx: viewportWidth,
 			});
 
 			if (nextScrollLeft === null) {
@@ -564,7 +576,7 @@ export function SelectionTimeline({
 						aria-hidden="true"
 						className="size-4 text-workbench-progress"
 					/>
-					<span className="truncate">Selection and waveform</span>
+					<span className="truncate">Selection</span>
 					<span className="hidden font-mono text-[11px] font-normal text-muted-foreground sm:inline">
 						{formatMediaTime(visibleSelection.endUs - visibleSelection.startUs)}
 					</span>
@@ -659,38 +671,50 @@ export function SelectionTimeline({
 				>
 					<div
 						className="relative flex min-h-full flex-col"
-						data-testid="selection-timeline-track"
-						ref={trackRef}
+						data-testid="selection-timeline-content"
 						style={{
 							minWidth: `${zoom * 100}%`,
 						}}
 					>
-						<button
-							aria-label="Seek timeline ruler"
-							className="relative block h-12 w-full cursor-crosshair border-0 border-b border-workbench-border bg-workbench-ruler p-0 text-left"
-							onMouseDown={(event) => {
-								if (shouldUseMouseFallback()) {
-									seekFromLanePointer(event);
-								}
+						<div
+							className="grid border-b border-workbench-border bg-workbench-ruler"
+							style={{
+								gridTemplateColumns: `${TIMELINE_LANE_HEADER_WIDTH_PX}px minmax(0, 1fr)`,
 							}}
-							onPointerDown={seekFromLanePointer}
-							type="button"
 						>
-							{timeMarkers.map((marker) => (
-								<div
-									className="absolute top-0 h-full w-0 -translate-x-px"
-									key={marker.timeUs}
-									style={{ left: `${marker.percent}%` }}
-								>
-									<div className="absolute bottom-5 left-0 h-4 w-px bg-workbench-border-strong" />
-									<span
-										className={`absolute bottom-1 whitespace-nowrap font-mono text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
+							<div
+								aria-hidden="true"
+								className="sticky left-0 z-[60] h-12 border-r border-workbench-border bg-workbench-ruler"
+							/>
+							<button
+								aria-label="Seek timeline ruler"
+								className="relative block h-12 min-w-0 cursor-crosshair border-0 bg-workbench-ruler p-0 text-left"
+								data-testid="selection-timeline-track"
+								onMouseDown={(event) => {
+									if (shouldUseMouseFallback()) {
+										seekFromLanePointer(event);
+									}
+								}}
+								onPointerDown={seekFromLanePointer}
+								ref={trackRef}
+								type="button"
+							>
+								{timeMarkers.map((marker) => (
+									<div
+										className="absolute top-0 h-full w-0 -translate-x-px"
+										key={marker.timeUs}
+										style={{ left: `${marker.percent}%` }}
 									>
-										{formatMediaTime(marker.timeUs)}
-									</span>
-								</div>
-							))}
-						</button>
+										<div className="absolute bottom-5 left-0 h-4 w-px bg-workbench-border-strong" />
+										<span
+											className={`absolute bottom-1 whitespace-nowrap font-mono text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
+										>
+											{formatMediaTime(marker.timeUs)}
+										</span>
+									</div>
+								))}
+							</button>
+						</div>
 
 						<div
 							className="relative min-h-0 flex-1"
@@ -704,9 +728,10 @@ export function SelectionTimeline({
 									}
 								}}
 								onPointerDown={seekFromLanePointer}
+								laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 								state={videoStripState}
 							/>
-							<div className="relative max-h-72 overflow-y-auto">
+							<div className="relative" data-testid="selection-audio-lanes">
 								{asset.tracks.audio.length > 0 ? (
 									asset.tracks.audio.map((track, trackIndex) => (
 										<WaveformLane
@@ -719,6 +744,7 @@ export function SelectionTimeline({
 											lane={
 												laneStates[track.id] ?? { status: "loading", track }
 											}
+											laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 											minimumSelectionDurationUs={minimumSelectionDurationUs}
 											onAudioTrackChannelModeChange={
 												onAudioTrackChannelModeChange
@@ -746,87 +772,95 @@ export function SelectionTimeline({
 								)}
 							</div>
 
-							{selectionIsRegionBacked && dragState === null ? null : (
-								<>
-									<div
-										aria-hidden="true"
-										className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
-										data-testid="selection-range-outline"
-										style={{
-											left: `${selectionStartPercent}%`,
-											width: `${selectionEndPercent - selectionStartPercent}%`,
-										}}
-									/>
-									<button
-										aria-label="Move selection range"
-										className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
-										disabled={selectionEditingDisabled}
-										onMouseDown={(event) => {
-											if (shouldUseMouseFallback()) {
-												beginRangeDrag(event);
-											}
-										}}
-										onPointerDown={beginRangeDrag}
-										style={{
-											left: `${selectionStartPercent}%`,
-											width: `${selectionEndPercent - selectionStartPercent}%`,
-										}}
-										type="button"
-									/>
-									<button
-										aria-label="Selection start handle"
-										className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-										disabled={selectionEditingDisabled}
-										onMouseDown={(event) => {
-											if (shouldUseMouseFallback()) {
-												beginHandleDrag(event, "start");
-											}
-										}}
-										onPointerDown={(event) => beginHandleDrag(event, "start")}
-										style={{ left: `${selectionStartPercent}%` }}
-										type="button"
-									>
-										<span
-											className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
-											data-testid="selection-start-handle-rail"
-										/>
-									</button>
-									<button
-										aria-label="Selection end handle"
-										className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
-										disabled={selectionEditingDisabled}
-										onMouseDown={(event) => {
-											if (shouldUseMouseFallback()) {
-												beginHandleDrag(event, "end");
-											}
-										}}
-										onPointerDown={(event) => beginHandleDrag(event, "end")}
-										style={{ left: `${selectionEndPercent}%` }}
-										type="button"
-									>
-										<span
-											className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
-											data-testid="selection-end-handle-rail"
-										/>
-									</button>
-								</>
-							)}
-							<button
-								aria-label="Playhead handle"
-								className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										beginPlayheadDrag(event);
-									}
+							<div
+								className="absolute inset-y-0 z-30"
+								style={{
+									left: `${TIMELINE_LANE_HEADER_WIDTH_PX}px`,
+									right: 0,
 								}}
-								onPointerDown={beginPlayheadDrag}
-								style={{ left: `${playheadPercent}%` }}
-								type="button"
 							>
-								<span className="relative block w-0.5 bg-workbench-playhead">
-									<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
-								</span>
-							</button>
+								{selectionIsRegionBacked && dragState === null ? null : (
+									<>
+										<div
+											aria-hidden="true"
+											className={`pointer-events-none absolute inset-y-0 z-30 border-y-2 border-workbench-selected bg-transparent ${selectionMotionClassName}`}
+											data-testid="selection-range-outline"
+											style={{
+												left: `${selectionStartPercent}%`,
+												width: `${selectionEndPercent - selectionStartPercent}%`,
+											}}
+										/>
+										<button
+											aria-label="Move selection range"
+											className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+											disabled={selectionEditingDisabled}
+											onMouseDown={(event) => {
+												if (shouldUseMouseFallback()) {
+													beginRangeDrag(event);
+												}
+											}}
+											onPointerDown={beginRangeDrag}
+											style={{
+												left: `${selectionStartPercent}%`,
+												width: `${selectionEndPercent - selectionStartPercent}%`,
+											}}
+											type="button"
+										/>
+										<button
+											aria-label="Selection start handle"
+											className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											disabled={selectionEditingDisabled}
+											onMouseDown={(event) => {
+												if (shouldUseMouseFallback()) {
+													beginHandleDrag(event, "start");
+												}
+											}}
+											onPointerDown={(event) => beginHandleDrag(event, "start")}
+											style={{ left: `${selectionStartPercent}%` }}
+											type="button"
+										>
+											<span
+												className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
+												data-testid="selection-start-handle-rail"
+											/>
+										</button>
+										<button
+											aria-label="Selection end handle"
+											className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											disabled={selectionEditingDisabled}
+											onMouseDown={(event) => {
+												if (shouldUseMouseFallback()) {
+													beginHandleDrag(event, "end");
+												}
+											}}
+											onPointerDown={(event) => beginHandleDrag(event, "end")}
+											style={{ left: `${selectionEndPercent}%` }}
+											type="button"
+										>
+											<span
+												className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
+												data-testid="selection-end-handle-rail"
+											/>
+										</button>
+									</>
+								)}
+								<button
+									aria-label="Playhead handle"
+									className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
+									onMouseDown={(event) => {
+										if (shouldUseMouseFallback()) {
+											beginPlayheadDrag(event);
+										}
+									}}
+									onPointerDown={beginPlayheadDrag}
+									style={{ left: `${playheadPercent}%` }}
+									type="button"
+								>
+									<span className="relative block w-0.5 bg-workbench-playhead">
+										<span className="absolute -top-1 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[7px] border-t-[10px] border-x-transparent border-t-workbench-playhead" />
+									</span>
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -836,12 +870,14 @@ export function SelectionTimeline({
 }
 
 function useTimelineViewport({
+	laneHeaderWidthPx,
 	scrollContainerRef,
 	trackRef,
 	zoom,
 }: {
+	laneHeaderWidthPx: number;
 	scrollContainerRef: RefObject<HTMLDivElement | null>;
-	trackRef: RefObject<HTMLDivElement | null>;
+	trackRef: RefObject<HTMLElement | null>;
 	zoom: number;
 }) {
 	const [viewport, setViewport] = useState<VideoStripThumbnailViewport | null>(
@@ -870,12 +906,17 @@ function useTimelineViewport({
 			const trackWidthPx = Math.max(
 				1,
 				measuredTrackWidth,
-				scrollContainer.scrollWidth,
-				measuredViewportWidth * Math.max(1, zoom),
+				scrollContainer.scrollWidth - laneHeaderWidthPx,
+				measuredViewportWidth * Math.max(1, zoom) - laneHeaderWidthPx,
 			);
+			const visibleTimelineViewportWidth =
+				measuredViewportWidth > 0
+					? measuredViewportWidth -
+						Math.min(laneHeaderWidthPx, measuredViewportWidth - 1)
+					: trackWidthPx / Math.max(1, zoom);
 			const viewportWidthPx = Math.max(
 				1,
-				measuredViewportWidth || trackWidthPx / Math.max(1, zoom),
+				Math.min(visibleTimelineViewportWidth, trackWidthPx),
 			);
 			const maxScrollLeftPx = Math.max(0, trackWidthPx - viewportWidthPx);
 
@@ -928,7 +969,7 @@ function useTimelineViewport({
 				cancelTimelineFrame(animationFrameId);
 			}
 		};
-	}, [scrollContainerRef, trackRef, zoom]);
+	}, [laneHeaderWidthPx, scrollContainerRef, trackRef, zoom]);
 
 	return viewport;
 }
@@ -937,9 +978,11 @@ function VideoThumbnailStrip({
 	onMouseDown,
 	onPointerDown,
 	durationUs,
+	laneHeaderWidthPx,
 	state,
 }: {
 	durationUs: MediaTimeUs;
+	laneHeaderWidthPx: number;
 	onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 	onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 	state: VideoStripThumbnailState;
@@ -948,7 +991,7 @@ function VideoThumbnailStrip({
 		state.status === "ready" || state.status === "loading"
 			? (state.thumbnailHeightPx ?? VIDEO_STRIP_THUMBNAIL_HEIGHT_PX)
 			: VIDEO_STRIP_THUMBNAIL_HEIGHT_PX;
-	const laneHeightPx = Math.max(64, thumbnailHeightPx + 10);
+	const laneHeightPx = Math.max(80, thumbnailHeightPx + 10);
 	const frames =
 		state.status === "ready" || state.status === "loading" ? state.frames : [];
 	const timestampsUs =
@@ -975,20 +1018,25 @@ function VideoThumbnailStrip({
 
 	return (
 		<div
-			className="relative border-b border-workbench-border bg-workbench-lane"
+			className="relative grid border-b border-workbench-border bg-workbench-lane"
 			data-testid="video-thumbnail-lane"
+			style={{
+				gridTemplateColumns: `${laneHeaderWidthPx}px minmax(0, 1fr)`,
+			}}
 		>
 			<div
-				className="relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
+				className="sticky left-0 z-[60] flex min-h-20 min-w-0 flex-col justify-center gap-1 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
 				data-testid="video-thumbnail-lane-header"
 			>
-				<Film
-					aria-hidden="true"
-					className="size-4 shrink-0 text-workbench-selected"
-				/>
-				<span className="mr-1 truncate text-sm font-medium text-workbench-lane-foreground">
-					Video
-				</span>
+				<div className="flex min-w-0 items-center gap-2">
+					<Film
+						aria-hidden="true"
+						className="size-4 shrink-0 text-workbench-selected"
+					/>
+					<span className="truncate text-sm font-medium text-workbench-lane-foreground">
+						Video
+					</span>
+				</div>
 				<VideoThumbnailStripStatus
 					expectedFrameCount={expectedFrameCount}
 					frameCount={frames.length}
@@ -997,7 +1045,7 @@ function VideoThumbnailStrip({
 			</div>
 			<button
 				aria-label="Seek video thumbnail strip"
-				className="relative block w-full cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt p-1 text-left"
+				className="relative block min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt p-1 text-left"
 				onMouseDown={onMouseDown}
 				onPointerDown={onPointerDown}
 				style={{ height: `${laneHeightPx}px` }}

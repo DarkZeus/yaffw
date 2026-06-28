@@ -222,6 +222,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - Surrounding **Editor workbench** chrome should use the scoped `.workbench` design tokens that carry the resolved prototype palette and border treatment.
 - The long-run **Editor workbench** should use a balanced Edit-page split: preview remains the visual anchor, while the selection and waveform surface gets enough height to support serious media-time inspection.
 - The **Selection** and **Waveform** interaction surface is a mature editor component; workbench visual-parity changes should preserve its established behavior and visual treatment while placing it in the lower workbench region.
+- Visible chrome for the lower workbench panel should use **Selection** as the panel identity; **Waveform** labels should be reserved for audio waveform context inside that panel.
 - The long-run **Editor workbench** should not include a persistent icon/status rail unless the rail has a clear navigational or state-changing function; passive markers for visible regions are avoidable chrome.
 - A **Customizable workbench layout** changes how **Editor workbench** panels are arranged; it does not introduce bins, source monitors, clip stacks, multi-asset timelines, or project workspaces.
 - A **Customizable workbench layout** stays inside the **Editor workbench** frame; panels should not float outside the workbench, tear off into separate windows, or target external-monitor workflows.
@@ -229,9 +230,16 @@ _Avoid_: first-slice requirement, automatic fallback
 - A **Customizable workbench layout** arranges **Workbench panels** in **Dock targets** and tab groups inside the **Editor workbench** frame.
 - The **Default workbench layout** exposes four initial **Dock targets**: left inspector tab group, preview viewer region, transport strip region, and selection/waveform region.
 - A **Workbench panel** may be hidden behind an inactive tab; hidden does not mean removed from the layout or unavailable to the user.
+- A **Panel tab group** carries the visible identity of its active **Workbench panel**; the panel body should start with useful section content rather than repeating the tab or region label.
+- A visible **Workbench panel** header should carry controls, changing state, or critical readouts; headers that only name a region should be removed from visible chrome or kept as accessibility labels only.
+- Inspector tab names should be noun-level **Workbench panel** identities, while labels inside each tab should name task or fact sections such as Source, Tracks, Selection, Output, Requirements, Job, or Result.
+- The inspector section vocabulary is Source, Tracks, Selection, Analysis, Output, Requirements, Job, and Result; Job and Result should appear only when the export state makes them relevant.
+- Primary inspector content should show compact working facts; deeper **Asset analysis** belongs under a secondary Analysis disclosure unless a failure or unsupported capability makes it immediately relevant.
+- Status badges in the **Editor workbench** should be reserved for capability, blocking, running, result, or delivery states; badges that only repeat a static role or section identity are avoidable chrome.
 - Dragging one **Workbench panel** onto another may create a **Panel tab group**, such as placing **Export review** and **Media asset** context in the same in-frame placement.
 - The **Preview transport panel** is a **Workbench panel** distinct from the preview viewer and waveform context.
 - The **Preview viewer panel** is a movable **Workbench panel** distinct from the **Preview transport panel** and waveform context.
+- Visible preview chrome should use **Preview** or omit the title when controls/readouts are sufficient; NLE monitor labels such as program viewer are avoided because YAFFW has one active **Media asset**, not source/program monitors.
 - The **Selection** and **Waveform** context is a separate movable **Workbench panel**, even though the **Default workbench layout** places it near the preview and transport controls.
 - The initial movable **Workbench panels** are media asset context, **Preview viewer panel**, **Preview transport panel**, **Selection**/**Waveform** context, and export inspector.
 - A **Customizable workbench layout** is a browser-local UI preference that may persist across refreshes and media assets without persisting the active **Single-asset editing session**.

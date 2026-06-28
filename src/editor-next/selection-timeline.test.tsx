@@ -51,13 +51,10 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByText("Voice")).toBeTruthy();
 		expect(screen.getByText("Game audio")).toBeTruthy();
 		expect(screen.queryByText(/Language/)).toBeNull();
-		expect(screen.getAllByText("AAC").length).toBeGreaterThan(0);
-		expect(screen.getAllByText("2 channels").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("AAC / 2 channels").length).toBeGreaterThan(0);
 
 		await waitFor(() => {
-			expect(
-				screen.getAllByText("Waveform generation failed").length,
-			).toBeGreaterThan(0);
+			expect(screen.getAllByText("Failed").length).toBeGreaterThan(0);
 		});
 		expect(screen.queryByText("Waveform ready")).toBeNull();
 		expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
@@ -118,7 +115,7 @@ describe("SelectionTimeline", () => {
 		await waitFor(() => {
 			expect(scrollTo).toHaveBeenCalledWith({
 				behavior: "smooth",
-				left: 300,
+				left: 384,
 			});
 		});
 	});
@@ -289,9 +286,9 @@ describe("SelectionTimeline", () => {
 		expect(onSelectionRangeMoveRequested).toHaveBeenCalledWith(3_000_000);
 
 		fireEvent.click(screen.getByRole("button", { name: "Zoom in timeline" }));
-		expect(screen.getByTestId("selection-timeline-track").style.minWidth).toBe(
-			"150%",
-		);
+		expect(
+			screen.getByTestId("selection-timeline-content").style.minWidth,
+		).toBe("150%");
 	});
 });
 
@@ -394,7 +391,12 @@ function mockTimelineGeometry() {
 				this instanceof HTMLElement &&
 				this.dataset.testid === "selection-timeline-track"
 			) {
-				const minWidthPercent = Number.parseFloat(this.style.minWidth);
+				const contentElement = this.closest(
+					'[data-testid="selection-timeline-content"]',
+				) as HTMLElement | null;
+				const minWidthPercent = Number.parseFloat(
+					contentElement?.style.minWidth ?? this.style.minWidth,
+				);
 				const width = Number.isFinite(minWidthPercent)
 					? (1_200 * minWidthPercent) / 100
 					: 1_200;

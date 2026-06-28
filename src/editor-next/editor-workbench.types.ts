@@ -1,12 +1,16 @@
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 
-import type { ReadyMediaAsset } from "@/editor-core/model";
+import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 
 export type EditorWorkbenchFrameProps = {
 	activeAsset: ReadyMediaAsset | null;
 	children: ReactNode;
+	previewStatus?: {
+		playheadUs: MediaTimeUs;
+		selectionDurationUs: MediaTimeUs;
+	} | null;
 	runtime: RuntimeSupport;
 	status: EditorSessionState["status"];
 };

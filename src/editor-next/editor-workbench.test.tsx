@@ -32,6 +32,10 @@ describe("Editor workbench", () => {
 		render(
 			<EditorWorkbenchFrame
 				activeAsset={readyAsset}
+				previewStatus={{
+					playheadUs: 1_500_000,
+					selectionDurationUs: 2_500_000,
+				}}
 				runtime={supportedRuntime}
 				status="ready"
 			>
@@ -47,7 +51,13 @@ describe("Editor workbench", () => {
 		const topBarAssetSummary = screen.getByLabelText(
 			"Top bar media asset summary",
 		);
+		const topBarMediaTimeReadouts = within(topBarAssetSummary).getByLabelText(
+			"Top bar media-time readouts",
+		);
 		expect(topBarAssetSummary.textContent).not.toContain("recording.mp4");
+		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:01.500");
+		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:12.000");
+		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:02.500");
 		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
 		expect(topBarAssetSummary.textContent).toContain("30 fps");
 

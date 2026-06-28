@@ -29,6 +29,7 @@ export function NativePreviewPlayer({
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
+	onPreviewPlayheadChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
 	onSelectionReplaceRequested,
@@ -127,6 +128,10 @@ export function NativePreviewPlayer({
 	});
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
+
+	useEffect(() => {
+		onPreviewPlayheadChange?.(playheadUs);
+	}, [onPreviewPlayheadChange, playheadUs]);
 
 	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
 		audioMix,
@@ -235,7 +240,6 @@ export function NativePreviewPlayer({
 				order={2}
 			>
 				<PreviewTransportRegion
-					durationUs={asset.durationUs}
 					isPlaying={isPlaying}
 					muted={muted}
 					onPlaybackRateChange={setPreviewPlaybackRate}
@@ -246,8 +250,6 @@ export function NativePreviewPlayer({
 					onToggleSelectionLoop={toggleSelectionLoop}
 					onVolumeChange={setPreviewVolume}
 					playbackRate={playbackRate}
-					playheadUs={playheadUs}
-					selectionDurationUs={selection.endUs - selection.startUs}
 					selectionLoopEnabled={selectionLoopEnabled}
 					volume={volume}
 				/>

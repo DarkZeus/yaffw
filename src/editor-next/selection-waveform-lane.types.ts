@@ -23,6 +23,7 @@ export type WaveformLaneProps = {
 	audioPreviewPreparing: boolean;
 	durationUs: MediaTimeUs;
 	lane: WaveformLaneState;
+	laneHeaderWidthPx: number;
 	minimumSelectionDurationUs: MediaTimeUs;
 	onAudioTrackChannelModeChange?: (
 		trackId: string,

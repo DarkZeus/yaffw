@@ -1,5 +1,13 @@
-import { type ChangeEvent, type DragEvent, useMemo } from "react";
+import {
+	type ChangeEvent,
+	type DragEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 
+import type { MediaTimeUs } from "@/editor-core/model";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
 import type { EditorNextRouteProps } from "./EditorNextRoute.types";
@@ -73,6 +81,20 @@ export function EditorNextRoute({
 	const displayedPreviewPosterSrc = visualFixtureActive
 		? EDITOR_WORKBENCH_VISUAL_FIXTURE_PREVIEW_POSTER_SRC
 		: undefined;
+	const activeAssetId =
+		displayedSession.status === "ready" ? displayedSession.asset.id : null;
+	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
+	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
+		setPreviewPlayheadUs((currentPlayheadUs) =>
+			currentPlayheadUs === playheadUs ? currentPlayheadUs : playheadUs,
+		);
+	}, []);
+
+	useEffect(() => {
+		setPreviewPlayheadUs((currentPlayheadUs) =>
+			activeAssetId === null || currentPlayheadUs !== 0 ? 0 : currentPlayheadUs,
+		);
+	}, [activeAssetId]);
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
 		const file = event.currentTarget.files?.[0];
@@ -127,6 +149,7 @@ export function EditorNextRoute({
 				onSelectionReplaceRequested={commands.setSelectionRange}
 				onSelectionResetRequested={commands.resetSelection}
 				onSelectionStartRequested={commands.setSelectionStartFromPlayhead}
+				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				previewPosterSrc={displayedPreviewPosterSrc}
 				selection={displayedSession.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
@@ -153,6 +176,16 @@ export function EditorNextRoute({
 		<EditorWorkbenchFrame
 			activeAsset={
 				displayedSession.status === "ready" ? displayedSession.asset : null
+			}
+			previewStatus={
+				displayedSession.status === "ready"
+					? {
+							playheadUs: previewPlayheadUs,
+							selectionDurationUs:
+								displayedSession.selection.endUs -
+								displayedSession.selection.startUs,
+						}
+					: null
 			}
 			runtime={runtime}
 			status={displayedSession.status}

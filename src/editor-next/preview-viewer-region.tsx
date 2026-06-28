@@ -90,7 +90,7 @@ export function PreviewViewerRegion({
 									: "text-workbench-playhead"
 							}`}
 						/>
-						<span className="font-medium text-foreground">Program viewer</span>
+						<span className="sr-only">Preview</span>
 						<span className="font-mono text-muted-foreground/70">
 							{playbackRate}x
 						</span>

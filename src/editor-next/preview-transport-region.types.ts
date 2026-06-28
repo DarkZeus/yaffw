@@ -1,7 +1,6 @@
 import type { MediaTimeUs } from "@/editor-core/model";
 
 export type PreviewTransportRegionProps = {
-	durationUs: MediaTimeUs;
 	isPlaying: boolean;
 	muted: boolean;
 	onPlaybackRateChange: (playbackRate: number) => void;
@@ -12,8 +11,6 @@ export type PreviewTransportRegionProps = {
 	onToggleSelectionLoop: () => void;
 	onVolumeChange: (volume: number) => void;
 	playbackRate: number;
-	playheadUs: MediaTimeUs;
-	selectionDurationUs: MediaTimeUs;
 	selectionLoopEnabled: boolean;
 	volume: number;
 };

@@ -33,6 +33,7 @@ export function WaveformLane({
 	audioPreviewPreparing,
 	durationUs,
 	lane,
+	laneHeaderWidthPx,
 	minimumSelectionDurationUs,
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
@@ -53,6 +54,7 @@ export function WaveformLane({
 		track: lane.track,
 		trackIndex,
 	});
+	const metadataLabel = identity.metadata.join(" / ");
 	const audioIncluded = audioDecision?.include ?? true;
 	const channelMode = audioDecision?.channelMode ?? "preserve";
 	const soloActive = soloedAudioTrackId === lane.track.id;
@@ -62,12 +64,28 @@ export function WaveformLane({
 		(!onAudioTrackIncludedChange && !onAudioTrackVolumePercentChange);
 
 	return (
-		<div className="relative border-b border-workbench-border bg-workbench-lane">
+		<div
+			className="relative grid border-b border-workbench-border bg-workbench-lane"
+			style={{
+				gridTemplateColumns: `${laneHeaderWidthPx}px minmax(0, 1fr)`,
+			}}
+		>
 			<div
-				className="relative z-30 flex min-h-10 flex-wrap items-center gap-x-2 gap-y-1 border-b border-workbench-border bg-workbench-ruler/90 px-3 py-2 backdrop-blur"
+				className="sticky left-0 z-[60] flex min-h-24 min-w-0 flex-col gap-1.5 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
-				<div className="mr-1 flex shrink-0 flex-wrap items-center gap-1">
+				<div className="flex min-w-0 items-start justify-between gap-1.5">
+					<div className="min-w-0">
+						<div className="truncate text-sm font-medium text-workbench-lane-foreground">
+							{identity.title}
+						</div>
+						<div className="truncate font-mono text-[10px] leading-4 text-muted-foreground">
+							{metadataLabel}
+						</div>
+					</div>
+					<LaneStatus lane={lane} status={identity.status} />
+				</div>
+				<div className="flex min-w-0 flex-wrap items-center gap-1">
 					<Button
 						aria-label={
 							audioIncluded
@@ -75,7 +93,7 @@ export function WaveformLane({
 								: `Include ${identity.title} in mix`
 						}
 						aria-pressed={!audioIncluded}
-						className={`size-7 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
 							audioIncluded
 								? "text-workbench-lane-foreground"
 								: "text-muted-foreground"
@@ -101,7 +119,7 @@ export function WaveformLane({
 							soloActive ? `Unsolo ${identity.title}` : `Solo ${identity.title}`
 						}
 						aria-pressed={soloActive}
-						className={`size-7 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
 							soloActive
 								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
 								: "text-muted-foreground"
@@ -119,14 +137,14 @@ export function WaveformLane({
 						<Headphones data-icon="inline-start" />
 					</Button>
 					<label
-						className={`flex items-center gap-1 ${
+						className={`flex min-w-0 flex-1 items-center gap-1 ${
 							audioIncluded ? "opacity-100" : "opacity-55"
 						}`}
 					>
 						<span className="sr-only">{identity.title} volume</span>
 						<input
 							aria-label={`${identity.title} volume`}
-							className="h-5 w-20 accent-primary"
+							className="h-5 min-w-10 flex-1 accent-primary"
 							disabled={
 								audioControlsDisabled || !onAudioTrackVolumePercentChange
 							}
@@ -143,19 +161,19 @@ export function WaveformLane({
 							type="range"
 							value={volumePercent}
 						/>
-						<span className="w-8 text-right font-mono text-[11px] text-muted-foreground">
+						<span className="w-7 text-right font-mono text-[10px] text-muted-foreground">
 							{volumePercent}%
 						</span>
 					</label>
 					<label
-						className={`flex items-center ${
+						className={`flex min-w-0 flex-1 basis-full items-center ${
 							audioIncluded ? "opacity-100" : "opacity-55"
 						}`}
 					>
 						<span className="sr-only">{identity.title} channel fix</span>
 						<select
 							aria-label={`${identity.title} channel fix`}
-							className="h-7 w-44 rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[11px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
+							className="h-6 w-full rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
 							disabled={
 								selectionEditingDisabled || !onAudioTrackChannelModeChange
 							}
@@ -176,33 +194,20 @@ export function WaveformLane({
 						</select>
 					</label>
 				</div>
-				<span className="mr-1 truncate text-sm font-medium text-workbench-lane-foreground">
-					{identity.title}
-				</span>
-				{identity.metadata.map((metadata) => (
-					<Badge
-						key={metadata}
-						className="border-workbench-border-strong font-mono text-muted-foreground"
-						variant="outline"
-					>
-						{metadata}
-					</Badge>
-				))}
 				{audioPreviewPreparing ? (
 					<Badge
-						className="gap-1 border-workbench-progress/45 bg-workbench-progress/15 text-workbench-progress"
+						className="w-fit gap-1 border-workbench-progress/45 bg-workbench-progress/15 text-workbench-progress"
 						variant="outline"
 					>
 						<Loader2 className="size-3 animate-spin" />
 						Preparing audio
 					</Badge>
 				) : null}
-				<LaneStatus lane={lane} status={identity.status} />
 			</div>
 			{lane.status === "ready" ? (
 				<button
 					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
+					className="relative block h-full min-h-24 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
 					type="button"
 				>
 					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
@@ -222,7 +227,7 @@ export function WaveformLane({
 			) : (
 				<button
 					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-16 w-full cursor-crosshair overflow-hidden bg-workbench-lane-alt text-left"
+					className="relative block h-full min-h-24 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
 					onMouseDown={(event) => {
 						if (typeof window.PointerEvent === "undefined") {
 							onPointerDown(event);
@@ -272,11 +277,12 @@ function LaneStatus({
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<Badge
-						className="pointer-events-auto border-destructive/45 bg-destructive/15 text-destructive"
+						className="pointer-events-auto shrink-0 border-destructive/45 bg-destructive/15 px-1.5 text-[10px] text-destructive"
 						tabIndex={0}
+						title={status.label}
 						variant="outline"
 					>
-						{status.label}
+						Failed
 					</Badge>
 				</TooltipTrigger>
 				<TooltipContent className="max-w-80">{lane.reason}</TooltipContent>
@@ -286,10 +292,11 @@ function LaneStatus({
 
 	return (
 		<Badge
-			className="border-workbench-border-strong text-muted-foreground"
+			className="shrink-0 border-workbench-border-strong px-1.5 text-[10px] text-muted-foreground"
+			title={status.label}
 			variant="outline"
 		>
-			{status.label}
+			Loading
 		</Badge>
 	);
 }

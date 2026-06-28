@@ -73,9 +73,14 @@ describe("EditorNextRoute", () => {
 		expect(
 			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
 		).toBeGreaterThan(0);
-		expect(screen.getByText("Selection and waveform")).toBeTruthy();
+		expect(
+			within(screen.getByLabelText("Workbench selection region")).getByText(
+				"Selection",
+			),
+		).toBeTruthy();
 		openExportTab();
-		expect(screen.getByText("Export file")).toBeTruthy();
+		expect(screen.getByText("Output")).toBeTruthy();
+		expect(screen.queryByText("Export file")).toBeNull();
 	});
 
 	it("renders the unsupported runtime state before exposing local import", () => {
@@ -258,9 +263,11 @@ describe("EditorNextRoute", () => {
 			within(transportControls).getByLabelText("Preview playback settings"),
 		).toBeTruthy();
 		expect(
-			within(transportControls).getByLabelText("Preview media-time readouts")
-				.className,
-		).toContain("font-mono");
+			within(transportControls).queryByLabelText("Preview media-time readouts"),
+		).toBeNull();
+		expect(
+			screen.getByLabelText("Top bar media-time readouts").textContent,
+		).toContain("00:00:12.000");
 		expect(
 			within(centerRegion).getByRole("button", {
 				name: "Open fullscreen preview",
@@ -275,8 +282,8 @@ describe("EditorNextRoute", () => {
 
 		await waitFor(() => {
 			expect(
-				within(transportRegion).getAllByText("00:00:10.000").length,
-			).toBeGreaterThan(0);
+				screen.getByLabelText("Top bar media-time readouts").textContent,
+			).toContain("00:00:10.000");
 		});
 		openExportTab();
 		expect(screen.getByLabelText("Export review")).toBeTruthy();
@@ -816,11 +823,8 @@ describe("EditorNextRoute", () => {
 		).toBeNull();
 		expect(screen.getAllByText("Voice").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Language eng")).toBeNull();
-		expect(screen.getAllByText("AAC").length).toBeGreaterThan(0);
-		expect(screen.getAllByText("2 channels").length).toBeGreaterThan(0);
-		expect(
-			within(selectionRegion).getByText("Selection and waveform"),
-		).toBeTruthy();
+		expect(screen.getAllByText("AAC / 2 channels").length).toBeGreaterThan(0);
+		expect(within(selectionRegion).getByText("Selection")).toBeTruthy();
 		expect(screen.getAllByText("00:00:12.000").length).toBeGreaterThan(0);
 
 		fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
