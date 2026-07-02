@@ -180,6 +180,98 @@ describe("createLivePreviewMeteringTrackStates", () => {
 		expect(unavailable.reason).toContain("Desktop decode failed");
 	});
 
+	it("keeps live meter sampling off the per-sample channel-data hot path", () => {
+		let getChannelDataCallCount = 0;
+		const trackStates = {
+			"audio-desktop": createPreparedTrackStateWithAudioBuffer({
+				audioBuffer: createCountedTestAudioBuffer({
+					channels: [[], [[2_400, 0.25]]],
+					onGetChannelData: () => {
+						getChannelDataCallCount += 1;
+					},
+				}),
+				channelLabels: ["Left", "Right"],
+				trackId: "audio-desktop",
+			}),
+			"audio-voice": createPreparedTrackStateWithAudioBuffer({
+				audioBuffer: createCountedTestAudioBuffer({
+					channels: [[[2_400, 0.5]], []],
+					onGetChannelData: () => {
+						getChannelDataCallCount += 1;
+					},
+				}),
+				channelLabels: ["Left", "Right"],
+				trackId: "audio-voice",
+			}),
+		};
+
+		createLivePreviewMeteringTrackStates({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-desktop": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-desktop",
+						volumePercent: 100,
+					},
+					"audio-voice": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-voice",
+						volumePercent: 100,
+					},
+				},
+			},
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 50_000,
+			soloedAudioTrackId: null,
+			trackStates,
+		});
+
+		expect(getChannelDataCallCount).toBeLessThanOrEqual(64);
+	});
+
+	it("reuses channel plans across live meter ticks instead of re-analyzing decoded buffers", () => {
+		let getChannelDataCallCount = 0;
+		const trackStates = {
+			"audio-voice": createPreparedTrackStateWithAudioBuffer({
+				audioBuffer: createCountedTestAudioBuffer({
+					channels: [[[2_400, 0.5]], []],
+					onGetChannelData: () => {
+						getChannelDataCallCount += 1;
+					},
+				}),
+				channelLabels: ["Left", "Right"],
+				trackId: "audio-voice",
+			}),
+		};
+		const options = {
+			audioMix: createAudioMix({
+				channelMode: "use-left-as-mono",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 50_000,
+			soloedAudioTrackId: null,
+			trackStates,
+		} satisfies Parameters<typeof createLivePreviewMeteringTrackStates>[0];
+
+		createLivePreviewMeteringTrackStates(options);
+		const firstTickCallCount = getChannelDataCallCount;
+		createLivePreviewMeteringTrackStates({
+			...options,
+			nowMs: 1_016,
+		});
+		const secondTickCallCount = getChannelDataCallCount - firstTickCallCount;
+
+		expect(secondTickCallCount).toBeLessThan(firstTickCallCount);
+	});
+
 	it("samples a peak window around the Playhead after channel handling and Track volume", () => {
 		const { trackStates } = createLivePreviewMeteringTrackStates({
 			audioMix: createAudioMix({
@@ -472,6 +564,36 @@ function createPreparedTrackState({
 	};
 }
 
+function createPreparedTrackStateWithAudioBuffer({
+	audioBuffer,
+	channelLabels,
+	trackId,
+}: {
+	audioBuffer: AudioBuffer;
+	channelLabels: string[];
+	trackId: "audio-voice" | "audio-desktop";
+}): PreviewMeteringTrackStates[string] {
+	const trackIndex = trackId === "audio-voice" ? 0 : 1;
+
+	return {
+		prepared: {
+			audioBuffer,
+			channelLabels,
+			startPositionSeconds: 0,
+			track: {
+				channels: channelLabels.length,
+				id: trackId,
+				kind: "audio",
+				label: trackId === "audio-voice" ? "Voice" : "Desktop",
+			},
+			trackId,
+			trackIndex,
+		},
+		status: "ready",
+		trackId,
+	};
+}
+
 function createTestAudioBuffer(
 	channels: Array<Array<[number, number]>>,
 ): AudioBuffer {
@@ -511,5 +633,52 @@ function createTestAudioBuffer(
 		length,
 		numberOfChannels: channelData.length,
 		sampleRate: 1_000,
+	} as AudioBuffer;
+}
+
+function createCountedTestAudioBuffer({
+	channels,
+	onGetChannelData,
+}: {
+	channels: Array<Array<[number, number]>>;
+	onGetChannelData: () => void;
+}): AudioBuffer {
+	const length = 4_800;
+	const channelData = channels.map((peaks) => {
+		const data = new Float32Array(length);
+
+		for (const [frameIndex, value] of peaks) {
+			data[frameIndex] = value;
+		}
+
+		return data;
+	});
+
+	return {
+		copyFromChannel(destination, channelNumber, startInChannel = 0) {
+			destination.set(
+				channelData[channelNumber]?.subarray(
+					startInChannel,
+					startInChannel + destination.length,
+				) ?? new Float32Array(destination.length),
+			);
+		},
+		copyToChannel(source, channelNumber, startInChannel = 0) {
+			channelData[channelNumber]?.set(source, startInChannel);
+		},
+		duration: length / 48_000,
+		getChannelData(channelNumber) {
+			onGetChannelData();
+			const data = channelData[channelNumber];
+
+			if (!data) {
+				throw new Error(`Missing channel ${channelNumber}.`);
+			}
+
+			return data;
+		},
+		length,
+		numberOfChannels: channelData.length,
+		sampleRate: 48_000,
 	} as AudioBuffer;
 }

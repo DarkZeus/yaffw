@@ -21,6 +21,15 @@ const PREVIEW_METERING_CLIP_HOLD_MS = 750;
 const COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY = "__combined-preview-output__";
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
+const trackChannelPlanCache = new WeakMap<
+	AudioBuffer,
+	Map<string, TrackChannelPlan>
+>();
+const channelAnalysisNotNeeded = {
+	channels: [],
+	oneSidedStereo: null,
+	reason: "not-needed-for-metering-mode",
+} satisfies ResolvedChannelTransform["analysis"];
 
 export type LivePreviewMeteringTrackState =
 	| {
@@ -188,6 +197,10 @@ type AudiblePreparedTrack = {
 	channelPlan: TrackChannelPlan;
 	prepared: PreviewMeteringPreparedTrack;
 	volumeGain: number;
+};
+
+type AudiblePreparedTrackWithChannelData = AudiblePreparedTrack & {
+	channelData: Float32Array[];
 };
 
 function createCombinedPreviewMeteringState({
@@ -360,6 +373,11 @@ function sampleCombinedOutputPeakWindow({
 	const startSeconds =
 		playheadUs / 1_000_000 - PREVIEW_METERING_PEAK_WINDOW_US / 1_000_000 / 2;
 	const peaks = Array.from({ length: outputChannelCount }, () => 0);
+	const tracksWithChannelData: AudiblePreparedTrackWithChannelData[] =
+		tracks.map((track) => ({
+			...track,
+			channelData: readAudioBufferChannelData(track.prepared.audioBuffer),
+		}));
 
 	for (let frameOffset = 0; frameOffset < frameCount; frameOffset += 1) {
 		const sampleTimeSeconds = startSeconds + frameOffset / referenceSampleRate;
@@ -371,7 +389,7 @@ function sampleCombinedOutputPeakWindow({
 		) {
 			let mixedSample = 0;
 
-			for (const track of tracks) {
+			for (const track of tracksWithChannelData) {
 				const frameIndex = Math.round(
 					(sampleTimeSeconds - track.prepared.startPositionSeconds) *
 						track.prepared.audioBuffer.sampleRate,
@@ -379,7 +397,7 @@ function sampleCombinedOutputPeakWindow({
 
 				mixedSample +=
 					readTrackSampleForOutputChannel({
-						audioBuffer: track.prepared.audioBuffer,
+						channelData: track.channelData,
 						channelPlan: track.channelPlan,
 						frameIndex,
 						outputChannelIndex,
@@ -399,17 +417,19 @@ function sampleCombinedOutputPeakWindow({
 }
 
 function readTrackSampleForOutputChannel({
-	audioBuffer,
+	channelData,
 	channelPlan,
 	frameIndex,
 	outputChannelIndex,
 }: {
-	audioBuffer: AudioBuffer;
+	channelData: Float32Array[];
 	channelPlan: TrackChannelPlan;
 	frameIndex: number;
 	outputChannelIndex: number;
 }): number {
-	if (frameIndex < 0 || frameIndex >= audioBuffer.length) {
+	const bufferLength = channelData[0]?.length ?? 0;
+
+	if (frameIndex < 0 || frameIndex >= bufferLength) {
 		return 0;
 	}
 
@@ -419,7 +439,7 @@ function readTrackSampleForOutputChannel({
 			: Math.min(outputChannelIndex, channelPlan.outputChannels - 1);
 
 	return readTransformedSample({
-		audioBuffer,
+		channelData,
 		channelIndex: transformedChannelIndex,
 		frameIndex,
 		resolvedMode: channelPlan.resolvedMode,
@@ -501,7 +521,19 @@ function createTrackChannelPlan(
 	prepared: PreviewMeteringPreparedTrack,
 	channelMode: AudioTrackChannelMode,
 ): TrackChannelPlan {
-	const channelTransform = resolveChannelTransform(
+	const cacheKey = createTrackChannelPlanCacheKey({
+		channelLabels: prepared.channelLabels,
+		channelMode,
+	});
+	const cachedPlan = trackChannelPlanCache
+		.get(prepared.audioBuffer)
+		?.get(cacheKey);
+
+	if (cachedPlan) {
+		return cachedPlan;
+	}
+
+	const channelTransform = resolveMeteringChannelTransform(
 		prepared.audioBuffer,
 		channelMode,
 	);
@@ -510,7 +542,7 @@ function createTrackChannelPlan(
 		channelTransform.resolvedMode,
 	);
 
-	return {
+	const plan = {
 		compensationGain: channelCompensationGain({
 			channelTransform,
 			outputChannels,
@@ -523,6 +555,38 @@ function createTrackChannelPlan(
 		outputChannels,
 		resolvedMode: channelTransform.resolvedMode,
 	};
+	const plansForBuffer =
+		trackChannelPlanCache.get(prepared.audioBuffer) ?? new Map();
+
+	plansForBuffer.set(cacheKey, plan);
+	trackChannelPlanCache.set(prepared.audioBuffer, plansForBuffer);
+
+	return plan;
+}
+
+function createTrackChannelPlanCacheKey({
+	channelLabels,
+	channelMode,
+}: {
+	channelLabels: string[];
+	channelMode: AudioTrackChannelMode;
+}): string {
+	return `${channelMode}:${channelLabels.join("\u0000")}`;
+}
+
+function resolveMeteringChannelTransform(
+	audioBuffer: AudioBuffer,
+	requestedMode: AudioTrackChannelMode,
+): ResolvedChannelTransform {
+	if (requestedMode === "preserve" || requestedMode === "average-to-mono") {
+		return {
+			analysis: channelAnalysisNotNeeded,
+			requestedMode,
+			resolvedMode: requestedMode,
+		};
+	}
+
+	return resolveChannelTransform(audioBuffer, requestedMode);
 }
 
 function sampleTrackPeakWindow({
@@ -554,6 +618,8 @@ function sampleTrackPeakWindow({
 		return Array.from({ length: channelPlan.outputChannels }, () => 0);
 	}
 
+	const channelData = readAudioBufferChannelData(audioBuffer);
+
 	return Array.from(
 		{ length: channelPlan.outputChannels },
 		(_, channelIndex) => {
@@ -568,7 +634,7 @@ function sampleTrackPeakWindow({
 					peak,
 					Math.abs(
 						readTransformedSample({
-							audioBuffer,
+							channelData,
 							channelIndex,
 							frameIndex,
 							resolvedMode: channelPlan.resolvedMode,
@@ -582,26 +648,32 @@ function sampleTrackPeakWindow({
 	);
 }
 
+function readAudioBufferChannelData(audioBuffer: AudioBuffer): Float32Array[] {
+	return Array.from({ length: audioBuffer.numberOfChannels }, (_, channel) =>
+		audioBuffer.getChannelData(channel),
+	);
+}
+
 function readTransformedSample({
-	audioBuffer,
+	channelData,
 	channelIndex,
 	frameIndex,
 	resolvedMode,
 }: {
-	audioBuffer: AudioBuffer;
+	channelData: Float32Array[];
 	channelIndex: number;
 	frameIndex: number;
 	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
 }): number {
 	if (resolvedMode === "preserve") {
-		return readSourceSample(audioBuffer, channelIndex, frameIndex);
+		return readSourceSample(channelData, channelIndex, frameIndex);
 	}
 
 	if (
 		resolvedMode === "use-left-as-mono" ||
 		resolvedMode === "duplicate-left-to-stereo"
 	) {
-		return readSourceSample(audioBuffer, 0, frameIndex);
+		return readSourceSample(channelData, 0, frameIndex);
 	}
 
 	if (
@@ -609,8 +681,8 @@ function readTransformedSample({
 		resolvedMode === "duplicate-right-to-stereo"
 	) {
 		return readSourceSample(
-			audioBuffer,
-			Math.min(1, audioBuffer.numberOfChannels - 1),
+			channelData,
+			Math.min(1, channelData.length - 1),
 			frameIndex,
 		);
 	}
@@ -618,31 +690,24 @@ function readTransformedSample({
 	if (resolvedMode === "average-to-mono") {
 		let sample = 0;
 
-		for (
-			let channel = 0;
-			channel < audioBuffer.numberOfChannels;
-			channel += 1
-		) {
-			sample += readSourceSample(audioBuffer, channel, frameIndex);
+		for (let channel = 0; channel < channelData.length; channel += 1) {
+			sample += readSourceSample(channelData, channel, frameIndex);
 		}
 
-		return sample / Math.max(1, audioBuffer.numberOfChannels);
+		return sample / Math.max(1, channelData.length);
 	}
 
-	return readSourceSample(audioBuffer, channelIndex, frameIndex);
+	return readSourceSample(channelData, channelIndex, frameIndex);
 }
 
 function readSourceSample(
-	audioBuffer: AudioBuffer,
+	channelData: Float32Array[],
 	channelIndex: number,
 	frameIndex: number,
 ): number {
-	const sourceChannel = Math.min(
-		channelIndex,
-		audioBuffer.numberOfChannels - 1,
-	);
+	const sourceChannel = Math.min(channelIndex, channelData.length - 1);
 
-	return audioBuffer.getChannelData(sourceChannel)[frameIndex] ?? 0;
+	return channelData[sourceChannel]?.[frameIndex] ?? 0;
 }
 
 function createChannelLabels({
@@ -684,11 +749,6 @@ function channelCompensationGain({
 	channelTransform: ResolvedChannelTransform;
 	outputChannels: number;
 }): number {
-	const activeInputChannelCount = channelTransform.analysis.channels.filter(
-		(channel) =>
-			channel.peak >= ONE_SIDED_ACTIVE_PEAK_THRESHOLD ||
-			channel.rms >= ONE_SIDED_ACTIVE_RMS_THRESHOLD,
-	).length;
 	const effectiveOutputChannels =
 		channelTransform.resolvedMode === "use-left-as-mono" ||
 		channelTransform.resolvedMode === "use-right-as-mono" ||
@@ -702,9 +762,17 @@ function channelCompensationGain({
 		channelTransform.resolvedMode === "duplicate-left-to-stereo" ||
 		channelTransform.resolvedMode === "duplicate-right-to-stereo";
 
+	if (!sourceChannelMode || channelTransform.analysis.oneSidedStereo === null) {
+		return 1;
+	}
+
+	const activeInputChannelCount = channelTransform.analysis.channels.filter(
+		(channel) =>
+			channel.peak >= ONE_SIDED_ACTIVE_PEAK_THRESHOLD ||
+			channel.rms >= ONE_SIDED_ACTIVE_RMS_THRESHOLD,
+	).length;
+
 	if (
-		!sourceChannelMode ||
-		channelTransform.analysis.oneSidedStereo === null ||
 		activeInputChannelCount !== 1 ||
 		effectiveOutputChannels <= activeInputChannelCount
 	) {
