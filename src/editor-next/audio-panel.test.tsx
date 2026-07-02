@@ -15,6 +15,10 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import { AudioPanel } from "./audio-panel";
+import type {
+	PreviewMeteringPreparedTrack,
+	PreviewMeteringTrackStates,
+} from "./preview-metering-preparation.types";
 
 afterEach(() => {
 	cleanup();
@@ -159,6 +163,98 @@ describe("AudioPanel", () => {
 		);
 		expect(onSoloedAudioTrackChange).toHaveBeenLastCalledWith(null);
 	});
+
+	it("renders controlled preview metering ready and preparing states without live peak values yet", () => {
+		const previewMetering = {
+			trackStates: {
+				"audio-desktop": {
+					status: "preparing",
+					trackId: "audio-desktop",
+				},
+				"audio-voice": {
+					prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
+					status: "ready",
+					trackId: "audio-voice",
+				},
+			} satisfies PreviewMeteringTrackStates,
+		};
+
+		render(<AudioPanel asset={readyAsset} previewMetering={previewMetering} />);
+
+		const voiceMeter = screen.getByLabelText("Voice preview meter");
+		const voiceStrip = screen.getByLabelText("Audio track strip Voice");
+		const desktopMeter = screen.getByLabelText("Desktop preview meter");
+
+		expect(voiceMeter.getAttribute("data-state")).toBe("ready");
+		expect(
+			within(voiceMeter)
+				.getByRole("meter", { name: "Left level" })
+				.getAttribute("aria-valuenow"),
+		).toBe("-72");
+		expect(within(voiceStrip).getByText("Ready")).toBeTruthy();
+		expect(desktopMeter.getAttribute("data-state")).toBe("preparing");
+		expect(
+			within(desktopMeter).getByText("Preparing decoded samples"),
+		).toBeTruthy();
+	});
+
+	it("keeps unavailable meter layout stable and owns retry outside the reusable meter", () => {
+		const onTrackRetry = vi.fn();
+		const previewMetering = {
+			onTrackRetry,
+			trackStates: {
+				"audio-desktop": {
+					reason: "Desktop decode failed",
+					status: "unavailable",
+					trackId: "audio-desktop",
+				},
+				"audio-voice": {
+					prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
+					status: "ready",
+					trackId: "audio-voice",
+				},
+			} satisfies PreviewMeteringTrackStates,
+		};
+
+		render(
+			<AudioPanel
+				asset={readyAsset}
+				onAudioTrackIncludedChange={() => {}}
+				onAudioTrackVolumePercentChange={() => {}}
+				previewMetering={previewMetering}
+			/>,
+		);
+
+		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
+		const desktopMeter = within(desktopStrip).getByLabelText(
+			"Desktop preview meter",
+		);
+
+		expect(desktopStrip.className).toContain("min-h-40");
+		expect(desktopMeter.getAttribute("data-state")).toBe("unavailable");
+		expect(
+			within(desktopStrip).getByText("Desktop decode failed"),
+		).toBeTruthy();
+		expect(within(desktopMeter).queryByRole("button")).toBeNull();
+		expect(
+			within(desktopStrip).getByRole("button", {
+				name: "Exclude Desktop from output",
+			}),
+		).toHaveProperty("disabled", false);
+		expect(
+			within(desktopStrip).getByRole("slider", {
+				name: "Desktop track volume",
+			}),
+		).toHaveProperty("disabled", false);
+
+		fireEvent.click(
+			within(desktopStrip).getByRole("button", {
+				name: "Retry Desktop preview meter",
+			}),
+		);
+
+		expect(onTrackRetry).toHaveBeenCalledWith("audio-desktop");
+	});
 });
 
 const videoOnlyAsset = {
@@ -227,3 +323,23 @@ const readyAsset = {
 		],
 	},
 } satisfies ReadyMediaAsset;
+
+function createPreparedTrack(
+	trackId: "audio-voice" | "audio-desktop",
+	channelLabels: string[],
+): PreviewMeteringPreparedTrack {
+	const trackIndex = trackId === "audio-voice" ? 0 : 1;
+
+	return {
+		audioBuffer: {
+			length: 1_024,
+			numberOfChannels: channelLabels.length,
+			sampleRate: 48_000,
+		} as unknown as AudioBuffer,
+		channelLabels,
+		startPositionSeconds: 0,
+		track: readyAsset.tracks.audio[trackIndex],
+		trackId,
+		trackIndex,
+	};
+}

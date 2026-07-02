@@ -1,4 +1,10 @@
-import { AudioLines, Headphones, Volume2, VolumeX } from "lucide-react";
+import {
+	AudioLines,
+	Headphones,
+	RefreshCcw,
+	Volume2,
+	VolumeX,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +20,13 @@ import type {
 import {
 	PreviewLevelMeter,
 	type PreviewLevelMeterChannel,
+	type PreviewLevelMeterState,
+	previewPeakMeterVisualRange,
 } from "./preview-level-meter";
+import type {
+	PreviewMeteringTrackState,
+	PreviewMeteringTrackStates,
+} from "./preview-metering-preparation.types";
 
 export type AudioPanelProps = {
 	asset: ReadyMediaAsset;
@@ -29,6 +41,10 @@ export type AudioPanelProps = {
 		trackId: string,
 		volumePercent: number,
 	) => void;
+	previewMetering?: {
+		onTrackRetry?: (trackId: string) => void;
+		trackStates: PreviewMeteringTrackStates;
+	};
 	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	soloedAudioTrackId?: string | null;
 };
@@ -51,6 +67,7 @@ export function AudioPanel({
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
+	previewMetering,
 	onSoloedAudioTrackChange,
 	soloedAudioTrackId = null,
 }: AudioPanelProps) {
@@ -80,7 +97,10 @@ export function AudioPanel({
 								onAudioTrackVolumePercentChange={
 									onAudioTrackVolumePercentChange
 								}
+								onPreviewMeteringRetry={previewMetering?.onTrackRetry}
 								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+								previewMeteringControlled={Boolean(previewMetering)}
+								previewMeteringState={previewMetering?.trackStates[track.id]}
 								soloActive={soloedAudioTrackId === track.id}
 								track={track}
 							/>
@@ -100,7 +120,10 @@ function AudioTrackStrip({
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
+	onPreviewMeteringRetry,
 	onSoloedAudioTrackChange,
+	previewMeteringControlled,
+	previewMeteringState,
 	soloActive,
 	track,
 }: {
@@ -116,13 +139,22 @@ function AudioTrackStrip({
 		trackId: string,
 		volumePercent: number,
 	) => void;
+	onPreviewMeteringRetry?: (trackId: string) => void;
 	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	previewMeteringControlled: boolean;
+	previewMeteringState?: PreviewMeteringTrackState;
 	soloActive: boolean;
 	track: AudioMediaTrack;
 }) {
 	const label = track.label ?? `Audio ${index + 1}`;
 	const audioIncluded = decision.include;
 	const volumePercent = clampVolumePercent(decision.volumePercent);
+	const meterDisplay = createTrackMeterDisplay({
+		controlled: previewMeteringControlled,
+		state: previewMeteringState,
+		track,
+		trackIndex: index,
+	});
 
 	return (
 		<section
@@ -219,10 +251,33 @@ function AudioTrackStrip({
 						</label>
 					</div>
 				</div>
-				<div className="flex flex-wrap gap-1.5">
+				<div className="flex min-w-0 flex-wrap items-center gap-1.5">
 					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
 						Track meter
 					</span>
+					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+						{meterDisplay.statusLabel}
+					</span>
+					{meterDisplay.state === "unavailable" && onPreviewMeteringRetry ? (
+						<Button
+							aria-label={`Retry ${label} preview meter`}
+							className="h-6 rounded border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-muted-foreground hover:bg-workbench-hover"
+							onClick={() => {
+								onPreviewMeteringRetry(track.id);
+							}}
+							size="sm"
+							type="button"
+							variant="outline"
+						>
+							<RefreshCcw data-icon="inline-start" />
+							Retry
+						</Button>
+					) : null}
+					{meterDisplay.reason ? (
+						<span className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground">
+							{meterDisplay.reason}
+						</span>
+					) : null}
 				</div>
 			</div>
 			<label className="flex min-w-0 flex-col items-center justify-between gap-2 rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-2">
@@ -249,10 +304,11 @@ function AudioTrackStrip({
 				</span>
 			</label>
 			<PreviewLevelMeter
-				channels={createStaticTrackMeterChannels(track, index)}
+				channels={meterDisplay.channels}
 				label={`${label} preview meter`}
+				message={meterDisplay.message}
 				showTickLabels={false}
-				state="ready"
+				state={meterDisplay.state}
 			/>
 		</section>
 	);
@@ -372,4 +428,59 @@ function formatPreviewMeterChannelLabel(
 	}
 
 	return `Ch ${channelIndex + 1}`;
+}
+
+function createTrackMeterDisplay({
+	controlled,
+	state,
+	track,
+	trackIndex,
+}: {
+	controlled: boolean;
+	state?: PreviewMeteringTrackState;
+	track: AudioMediaTrack;
+	trackIndex: number;
+}): {
+	channels: PreviewLevelMeterChannel[];
+	message?: string;
+	reason?: string;
+	state: PreviewLevelMeterState;
+	statusLabel: string;
+} {
+	if (!controlled) {
+		return {
+			channels: createStaticTrackMeterChannels(track, trackIndex),
+			state: "ready",
+			statusLabel: "Ready",
+		};
+	}
+
+	if (!state || state.status === "preparing") {
+		return {
+			channels: [],
+			message: "Preparing decoded samples",
+			state: "preparing",
+			statusLabel: "Preparing",
+		};
+	}
+
+	if (state.status === "unavailable") {
+		return {
+			channels: [],
+			message: "Meter unavailable",
+			reason: state.reason,
+			state: "unavailable",
+			statusLabel: "Unavailable",
+		};
+	}
+
+	return {
+		channels: state.prepared.channelLabels.map((channelLabel) => ({
+			clipHeld: false,
+			label: channelLabel,
+			peakDb: previewPeakMeterVisualRange.floorDb,
+		})),
+		state: "ready",
+		statusLabel: "Ready",
+	};
 }

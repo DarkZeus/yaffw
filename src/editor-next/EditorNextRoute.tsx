@@ -28,6 +28,7 @@ import { ExportInspectorPanel } from "./export-inspector";
 import { deliverBrowserGeneratedMedia } from "./generated-media-delivery";
 import { MediaAssetContextPanel } from "./media-asset-context";
 import { NativePreviewPlayer } from "./native-preview-player";
+import { usePreviewMeteringPreparation } from "./use-preview-metering-preparation";
 import { useSingleAssetEditingSession } from "./use-single-asset-editing-session";
 
 export function EditorNextRoute({
@@ -84,6 +85,18 @@ export function EditorNextRoute({
 		: undefined;
 	const activeAssetId =
 		displayedSession.status === "ready" ? displayedSession.asset.id : null;
+	const previewMeteringPreparation = usePreviewMeteringPreparation({
+		activeMediaAssetCleanupScope: visualFixtureActive
+			? undefined
+			: (activeMediaAssetCleanupScope ?? undefined),
+		asset: displayedSession.status === "ready" ? displayedSession.asset : null,
+		enabled:
+			displayedSession.status === "ready" && Boolean(displayedPreviewSource),
+		source:
+			displayedSession.status === "ready" && displayedPreviewSource
+				? displayedPreviewSource
+				: null,
+	});
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
@@ -152,6 +165,7 @@ export function EditorNextRoute({
 				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
 				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
 				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
+				previewMetering={previewMeteringPreparation}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				soloedAudioTrackId={soloedAudioTrackId}
 			/>
