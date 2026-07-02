@@ -136,6 +136,67 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:2060000");
 	});
 
+	it("hard-resyncs large native video drift to the audio-master clock", async () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 5,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+
+		video.currentTime = 4.5;
+		fireEvent.timeUpdate(video);
+
+		expect(video.currentTime).toBe(5);
+		expect(readState()).toContain("playhead:5000000");
+	});
+
+	it("keeps paused audio-master seeks on the requested visual follower frame", () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 0,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+		expect(video.currentTime).toBe(10);
+		expect(multitrack.setTime).toHaveBeenCalledWith(10);
+		expect(readState()).toContain("playhead:10000000");
+
+		fireEvent.seeked(video);
+
+		expect(video.currentTime).toBe(10);
+		expect(readState()).toContain("playhead:10000000");
+	});
+
+	it("keeps paused audio-master frame steps on the requested visual follower frame", () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 0,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Step forward" }));
+		expect(video.currentTime).toBeCloseTo(0.033333, 5);
+		expect(multitrack.setTime).toHaveBeenCalledWith(0.033333);
+		expect(readState()).toContain("playhead:33333");
+
+		fireEvent.seeked(video);
+
+		expect(video.currentTime).toBeCloseTo(0.033333, 5);
+		expect(readState()).toContain("playhead:33333");
+	});
+
 	it("ignores native video playback events while audio-master owns preview state", async () => {
 		const multitrack = createMultitrackSpy({
 			currentTimeSeconds: 3,

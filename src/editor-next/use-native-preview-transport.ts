@@ -265,6 +265,14 @@ export function useNativePreviewTransport({
 		}
 
 		const previousPlayheadUs = playheadRef.current;
+
+		if (audioMasterClockActive && !isPlaying) {
+			setVideoFollowerTime(video, previousPlayheadUs);
+			updateSelectionLoopEntryFromPlayhead(previousPlayheadUs);
+			setPlayheadUs(previousPlayheadUs);
+			return;
+		}
+
 		const transportTimeSeconds =
 			audioMasterClockActive && multitrackRef.current
 				? multitrackRef.current.getCurrentTime()
@@ -494,6 +502,17 @@ function isMediaTimeInsideSelection(
 
 function secondsToMicroseconds(seconds: number): MediaTimeUs {
 	return Math.round(seconds * 1_000_000);
+}
+
+function setVideoFollowerTime(
+	video: { currentTime: number },
+	playheadUs: MediaTimeUs,
+) {
+	if (secondsToMicroseconds(video.currentTime) === playheadUs) {
+		return;
+	}
+
+	video.currentTime = playheadUs / 1_000_000;
 }
 
 function clampMediaTime(
