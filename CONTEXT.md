@@ -108,6 +108,10 @@ _Avoid_: timeline panel, export controls, audio mix panel
 The workbench panel that visually renders the active media asset for preview.
 _Avoid_: source monitor, program monitor, canvas
 
+**Audio**:
+The workbench panel identity for preview level meters and audio mix decisions for the active media asset.
+_Avoid_: audio mixer, preview meters panel
+
 **Playback speed**:
 A preview setting that changes playback rate without changing exported media.
 _Avoid_: output speed, frame interpolation
@@ -115,6 +119,10 @@ _Avoid_: output speed, frame interpolation
 **Preview volume**:
 A preview setting for global playback volume or mute state that does not affect exported media.
 _Avoid_: audio mix decision, track volume
+
+**Preview level meter**:
+A preview-only peak-level readout in dBFS for a specific preview monitoring scope that does not change generated media.
+_Avoid_: export meter, audio mix decision, loudness analysis
 
 **Selection loop**:
 A preview setting that repeats playback after playback enters the current selection without changing exported media.
@@ -215,7 +223,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector panel is shown only after a **Ready media asset** exists.
 - The **Default workbench layout** should favor an Edit-page-style arrangement: central preview, prominent selection/waveform surface, and inspector-style panels for asset facts, export review, and delivery.
 - In the **Default workbench layout**, the inspector tab group should answer what media asset is loaded and what generated media will be produced, while the center should answer what selection is being chosen.
-- In the **Default workbench layout**, the Media tab should present compact source, media-track, and **Selection** context for the active **Media asset**; the Export tab should keep runtime checks, export capability, **Export review**, and **Generated media** status together.
+- In the **Default workbench layout**, the Media tab should present compact source, media-track, and **Selection** context for the active **Media asset**; the **Audio** tab should present audio track strips and preview meters; the Export tab should keep runtime checks, export capability, **Export review**, and **Generated media** status together.
 - In the ready state, the **Editor workbench** should fit the viewport-height editor composition; overflow belongs inside workbench panels or the selection/waveform surface rather than in an outer page scroll.
 - The ready-state desktop **Default workbench layout** should use the resolved proportions: compact left inspector tab group, central preview, slim transport strip, and a lower selection/waveform surface around two-fifths of the viewport height.
 - The coded first slice of the **Default workbench layout** lets users resize the boundary between the left inspector tab group and preview area, and the boundary between the preview viewer and lower transport/selection area; resizing changes working room, not **Editing decisions**.
@@ -239,9 +247,13 @@ _Avoid_: first-slice requirement, automatic fallback
 - Dragging one **Workbench panel** onto another may create a **Panel tab group**, such as placing **Export review** and **Media asset** context in the same in-frame placement.
 - The **Preview transport panel** is a **Workbench panel** distinct from the preview viewer and waveform context.
 - The **Preview viewer panel** is a movable **Workbench panel** distinct from the **Preview transport panel** and waveform context.
+- **Audio** is a movable **Workbench panel** distinct from **Waveform lanes**; it may present preview-only meters beside export-affecting **Audio mix decisions**.
+- **Audio** presents one strip per audio **Media track** plus one combined preview meter strip; it does not introduce buses, submixes, or routing.
+- In the **Default workbench layout**, **Audio** starts as an inspector tab beside Media and Export rather than as an always-visible region.
+- When the active **Media asset** has no audio tracks, **Audio** remains available and shows an empty state rather than disappearing from the workbench.
 - Visible preview chrome should use **Preview** or omit the title when controls/readouts are sufficient; NLE monitor labels such as program viewer are avoided because YAFFW has one active **Media asset**, not source/program monitors.
 - The **Selection** and **Waveform** context is a separate movable **Workbench panel**, even though the **Default workbench layout** places it near the preview and transport controls.
-- The initial movable **Workbench panels** are media asset context, **Preview viewer panel**, **Preview transport panel**, **Selection**/**Waveform** context, and export inspector.
+- The initial movable **Workbench panels** are media asset context, **Preview viewer panel**, **Preview transport panel**, **Audio**, **Selection**/**Waveform** context, and export inspector.
 - A **Customizable workbench layout** is a browser-local UI preference that may persist across refreshes and media assets without persisting the active **Single-asset editing session**.
 - A **Workbench layout preset** may be imported from or exported to JSON; it saves panel arrangement, not media assets or editing decisions.
 - The current coded ready-state arrangement is the **Default workbench layout** and is the fallback when a saved or imported layout cannot be applied.
@@ -270,6 +282,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Timeline zoom** is inspection state owned by the UI adapter, not an **Editing decision**.
 - **Playback speed** is preview state, not an **Editing decision**.
 - **Preview volume** is preview state, not an **Audio mix decision**.
+- A **Preview level meter** is preview state, not an **Editing decision** or **Audio mix decision**.
 - **Selection loop** is preview state, not an **Editing decision**.
 - **Selection loop** starts off for each newly loaded **Media asset**.
 - Preview and transport chrome may follow the resolved **Editor workbench** composition as long as **Playhead**, **Playback speed**, **Preview volume**, fullscreen, seeking, and shortcut behavior are preserved.
@@ -302,7 +315,13 @@ _Avoid_: first-slice requirement, automatic fallback
 - An **Audio mix decision** is an **Editing decision** for one **Media track**.
 - Audio-capable **Media tracks** are included in the mix by default so preview playback and generated media preserve all audible source context unless the user changes an **Audio mix decision**.
 - **Audio mix decisions** should affect both preview playback and generated media; what the user hears in preview should match what the export contains unless **Export review** explicitly says otherwise.
+- **Audio** may duplicate include/exclude and preview solo controls from **Waveform lanes**, but include/exclude should be labeled as output contribution rather than preview mute.
 - **Audio mix decisions** include whether an audio track is included in the generated mix and the **Track volume** used for that mix.
+- In **Audio**, channel handling should sit with track setup controls rather than beside the live meter or fader.
+- In **Audio**, **Track volume** should be presented as a vertical fader while remaining the same percentage-based **Audio mix decision**.
+- In each **Audio** strip, the **Preview level meter** should be the visual anchor and the **Track volume** fader should sit adjacent rather than acting as the central object.
+- The combined meter in **Audio** should not introduce a master fader unless YAFFW adds an explicit master gain **Audio mix decision**.
+- The first combined **Audio** strip should be meter-only plus identity/status; it should not show **Track volume**, channel handling, master gain, or routing controls.
 - Preview mixing and export mixing should use the same **Track volume** interpretation so the same percentage produces matching loudness intent in preview and generated media.
 - Excluding an audio track from the generated mix is distinct from setting its **Track volume** to 0%; excluded tracks do not contribute to the generated audio, while included tracks at 0% contribute silence and remain part of the mix decision.
 - Excluding an audio track is a fast contribution decision and should preserve the track's remembered **Track volume** for later re-inclusion.
@@ -310,6 +329,51 @@ _Avoid_: first-slice requirement, automatic fallback
 - When preview solo is active, soloed tracks are audible in preview even if they are excluded from generated media; the UI should allow both states to be visible at once.
 - Preview solo changes which tracks are monitored, not their loudness; **Track volume** still applies to soloed preview tracks.
 - **Preview volume** and preview mute are global preview settings and do not change **Audio mix decisions** or generated media.
+- **Preview level meters** ignore global **Preview volume** and preview mute because those settings change listening comfort rather than the monitored signal.
+- **Preview level meters** use a dBFS scale where 0 dBFS is the clipping ceiling and the first visual floor is around -72 dBFS.
+- **Preview level meters** should keep a visible clip warning briefly after clipping occurs, while the live meter level continues to decay normally.
+- **Preview level meters** should use configurable color zones with OBS-style sample-peak defaults: green below -20 dBFS, yellow from -20 dBFS to -9 dBFS, red above -9 dBFS, and clipping at 0 dBFS.
+- Implementation naming for the default **Preview level meter** color-zone config should use product language such as `previewPeakMeterZones`, not external-source names such as OBS.
+- The first **Audio** branch should not introduce a user-facing settings panel for **Preview level meter** thresholds; threshold configurability is implementation plumbing for future settings.
+- A reusable **Preview level meter** component should be presentation/config driven and receive prepared dBFS display values plus generic display state; it may know about channel values, visual clamping, labels, orientation, color zones, and state presentation, but not signal math, tracks, solo, include/exclude, channel handling, or preview playback policy.
+- Clip event and clip-hold state should be prepared outside the reusable **Preview level meter** component and passed in as display state; the component should render clip indicators rather than deciding clip timing.
+- Prepared **Preview level meter** channel values should include required `peakDb` and `clipHeld` fields plus an optional display `label` such as `L`, `R`, or `M`; the reusable component renders supplied labels without deriving channel identity.
+- The reusable **Preview level meter** component API should accept `channels: PreviewMeterChannel[]` for every layout, including single-channel meters, and should avoid mono- or stereo-specific props.
+- A reusable **Preview level meter** instance represents one logical signal scope and should render its prepared channels as parallel bars sharing the same scale, labels, zones, and tick marks rather than requiring one meter component per channel.
+- Preview-metering domain and adapter code may use `channelLayout` terminology for mono, stereo, surround, or custom source layouts; the reusable **Preview level meter** component should only receive the prepared `channels` array.
+- When preview-metering cannot identify a source channel layout, the adapter should prepare neutral channel labels such as `Ch 1` and `Ch 2` rather than leaving channel labels blank.
+- A **Preview level meter** may be rendered vertically or horizontally, but **Audio** should use vertical meter strips.
+- **Audio** meter strips should be visually optimized for mono and stereo while allowing wider surround or custom channel layouts to extend horizontally with scrolling rather than hiding or collapsing channels.
+- **Preview level meters** may show fixed dBFS tick labels in either orientation, and labels may be disabled when the surrounding UI already provides enough scale context.
+- Vertical **Preview level meters** should place fixed dBFS tick labels beside the meter; live numeric readouts are secondary and not required for the first version.
+- **Preview level meters** should preserve supplied channel identity and render the prepared channel list without assuming mono or stereo; sources may be mono, 2.0, 2.1, 5.1, 7.1, or custom channel layouts.
+- **Preview level meters** are live playback readouts; when preview is paused or stopped, they should fall to silence rather than analyze the paused playhead position.
+- Live **Preview level meter** sampling should use a short peak window around 50 ms so the meter remains responsive without flickering on individual samples.
+- Cached peak buckets for **Preview level meters** are a deferred performance optimization, not part of the first meter architecture.
+- **Preview level meters** should be fed by a preview-metering adapter rather than directly reading the multitrack preview output, so metering can follow its own preview-signal rules.
+- The first preview-metering adapter should read decoded per-track sample data at the current **Playhead** rather than attaching to the live browser audio output graph.
+- The preview-metering adapter may reuse lower-level audio preparation and worker infrastructure used by waveform extraction, but it should not depend on **Waveform lane** artifacts or waveform availability.
+- **Preview level meter** preparation failures should be isolated per audio **Media track**; one failed track meter should not disable the whole **Audio** panel or other track controls.
+- **Preview level meter** preparation or display failures should not block preview playback or export-affecting controls; they only reduce visual monitoring confidence.
+- Unavailable **Preview level meters** should reserve their normal strip space and render a disabled/unavailable state rather than being removed and shifting the **Audio** layout.
+- Per-track **Preview level meter** preparation failures should expose a per-track retry action so successful meter preparation for other tracks does not need to be repeated.
+- Per-track **Preview level meter** retry controls belong to the **Audio** strip, not inside the reusable meter component, because retry is track and adapter behavior.
+- **Audio** should distinguish **Preview level meter** states such as preparing, unavailable, and ready rather than presenting all non-moving meters as silence.
+- The reusable **Preview level meter** component may render a small generic state union such as `preparing`, `unavailable`, and `ready`, but the **Audio** panel or preview-metering adapter should decide which state applies.
+- Silence should be represented as a ready **Preview level meter** whose prepared channel values sit at the visual floor, not as a separate meter lifecycle state.
+- `channels` should remain part of the **Preview level meter** display contract for non-ready states; when the channel layout is known, callers should provide placeholder channels at the visual floor, and when it is unknown the strip may render a generic preparing/unavailable meter body.
+- The reusable **Preview level meter** component may accept a short generic message for preparing or unavailable states, while track-specific explanation and retry controls belong to the **Audio** strip.
+- A **Preview level meter** may be scoped to one audio **Media track** or to the combined preview output, but it does not describe or validate generated media.
+- A per-track **Preview level meter** shows that track's effective signal after **Track volume** and channel handling, and does not disappear just because another track is soloed.
+- Changing **Track volume** should update the affected track's **Preview level meter** and the combined **Preview level meter** because meters reflect the monitored signal after track-level mix decisions.
+- Per-track **Preview level meter** clip detection should happen after **Track volume** and channel handling, so reducing track volume can clear effective-signal clipping.
+- Changing channel handling should update the affected track's **Preview level meter** values and displayed channel layout because meters reflect the monitored signal after channel handling.
+- An excluded track's per-track **Preview level meter** shows silence and should be visually marked as excluded, unless that track is soloed for **Preview audio monitoring**.
+- A combined **Preview level meter** follows **Preview audio monitoring**, including preview solo, rather than the generated-media mix.
+- A combined **Preview level meter** should preserve the monitored output channel layout instead of downmixing to a single mono peak, so channel imbalance and surround routing remain visible.
+- When tracks with different channel layouts are combined, preview metering should use the same channel-mapping policy as preview and export mixing rather than inventing a meter-only layout.
+- In the first implementation, the combined **Preview level meter** may use stereo 2.0 output channels when the actual preview/export mixer outputs stereo, even if per-track meters preserve richer source channel layouts.
+- If an audible track's metering data is unavailable, the combined **Preview level meter** should show a partial or unavailable state rather than silently exclude that track from the displayed combined level.
 - When a **Media asset** has audio tracks and preview can use a mix-capable multitrack adapter, that adapter should be the preview transport authority for play, pause, seeking, playback speed, and audio monitoring; the native video element should act as the visual renderer synchronized to the shared **Playhead**.
 - Mix-capable preview may expose each embedded audio **Media track** to the multitrack adapter through temporary playable audio sources derived from the source media; those preview resources are adapter-owned and must be disposed with the active **Media asset**.
 - Temporary audio sources should preserve the source track's encoded audio when it can be remuxed into a reliable browser-playable source; decoded fallback sources are used only when the encoded path is unavailable or unreliable.
@@ -328,8 +392,10 @@ _Avoid_: first-slice requirement, automatic fallback
 - Custom **Output settings** such as target bitrate are future options and may require re-encoding the selected media.
 - A **Waveform** may be derived from a **Media track**, but it is not the track and is not required for readiness or export.
 - The first slice should load per-track **Waveform lanes** progressively for audio tracks when available because separate tracks may carry different selection context, such as desktop audio versus voice.
-- A **Waveform lane** may expose minimal **Audio mix decision** controls for the same audio track, but the lane remains visual selection context rather than becoming an editable track lane.
-- **Waveform lane** audio controls should be compact and colocated with track identity in the lane header, so track contribution decisions stay visually tied to the waveform they affect.
+- A **Waveform lane** may expose only quick audio controls for include/exclude and preview solo; dense audio controls belong in **Audio**.
+- **Waveform lane** audio controls should be compact and colocated with track identity in the lane header, so fast track contribution and monitoring decisions stay visually tied to the waveform they affect.
+- **Track volume** and channel handling should live in **Audio**, not in **Waveform lanes**.
+- Per-track **Preview level meters** should not be embedded as persistent decoration inside **Waveform lanes**; lanes remain selection context.
 - **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context without a selection affordance.
 - The first slice shows all available **Waveform lanes** and uses vertical scrolling if the lanes exceed the available viewport.
 - All **Waveform lanes** align to the same **Media time** ruler and share one **Selection** and **Playhead** overlay.
