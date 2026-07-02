@@ -75,9 +75,7 @@ export function SelectionTimeline({
 	asset,
 	audioMix = createDefaultAudioMix(asset),
 	audioPreviewPreparingTrackIds = EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS,
-	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
-	onAudioTrackVolumePercentChange,
 	onPlayheadSeekRequested,
 	onSelectionEndCommitRequested,
 	onSelectionRangeMoveRequested,
@@ -746,13 +744,7 @@ export function SelectionTimeline({
 											}
 											laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 											minimumSelectionDurationUs={minimumSelectionDurationUs}
-											onAudioTrackChannelModeChange={
-												onAudioTrackChannelModeChange
-											}
 											onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-											onAudioTrackVolumePercentChange={
-												onAudioTrackVolumePercentChange
-											}
 											onPlayheadSeekRequested={onPlayheadSeekRequested}
 											onPointerDown={seekFromLanePointer}
 											onSelectionCommitRequested={commitRegionSelectionChange}

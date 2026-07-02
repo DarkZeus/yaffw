@@ -77,10 +77,10 @@ describe("SelectionTimeline", () => {
 		).toBeTruthy();
 		expect(screen.queryByTestId("selection-start-handle-rail")).toBeNull();
 		expect(screen.queryByTestId("selection-end-handle-rail")).toBeNull();
-		expect(screen.getByRole("button", { name: "Exclude Voice from mix" }));
-		expect(screen.getByLabelText("Voice volume"));
-		expect(screen.getByLabelText("Voice channel fix"));
-		expect(screen.getByRole("button", { name: "Solo Voice" }));
+		expect(screen.getByRole("button", { name: "Exclude Voice from output" }));
+		expect(screen.queryByLabelText("Voice track volume")).toBeNull();
+		expect(screen.queryByLabelText("Voice channel handling")).toBeNull();
+		expect(screen.getByRole("button", { name: "Solo Voice for preview" }));
 		expect(screen.getByText("Preparing audio")).toBeTruthy();
 
 		expect(screen.queryByText("Mute")).toBeNull();

@@ -1,6 +1,16 @@
-import { AudioLines } from "lucide-react";
+import { AudioLines, Headphones, Volume2, VolumeX } from "lucide-react";
 
-import type { AudioMediaTrack, ReadyMediaAsset } from "@/editor-core/model";
+import { Button } from "@/components/ui/button";
+import {
+	createDefaultAudioMix,
+	createDefaultAudioMixTrackDecision,
+} from "@/editor-core/audio-mix";
+import type {
+	AudioMediaTrack,
+	AudioMix,
+	AudioTrackChannelMode,
+	ReadyMediaAsset,
+} from "@/editor-core/model";
 import {
 	PreviewLevelMeter,
 	type PreviewLevelMeterChannel,
@@ -8,9 +18,42 @@ import {
 
 export type AudioPanelProps = {
 	asset: ReadyMediaAsset;
+	audioEditingDisabled?: boolean;
+	audioMix?: AudioMix;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onAudioTrackVolumePercentChange?: (
+		trackId: string,
+		volumePercent: number,
+	) => void;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloedAudioTrackId?: string | null;
 };
 
-export function AudioPanel({ asset }: AudioPanelProps) {
+const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
+	label: string;
+	value: AudioTrackChannelMode;
+}> = [
+	{ label: "Auto-fix quiet side", value: "auto-one-sided-stereo" },
+	{ label: "Keep as recorded", value: "preserve" },
+	{ label: "Center left-side audio", value: "use-left-as-mono" },
+	{ label: "Center right-side audio", value: "use-right-as-mono" },
+	{ label: "Center both sides", value: "average-to-mono" },
+];
+
+export function AudioPanel({
+	asset,
+	audioEditingDisabled = false,
+	audioMix = createDefaultAudioMix(asset),
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onAudioTrackVolumePercentChange,
+	onSoloedAudioTrackChange,
+	soloedAudioTrackId = null,
+}: AudioPanelProps) {
 	const audioTracks = asset.tracks.audio;
 
 	return (
@@ -24,7 +67,23 @@ export function AudioPanel({ asset }: AudioPanelProps) {
 				) : (
 					<div className="grid gap-2">
 						{audioTracks.map((track, index) => (
-							<AudioTrackStrip index={index} key={track.id} track={track} />
+							<AudioTrackStrip
+								audioEditingDisabled={audioEditingDisabled}
+								decision={
+									audioMix.tracks[track.id] ??
+									createDefaultAudioMixTrackDecision(track)
+								}
+								index={index}
+								key={track.id}
+								onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+								onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+								onAudioTrackVolumePercentChange={
+									onAudioTrackVolumePercentChange
+								}
+								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+								soloActive={soloedAudioTrackId === track.id}
+								track={track}
+							/>
 						))}
 						<CombinedPreviewStrip />
 					</div>
@@ -35,26 +94,129 @@ export function AudioPanel({ asset }: AudioPanelProps) {
 }
 
 function AudioTrackStrip({
+	audioEditingDisabled,
+	decision,
 	index,
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onAudioTrackVolumePercentChange,
+	onSoloedAudioTrackChange,
+	soloActive,
 	track,
 }: {
+	audioEditingDisabled: boolean;
+	decision: AudioMix["tracks"][string];
 	index: number;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onAudioTrackVolumePercentChange?: (
+		trackId: string,
+		volumePercent: number,
+	) => void;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloActive: boolean;
 	track: AudioMediaTrack;
 }) {
 	const label = track.label ?? `Audio ${index + 1}`;
+	const audioIncluded = decision.include;
+	const volumePercent = clampVolumePercent(decision.volumePercent);
 
 	return (
 		<section
 			aria-label={`Audio track strip ${label}`}
-			className="grid min-h-36 min-w-0 grid-cols-[minmax(0,1fr)_4.75rem] gap-2 rounded border border-workbench-border bg-workbench-lane p-2"
+			className="grid min-h-40 min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_4.75rem] gap-2 rounded border border-workbench-border bg-workbench-lane p-2"
 		>
 			<div className="flex min-w-0 flex-col justify-between gap-3">
-				<div className="min-w-0">
-					<div className="truncate text-xs font-medium text-foreground">
-						{label}
+				<div className="grid min-w-0 gap-2">
+					<div className="min-w-0">
+						<div className="truncate text-xs font-medium text-foreground">
+							{label}
+						</div>
+						<div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
+							{formatAudioTrackMeta(track)}
+						</div>
 					</div>
-					<div className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
-						{formatAudioTrackMeta(track)}
+					<div className="grid gap-1.5">
+						<div className="flex min-w-0 flex-wrap items-center gap-1.5">
+							<Button
+								aria-label={
+									audioIncluded
+										? `Exclude ${label} from output`
+										: `Include ${label} in output`
+								}
+								aria-pressed={audioIncluded}
+								className={`h-6 rounded border-workbench-border bg-workbench-viewer px-1.5 text-[10px] hover:bg-workbench-hover ${
+									audioIncluded
+										? "text-workbench-lane-foreground"
+										: "text-muted-foreground"
+								}`}
+								disabled={audioEditingDisabled || !onAudioTrackIncludedChange}
+								onClick={() => {
+									onAudioTrackIncludedChange?.(track.id, !audioIncluded);
+								}}
+								size="sm"
+								type="button"
+								variant="outline"
+							>
+								{audioIncluded ? (
+									<Volume2 data-icon="inline-start" />
+								) : (
+									<VolumeX data-icon="inline-start" />
+								)}
+								{audioIncluded ? "Output included" : "Output excluded"}
+							</Button>
+							<Button
+								aria-label={
+									soloActive
+										? `Clear ${label} preview solo`
+										: `Solo ${label} for preview`
+								}
+								aria-pressed={soloActive}
+								className={`h-6 rounded border-workbench-border bg-workbench-viewer px-1.5 text-[10px] hover:bg-workbench-hover ${
+									soloActive
+										? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
+										: "text-muted-foreground"
+								}`}
+								disabled={!onSoloedAudioTrackChange}
+								onClick={() => {
+									onSoloedAudioTrackChange?.(soloActive ? null : track.id);
+								}}
+								size="sm"
+								type="button"
+								variant="outline"
+							>
+								<Headphones data-icon="inline-start" />
+								Preview solo
+							</Button>
+						</div>
+						<label className="grid min-w-0 gap-1">
+							<span className="text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+								Channel handling
+							</span>
+							<select
+								aria-label={`${label} channel handling`}
+								className="h-7 min-w-0 rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
+								disabled={
+									audioEditingDisabled || !onAudioTrackChannelModeChange
+								}
+								onChange={(event) => {
+									onAudioTrackChannelModeChange?.(
+										track.id,
+										event.currentTarget.value as AudioTrackChannelMode,
+									);
+								}}
+								value={decision.channelMode}
+							>
+								{AUDIO_CHANNEL_MODE_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</label>
 					</div>
 				</div>
 				<div className="flex flex-wrap gap-1.5">
@@ -63,6 +225,29 @@ function AudioTrackStrip({
 					</span>
 				</div>
 			</div>
+			<label className="flex min-w-0 flex-col items-center justify-between gap-2 rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-2">
+				<span className="sr-only">{label} track volume</span>
+				<input
+					aria-label={`${label} track volume`}
+					aria-valuetext={`${volumePercent}%`}
+					className="h-24 w-5 accent-primary [writing-mode:vertical-lr]"
+					disabled={audioEditingDisabled || !onAudioTrackVolumePercentChange}
+					max="100"
+					min="0"
+					onChange={(event) => {
+						onAudioTrackVolumePercentChange?.(
+							track.id,
+							Number.parseInt(event.currentTarget.value, 10),
+						);
+					}}
+					style={{ direction: "rtl" }}
+					type="range"
+					value={volumePercent}
+				/>
+				<span className="font-mono text-[10px] text-muted-foreground">
+					{volumePercent}%
+				</span>
+			</label>
 			<PreviewLevelMeter
 				channels={createStaticTrackMeterChannels(track, index)}
 				label={`${label} preview meter`}
@@ -71,6 +256,14 @@ function AudioTrackStrip({
 			/>
 		</section>
 	);
+}
+
+function clampVolumePercent(volumePercent: number) {
+	if (!Number.isFinite(volumePercent)) {
+		return 100;
+	}
+
+	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }
 
 function CombinedPreviewStrip() {

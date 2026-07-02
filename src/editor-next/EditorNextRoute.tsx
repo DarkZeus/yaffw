@@ -85,15 +85,26 @@ export function EditorNextRoute({
 	const activeAssetId =
 		displayedSession.status === "ready" ? displayedSession.asset.id : null;
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
+	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
+		null,
+	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
 			currentPlayheadUs === playheadUs ? currentPlayheadUs : playheadUs,
+		);
+	}, []);
+	const handleSoloedAudioTrackChange = useCallback((trackId: string | null) => {
+		setSoloedAudioTrackId((currentTrackId) =>
+			currentTrackId === trackId ? currentTrackId : trackId,
 		);
 	}, []);
 
 	useEffect(() => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
 			activeAssetId === null || currentPlayheadUs !== 0 ? 0 : currentPlayheadUs,
+		);
+		setSoloedAudioTrackId((currentTrackId) =>
+			activeAssetId === null || currentTrackId !== null ? null : currentTrackId,
 		);
 	}, [activeAssetId]);
 
@@ -129,13 +140,22 @@ export function EditorNextRoute({
 				selection={displayedSession.selection}
 			/>
 		) : null;
-	const readyAudioPanel =
-		displayedSession.status === "ready" ? (
-			<AudioPanel asset={displayedSession.asset} />
-		) : null;
 	const selectionEditingDisabled =
 		displayedSession.status === "ready" &&
 		displayedSession.export.status === "running";
+	const readyAudioPanel =
+		displayedSession.status === "ready" ? (
+			<AudioPanel
+				asset={displayedSession.asset}
+				audioEditingDisabled={selectionEditingDisabled}
+				audioMix={displayedSession.audioMix}
+				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
+				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
+				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
+				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
+				soloedAudioTrackId={soloedAudioTrackId}
+			/>
+		) : null;
 	const readyPreviewPlayer =
 		displayedSession.status === "ready" && displayedPreviewSource ? (
 			<NativePreviewPlayer
@@ -146,9 +166,8 @@ export function EditorNextRoute({
 				}
 				asset={displayedSession.asset}
 				audioMix={displayedSession.audioMix}
-				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
 				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
-				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
+				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				onSelectionEndRequested={commands.setSelectionEndFromPlayhead}
 				onSelectionRangeMoveRequested={commands.moveSelectionRange}
 				onSelectionReplaceRequested={commands.setSelectionRange}
@@ -159,6 +178,7 @@ export function EditorNextRoute({
 				selection={displayedSession.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				shortcutsDisabled={selectionEditingDisabled}
+				soloedAudioTrackId={soloedAudioTrackId}
 				source={displayedPreviewSource}
 			/>
 		) : null;

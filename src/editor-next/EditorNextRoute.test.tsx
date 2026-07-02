@@ -208,6 +208,95 @@ describe("EditorNextRoute", () => {
 		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
 	});
 
+	it("keeps Audio panel controls synced with Waveform lane quick controls", async () => {
+		mockTimelineGeometry();
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-audio-controls"}
+				createDraftId={() => "draft-audio-controls"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local media file"), {
+			target: {
+				files: [
+					new File(["video"], "audio-controls.mp4", { type: "video/mp4" }),
+				],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
+		});
+		openAudioTab();
+
+		const audioPanel = screen.getByLabelText("Audio panel");
+		const selectionRegion = screen.getByLabelText("Workbench selection region");
+
+		fireEvent.click(
+			within(audioPanel).getByRole("button", {
+				name: "Exclude Voice from output",
+			}),
+		);
+
+		await waitFor(() => {
+			expect(
+				within(audioPanel).getByRole("button", {
+					name: "Include Voice in output",
+				}),
+			).toBeTruthy();
+		});
+		expect(
+			within(selectionRegion).getByRole("button", {
+				name: "Include Voice in output",
+			}),
+		).toBeTruthy();
+
+		fireEvent.click(
+			within(selectionRegion).getByRole("button", {
+				name: "Include Voice in output",
+			}),
+		);
+
+		await waitFor(() => {
+			expect(
+				within(audioPanel).getByRole("button", {
+					name: "Exclude Voice from output",
+				}),
+			).toBeTruthy();
+		});
+
+		fireEvent.click(
+			within(audioPanel).getByRole("button", {
+				name: "Solo Voice for preview",
+			}),
+		);
+
+		await waitFor(() => {
+			expect(
+				within(selectionRegion).getByRole("button", {
+					name: "Clear Voice preview solo",
+				}),
+			).toBeTruthy();
+		});
+
+		fireEvent.click(
+			within(selectionRegion).getByRole("button", {
+				name: "Clear Voice preview solo",
+			}),
+		);
+
+		await waitFor(() => {
+			expect(
+				within(audioPanel).getByRole("button", {
+					name: "Solo Voice for preview",
+				}),
+			).toBeTruthy();
+		});
+	});
+
 	it("places preview, transport, and selection in the resolved ready workbench layout", async () => {
 		render(
 			<EditorNextRoute

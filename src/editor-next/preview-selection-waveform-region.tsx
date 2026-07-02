@@ -5,9 +5,7 @@ export function PreviewSelectionWaveformRegion({
 	asset,
 	audioMix,
 	audioPreviewPreparingTrackIds,
-	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
-	onAudioTrackVolumePercentChange,
 	onPlayheadSeekRequested,
 	onSelectionEndCommitRequested,
 	onSelectionRangeMoveRequested,
@@ -30,9 +28,7 @@ export function PreviewSelectionWaveformRegion({
 				audioMix={audioMix}
 				audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 				asset={asset}
-				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
 				onPlayheadSeekRequested={onPlayheadSeekRequested}
 				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
 				onSelectionEndCommitRequested={onSelectionEndCommitRequested}

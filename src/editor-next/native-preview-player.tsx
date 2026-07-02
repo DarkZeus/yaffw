@@ -27,9 +27,7 @@ export function NativePreviewPlayer({
 	activeMediaAssetCleanupScope,
 	asset,
 	audioMix = createDefaultAudioMix(asset),
-	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
-	onAudioTrackVolumePercentChange,
 	onPreviewPlayheadChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
@@ -40,6 +38,8 @@ export function NativePreviewPlayer({
 	selection,
 	selectionEditingDisabled = false,
 	shortcutsDisabled = false,
+	onSoloedAudioTrackChange,
+	soloedAudioTrackId: controlledSoloedAudioTrackId,
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<MediaPlayerInstance | null>(null);
@@ -49,11 +49,24 @@ export function NativePreviewPlayer({
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const [audioMonitoringReady, setAudioMonitoringReady] = useState(false);
 	const [previewUrl, setPreviewUrl] = useState("");
-	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
-		null,
-	);
+	const [localSoloedAudioTrackId, setLocalSoloedAudioTrackId] = useState<
+		string | null
+	>(null);
 	const { previewApertureStyle, previewSurfaceRef } =
 		usePreviewApertureLayout(asset);
+	const soloedAudioTrackId =
+		controlledSoloedAudioTrackId === undefined
+			? localSoloedAudioTrackId
+			: controlledSoloedAudioTrackId;
+	const handleSoloedAudioTrackChange = useCallback(
+		(trackId: string | null) => {
+			setLocalSoloedAudioTrackId((currentTrackId) =>
+				currentTrackId === trackId ? currentTrackId : trackId,
+			);
+			onSoloedAudioTrackChange?.(trackId);
+		},
+		[onSoloedAudioTrackChange],
+	);
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
@@ -63,7 +76,8 @@ export function NativePreviewPlayer({
 			},
 		);
 		setPreviewUrl(objectUrl);
-		setSoloedAudioTrackId(null);
+		setLocalSoloedAudioTrackId(null);
+		onSoloedAudioTrackChange?.(null);
 
 		return () => {
 			if (cleanupRegistration) {
@@ -73,9 +87,10 @@ export function NativePreviewPlayer({
 
 			URL.revokeObjectURL(objectUrl);
 		};
-	}, [activeMediaAssetCleanupScope, source]);
+	}, [activeMediaAssetCleanupScope, onSoloedAudioTrackChange, source]);
 
-	const audioPreviewTransportSupported = canUseBrowserAudioPreviewTransport(asset);
+	const audioPreviewTransportSupported =
+		canUseBrowserAudioPreviewTransport(asset);
 	const audioPreviewSources = useBrowserAudioPreviewSources({
 		activeMediaAssetCleanupScope,
 		audioMix,
@@ -264,11 +279,9 @@ export function NativePreviewPlayer({
 					audioMix={audioMix}
 					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 					asset={asset}
-					onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-					onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
 					onPlayheadSeekRequested={seekToUs}
-					onSoloedAudioTrackChange={setSoloedAudioTrackId}
+					onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 					onSelectionEndCommitRequested={onSelectionEndRequested}
 					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 					onSelectionResetRequested={onSelectionResetRequested}

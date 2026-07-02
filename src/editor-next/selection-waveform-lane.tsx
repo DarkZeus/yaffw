@@ -7,7 +7,6 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { AudioTrackChannelMode } from "@/editor-core/model";
 
 import type {
 	WaveformLaneIdentityInput,
@@ -17,17 +16,6 @@ import type {
 import type { WaveformLaneState } from "./selection-waveform-lanes.types";
 import { WaveformSurface } from "./selection-waveform-surface";
 
-const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
-	label: string;
-	value: AudioTrackChannelMode;
-}> = [
-	{ label: "Auto-fix quiet side", value: "auto-one-sided-stereo" },
-	{ label: "Keep as recorded", value: "preserve" },
-	{ label: "Center left-side audio", value: "use-left-as-mono" },
-	{ label: "Center right-side audio", value: "use-right-as-mono" },
-	{ label: "Center both sides", value: "average-to-mono" },
-];
-
 export function WaveformLane({
 	audioDecision,
 	audioPreviewPreparing,
@@ -35,9 +23,7 @@ export function WaveformLane({
 	lane,
 	laneHeaderWidthPx,
 	minimumSelectionDurationUs,
-	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
-	onAudioTrackVolumePercentChange,
 	onPlayheadSeekRequested,
 	onPointerDown,
 	onSelectionCommitRequested,
@@ -56,12 +42,7 @@ export function WaveformLane({
 	});
 	const metadataLabel = identity.metadata.join(" / ");
 	const audioIncluded = audioDecision?.include ?? true;
-	const channelMode = audioDecision?.channelMode ?? "preserve";
 	const soloActive = soloedAudioTrackId === lane.track.id;
-	const volumePercent = clampVolumePercent(audioDecision?.volumePercent ?? 100);
-	const audioControlsDisabled =
-		selectionEditingDisabled ||
-		(!onAudioTrackIncludedChange && !onAudioTrackVolumePercentChange);
 
 	return (
 		<div
@@ -89,10 +70,10 @@ export function WaveformLane({
 					<Button
 						aria-label={
 							audioIncluded
-								? `Exclude ${identity.title} from mix`
-								: `Include ${identity.title} in mix`
+								? `Exclude ${identity.title} from output`
+								: `Include ${identity.title} in output`
 						}
-						aria-pressed={!audioIncluded}
+						aria-pressed={audioIncluded}
 						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
 							audioIncluded
 								? "text-workbench-lane-foreground"
@@ -116,7 +97,9 @@ export function WaveformLane({
 					</Button>
 					<Button
 						aria-label={
-							soloActive ? `Unsolo ${identity.title}` : `Solo ${identity.title}`
+							soloActive
+								? `Clear ${identity.title} preview solo`
+								: `Solo ${identity.title} for preview`
 						}
 						aria-pressed={soloActive}
 						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
@@ -136,63 +119,6 @@ export function WaveformLane({
 					>
 						<Headphones data-icon="inline-start" />
 					</Button>
-					<label
-						className={`flex min-w-0 flex-1 items-center gap-1 ${
-							audioIncluded ? "opacity-100" : "opacity-55"
-						}`}
-					>
-						<span className="sr-only">{identity.title} volume</span>
-						<input
-							aria-label={`${identity.title} volume`}
-							className="h-5 min-w-10 flex-1 accent-primary"
-							disabled={
-								audioControlsDisabled || !onAudioTrackVolumePercentChange
-							}
-							max="100"
-							min="0"
-							onChange={(event) => {
-								onAudioTrackVolumePercentChange?.(
-									lane.track.id,
-									Number.parseInt(event.currentTarget.value, 10),
-								);
-							}}
-							onClick={(event) => event.stopPropagation()}
-							onPointerDown={(event) => event.stopPropagation()}
-							type="range"
-							value={volumePercent}
-						/>
-						<span className="w-7 text-right font-mono text-[10px] text-muted-foreground">
-							{volumePercent}%
-						</span>
-					</label>
-					<label
-						className={`flex min-w-0 flex-1 basis-full items-center ${
-							audioIncluded ? "opacity-100" : "opacity-55"
-						}`}
-					>
-						<span className="sr-only">{identity.title} channel fix</span>
-						<select
-							aria-label={`${identity.title} channel fix`}
-							className="h-6 w-full rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
-							disabled={
-								selectionEditingDisabled || !onAudioTrackChannelModeChange
-							}
-							onChange={(event) => {
-								onAudioTrackChannelModeChange?.(
-									lane.track.id,
-									event.currentTarget.value as AudioTrackChannelMode,
-								);
-							}}
-							onPointerDown={(event) => event.stopPropagation()}
-							value={channelMode}
-						>
-							{AUDIO_CHANNEL_MODE_OPTIONS.map((option) => (
-								<option key={option.value} value={option.value}>
-									{option.label}
-								</option>
-							))}
-						</select>
-					</label>
 				</div>
 				{audioPreviewPreparing ? (
 					<Badge
@@ -251,14 +177,6 @@ export function WaveformLane({
 			)}
 		</div>
 	);
-}
-
-function clampVolumePercent(volumePercent: number) {
-	if (!Number.isFinite(volumePercent)) {
-		return 100;
-	}
-
-	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }
 
 function LaneStatus({

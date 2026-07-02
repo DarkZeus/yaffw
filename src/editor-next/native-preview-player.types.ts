@@ -1,6 +1,5 @@
 import type {
 	AudioMix,
-	AudioTrackChannelMode,
 	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
@@ -11,15 +10,7 @@ export type NativePreviewPlayerProps = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	audioMix?: AudioMix;
-	onAudioTrackChannelModeChange?: (
-		trackId: string,
-		channelMode: AudioTrackChannelMode,
-	) => void;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
-	onAudioTrackVolumePercentChange?: (
-		trackId: string,
-		volumePercent: number,
-	) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
@@ -30,5 +21,7 @@ export type NativePreviewPlayerProps = {
 	selection: Selection;
 	selectionEditingDisabled?: boolean;
 	shortcutsDisabled?: boolean;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloedAudioTrackId?: string | null;
 	source: Blob;
 };

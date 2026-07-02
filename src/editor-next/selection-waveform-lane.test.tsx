@@ -78,10 +78,8 @@ describe("createWaveformLaneIdentityViewModel", () => {
 		});
 	});
 
-	it("emits compact audio mix and preview controls from the lane header", () => {
-		const onAudioTrackChannelModeChange = vi.fn();
+	it("keeps only quick output and preview-solo controls in the lane header", () => {
 		const onAudioTrackIncludedChange = vi.fn();
-		const onAudioTrackVolumePercentChange = vi.fn();
 		const onSoloedAudioTrackChange = vi.fn();
 
 		render(
@@ -106,9 +104,7 @@ describe("createWaveformLaneIdentityViewModel", () => {
 				}}
 				laneHeaderWidthPx={168}
 				minimumSelectionDurationUs={33_333}
-				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
 				onPlayheadSeekRequested={() => {}}
 				onPointerDown={() => {}}
 				onSelectionCommitRequested={() => {}}
@@ -125,33 +121,20 @@ describe("createWaveformLaneIdentityViewModel", () => {
 		);
 
 		fireEvent.click(
-			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+			screen.getByRole("button", { name: "Exclude Voice from output" }),
 		);
 		expect(onAudioTrackIncludedChange).toHaveBeenCalledWith(
 			"audio-voice",
 			false,
 		);
 
-		fireEvent.change(screen.getByLabelText("Voice volume"), {
-			target: { value: "37" },
-		});
-		expect(onAudioTrackVolumePercentChange).toHaveBeenCalledWith(
-			"audio-voice",
-			37,
-		);
-		expect(screen.getByText("Keep as recorded")).toBeTruthy();
 		expect(screen.getByText("Preparing audio")).toBeTruthy();
-		expect(screen.queryByText("Copy left to both")).toBeNull();
-		expect(screen.queryByText("Copy right to both")).toBeNull();
-		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
-			target: { value: "auto-one-sided-stereo" },
-		});
-		expect(onAudioTrackChannelModeChange).toHaveBeenCalledWith(
-			"audio-voice",
-			"auto-one-sided-stereo",
+		expect(screen.queryByLabelText("Voice track volume")).toBeNull();
+		expect(screen.queryByLabelText("Voice channel handling")).toBeNull();
+		expect(screen.queryByText("64%")).toBeNull();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Solo Voice for preview" }),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
 		expect(onSoloedAudioTrackChange).toHaveBeenCalledWith("audio-voice");
-		expect(screen.getByText("64%")).toBeTruthy();
 	});
 });

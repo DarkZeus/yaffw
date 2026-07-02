@@ -6,7 +6,6 @@ import type {
 import type {
 	AudioMediaTrack,
 	AudioMixTrackDecision,
-	AudioTrackChannelMode,
 	MediaTimeUs,
 	Selection,
 } from "@/editor-core/model";
@@ -25,15 +24,7 @@ export type WaveformLaneProps = {
 	lane: WaveformLaneState;
 	laneHeaderWidthPx: number;
 	minimumSelectionDurationUs: MediaTimeUs;
-	onAudioTrackChannelModeChange?: (
-		trackId: string,
-		channelMode: AudioTrackChannelMode,
-	) => void;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
-	onAudioTrackVolumePercentChange?: (
-		trackId: string,
-		volumePercent: number,
-	) => void;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onPointerDown: (event: WaveformLanePointerEvent) => void;
 	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;

@@ -571,9 +571,11 @@ describe("NativePreviewPlayer", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Unmute preview audio" }),
 		);
-		fireEvent.change(screen.getByLabelText("Voice volume"), {
-			target: { value: "50" },
-		});
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Set Voice track volume to 50%",
+			}),
+		);
 
 		await waitFor(() => {
 			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
@@ -584,7 +586,7 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		fireEvent.click(
-			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+			screen.getByRole("button", { name: "Exclude Voice from output" }),
 		);
 
 		await waitFor(() => {
@@ -592,7 +594,9 @@ describe("NativePreviewPlayer", () => {
 			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Solo Voice for preview" }),
+		);
 
 		await waitFor(() => {
 			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
@@ -603,9 +607,11 @@ describe("NativePreviewPlayer", () => {
 		);
 		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
 
-		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
-			target: { value: "use-left-as-mono" },
-		});
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Set Voice channel handling to left mono",
+			}),
+		);
 
 		await waitFor(() => {
 			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
@@ -650,16 +656,22 @@ describe("NativePreviewPlayer", () => {
 			adapterMockState.multitracks[0].emitCanPlay();
 		});
 
-		fireEvent.change(screen.getByLabelText("Voice volume"), {
-			target: { value: "50" },
-		});
 		fireEvent.click(
-			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+			screen.getByRole("button", {
+				name: "Set Voice track volume to 50%",
+			}),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
-		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
-			target: { value: "use-left-as-mono" },
-		});
+		fireEvent.click(
+			screen.getByRole("button", { name: "Exclude Voice from output" }),
+		);
+		fireEvent.click(
+			screen.getByRole("button", { name: "Solo Voice for preview" }),
+		);
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Set Voice channel handling to left mono",
+			}),
+		);
 
 		await waitFor(() => {
 			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
@@ -1027,32 +1039,16 @@ function AudioMasterPlayerProbe({
 	selection?: Selection;
 	source?: Blob;
 } = {}) {
-	const [audioMix, setAudioMix] = useState(() =>
-		createDefaultAudioMix(asset),
-	);
+	const [audioMix, setAudioMix] = useState(() => createDefaultAudioMix(asset));
 
 	return (
 		<>
 			<NativePreviewPlayer
 				asset={asset}
 				audioMix={audioMix}
-				onAudioTrackChannelModeChange={(trackId, channelMode) => {
-					setAudioMix((currentAudioMix) =>
-						updateAudioMixTrack(currentAudioMix, trackId, {
-							channelMode,
-						}),
-					);
-				}}
 				onAudioTrackIncludedChange={(trackId, include) => {
 					setAudioMix((currentAudioMix) =>
 						updateAudioMixTrack(currentAudioMix, trackId, { include }),
-					);
-				}}
-				onAudioTrackVolumePercentChange={(trackId, volumePercent) => {
-					setAudioMix((currentAudioMix) =>
-						updateAudioMixTrack(currentAudioMix, trackId, {
-							volumePercent,
-						}),
 					);
 				}}
 				onPreviewPlayheadChange={onPreviewPlayheadChange}
@@ -1063,6 +1059,30 @@ function AudioMasterPlayerProbe({
 				selection={playerSelection}
 				source={source}
 			/>
+			<button
+				onClick={() => {
+					setAudioMix((currentAudioMix) =>
+						updateAudioMixTrack(currentAudioMix, "audio-1", {
+							volumePercent: 50,
+						}),
+					);
+				}}
+				type="button"
+			>
+				Set Voice track volume to 50%
+			</button>
+			<button
+				onClick={() => {
+					setAudioMix((currentAudioMix) =>
+						updateAudioMixTrack(currentAudioMix, "audio-1", {
+							channelMode: "use-left-as-mono",
+						}),
+					);
+				}}
+				type="button"
+			>
+				Set Voice channel handling to left mono
+			</button>
 			<output aria-label="audio mix snapshot">
 				{formatAudioMixSnapshot(audioMix)}
 			</output>

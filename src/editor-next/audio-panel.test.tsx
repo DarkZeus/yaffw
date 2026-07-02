@@ -1,8 +1,15 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import {
 	DEFAULT_OUTPUT_PROFILE,
 	type ReadyMediaAsset,
@@ -69,6 +76,88 @@ describe("AudioPanel", () => {
 		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
 		expect(within(audioPanel).queryByText(/routing/i)).toBeNull();
 		expect(within(audioPanel).queryByText(/bus/i)).toBeNull();
+	});
+
+	it("exposes per-track Audio mix and preview monitoring controls", () => {
+		const audioMix = createDefaultAudioMix(readyAsset);
+		const voiceDecision = audioMix.tracks["audio-voice"];
+
+		if (!voiceDecision) {
+			throw new Error("Expected Voice audio decision.");
+		}
+
+		voiceDecision.channelMode = "use-left-as-mono";
+		voiceDecision.volumePercent = 64;
+
+		const onAudioTrackChannelModeChange = vi.fn();
+		const onAudioTrackIncludedChange = vi.fn();
+		const onAudioTrackVolumePercentChange = vi.fn();
+		const onSoloedAudioTrackChange = vi.fn();
+
+		render(
+			<AudioPanel
+				asset={readyAsset}
+				audioMix={audioMix}
+				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
+				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+				soloedAudioTrackId="audio-desktop"
+			/>,
+		);
+
+		const voiceStrip = screen.getByLabelText("Audio track strip Voice");
+		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
+		const voiceVolume = within(voiceStrip).getByRole("slider", {
+			name: "Voice track volume",
+		});
+		const voiceChannelHandling = within(voiceStrip).getByLabelText(
+			"Voice channel handling",
+		);
+
+		expect((voiceVolume as HTMLInputElement).value).toBe("64");
+		expect(within(voiceStrip).getByText("64%")).toBeTruthy();
+		expect((voiceChannelHandling as HTMLSelectElement).value).toBe(
+			"use-left-as-mono",
+		);
+
+		fireEvent.change(voiceVolume, { target: { value: "37" } });
+		expect(onAudioTrackVolumePercentChange).toHaveBeenCalledWith(
+			"audio-voice",
+			37,
+		);
+
+		fireEvent.change(voiceChannelHandling, {
+			target: { value: "auto-one-sided-stereo" },
+		});
+		expect(onAudioTrackChannelModeChange).toHaveBeenCalledWith(
+			"audio-voice",
+			"auto-one-sided-stereo",
+		);
+
+		fireEvent.click(
+			within(voiceStrip).getByRole("button", {
+				name: "Exclude Voice from output",
+			}),
+		);
+		expect(onAudioTrackIncludedChange).toHaveBeenCalledWith(
+			"audio-voice",
+			false,
+		);
+
+		fireEvent.click(
+			within(voiceStrip).getByRole("button", {
+				name: "Solo Voice for preview",
+			}),
+		);
+		expect(onSoloedAudioTrackChange).toHaveBeenCalledWith("audio-voice");
+
+		fireEvent.click(
+			within(desktopStrip).getByRole("button", {
+				name: "Clear Desktop preview solo",
+			}),
+		);
+		expect(onSoloedAudioTrackChange).toHaveBeenLastCalledWith(null);
 	});
 });
 
