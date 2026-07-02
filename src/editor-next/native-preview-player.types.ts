@@ -5,12 +5,16 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import type { ActiveMediaAssetCleanupScope } from "./active-media-asset-cleanup-scope";
+import type { LivePreviewMeteringClock } from "./preview-metering-live";
 
 export type NativePreviewPlayerProps = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	audioMix?: AudioMix;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPreviewMeteringClockChange?: (
+		clock: LivePreviewMeteringClock | null,
+	) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;

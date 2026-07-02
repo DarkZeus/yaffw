@@ -1,0 +1,340 @@
+import { describe, expect, it } from "vitest";
+
+import type { AudioMix } from "@/editor-core/model";
+import { createLivePreviewMeteringTrackStates } from "./preview-metering-live";
+import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
+
+describe("createLivePreviewMeteringTrackStates", () => {
+	it("samples a peak window around the Playhead after channel handling and Track volume", () => {
+		const { trackStates } = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "use-left-as-mono",
+				include: true,
+				volumePercent: 50,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left", "Right"],
+				channels: [[[100, 1]], [[100, 0.25]]],
+			}),
+		});
+
+		const voiceState = trackStates["audio-voice"];
+
+		expect(voiceState?.status).toBe("ready");
+		if (voiceState?.status !== "ready") {
+			throw new Error("Expected ready live metering state.");
+		}
+
+		expect(voiceState.channels).toHaveLength(1);
+		expect(voiceState.channels[0]?.label).toBe("Mono");
+		expect(voiceState.channels[0]?.peakDb).toBeCloseTo(-12.04, 2);
+		expect(voiceState.channels[0]?.clipHeld).toBe(false);
+	});
+
+	it("uses the 50 ms playhead window and floors ready meters while paused", () => {
+		const playing = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left", "Right"],
+				channels: [
+					[
+						[124, 0.5],
+						[130, 1],
+					],
+					[[130, 1]],
+				],
+			}),
+		}).trackStates["audio-voice"];
+
+		expect(playing?.status).toBe("ready");
+		if (playing?.status !== "ready") {
+			throw new Error("Expected ready live metering state.");
+		}
+		expect(playing.channels).toHaveLength(2);
+		expect(playing.channels[0]?.label).toBe("Left");
+		expect(playing.channels[1]?.label).toBe("Right");
+		expect(playing.channels[0]?.peakDb).toBeCloseTo(-6.02, 2);
+		expect(playing.channels[1]?.peakDb).toBe(-72);
+
+		const paused = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: false,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left", "Right"],
+				channels: [[[100, 1]], [[100, 1]]],
+			}),
+		}).trackStates["audio-voice"];
+
+		expect(paused?.status).toBe("ready");
+		if (paused?.status !== "ready") {
+			throw new Error("Expected ready live metering state.");
+		}
+		expect(paused.channels.map((channel) => channel.peakDb)).toEqual([
+			-72, -72,
+		]);
+	});
+
+	it("holds clip indicators briefly after effective Track volume clipping", () => {
+		const clipped = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left"],
+				channels: [[[100, 1.2]]],
+			}),
+		});
+		const held = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_500,
+			playheadUs: 100_000,
+			previousClipHoldState: clipped.clipHoldState,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left"],
+				channels: [[[100, 0.2]]],
+			}),
+		}).trackStates["audio-voice"];
+		const expired = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_800,
+			playheadUs: 100_000,
+			previousClipHoldState: clipped.clipHoldState,
+			soloedAudioTrackId: null,
+			trackStates: createPreparedTrackStates({
+				channelLabels: ["Left"],
+				channels: [[[100, 0.2]]],
+			}),
+		}).trackStates["audio-voice"];
+
+		expect(held?.status).toBe("ready");
+		expect(expired?.status).toBe("ready");
+		if (held?.status !== "ready" || expired?.status !== "ready") {
+			throw new Error("Expected ready live metering states.");
+		}
+		expect(held.channels[0]?.clipHeld).toBe(true);
+		expect(held.channels[0]?.peakDb).toBeCloseTo(-13.98, 2);
+		expect(expired.channels[0]?.clipHeld).toBe(false);
+	});
+
+	it("shows excluded tracks as floor unless that track is soloed for preview", () => {
+		const trackStates = {
+			...createPreparedTrackStates({
+				channelLabels: ["Ch 1", "Ch 2"],
+				channels: [[[100, 0.5]], [[100, 0.25]]],
+			}),
+			"audio-desktop": createPreparedTrackState({
+				channelLabels: ["Left", "Right"],
+				channels: [[[100, 0.75]], [[100, 0.5]]],
+				trackId: "audio-desktop",
+			}),
+		};
+		const excluded = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: false,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates,
+		}).trackStates["audio-voice"];
+		const soloed = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: false,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: "audio-voice",
+			trackStates,
+		}).trackStates["audio-voice"];
+		const otherTrackWhileSoloed = createLivePreviewMeteringTrackStates({
+			audioMix: createAudioMix({
+				channelMode: "preserve",
+				include: true,
+				volumePercent: 100,
+			}),
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: "audio-voice",
+			trackStates,
+		}).trackStates["audio-desktop"];
+
+		expect(excluded?.status).toBe("ready");
+		expect(soloed?.status).toBe("ready");
+		expect(otherTrackWhileSoloed?.status).toBe("ready");
+		if (
+			excluded?.status !== "ready" ||
+			soloed?.status !== "ready" ||
+			otherTrackWhileSoloed?.status !== "ready"
+		) {
+			throw new Error("Expected ready live metering states.");
+		}
+		expect(excluded.excluded).toBe(true);
+		expect(excluded.channels.map((channel) => channel.peakDb)).toEqual([
+			-72, -72,
+		]);
+		expect(soloed.excluded).toBe(false);
+		expect(soloed.channels[0]?.label).toBe("Ch 1");
+		expect(soloed.channels[0]?.peakDb).toBeCloseTo(-6.02, 2);
+		expect(otherTrackWhileSoloed.channels[0]?.peakDb).toBeCloseTo(-2.5, 1);
+	});
+});
+
+function createAudioMix({
+	channelMode,
+	include,
+	volumePercent,
+}: {
+	channelMode: AudioMix["tracks"][string]["channelMode"];
+	include: boolean;
+	volumePercent: number;
+}): AudioMix {
+	return {
+		finalPeakGuardDb: -1,
+		outputChannels: 2,
+		tracks: {
+			"audio-desktop": {
+				channelMode: "preserve",
+				include: true,
+				trackId: "audio-desktop",
+				volumePercent: 100,
+			},
+			"audio-voice": {
+				channelMode,
+				include,
+				trackId: "audio-voice",
+				volumePercent,
+			},
+		},
+	};
+}
+
+function createPreparedTrackStates({
+	channelLabels,
+	channels,
+}: {
+	channelLabels: string[];
+	channels: Array<Array<[number, number]>>;
+}): PreviewMeteringTrackStates {
+	return {
+		"audio-voice": createPreparedTrackState({
+			channelLabels,
+			channels,
+			trackId: "audio-voice",
+		}),
+	};
+}
+
+function createPreparedTrackState({
+	channelLabels,
+	channels,
+	trackId,
+}: {
+	channelLabels: string[];
+	channels: Array<Array<[number, number]>>;
+	trackId: "audio-voice" | "audio-desktop";
+}): PreviewMeteringTrackStates[string] {
+	const trackIndex = trackId === "audio-voice" ? 0 : 1;
+
+	return {
+		prepared: {
+			audioBuffer: createTestAudioBuffer(channels),
+			channelLabels,
+			startPositionSeconds: 0,
+			track: {
+				channels: channelLabels.length,
+				id: trackId,
+				kind: "audio",
+				label: trackId === "audio-voice" ? "Voice" : "Desktop",
+			},
+			trackId,
+			trackIndex,
+		},
+		status: "ready",
+		trackId,
+	};
+}
+
+function createTestAudioBuffer(
+	channels: Array<Array<[number, number]>>,
+): AudioBuffer {
+	const length = 200;
+	const channelData = channels.map((peaks) => {
+		const data = new Float32Array(length);
+
+		for (const [frameIndex, value] of peaks) {
+			data[frameIndex] = value;
+		}
+
+		return data;
+	});
+
+	return {
+		copyFromChannel(destination, channelNumber, startInChannel = 0) {
+			destination.set(
+				channelData[channelNumber]?.subarray(
+					startInChannel,
+					startInChannel + destination.length,
+				) ?? new Float32Array(destination.length),
+			);
+		},
+		copyToChannel(source, channelNumber, startInChannel = 0) {
+			channelData[channelNumber]?.set(source, startInChannel);
+		},
+		duration: length / 1_000,
+		getChannelData(channelNumber) {
+			const data = channelData[channelNumber];
+
+			if (!data) {
+				throw new Error(`Missing channel ${channelNumber}.`);
+			}
+
+			return data;
+		},
+		length,
+		numberOfChannels: channelData.length,
+		sampleRate: 1_000,
+	} as AudioBuffer;
+}

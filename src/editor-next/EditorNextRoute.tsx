@@ -28,6 +28,7 @@ import { ExportInspectorPanel } from "./export-inspector";
 import { deliverBrowserGeneratedMedia } from "./generated-media-delivery";
 import { MediaAssetContextPanel } from "./media-asset-context";
 import { NativePreviewPlayer } from "./native-preview-player";
+import type { LivePreviewMeteringClock } from "./preview-metering-live";
 import { usePreviewMeteringPreparation } from "./use-preview-metering-preparation";
 import { useSingleAssetEditingSession } from "./use-single-asset-editing-session";
 
@@ -98,6 +99,8 @@ export function EditorNextRoute({
 				: null,
 	});
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
+	const [previewMeteringClock, setPreviewMeteringClock] =
+		useState<LivePreviewMeteringClock | null>(null);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
 	);
@@ -111,6 +114,14 @@ export function EditorNextRoute({
 			currentTrackId === trackId ? currentTrackId : trackId,
 		);
 	}, []);
+	const handlePreviewMeteringClockChange = useCallback(
+		(clock: LivePreviewMeteringClock | null) => {
+			setPreviewMeteringClock((currentClock) =>
+				currentClock === clock ? currentClock : clock,
+			);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
@@ -118,6 +129,9 @@ export function EditorNextRoute({
 		);
 		setSoloedAudioTrackId((currentTrackId) =>
 			activeAssetId === null || currentTrackId !== null ? null : currentTrackId,
+		);
+		setPreviewMeteringClock((currentClock) =>
+			activeAssetId === null ? null : currentClock,
 		);
 	}, [activeAssetId]);
 
@@ -165,7 +179,10 @@ export function EditorNextRoute({
 				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
 				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
 				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
-				previewMetering={previewMeteringPreparation}
+				previewMetering={{
+					...previewMeteringPreparation,
+					clock: previewMeteringClock,
+				}}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				soloedAudioTrackId={soloedAudioTrackId}
 			/>
@@ -187,6 +204,7 @@ export function EditorNextRoute({
 				onSelectionReplaceRequested={commands.setSelectionRange}
 				onSelectionResetRequested={commands.resetSelection}
 				onSelectionStartRequested={commands.setSelectionStartFromPlayhead}
+				onPreviewMeteringClockChange={handlePreviewMeteringClockChange}
 				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				previewPosterSrc={displayedPreviewPosterSrc}
 				selection={displayedSession.selection}

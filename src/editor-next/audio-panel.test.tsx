@@ -5,6 +5,7 @@ import {
 	fireEvent,
 	render,
 	screen,
+	waitFor,
 	within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -255,6 +256,53 @@ describe("AudioPanel", () => {
 
 		expect(onTrackRetry).toHaveBeenCalledWith("audio-desktop");
 	});
+
+	it("renders live prepared meter values through the Audio strip", async () => {
+		const audioMix = createDefaultAudioMix(readyAsset);
+		const voiceDecision = audioMix.tracks["audio-voice"];
+
+		if (!voiceDecision) {
+			throw new Error("Expected Voice audio decision.");
+		}
+
+		voiceDecision.channelMode = "use-left-as-mono";
+		voiceDecision.volumePercent = 50;
+
+		render(
+			<AudioPanel
+				asset={readyAsset}
+				audioMix={audioMix}
+				previewMetering={{
+					clock: {
+						getIsPlaying: () => true,
+						getPlayheadUs: () => 100_000,
+					},
+					trackStates: {
+						"audio-voice": {
+							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
+				}}
+			/>,
+		);
+
+		const voiceMeter = screen.getByLabelText("Voice preview meter");
+
+		await waitFor(() => {
+			expect(
+				Number(
+					within(voiceMeter)
+						.getByRole("meter", { name: "Mono level" })
+						.getAttribute("aria-valuenow"),
+				),
+			).toBeCloseTo(-12.04, 2);
+		});
+		expect(
+			within(voiceMeter).queryByRole("meter", { name: "Left level" }),
+		).toBeNull();
+	});
 });
 
 const videoOnlyAsset = {
@@ -331,15 +379,50 @@ function createPreparedTrack(
 	const trackIndex = trackId === "audio-voice" ? 0 : 1;
 
 	return {
-		audioBuffer: {
-			length: 1_024,
-			numberOfChannels: channelLabels.length,
-			sampleRate: 48_000,
-		} as unknown as AudioBuffer,
+		audioBuffer: createTestAudioBuffer(channelLabels.length),
 		channelLabels,
 		startPositionSeconds: 0,
 		track: readyAsset.tracks.audio[trackIndex],
 		trackId,
 		trackIndex,
 	};
+}
+
+function createTestAudioBuffer(numberOfChannels: number): AudioBuffer {
+	const length = 200;
+	const channelData = Array.from(
+		{ length: numberOfChannels },
+		(_, channelIndex) => {
+			const data = new Float32Array(length);
+			data[100] = channelIndex === 0 ? 1 : 0.25;
+			return data;
+		},
+	);
+
+	return {
+		copyFromChannel(destination, channelNumber, startInChannel = 0) {
+			destination.set(
+				channelData[channelNumber]?.subarray(
+					startInChannel,
+					startInChannel + destination.length,
+				) ?? new Float32Array(destination.length),
+			);
+		},
+		copyToChannel(source, channelNumber, startInChannel = 0) {
+			channelData[channelNumber]?.set(source, startInChannel);
+		},
+		duration: length / 1_000,
+		getChannelData(channelNumber) {
+			const data = channelData[channelNumber];
+
+			if (!data) {
+				throw new Error(`Missing channel ${channelNumber}.`);
+			}
+
+			return data;
+		},
+		length,
+		numberOfChannels,
+		sampleRate: 1_000,
+	} as AudioBuffer;
 }

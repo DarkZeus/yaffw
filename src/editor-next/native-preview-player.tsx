@@ -12,11 +12,11 @@ import type { MediaTimeUs } from "@/editor-core/model";
 import { canUseBrowserAudioPreviewTransport } from "./native-preview-audio-transport";
 import type { NativePreviewPlayerProps } from "./native-preview-player.types";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
+import { resolvePreviewClockMode } from "./preview-clock-mode";
 import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { PreviewSelectionWaveformRegion } from "./preview-selection-waveform-region";
 import { PreviewTransportRegion } from "./preview-transport-region";
 import { PreviewViewerRegion } from "./preview-viewer-region";
-import { resolvePreviewClockMode } from "./preview-clock-mode";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
@@ -28,6 +28,7 @@ export function NativePreviewPlayer({
 	asset,
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackIncludedChange,
+	onPreviewMeteringClockChange,
 	onPreviewPlayheadChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
@@ -47,6 +48,11 @@ export function NativePreviewPlayer({
 	const multitrackRef = useRef<MultiTrack | null>(null);
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
+	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
+	const previewMeteringClockRef = useRef({
+		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
+		getPlayheadUs: () => getPlayheadUsRef.current(),
+	});
 	const [audioMonitoringReady, setAudioMonitoringReady] = useState(false);
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [localSoloedAudioTrackId, setLocalSoloedAudioTrackId] = useState<
@@ -149,6 +155,16 @@ export function NativePreviewPlayer({
 	});
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
+	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
+
+	useEffect(() => {
+		const clock = previewMeteringClockRef.current;
+		onPreviewMeteringClockChange?.(clock);
+
+		return () => {
+			onPreviewMeteringClockChange?.(null);
+		};
+	}, [onPreviewMeteringClockChange]);
 
 	useEffect(() => {
 		onPreviewPlayheadChange?.(playheadUs);

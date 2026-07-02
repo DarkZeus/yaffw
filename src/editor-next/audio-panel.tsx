@@ -5,6 +5,7 @@ import {
 	Volume2,
 	VolumeX,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,12 +22,13 @@ import {
 	PreviewLevelMeter,
 	type PreviewLevelMeterChannel,
 	type PreviewLevelMeterState,
-	previewPeakMeterVisualRange,
 } from "./preview-level-meter";
 import type {
-	PreviewMeteringTrackState,
-	PreviewMeteringTrackStates,
-} from "./preview-metering-preparation.types";
+	LivePreviewMeteringClock,
+	LivePreviewMeteringTrackState,
+} from "./preview-metering-live";
+import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
+import { useLivePreviewMetering } from "./use-live-preview-metering";
 
 export type AudioPanelProps = {
 	asset: ReadyMediaAsset;
@@ -42,6 +44,7 @@ export type AudioPanelProps = {
 		volumePercent: number,
 	) => void;
 	previewMetering?: {
+		clock?: LivePreviewMeteringClock | null;
 		onTrackRetry?: (trackId: string) => void;
 		trackStates: PreviewMeteringTrackStates;
 	};
@@ -60,10 +63,12 @@ const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
 	{ label: "Center both sides", value: "average-to-mono" },
 ];
 
+const EMPTY_PREVIEW_METERING_TRACK_STATES = {};
+
 export function AudioPanel({
 	asset,
 	audioEditingDisabled = false,
-	audioMix = createDefaultAudioMix(asset),
+	audioMix: providedAudioMix,
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
@@ -71,7 +76,17 @@ export function AudioPanel({
 	onSoloedAudioTrackChange,
 	soloedAudioTrackId = null,
 }: AudioPanelProps) {
+	const defaultAudioMix = useMemo(() => createDefaultAudioMix(asset), [asset]);
+	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
+	const livePreviewMeteringTrackStates = useLivePreviewMetering({
+		audioMix,
+		clock: previewMetering?.clock,
+		enabled: Boolean(previewMetering),
+		soloedAudioTrackId,
+		trackStates:
+			previewMetering?.trackStates ?? EMPTY_PREVIEW_METERING_TRACK_STATES,
+	});
 
 	return (
 		<section
@@ -100,7 +115,7 @@ export function AudioPanel({
 								onPreviewMeteringRetry={previewMetering?.onTrackRetry}
 								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
 								previewMeteringControlled={Boolean(previewMetering)}
-								previewMeteringState={previewMetering?.trackStates[track.id]}
+								previewMeteringState={livePreviewMeteringTrackStates[track.id]}
 								soloActive={soloedAudioTrackId === track.id}
 								track={track}
 							/>
@@ -142,7 +157,7 @@ function AudioTrackStrip({
 	onPreviewMeteringRetry?: (trackId: string) => void;
 	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	previewMeteringControlled: boolean;
-	previewMeteringState?: PreviewMeteringTrackState;
+	previewMeteringState?: LivePreviewMeteringTrackState;
 	soloActive: boolean;
 	track: AudioMediaTrack;
 }) {
@@ -159,7 +174,10 @@ function AudioTrackStrip({
 	return (
 		<section
 			aria-label={`Audio track strip ${label}`}
-			className="grid min-h-40 min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_4.75rem] gap-2 rounded border border-workbench-border bg-workbench-lane p-2"
+			className={`grid min-h-40 min-w-0 grid-cols-[minmax(0,1fr)_2.75rem_4.75rem] gap-2 rounded border border-workbench-border bg-workbench-lane p-2 ${
+				meterDisplay.excluded ? "opacity-70" : ""
+			}`}
+			data-preview-meter-excluded={meterDisplay.excluded ? "true" : undefined}
 		>
 			<div className="flex min-w-0 flex-col justify-between gap-3">
 				<div className="grid min-w-0 gap-2">
@@ -437,11 +455,12 @@ function createTrackMeterDisplay({
 	trackIndex,
 }: {
 	controlled: boolean;
-	state?: PreviewMeteringTrackState;
+	state?: LivePreviewMeteringTrackState;
 	track: AudioMediaTrack;
 	trackIndex: number;
 }): {
 	channels: PreviewLevelMeterChannel[];
+	excluded: boolean;
 	message?: string;
 	reason?: string;
 	state: PreviewLevelMeterState;
@@ -450,6 +469,7 @@ function createTrackMeterDisplay({
 	if (!controlled) {
 		return {
 			channels: createStaticTrackMeterChannels(track, trackIndex),
+			excluded: false,
 			state: "ready",
 			statusLabel: "Ready",
 		};
@@ -458,6 +478,7 @@ function createTrackMeterDisplay({
 	if (!state || state.status === "preparing") {
 		return {
 			channels: [],
+			excluded: false,
 			message: "Preparing decoded samples",
 			state: "preparing",
 			statusLabel: "Preparing",
@@ -467,6 +488,7 @@ function createTrackMeterDisplay({
 	if (state.status === "unavailable") {
 		return {
 			channels: [],
+			excluded: false,
 			message: "Meter unavailable",
 			reason: state.reason,
 			state: "unavailable",
@@ -475,12 +497,9 @@ function createTrackMeterDisplay({
 	}
 
 	return {
-		channels: state.prepared.channelLabels.map((channelLabel) => ({
-			clipHeld: false,
-			label: channelLabel,
-			peakDb: previewPeakMeterVisualRange.floorDb,
-		})),
+		channels: state.channels,
+		excluded: state.excluded,
 		state: "ready",
-		statusLabel: "Ready",
+		statusLabel: state.excluded ? "Excluded" : "Ready",
 	};
 }
