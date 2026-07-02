@@ -3,6 +3,8 @@ import type MultiTrack from "wavesurfer-multitrack";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
+import type { PreviewClockMode } from "./preview-clock-mode";
+
 export type PreviewMediaTransportHandle = {
 	currentTime: number;
 	muted: boolean;
@@ -13,10 +15,10 @@ export type PreviewMediaTransportHandle = {
 };
 
 export type UseNativePreviewTransportOptions = {
-	audioTransportReady: boolean;
 	durationUs: MediaTimeUs;
 	frameDurationUs: MediaTimeUs;
 	multitrackRef: RefObject<MultiTrack | null>;
+	previewClockMode: PreviewClockMode;
 	selection: Selection;
 	source: Blob;
 	videoRef: RefObject<PreviewMediaTransportHandle | null>;

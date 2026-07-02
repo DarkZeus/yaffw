@@ -149,7 +149,19 @@ vi.mock("@vidstack/react/player/layouts/default", async () => {
 	};
 });
 
+vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("./browser-audio-preview-sources")>();
+
+	return {
+		...actual,
+		prepareBrowserAudioPreviewSources: vi.fn(),
+	};
+});
+
 import { createActiveMediaAssetCleanupScopeController } from "./active-media-asset-cleanup-scope";
+import { prepareBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
+import type { BrowserAudioPreviewSourcesResult } from "./browser-audio-preview-sources.types";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 function normalizeMockPlayerSrc(src: unknown): string | undefined {
@@ -174,6 +186,9 @@ const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
 const play = vi.fn().mockResolvedValue(undefined);
 const pause = vi.fn();
+const prepareBrowserAudioPreviewSourcesMock = vi.mocked(
+	prepareBrowserAudioPreviewSources,
+);
 
 beforeEach(() => {
 	vi.stubGlobal("URL", {
@@ -192,6 +207,7 @@ beforeEach(() => {
 	revokeObjectURL.mockClear();
 	play.mockClear();
 	pause.mockClear();
+	prepareBrowserAudioPreviewSourcesMock.mockReset();
 });
 
 afterEach(() => {
@@ -409,6 +425,27 @@ describe("NativePreviewPlayer", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 		expect(video.muted).toBe(true);
+	});
+
+	it("keeps audio preview preparation visible and blocks native playback while audio-master is pending", async () => {
+		const pendingAudioPreview =
+			createDeferred<BrowserAudioPreviewSourcesResult>();
+		prepareBrowserAudioPreviewSourcesMock.mockReturnValueOnce(
+			pendingAudioPreview.promise,
+		);
+		vi.stubGlobal("AudioContext", class AudioContext {});
+
+		renderPlayer({ asset: readyAssetWithAudio });
+
+		await waitFor(() => {
+			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		});
+		expect(screen.getByText("Preparing audio")).toBeTruthy();
+
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		expect(play).not.toHaveBeenCalled();
+		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
 	});
 
 	it("keeps Playhead seek, Selection commit, and Selection range move channels separate in the lower region", () => {
@@ -755,6 +792,21 @@ function runNextPreviewFrame(frameCallbacks: FrameRequestCallback[]) {
 	});
 }
 
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+
+	return {
+		promise,
+		reject,
+		resolve,
+	};
+}
+
 function createTestDomRect({
 	height,
 	width,
@@ -803,6 +855,21 @@ const readyAsset = {
 			{
 				id: "video-1",
 				kind: "video",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
+const readyAssetWithAudio = {
+	...readyAsset,
+	tracks: {
+		...readyAsset.tracks,
+		audio: [
+			{
+				codec: "aac",
+				id: "audio-1",
+				kind: "audio",
+				label: "Voice",
 			},
 		],
 	},

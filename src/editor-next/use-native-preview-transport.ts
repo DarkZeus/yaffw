@@ -8,10 +8,10 @@ import type { UseNativePreviewTransportOptions } from "./use-native-preview-tran
 const PREVIEW_AV_HARD_RESYNC_THRESHOLD_SECONDS = 0.25;
 
 export function useNativePreviewTransport({
-	audioTransportReady,
 	durationUs,
 	frameDurationUs,
 	multitrackRef,
+	previewClockMode,
 	selection,
 	source,
 	videoRef,
@@ -30,6 +30,8 @@ export function useNativePreviewTransport({
 
 	const getPlaybackRate = useCallback(() => playbackRateRef.current, []);
 	const getPlayheadUs = useCallback(() => playheadRef.current, []);
+	const audioMasterClockActive = previewClockMode === "audio-master";
+	const nativeVideoClockActive = previewClockMode === "native-video";
 
 	useEffect(() => {
 		if (!source) {
@@ -67,11 +69,11 @@ export function useNativePreviewTransport({
 				video.currentTime = nextTimeSeconds;
 			}
 
-			if (audioTransportReady) {
+			if (audioMasterClockActive) {
 				multitrackRef.current?.setTime(nextTimeSeconds);
 			}
 		},
-		[audioTransportReady, multitrackRef, videoRef],
+		[audioMasterClockActive, multitrackRef, videoRef],
 	);
 
 	const updateSelectionLoopEntryFromPlayhead = useCallback(
@@ -136,8 +138,12 @@ export function useNativePreviewTransport({
 			return;
 		}
 
+		if (previewClockMode === "audio-master-pending") {
+			return;
+		}
+
 		try {
-			if (audioTransportReady) {
+			if (audioMasterClockActive) {
 				video.muted = true;
 				multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
 				multitrackRef.current?.play();
@@ -153,7 +159,13 @@ export function useNativePreviewTransport({
 			multitrackPlaybackStartedRef.current = false;
 			setIsPlaying(false);
 		}
-	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
+	}, [
+		audioMasterClockActive,
+		isPlaying,
+		multitrackRef,
+		previewClockMode,
+		videoRef,
+	]);
 
 	const setPreviewPlaybackRate = useCallback(
 		(nextPlaybackRate: number) => {
@@ -188,11 +200,11 @@ export function useNativePreviewTransport({
 		const video = videoRef.current;
 
 		if (video) {
-			video.muted = audioTransportReady || nextMuted;
+			video.muted = !nativeVideoClockActive || nextMuted;
 		}
 
 		setMuted(nextMuted);
-	}, [audioTransportReady, muted, videoRef]);
+	}, [muted, nativeVideoClockActive, videoRef]);
 
 	useEffect(() => {
 		const video = videoRef.current;
@@ -201,11 +213,11 @@ export function useNativePreviewTransport({
 			return;
 		}
 
-		video.muted = audioTransportReady || muted;
-	}, [audioTransportReady, muted, videoRef]);
+		video.muted = !nativeVideoClockActive || muted;
+	}, [muted, nativeVideoClockActive, videoRef]);
 
 	useEffect(() => {
-		if (!audioTransportReady || !isPlaying) {
+		if (!audioMasterClockActive || !isPlaying) {
 			multitrackPlaybackStartedRef.current = false;
 			return;
 		}
@@ -221,7 +233,18 @@ export function useNativePreviewTransport({
 		multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
 		multitrackRef.current?.play();
 		multitrackPlaybackStartedRef.current = true;
-	}, [audioTransportReady, isPlaying, multitrackRef, videoRef]);
+	}, [audioMasterClockActive, isPlaying, multitrackRef, videoRef]);
+
+	useEffect(() => {
+		if (previewClockMode !== "audio-master-pending" || !isPlaying) {
+			return;
+		}
+
+		multitrackRef.current?.pause();
+		videoRef.current?.pause();
+		multitrackPlaybackStartedRef.current = false;
+		setIsPlaying(false);
+	}, [isPlaying, multitrackRef, previewClockMode, videoRef]);
 
 	const toggleSelectionLoop = useCallback(() => {
 		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
@@ -243,13 +266,13 @@ export function useNativePreviewTransport({
 
 		const previousPlayheadUs = playheadRef.current;
 		const transportTimeSeconds =
-			audioTransportReady && multitrackRef.current
+			audioMasterClockActive && multitrackRef.current
 				? multitrackRef.current.getCurrentTime()
 				: video.currentTime;
 		const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
 
 		if (
-			audioTransportReady &&
+			audioMasterClockActive &&
 			Number.isFinite(transportTimeSeconds) &&
 			Math.abs(video.currentTime - transportTimeSeconds) >
 				PREVIEW_AV_HARD_RESYNC_THRESHOLD_SECONDS
@@ -291,7 +314,7 @@ export function useNativePreviewTransport({
 
 		setPlayheadUs(nativePlayheadUs);
 	}, [
-		audioTransportReady,
+		audioMasterClockActive,
 		isPlaying,
 		multitrackRef,
 		selection,
@@ -343,7 +366,7 @@ export function useNativePreviewTransport({
 	}, [isPlaying, syncPlayheadWithNativeVideo]);
 
 	const handleEnded = useCallback(() => {
-		if (audioTransportReady) {
+		if (!nativeVideoClockActive) {
 			return;
 		}
 
@@ -362,10 +385,6 @@ export function useNativePreviewTransport({
 				multitrackPlaybackStartedRef.current = false;
 				setIsPlaying(false);
 			});
-			if (audioTransportReady) {
-				multitrackRef.current?.play();
-				multitrackPlaybackStartedRef.current = true;
-			}
 			return;
 		}
 
@@ -374,9 +393,9 @@ export function useNativePreviewTransport({
 		setIsPlaying(false);
 		setPlayheadUs(durationUs);
 	}, [
-		audioTransportReady,
 		durationUs,
 		multitrackRef,
+		nativeVideoClockActive,
 		selection.endUs,
 		selection.startUs,
 		selectionLoopEnabled,
@@ -386,22 +405,22 @@ export function useNativePreviewTransport({
 	]);
 
 	const handleNativePause = useCallback(() => {
-		if (audioTransportReady) {
+		if (!nativeVideoClockActive) {
 			return;
 		}
 
 		multitrackRef.current?.pause();
 		multitrackPlaybackStartedRef.current = false;
 		setIsPlaying(false);
-	}, [audioTransportReady, multitrackRef]);
+	}, [multitrackRef, nativeVideoClockActive]);
 
 	const handleNativePlay = useCallback(() => {
-		if (audioTransportReady) {
+		if (!nativeVideoClockActive) {
 			return;
 		}
 
 		setIsPlaying(true);
-	}, [audioTransportReady]);
+	}, [nativeVideoClockActive]);
 
 	return {
 		getPlaybackRate,
@@ -412,6 +431,7 @@ export function useNativePreviewTransport({
 		isPlaying,
 		muted,
 		playbackRate,
+		previewClockMode,
 		playheadUs,
 		seekByUs,
 		seekToUs,

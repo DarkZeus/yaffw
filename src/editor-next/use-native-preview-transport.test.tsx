@@ -175,8 +175,8 @@ describe("useNativePreviewTransport", () => {
 
 		render(
 			<NativePreviewTransportProbe
-				audioTransportReady={false}
 				multitrack={multitrack}
+				previewClockMode="native-video"
 			/>,
 		);
 
@@ -210,13 +210,44 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:12000000");
 	});
 
+	it("does not start native-video free-run while audio-master preview is pending", async () => {
+		const multitrack = createMultitrackSpy();
+		const view = render(
+			<NativePreviewTransportProbe
+				multitrack={multitrack}
+				previewClockMode="audio-master-pending"
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		expect(play).not.toHaveBeenCalled();
+		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(readState()).toContain("mode:audio-master-pending");
+		expect(readState()).toContain("playing:false");
+
+		view.rerender(
+			<NativePreviewTransportProbe
+				multitrack={multitrack}
+				previewClockMode="audio-master"
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(readState()).toContain("mode:audio-master");
+		});
+		expect(play).not.toHaveBeenCalled();
+		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:false");
+	});
+
 	it("loops only after playback enters the selection", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
 
 		render(
 			<NativePreviewTransportProbe
-				audioTransportReady={false}
+				previewClockMode="native-video"
 				selection={{ endUs: 8_000_000, startUs: 4_000_000 }}
 			/>,
 		);
@@ -263,13 +294,13 @@ describe("useNativePreviewTransport", () => {
 });
 
 function NativePreviewTransportProbe({
-	audioTransportReady = true,
 	multitrack = createMultitrackSpy(),
+	previewClockMode = "audio-master",
 	selection = { endUs: 12_000_000, startUs: 0 },
 	source = previewSource,
 }: {
-	audioTransportReady?: boolean;
 	multitrack?: ReturnType<typeof createMultitrackSpy>;
+	previewClockMode?: "audio-master" | "audio-master-pending" | "native-video";
 	selection?: Selection;
 	source?: Blob;
 }) {
@@ -278,10 +309,10 @@ function NativePreviewTransportProbe({
 		multitrack as unknown as MultiTrack,
 	);
 	const transport = useNativePreviewTransport({
-		audioTransportReady,
 		durationUs: 12_000_000,
 		frameDurationUs: 33_333,
 		multitrackRef,
+		previewClockMode,
 		selection,
 		source,
 		videoRef,
@@ -304,6 +335,7 @@ function NativePreviewTransportProbe({
 				{[
 					`playing:${transport.isPlaying}`,
 					`muted:${transport.muted}`,
+					`mode:${transport.previewClockMode}`,
 					`rate:${transport.playbackRate}`,
 					`volume:${transport.volume}`,
 					`playhead:${transport.playheadUs}`,

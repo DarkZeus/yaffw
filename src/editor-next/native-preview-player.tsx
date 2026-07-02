@@ -16,6 +16,7 @@ import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { PreviewSelectionWaveformRegion } from "./preview-selection-waveform-region";
 import { PreviewTransportRegion } from "./preview-transport-region";
 import { PreviewViewerRegion } from "./preview-viewer-region";
+import { resolvePreviewClockMode } from "./preview-clock-mode";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
@@ -74,11 +75,12 @@ export function NativePreviewPlayer({
 		};
 	}, [activeMediaAssetCleanupScope, source]);
 
+	const audioPreviewTransportSupported = canUseBrowserAudioPreviewTransport(asset);
 	const audioPreviewSources = useBrowserAudioPreviewSources({
 		activeMediaAssetCleanupScope,
 		audioMix,
 		asset,
-		enabled: canUseBrowserAudioPreviewTransport(asset),
+		enabled: audioPreviewTransportSupported,
 		source,
 	});
 	const audioPreviewPreparingTrackIds =
@@ -93,8 +95,12 @@ export function NativePreviewPlayer({
 		() => getPlayheadUsRef.current(),
 		[],
 	);
-	const audioTransportReady =
-		audioPreviewSources.status === "ready" && audioMonitoringReady;
+	const previewClockMode = resolvePreviewClockMode({
+		asset,
+		audioMonitoringReady,
+		audioPreviewSources,
+		audioPreviewTransportSupported,
+	});
 
 	const {
 		getPlaybackRate,
@@ -118,10 +124,10 @@ export function NativePreviewPlayer({
 		toggleSelectionLoop,
 		volume,
 	} = useNativePreviewTransport({
-		audioTransportReady,
 		durationUs: asset.durationUs,
 		frameDurationUs: asset.frameTiming.frameDurationUs,
 		multitrackRef,
+		previewClockMode,
 		selection,
 		source,
 		videoRef,
@@ -206,7 +212,7 @@ export function NativePreviewPlayer({
 					asset={asset}
 					canFullscreen={canFullscreen}
 					isPlaying={isPlaying}
-					mediaMuted={audioTransportReady || muted}
+					mediaMuted={previewClockMode !== "native-video" || muted}
 					multitrackContainerRef={audioMonitoring.multitrackContainerRef}
 					onChapterSelectionRequested={
 						selectionEditingDisabled ? undefined : onSelectionReplaceRequested
