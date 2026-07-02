@@ -320,9 +320,20 @@ export function useNativePreviewTransport({
 			selectionLoopEnteredRef.current = true;
 		}
 
+		if (audioMasterClockActive && nativePlayheadUs >= durationUs) {
+			multitrackRef.current?.pause();
+			video.pause();
+			multitrackPlaybackStartedRef.current = false;
+			setVideoFollowerTime(video, durationUs);
+			setPlayheadUs(durationUs);
+			setIsPlaying(false);
+			return;
+		}
+
 		setPlayheadUs(nativePlayheadUs);
 	}, [
 		audioMasterClockActive,
+		durationUs,
 		isPlaying,
 		multitrackRef,
 		selection,

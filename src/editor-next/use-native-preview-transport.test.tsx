@@ -336,6 +336,78 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:4000000");
 	});
 
+	it("loops audio-master playback from the selection end using the audio clock", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 2,
+		});
+
+		render(
+			<NativePreviewTransportProbe
+				multitrack={multitrack}
+				selection={{ endUs: 8_000_000, startUs: 4_000_000 }}
+			/>,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle loop" }));
+		video.currentTime = 8.5;
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		multitrack.setTime.mockClear();
+
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(2);
+		expect(readState()).toContain("playhead:2000000");
+
+		multitrack.setCurrentTimeSeconds(4.5);
+		runNextPreviewFrame(frameCallbacks);
+		expect(video.currentTime).toBe(4.5);
+		expect(readState()).toContain("playhead:4500000");
+
+		multitrack.setCurrentTimeSeconds(8.2);
+		runNextPreviewFrame(frameCallbacks);
+
+		expect(multitrack.setTime).toHaveBeenCalledWith(4);
+		expect(video.currentTime).toBe(4);
+		expect(readState()).toContain("playhead:4000000");
+		expect(readState()).toContain("playing:true");
+	});
+
+	it("stops audio-master playback when the audio clock reaches media end", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 3,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		pause.mockClear();
+		multitrack.pause.mockClear();
+
+		video.currentTime = 10;
+		multitrack.setCurrentTimeSeconds(12.4);
+		runNextPreviewFrame(frameCallbacks);
+
+		expect(multitrack.pause).toHaveBeenCalledTimes(1);
+		expect(pause).toHaveBeenCalledTimes(1);
+		expect(video.currentTime).toBe(12);
+		expect(readState()).toContain("playhead:12000000");
+		expect(readState()).toContain("playing:false");
+	});
+
 	it("resets playhead and selection loop when the source changes", async () => {
 		const nextSource = new File(["next"], "next.mp4", { type: "video/mp4" });
 		const view = render(<NativePreviewTransportProbe />);
@@ -436,11 +508,16 @@ function createMultitrackSpy({
 }: {
 	currentTimeSeconds?: number;
 } = {}) {
+	let currentTime = currentTimeSeconds;
+
 	return {
-		getCurrentTime: vi.fn(() => currentTimeSeconds),
+		getCurrentTime: vi.fn(() => currentTime),
 		pause: vi.fn(),
 		play: vi.fn(),
 		setAudioRate: vi.fn(),
+		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
+			currentTime = nextCurrentTimeSeconds;
+		},
 		setTime: vi.fn(),
 	};
 }
