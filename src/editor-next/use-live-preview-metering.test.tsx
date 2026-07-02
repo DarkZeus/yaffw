@@ -72,7 +72,7 @@ function LivePreviewMeteringProbe({
 	};
 	trackStates: PreviewMeteringTrackStates;
 }) {
-	const liveTrackStates = useLivePreviewMetering({
+	const liveMetering = useLivePreviewMetering({
 		audioMix,
 		clock,
 		enabled: true,
@@ -80,7 +80,7 @@ function LivePreviewMeteringProbe({
 		soloedAudioTrackId: null,
 		trackStates,
 	});
-	const voiceState = liveTrackStates["audio-voice"];
+	const voiceState = liveMetering.trackStates["audio-voice"];
 	const voicePeak =
 		voiceState?.status === "ready" ? voiceState.channels[0]?.peakDb : null;
 	const voiceClip =

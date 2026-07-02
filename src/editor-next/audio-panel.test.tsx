@@ -303,6 +303,116 @@ describe("AudioPanel", () => {
 			within(voiceMeter).queryByRole("meter", { name: "Left level" }),
 		).toBeNull();
 	});
+
+	it("renders live combined Preview output meter values as stereo channels", async () => {
+		render(
+			<AudioPanel
+				asset={readyAsset}
+				previewMetering={{
+					clock: {
+						getIsPlaying: () => true,
+						getPlayheadUs: () => 100_000,
+					},
+					trackStates: {
+						"audio-desktop": {
+							prepared: createPreparedTrack("audio-desktop", ["Left", "Right"]),
+							status: "ready",
+							trackId: "audio-desktop",
+						},
+						"audio-voice": {
+							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
+				}}
+			/>,
+		);
+
+		const combinedStrip = screen.getByLabelText("Combined preview strip");
+		const combinedMeter = within(combinedStrip).getByLabelText(
+			"Combined preview output meter",
+		);
+
+		await waitFor(() => {
+			expect(
+				Number(
+					within(combinedMeter)
+						.getByRole("meter", { name: "Left level" })
+						.getAttribute("aria-valuenow"),
+				),
+			).toBe(0);
+		});
+		expect(
+			Number(
+				within(combinedMeter)
+					.getByRole("meter", { name: "Right level" })
+					.getAttribute("aria-valuenow"),
+			),
+		).toBeCloseTo(-6.02, 2);
+		expect(within(combinedStrip).getByText("Ready")).toBeTruthy();
+		expect(within(combinedStrip).queryByText(/track volume/i)).toBeNull();
+		expect(within(combinedStrip).queryByText(/channel handling/i)).toBeNull();
+		expect(within(combinedStrip).queryByText(/master/i)).toBeNull();
+		expect(within(combinedStrip).queryByText(/routing/i)).toBeNull();
+	});
+
+	it("shows a partial combined output meter when an audible track is unavailable without blocking track controls", async () => {
+		const onAudioTrackIncludedChange = vi.fn();
+		const onAudioTrackVolumePercentChange = vi.fn();
+
+		render(
+			<AudioPanel
+				asset={readyAsset}
+				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
+				previewMetering={{
+					clock: {
+						getIsPlaying: () => true,
+						getPlayheadUs: () => 100_000,
+					},
+					trackStates: {
+						"audio-desktop": {
+							reason: "Desktop decode failed",
+							status: "unavailable",
+							trackId: "audio-desktop",
+						},
+						"audio-voice": {
+							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
+				}}
+			/>,
+		);
+
+		const combinedStrip = screen.getByLabelText("Combined preview strip");
+		const combinedMeter = within(combinedStrip).getByLabelText(
+			"Combined preview output meter",
+		);
+		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
+
+		await waitFor(() => {
+			expect(within(combinedStrip).getByText("Partial")).toBeTruthy();
+		});
+		expect(combinedMeter.getAttribute("data-state")).toBe("ready");
+		expect(
+			within(combinedStrip).getByText(
+				"Some monitored tracks are unavailable: Desktop decode failed",
+			),
+		).toBeTruthy();
+		expect(
+			within(desktopStrip).getByRole("button", {
+				name: "Exclude Desktop from output",
+			}),
+		).toHaveProperty("disabled", false);
+		expect(
+			within(desktopStrip).getByRole("slider", {
+				name: "Desktop track volume",
+			}),
+		).toHaveProperty("disabled", false);
+	});
 });
 
 const videoOnlyAsset = {

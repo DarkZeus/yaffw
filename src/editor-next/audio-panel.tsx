@@ -25,6 +25,7 @@ import {
 } from "./preview-level-meter";
 import type {
 	LivePreviewMeteringClock,
+	LivePreviewMeteringCombinedState,
 	LivePreviewMeteringTrackState,
 } from "./preview-metering-live";
 import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
@@ -79,7 +80,7 @@ export function AudioPanel({
 	const defaultAudioMix = useMemo(() => createDefaultAudioMix(asset), [asset]);
 	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
-	const livePreviewMeteringTrackStates = useLivePreviewMetering({
+	const livePreviewMetering = useLivePreviewMetering({
 		audioMix,
 		clock: previewMetering?.clock,
 		enabled: Boolean(previewMetering),
@@ -115,12 +116,15 @@ export function AudioPanel({
 								onPreviewMeteringRetry={previewMetering?.onTrackRetry}
 								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
 								previewMeteringControlled={Boolean(previewMetering)}
-								previewMeteringState={livePreviewMeteringTrackStates[track.id]}
+								previewMeteringState={livePreviewMetering.trackStates[track.id]}
 								soloActive={soloedAudioTrackId === track.id}
 								track={track}
 							/>
 						))}
-						<CombinedPreviewStrip />
+						<CombinedPreviewStrip
+							previewMeteringControlled={Boolean(previewMetering)}
+							previewMeteringState={livePreviewMetering.combinedState}
+						/>
 					</div>
 				)}
 			</div>
@@ -340,7 +344,18 @@ function clampVolumePercent(volumePercent: number) {
 	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }
 
-function CombinedPreviewStrip() {
+function CombinedPreviewStrip({
+	previewMeteringControlled,
+	previewMeteringState,
+}: {
+	previewMeteringControlled: boolean;
+	previewMeteringState?: LivePreviewMeteringCombinedState;
+}) {
+	const meterDisplay = createCombinedMeterDisplay({
+		controlled: previewMeteringControlled,
+		state: previewMeteringState,
+	});
+
 	return (
 		<section
 			aria-label="Combined preview strip"
@@ -359,16 +374,22 @@ function CombinedPreviewStrip() {
 					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
 						Output meter
 					</span>
+					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+						{meterDisplay.statusLabel}
+					</span>
+					{meterDisplay.reason ? (
+						<span className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground">
+							{meterDisplay.reason}
+						</span>
+					) : null}
 				</div>
 			</div>
 			<PreviewLevelMeter
-				channels={[
-					{ clipHeld: false, label: "Left", peakDb: -16 },
-					{ clipHeld: false, label: "Right", peakDb: -18 },
-				]}
+				channels={meterDisplay.channels}
 				label="Combined preview output meter"
+				message={meterDisplay.message}
 				showTickLabels={false}
-				state="ready"
+				state={meterDisplay.state}
 			/>
 		</section>
 	);
@@ -501,5 +522,57 @@ function createTrackMeterDisplay({
 		excluded: state.excluded,
 		state: "ready",
 		statusLabel: state.excluded ? "Excluded" : "Ready",
+	};
+}
+
+function createCombinedMeterDisplay({
+	controlled,
+	state,
+}: {
+	controlled: boolean;
+	state?: LivePreviewMeteringCombinedState;
+}): {
+	channels: PreviewLevelMeterChannel[];
+	message?: string;
+	reason?: string;
+	state: PreviewLevelMeterState;
+	statusLabel: string;
+} {
+	if (!controlled) {
+		return {
+			channels: [
+				{ clipHeld: false, label: "Left", peakDb: -16 },
+				{ clipHeld: false, label: "Right", peakDb: -18 },
+			],
+			state: "ready",
+			statusLabel: "Ready",
+		};
+	}
+
+	if (!state || state.status === "preparing") {
+		return {
+			channels: [],
+			message: state?.reason ?? "Preparing monitored output",
+			reason: state?.reason,
+			state: "preparing",
+			statusLabel: "Preparing",
+		};
+	}
+
+	if (state.status === "unavailable") {
+		return {
+			channels: [],
+			message: "Output meter unavailable",
+			reason: state.reason,
+			state: "unavailable",
+			statusLabel: "Unavailable",
+		};
+	}
+
+	return {
+		channels: state.channels,
+		reason: state.reason,
+		state: "ready",
+		statusLabel: state.partial ? "Partial" : "Ready",
 	};
 }

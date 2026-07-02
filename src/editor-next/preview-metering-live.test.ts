@@ -5,6 +5,181 @@ import { createLivePreviewMeteringTrackStates } from "./preview-metering-live";
 import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
 
 describe("createLivePreviewMeteringTrackStates", () => {
+	it("combines monitored tracks into stereo output channels without mono downmixing", () => {
+		const { combinedState } = createLivePreviewMeteringTrackStates({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-desktop": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-desktop",
+						volumePercent: 100,
+					},
+					"audio-voice": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-voice",
+						volumePercent: 100,
+					},
+				},
+			},
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: {
+				"audio-desktop": createPreparedTrackState({
+					channelLabels: ["Left", "Right"],
+					channels: [[], [[100, 0.25]]],
+					trackId: "audio-desktop",
+				}),
+				"audio-voice": createPreparedTrackState({
+					channelLabels: ["Left", "Right"],
+					channels: [[[100, 0.5]], []],
+					trackId: "audio-voice",
+				}),
+			},
+		});
+
+		expect(combinedState.status).toBe("ready");
+		if (combinedState.status !== "ready") {
+			throw new Error("Expected ready combined metering state.");
+		}
+		expect(combinedState.partial).toBe(false);
+		expect(combinedState.channels).toHaveLength(2);
+		expect(combinedState.channels[0]?.label).toBe("Left");
+		expect(combinedState.channels[1]?.label).toBe("Right");
+		expect(combinedState.channels[0]?.peakDb).toBeCloseTo(-6.02, 2);
+		expect(combinedState.channels[1]?.peakDb).toBeCloseTo(-12.04, 2);
+	});
+
+	it("makes the combined output follow preview solo monitoring", () => {
+		const { combinedState } = createLivePreviewMeteringTrackStates({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-desktop": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-desktop",
+						volumePercent: 100,
+					},
+					"audio-voice": {
+						channelMode: "preserve",
+						include: false,
+						trackId: "audio-voice",
+						volumePercent: 100,
+					},
+				},
+			},
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: "audio-voice",
+			trackStates: {
+				"audio-desktop": createPreparedTrackState({
+					channelLabels: ["Left", "Right"],
+					channels: [[], [[100, 1]]],
+					trackId: "audio-desktop",
+				}),
+				"audio-voice": createPreparedTrackState({
+					channelLabels: ["Left", "Right"],
+					channels: [[[100, 0.5]], []],
+					trackId: "audio-voice",
+				}),
+			},
+		});
+
+		expect(combinedState.status).toBe("ready");
+		if (combinedState.status !== "ready") {
+			throw new Error("Expected ready combined metering state.");
+		}
+		expect(combinedState.partial).toBe(false);
+		expect(combinedState.channels[0]?.peakDb).toBeCloseTo(-6.02, 2);
+		expect(combinedState.channels[1]?.peakDb).toBe(-72);
+	});
+
+	it("marks the combined output partial or unavailable when audible tracks cannot be metered", () => {
+		const partial = createLivePreviewMeteringTrackStates({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-desktop": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-desktop",
+						volumePercent: 100,
+					},
+					"audio-voice": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-voice",
+						volumePercent: 100,
+					},
+				},
+			},
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: {
+				"audio-desktop": {
+					reason: "Desktop decode failed",
+					status: "unavailable",
+					trackId: "audio-desktop",
+				},
+				"audio-voice": createPreparedTrackState({
+					channelLabels: ["Left", "Right"],
+					channels: [[[100, 0.5]], []],
+					trackId: "audio-voice",
+				}),
+			},
+		}).combinedState;
+		const unavailable = createLivePreviewMeteringTrackStates({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-desktop": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-desktop",
+						volumePercent: 100,
+					},
+				},
+			},
+			isPlaying: true,
+			nowMs: 1_000,
+			playheadUs: 100_000,
+			soloedAudioTrackId: null,
+			trackStates: {
+				"audio-desktop": {
+					reason: "Desktop decode failed",
+					status: "unavailable",
+					trackId: "audio-desktop",
+				},
+			},
+		}).combinedState;
+
+		expect(partial.status).toBe("ready");
+		if (partial.status !== "ready") {
+			throw new Error("Expected partial ready combined state.");
+		}
+		expect(partial.partial).toBe(true);
+		expect(partial.reason).toContain("Desktop decode failed");
+		expect(partial.channels[0]?.peakDb).toBeCloseTo(-6.02, 2);
+		expect(partial.channels[1]?.peakDb).toBe(-72);
+		expect(unavailable.status).toBe("unavailable");
+		if (unavailable.status !== "unavailable") {
+			throw new Error("Expected unavailable combined state.");
+		}
+		expect(unavailable.reason).toContain("Desktop decode failed");
+	});
+
 	it("samples a peak window around the Playhead after channel handling and Track volume", () => {
 		const { trackStates } = createLivePreviewMeteringTrackStates({
 			audioMix: createAudioMix({

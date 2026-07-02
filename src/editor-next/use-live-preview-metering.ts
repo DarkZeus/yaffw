@@ -4,12 +4,22 @@ import type { AudioMix } from "@/editor-core/model";
 import {
 	type LivePreviewMeteringClipHoldState,
 	type LivePreviewMeteringClock,
-	type LivePreviewMeteringTrackStates,
+	type LivePreviewMeteringState,
 	createLivePreviewMeteringTrackStates,
 } from "./preview-metering-live";
 import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
 
-const EMPTY_LIVE_PREVIEW_METERING_TRACK_STATES = {};
+const EMPTY_LIVE_PREVIEW_METERING_STATE = {
+	combinedState: {
+		channels: [
+			{ clipHeld: false, label: "Left", peakDb: -72 },
+			{ clipHeld: false, label: "Right", peakDb: -72 },
+		],
+		partial: false,
+		status: "ready",
+	},
+	trackStates: {},
+} satisfies LivePreviewMeteringState;
 
 export type UseLivePreviewMeteringOptions = {
 	audioMix: AudioMix;
@@ -27,18 +37,16 @@ export function useLivePreviewMetering({
 	now = previewNowMs,
 	soloedAudioTrackId,
 	trackStates,
-}: UseLivePreviewMeteringOptions): LivePreviewMeteringTrackStates {
+}: UseLivePreviewMeteringOptions): LivePreviewMeteringState {
 	const clipHoldStateRef = useRef<LivePreviewMeteringClipHoldState>({});
-	const [liveTrackStates, setLiveTrackStates] =
-		useState<LivePreviewMeteringTrackStates>(
-			EMPTY_LIVE_PREVIEW_METERING_TRACK_STATES,
-		);
+	const [liveMeteringState, setLiveMeteringState] =
+		useState<LivePreviewMeteringState>(EMPTY_LIVE_PREVIEW_METERING_STATE);
 
 	useEffect(() => {
 		clipHoldStateRef.current = {};
 
 		if (!enabled) {
-			setLiveTrackStates(EMPTY_LIVE_PREVIEW_METERING_TRACK_STATES);
+			setLiveMeteringState(EMPTY_LIVE_PREVIEW_METERING_STATE);
 			return;
 		}
 
@@ -60,7 +68,10 @@ export function useLivePreviewMetering({
 				trackStates,
 			});
 			clipHoldStateRef.current = result.clipHoldState;
-			setLiveTrackStates(result.trackStates);
+			setLiveMeteringState({
+				combinedState: result.combinedState,
+				trackStates: result.trackStates,
+			});
 
 			if (clock) {
 				frameId = requestPreviewMeteringFrame(updateLiveMeters);
@@ -78,7 +89,7 @@ export function useLivePreviewMetering({
 		};
 	}, [audioMix, clock, enabled, now, soloedAudioTrackId, trackStates]);
 
-	return liveTrackStates;
+	return liveMeteringState;
 }
 
 function requestPreviewMeteringFrame(
