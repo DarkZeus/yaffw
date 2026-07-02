@@ -9,10 +9,15 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
+import type {
+	AudioMix,
+	ReadyMediaAsset,
+	Selection,
+} from "@/editor-core/model";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
 	children?: ReactNode;
@@ -20,6 +25,18 @@ type MockMediaPlayerProps = Record<string, unknown> & {
 	crossOrigin?: boolean;
 	src?: unknown;
 };
+
+const adapterMockState = vi.hoisted(() => ({
+	multitrackCreate: vi.fn(),
+	multitracks: [] as Array<{
+		destroy: ReturnType<typeof vi.fn>;
+		emitCanPlay: () => void;
+		on: ReturnType<typeof vi.fn>;
+		setAudioRate: ReturnType<typeof vi.fn>;
+		setTime: ReturnType<typeof vi.fn>;
+		setTrackVolume: ReturnType<typeof vi.fn>;
+	}>,
+}));
 
 vi.mock("@vidstack/react", async () => {
 	const React = await import("react");
@@ -149,6 +166,12 @@ vi.mock("@vidstack/react/player/layouts/default", async () => {
 	};
 });
 
+vi.mock("wavesurfer-multitrack", () => ({
+	default: {
+		create: adapterMockState.multitrackCreate,
+	},
+}));
+
 vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
 	const actual =
 		await importOriginal<typeof import("./browser-audio-preview-sources")>();
@@ -161,7 +184,10 @@ vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
 
 import { createActiveMediaAssetCleanupScopeController } from "./active-media-asset-cleanup-scope";
 import { prepareBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
-import type { BrowserAudioPreviewSourcesResult } from "./browser-audio-preview-sources.types";
+import type {
+	BrowserAudioPreviewSource,
+	BrowserAudioPreviewSourcesResult,
+} from "./browser-audio-preview-sources.types";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 function normalizeMockPlayerSrc(src: unknown): string | undefined {
@@ -189,11 +215,38 @@ const pause = vi.fn();
 const prepareBrowserAudioPreviewSourcesMock = vi.mocked(
 	prepareBrowserAudioPreviewSources,
 );
+type PrepareAudioPreviewSourcesRequest = Parameters<
+	typeof prepareBrowserAudioPreviewSources
+>[0];
 
 beforeEach(() => {
 	vi.stubGlobal("URL", {
 		createObjectURL,
 		revokeObjectURL,
+	});
+	adapterMockState.multitracks.length = 0;
+	adapterMockState.multitrackCreate.mockReset();
+	adapterMockState.multitrackCreate.mockImplementation(() => {
+		let canPlayHandler: (() => void) | undefined;
+		const multitrack = {
+			destroy: vi.fn(),
+			emitCanPlay: () => {
+				canPlayHandler?.();
+			},
+			on: vi.fn((eventName: string, handler: () => void) => {
+				if (eventName === "canplay") {
+					canPlayHandler = handler;
+				}
+
+				return vi.fn();
+			}),
+			setAudioRate: vi.fn(),
+			setTime: vi.fn(),
+			setTrackVolume: vi.fn(),
+		};
+		adapterMockState.multitracks.push(multitrack);
+
+		return multitrack;
 	});
 	Object.defineProperty(HTMLMediaElement.prototype, "play", {
 		configurable: true,
@@ -446,6 +499,110 @@ describe("NativePreviewPlayer", () => {
 
 		expect(play).not.toHaveBeenCalled();
 		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+	});
+
+	it("applies preview and audio mix controls through the audio-master multitrack adapter", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
+			createPreparedAudioPreviewSourcesForRequest(request),
+		);
+
+		render(<AudioMasterPlayerProbe />);
+
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+
+		await waitFor(() => {
+			expect(adapterMockState.multitracks).toHaveLength(1);
+		});
+		const multitrack = adapterMockState.multitracks[0];
+		multitrack.emitCanPlay();
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBe(1);
+			expect(lastTrackVolume(multitrack, 1)).toBe(1);
+		});
+		expect(video.muted).toBe(true);
+		expect(readAudioMixSnapshot()).toBe(
+			"audio-1:true:preserve:100|audio-2:true:preserve:100",
+		);
+
+		fireEvent.change(screen.getByLabelText("Preview volume"), {
+			target: { value: "50" },
+		});
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.5);
+			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+		});
+
+		fireEvent.change(screen.getByLabelText("Playback speed"), {
+			target: { value: "1.5" },
+		});
+
+		expect(video.playbackRate).toBe(1.5);
+		expect(multitrack.setAudioRate).toHaveBeenCalledWith(1.5);
+
+		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBe(0);
+			expect(lastTrackVolume(multitrack, 1)).toBe(0);
+		});
+		expect(video.muted).toBe(true);
+		expect(readAudioMixSnapshot()).toBe(
+			"audio-1:true:preserve:100|audio-2:true:preserve:100",
+		);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Unmute preview audio" }),
+		);
+		fireEvent.change(screen.getByLabelText("Voice volume"), {
+			target: { value: "50" },
+		});
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
+			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+		});
+		expect(readAudioMixSnapshot()).toBe(
+			"audio-1:true:preserve:50|audio-2:true:preserve:100",
+		);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+		);
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBe(0);
+			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
+
+		await waitFor(() => {
+			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
+			expect(lastTrackVolume(multitrack, 1)).toBe(0);
+		});
+		expect(readAudioMixSnapshot()).toBe(
+			"audio-1:false:preserve:50|audio-2:true:preserve:100",
+		);
+		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+
+		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
+			target: { value: "use-left-as-mono" },
+		});
+
+		await waitFor(() => {
+			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+		});
+		const channelModeRequest =
+			prepareBrowserAudioPreviewSourcesMock.mock.calls[1]?.[0];
+		expect(channelModeRequest?.audioMix.tracks["audio-1"]?.channelMode).toBe(
+			"use-left-as-mono",
+		);
+		expect(Array.from(channelModeRequest?.trackIds ?? [])).toEqual(["audio-1"]);
 	});
 
 	it("keeps Playhead seek, Selection commit, and Selection range move channels separate in the lower region", () => {
@@ -769,6 +926,101 @@ function createPlayerElement(
 	);
 }
 
+function AudioMasterPlayerProbe() {
+	const [audioMix, setAudioMix] = useState(() =>
+		createDefaultAudioMix(readyAssetWithTwoAudioTracks),
+	);
+
+	return (
+		<>
+			<NativePreviewPlayer
+				asset={readyAssetWithTwoAudioTracks}
+				audioMix={audioMix}
+				onAudioTrackChannelModeChange={(trackId, channelMode) => {
+					setAudioMix((currentAudioMix) =>
+						updateAudioMixTrack(currentAudioMix, trackId, {
+							channelMode,
+						}),
+					);
+				}}
+				onAudioTrackIncludedChange={(trackId, include) => {
+					setAudioMix((currentAudioMix) =>
+						updateAudioMixTrack(currentAudioMix, trackId, { include }),
+					);
+				}}
+				onAudioTrackVolumePercentChange={(trackId, volumePercent) => {
+					setAudioMix((currentAudioMix) =>
+						updateAudioMixTrack(currentAudioMix, trackId, {
+							volumePercent,
+						}),
+					);
+				}}
+				onSelectionEndRequested={() => {}}
+				onSelectionRangeMoveRequested={() => {}}
+				onSelectionResetRequested={() => {}}
+				onSelectionStartRequested={() => {}}
+				selection={selection}
+				source={previewSource}
+			/>
+			<output aria-label="audio mix snapshot">
+				{formatAudioMixSnapshot(audioMix)}
+			</output>
+		</>
+	);
+}
+
+function updateAudioMixTrack(
+	audioMix: AudioMix,
+	trackId: string,
+	patch: Partial<AudioMix["tracks"][string]>,
+): AudioMix {
+	const currentDecision = audioMix.tracks[trackId];
+
+	if (!currentDecision) {
+		return audioMix;
+	}
+
+	return {
+		...audioMix,
+		tracks: {
+			...audioMix.tracks,
+			[trackId]: {
+				...currentDecision,
+				...patch,
+			},
+		},
+	};
+}
+
+function formatAudioMixSnapshot(audioMix: AudioMix) {
+	return Object.values(audioMix.tracks)
+		.map(
+			(decision) =>
+				`${decision.trackId}:${decision.include}:${decision.channelMode}:${decision.volumePercent}`,
+		)
+		.join("|");
+}
+
+function readAudioMixSnapshot() {
+	return screen.getByLabelText("audio mix snapshot").textContent ?? "";
+}
+
+function lastTrackVolume(
+	multitrack: (typeof adapterMockState.multitracks)[number],
+	trackIndex: number,
+) {
+	const calls = multitrack.setTrackVolume.mock.calls.filter(
+		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
+	);
+	const lastCall = calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error(`No volume call found for track ${trackIndex}.`);
+	}
+
+	return lastCall[1];
+}
+
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];
 	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
@@ -827,6 +1079,42 @@ function createTestDomRect({
 	} as DOMRect;
 }
 
+function createPreparedAudioPreviewSourcesForRequest(
+	request: PrepareAudioPreviewSourcesRequest,
+): BrowserAudioPreviewSourcesResult {
+	const requestedTrackIds = request.trackIds
+		? Array.from(request.trackIds)
+		: request.asset.tracks.audio.map((track) => track.id);
+
+	return {
+		failures: [],
+		sources: requestedTrackIds.map((trackId, sourceIndex) => {
+			const track = request.asset.tracks.audio.find(
+				(candidateTrack) => candidateTrack.id === trackId,
+			);
+			const channelMode =
+				request.audioMix.tracks[trackId]?.channelMode ?? "preserve";
+
+			if (!track) {
+				throw new Error(`Expected audio track ${trackId}.`);
+			}
+
+			return {
+				blob: new Blob(["audio"], { type: "audio/mp4" }),
+				byteLength: 5,
+				downloadName: `${trackId}.m4a`,
+				mimeType: "audio/mp4",
+				startPositionSeconds: 0,
+				strategy: "same-codec-remux",
+				track,
+				trackId,
+				trackIndex: sourceIndex,
+				url: `blob:audio:${request.asset.id}:${trackId}:${channelMode}`,
+			} satisfies BrowserAudioPreviewSource;
+		}),
+	};
+}
+
 const readyAsset = {
 	durationUs: 12_000_000,
 	exportCapability: {
@@ -855,6 +1143,27 @@ const readyAsset = {
 			{
 				id: "video-1",
 				kind: "video",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
+const readyAssetWithTwoAudioTracks = {
+	...readyAsset,
+	tracks: {
+		...readyAsset.tracks,
+		audio: [
+			{
+				codec: "aac",
+				id: "audio-1",
+				kind: "audio",
+				label: "Voice",
+			},
+			{
+				codec: "aac",
+				id: "audio-2",
+				kind: "audio",
+				label: "Desktop",
 			},
 		],
 	},
