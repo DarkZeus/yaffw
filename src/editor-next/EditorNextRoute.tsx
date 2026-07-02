@@ -11,6 +11,7 @@ import type { MediaTimeUs } from "@/editor-core/model";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
 import type { EditorNextRouteProps } from "./EditorNextRoute.types";
+import { AudioPanel } from "./audio-panel";
 import { inspectBrowserLocalMediaAssetDraft } from "./browser-local-asset-analyzer";
 import { browserDefaultExportRunner } from "./default-export-runner";
 import {
@@ -128,6 +129,10 @@ export function EditorNextRoute({
 				selection={displayedSession.selection}
 			/>
 		) : null;
+	const readyAudioPanel =
+		displayedSession.status === "ready" ? (
+			<AudioPanel asset={displayedSession.asset} />
+		) : null;
 	const selectionEditingDisabled =
 		displayedSession.status === "ready" &&
 		displayedSession.export.status === "running";
@@ -194,6 +199,7 @@ export function EditorNextRoute({
 				<UnsupportedRuntimeState session={displayedSession} />
 			) : (
 				<EditorSessionShell
+					audioPanel={readyAudioPanel}
 					exportInspector={readyExportInspector}
 					localFileInputKey={localFileInputKey}
 					mediaAssetContext={readyMediaAssetContext}

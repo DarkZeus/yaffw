@@ -1,5 +1,6 @@
 import {
 	AlertTriangle,
+	AudioLines,
 	Brackets,
 	FileVideo,
 	PackageCheck,
@@ -129,6 +130,7 @@ export function UnsupportedRuntimeState({
 }
 
 export function EditorSessionShell({
+	audioPanel,
 	exportInspector,
 	localFileInputKey,
 	mediaAssetContext,
@@ -180,6 +182,7 @@ export function EditorSessionShell({
 					order={1}
 				>
 					<WorkbenchInspectorTabs
+						audioPanel={audioPanel}
 						exportInspector={exportInspector}
 						mediaAssetContext={mediaAssetContext}
 					/>
@@ -205,9 +208,13 @@ export function EditorSessionShell({
 }
 
 function WorkbenchInspectorTabs({
+	audioPanel,
 	exportInspector,
 	mediaAssetContext,
-}: Pick<EditorSessionShellProps, "exportInspector" | "mediaAssetContext">) {
+}: Pick<
+	EditorSessionShellProps,
+	"audioPanel" | "exportInspector" | "mediaAssetContext"
+>) {
 	return (
 		<aside
 			aria-label="Workbench inspector region"
@@ -226,6 +233,10 @@ function WorkbenchInspectorTabs({
 							<FileVideo data-icon="inline-start" />
 							<span>Media</span>
 						</WorkbenchInspectorTabTrigger>
+						<WorkbenchInspectorTabTrigger value="audio">
+							<AudioLines data-icon="inline-start" />
+							<span>Audio</span>
+						</WorkbenchInspectorTabTrigger>
 						<WorkbenchInspectorTabTrigger value="export">
 							<PackageCheck data-icon="inline-start" />
 							<span>Export</span>
@@ -237,6 +248,12 @@ function WorkbenchInspectorTabs({
 					value="media"
 				>
 					{mediaAssetContext}
+				</TabsContent>
+				<TabsContent
+					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+					value="audio"
+				>
+					{audioPanel}
 				</TabsContent>
 				<TabsContent
 					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"

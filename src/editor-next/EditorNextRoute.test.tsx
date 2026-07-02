@@ -176,6 +176,38 @@ describe("EditorNextRoute", () => {
 		});
 	});
 
+	it("renders the Audio panel shell for the ready media asset", async () => {
+		render(
+			<EditorNextRoute
+				createAssetId={() => "asset-audio-panel"}
+				createDraftId={() => "draft-audio-panel"}
+				initialRuntime={supportedRuntime}
+				inspectLocalAsset={async () => supportedInspection}
+			/>,
+		);
+
+		fireEvent.change(screen.getByLabelText("Local media file"), {
+			target: {
+				files: [new File(["video"], "audio-panel.mp4", { type: "video/mp4" })],
+			},
+		});
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Preview for audio-panel.mp4")).toBeTruthy();
+		});
+
+		openAudioTab();
+
+		const audioPanel = screen.getByLabelText("Audio panel");
+		expect(
+			within(audioPanel).getByLabelText("Audio track strip Voice"),
+		).toBeTruthy();
+		expect(
+			within(audioPanel).getByLabelText("Combined preview strip"),
+		).toBeTruthy();
+		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
+	});
+
 	it("places preview, transport, and selection in the resolved ready workbench layout", async () => {
 		render(
 			<EditorNextRoute
@@ -957,6 +989,10 @@ function restoreObjectUrl(
 
 function openExportTab() {
 	activateTab(screen.getByRole("tab", { name: "Export" }));
+}
+
+function openAudioTab() {
+	activateTab(screen.getByRole("tab", { name: "Audio" }));
 }
 
 function openMediaTab() {

@@ -116,6 +116,7 @@ describe("Editor workbench", () => {
 
 		render(
 			<EditorSessionShell
+				audioPanel={null}
 				exportInspector={null}
 				localFileInputKey={0}
 				mediaAssetContext={null}
@@ -157,6 +158,7 @@ describe("Editor workbench", () => {
 	it("renders loading state with disabled import controls", () => {
 		render(
 			<EditorSessionShell
+				audioPanel={null}
 				exportInspector={null}
 				localFileInputKey={0}
 				mediaAssetContext={null}
@@ -179,6 +181,9 @@ describe("Editor workbench", () => {
 	it("places ready-state media and export slots in one left tabbed inspector region", () => {
 		render(
 			<EditorSessionShell
+				audioPanel={
+					<section aria-label="Audio panel">Audio panel slot</section>
+				}
 				exportInspector={
 					<section aria-label="Export inspector">Export inspector slot</section>
 				}
@@ -236,6 +241,9 @@ describe("Editor workbench", () => {
 			within(inspectorRegion).getByRole("tab", { name: "Media" }).className,
 		).toContain("rounded-none");
 		expect(
+			within(inspectorRegion).getByRole("tab", { name: "Audio" }),
+		).toBeTruthy();
+		expect(
 			within(inspectorRegion)
 				.getByRole("tab", { name: "Media" })
 				.getAttribute("aria-selected"),
@@ -243,6 +251,10 @@ describe("Editor workbench", () => {
 		expect(
 			within(inspectorRegion).getByLabelText("Media asset context"),
 		).toBeTruthy();
+
+		activateTab(within(inspectorRegion).getByRole("tab", { name: "Audio" }));
+
+		expect(within(inspectorRegion).getByLabelText("Audio panel")).toBeTruthy();
 
 		activateTab(within(inspectorRegion).getByRole("tab", { name: "Export" }));
 

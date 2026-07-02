@@ -20,6 +20,7 @@ export type UnsupportedRuntimeStateProps = {
 };
 
 export type EditorSessionShellProps = {
+	audioPanel: ReactNode;
 	exportInspector: ReactNode;
 	localFileInputKey: number;
 	mediaAssetContext: ReactNode;
