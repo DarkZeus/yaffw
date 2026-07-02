@@ -47,4 +47,27 @@ describe("preview sync regression fixture", () => {
 		expect(manualQaDocument).toContain("audio mix");
 		expect(manualQaDocument).toContain("original visible-drift failure");
 	});
+
+	it("documents the preview clock authority invariant and regression path", () => {
+		const invariantDocument = readFileSync(
+			join(process.cwd(), "docs/preview-clock-invariant.md"),
+			"utf8",
+		);
+		const normalizedInvariantDocument = invariantDocument.replace(/\s+/g, " ");
+
+		expect(normalizedInvariantDocument).toContain(
+			"Single-asset editing session",
+		);
+		expect(normalizedInvariantDocument).toContain("Preview clock state");
+		expect(normalizedInvariantDocument).toContain(
+			"audio engine is the preview time authority",
+		);
+		expect(normalizedInvariantDocument).toContain("muted visual follower");
+		expect(normalizedInvariantDocument).toContain(
+			"WaveSurfer waveform rendering",
+		);
+		expect(normalizedInvariantDocument).toContain("Export jobs");
+		expect(invariantDocument).toContain("docs/preview-sync-regression.md");
+		expect(invariantDocument).toContain("sync-flash-click.mp4");
+	});
 });
