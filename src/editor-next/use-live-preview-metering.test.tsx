@@ -8,9 +8,11 @@ import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.
 import { useLivePreviewMetering } from "./use-live-preview-metering";
 
 const frameCallbacks: FrameRequestCallback[] = [];
+const timeoutCallbacks: Array<() => void> = [];
 
 beforeEach(() => {
 	frameCallbacks.length = 0;
+	timeoutCallbacks.length = 0;
 	Object.defineProperty(window, "requestAnimationFrame", {
 		configurable: true,
 		value: vi.fn((callback: FrameRequestCallback) => {
@@ -22,6 +24,17 @@ beforeEach(() => {
 		configurable: true,
 		value: vi.fn(),
 	});
+	Object.defineProperty(window, "setTimeout", {
+		configurable: true,
+		value: vi.fn((callback: () => void) => {
+			timeoutCallbacks.push(callback);
+			return timeoutCallbacks.length;
+		}),
+	});
+	Object.defineProperty(window, "clearTimeout", {
+		configurable: true,
+		value: vi.fn(),
+	});
 });
 
 afterEach(() => {
@@ -30,7 +43,7 @@ afterEach(() => {
 });
 
 describe("useLivePreviewMetering", () => {
-	it("updates prepared meter values on animation frames", () => {
+	it("throttles prepared meter value updates on animation frames", () => {
 		let playheadUs = 100_000;
 		const clock = {
 			getIsPlaying: () => true,
@@ -57,6 +70,49 @@ describe("useLivePreviewMetering", () => {
 
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
 		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
+
+		playheadUs = 100_000;
+		act(() => {
+			frameCallbacks.shift()?.(32);
+		});
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
+
+		act(() => {
+			frameCallbacks.shift()?.(80);
+		});
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
+			-12.04,
+			2,
+		);
+	});
+
+	it("uses low-frequency paused polling instead of an animation-frame loop", () => {
+		let isPlaying = false;
+		const clock = {
+			getIsPlaying: () => isPlaying,
+			getPlayheadUs: () => 100_000,
+		};
+
+		render(
+			<LivePreviewMeteringProbe
+				audioMix={audioMix}
+				clock={clock}
+				trackStates={trackStates}
+			/>,
+		);
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(-72);
+		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+		expect(timeoutCallbacks).toHaveLength(1);
+
+		isPlaying = true;
+		act(() => {
+			timeoutCallbacks.shift()?.();
+		});
+
+		expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
 	});
 });
 
