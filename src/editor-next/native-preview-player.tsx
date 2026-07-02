@@ -1,5 +1,5 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type MultiTrack from "wavesurfer-multitrack";
 
 import {
@@ -23,7 +23,7 @@ import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitori
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 
-export function NativePreviewPlayer({
+export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	activeMediaAssetCleanupScope,
 	asset,
 	audioMix = createDefaultAudioMix(asset),
@@ -312,4 +312,4 @@ export function NativePreviewPlayer({
 			</ResizablePanel>
 		</ResizablePanelGroup>
 	);
-}
+});

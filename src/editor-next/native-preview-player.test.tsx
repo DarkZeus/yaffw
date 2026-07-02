@@ -28,6 +28,7 @@ type MockMediaPlayerProps = Record<string, unknown> & {
 };
 
 const adapterMockState = vi.hoisted(() => ({
+	mediaPlayerRenderCount: 0,
 	multitrackCreate: vi.fn(),
 	multitracks: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
@@ -59,6 +60,8 @@ vi.mock("@vidstack/react", async () => {
 			},
 			ref,
 		) {
+			adapterMockState.mediaPlayerRenderCount += 1;
+
 			return React.createElement(
 				"div",
 				{
@@ -231,6 +234,7 @@ beforeEach(() => {
 		revokeObjectURL,
 	});
 	adapterMockState.multitracks.length = 0;
+	adapterMockState.mediaPlayerRenderCount = 0;
 	adapterMockState.multitrackCreate.mockReset();
 	adapterMockState.multitrackCreate.mockImplementation(() => {
 		let canPlayHandler: (() => void) | undefined;
@@ -282,6 +286,25 @@ afterEach(() => {
 });
 
 describe("NativePreviewPlayer", () => {
+	it("does not rerender the media player when parent state changes but player props are stable", async () => {
+		const stableCallbacks = {
+			onSelectionEndRequested: vi.fn(),
+			onSelectionRangeMoveRequested: vi.fn(),
+			onSelectionResetRequested: vi.fn(),
+			onSelectionStartRequested: vi.fn(),
+		};
+		const view = renderPlayer(stableCallbacks);
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("Preview for clip.mp4")).toBeTruthy();
+		});
+		const renderCountAfterMount = adapterMockState.mediaPlayerRenderCount;
+
+		view.rerender(createPlayerElement(stableCallbacks));
+
+		expect(adapterMockState.mediaPlayerRenderCount).toBe(renderCountAfterMount);
+	});
+
 	it("owns the preview object URL and native video element lifecycle", () => {
 		const { unmount } = renderPlayer();
 
