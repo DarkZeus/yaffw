@@ -48,19 +48,21 @@ describe("AudioPanel", () => {
 		expect(within(voiceStrip).getByText("Voice")).toBeTruthy();
 		expect(within(voiceStrip).getByText("AAC / 2 channels / eng")).toBeTruthy();
 		expect(
-			within(voiceStrip).getByLabelText("Meter scaffold for Voice"),
+			within(voiceStrip).getByLabelText("Voice preview meter"),
+		).toBeTruthy();
+		expect(
+			within(voiceStrip).getByRole("meter", { name: "Left level" }),
 		).toBeTruthy();
 		expect(within(desktopStrip).getByText("Desktop")).toBeTruthy();
 		expect(
-			within(desktopStrip).getByLabelText("Meter scaffold for Desktop"),
+			within(desktopStrip).getByLabelText("Desktop preview meter"),
 		).toBeTruthy();
 		expect(within(combinedStrip).getByText("Combined preview")).toBeTruthy();
 		expect(within(combinedStrip).getByText("Monitored output")).toBeTruthy();
 		expect(
-			within(combinedStrip).getByLabelText(
-				"Meter scaffold for combined preview output",
-			),
+			within(combinedStrip).getByLabelText("Combined preview output meter"),
 		).toBeTruthy();
+		expect(within(audioPanel).queryByText("Scaffold")).toBeNull();
 		expect(within(combinedStrip).queryByText(/track volume/i)).toBeNull();
 		expect(within(combinedStrip).queryByText(/channel handling/i)).toBeNull();
 		expect(within(audioPanel).queryByText(/master gain/i)).toBeNull();

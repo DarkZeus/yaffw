@@ -1,6 +1,10 @@
 import { AudioLines } from "lucide-react";
 
 import type { AudioMediaTrack, ReadyMediaAsset } from "@/editor-core/model";
+import {
+	PreviewLevelMeter,
+	type PreviewLevelMeterChannel,
+} from "./preview-level-meter";
 
 export type AudioPanelProps = {
 	asset: ReadyMediaAsset;
@@ -57,12 +61,14 @@ function AudioTrackStrip({
 					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
 						Track meter
 					</span>
-					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
-						Scaffold
-					</span>
 				</div>
 			</div>
-			<MeterScaffold label={`Meter scaffold for ${label}`} />
+			<PreviewLevelMeter
+				channels={createStaticTrackMeterChannels(track, index)}
+				label={`${label} preview meter`}
+				showTickLabels={false}
+				state="ready"
+			/>
 		</section>
 	);
 }
@@ -86,29 +92,18 @@ function CombinedPreviewStrip() {
 					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
 						Output meter
 					</span>
-					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
-						Scaffold
-					</span>
 				</div>
 			</div>
-			<MeterScaffold label="Meter scaffold for combined preview output" />
+			<PreviewLevelMeter
+				channels={[
+					{ clipHeld: false, label: "Left", peakDb: -16 },
+					{ clipHeld: false, label: "Right", peakDb: -18 },
+				]}
+				label="Combined preview output meter"
+				showTickLabels={false}
+				state="ready"
+			/>
 		</section>
-	);
-}
-
-function MeterScaffold({ label }: { label: string }) {
-	return (
-		<div
-			aria-label={label}
-			className="grid h-full min-h-28 w-[4.25rem] grid-cols-2 gap-1 overflow-hidden rounded-sm border border-workbench-border bg-workbench-viewer p-1"
-		>
-			<div className="relative min-h-0 rounded-sm bg-workbench-lane">
-				<div className="absolute inset-x-0 bottom-0 h-2/5 rounded-sm bg-workbench-progress/35" />
-			</div>
-			<div className="relative min-h-0 rounded-sm bg-workbench-lane">
-				<div className="absolute inset-x-0 bottom-0 h-1/3 rounded-sm bg-workbench-progress/25" />
-			</div>
-		</div>
 	);
 }
 
@@ -146,4 +141,42 @@ function formatChannels(channels: number | undefined): string {
 	}
 
 	return channels === 1 ? "1 channel" : `${channels} channels`;
+}
+
+function createStaticTrackMeterChannels(
+	track: AudioMediaTrack,
+	trackIndex: number,
+): PreviewLevelMeterChannel[] {
+	const channelCount = normalizePreviewMeterChannelCount(track.channels);
+
+	return Array.from({ length: channelCount }, (_, channelIndex) => ({
+		clipHeld: false,
+		label: formatPreviewMeterChannelLabel(channelCount, channelIndex),
+		peakDb: Math.max(-72, -18 - trackIndex * 4 - channelIndex * 3),
+	}));
+}
+
+function normalizePreviewMeterChannelCount(
+	channels: number | undefined,
+): number {
+	if (!Number.isFinite(channels) || typeof channels !== "number") {
+		return 2;
+	}
+
+	return Math.min(Math.max(Math.round(channels), 1), 8);
+}
+
+function formatPreviewMeterChannelLabel(
+	channelCount: number,
+	channelIndex: number,
+): string {
+	if (channelCount === 1) {
+		return "Mono";
+	}
+
+	if (channelCount === 2) {
+		return channelIndex === 0 ? "Left" : "Right";
+	}
+
+	return `Ch ${channelIndex + 1}`;
 }
