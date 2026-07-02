@@ -57,8 +57,10 @@ describe("useNativePreviewTransport", () => {
 		expect(pause).toHaveBeenCalledTimes(1);
 		expect(readState()).toContain("playing:false");
 
+		multitrack.setTime.mockClear();
 		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
 		expect(video.currentTime).toBe(10);
+		expect(multitrack.setTime).toHaveBeenCalledWith(10);
 		expect(readState()).toContain("playhead:10000000");
 
 		fireEvent.click(screen.getByRole("button", { name: "Step forward" }));
@@ -82,7 +84,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("muted:false");
 	});
 
-	it("waits for native video playback before starting multitrack preview audio", async () => {
+	it("starts audio-master playback without waiting for native video playback", async () => {
 		const playStarted = createDeferred<void>();
 		const multitrack = createMultitrackSpy();
 		play.mockReturnValueOnce(playStarted.promise);
@@ -94,9 +96,13 @@ describe("useNativePreviewTransport", () => {
 		await waitFor(() => {
 			expect(play).toHaveBeenCalledTimes(1);
 		});
+		expect(screen.getByLabelText("Preview video")).toHaveProperty(
+			"muted",
+			true,
+		);
 		expect(multitrack.setTime).toHaveBeenCalledWith(0);
-		expect(multitrack.play).not.toHaveBeenCalled();
-		expect(readState()).toContain("playing:false");
+		expect(multitrack.play).toHaveBeenCalledTimes(1);
+		expect(readState()).toContain("playing:true");
 
 		await act(async () => {
 			playStarted.resolve();
@@ -128,6 +134,80 @@ describe("useNativePreviewTransport", () => {
 
 		expect(video.currentTime).toBe(2.12);
 		expect(readState()).toContain("playhead:2060000");
+	});
+
+	it("ignores native video playback events while audio-master owns preview state", async () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 3,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.play(video);
+		expect(readState()).toContain("playing:false");
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+		multitrack.pause.mockClear();
+
+		video.currentTime = 9;
+		fireEvent.seeked(video);
+		expect(video.currentTime).toBe(3);
+		expect(readState()).toContain("playhead:3000000");
+
+		fireEvent.pause(video);
+		expect(multitrack.pause).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:true");
+
+		fireEvent.ended(video);
+		expect(readState()).toContain("playing:true");
+		expect(readState()).toContain("playhead:3000000");
+	});
+
+	it("keeps native-clock fallback tied to native video playback events", async () => {
+		const playStarted = createDeferred<void>();
+		const multitrack = createMultitrackSpy();
+		play.mockReturnValueOnce(playStarted.promise);
+
+		render(
+			<NativePreviewTransportProbe
+				audioTransportReady={false}
+				multitrack={multitrack}
+			/>,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(play).toHaveBeenCalledTimes(1);
+		});
+		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:false");
+
+		await act(async () => {
+			playStarted.resolve();
+			await playStarted.promise;
+		});
+
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+
+		fireEvent.pause(video);
+		expect(readState()).toContain("playing:false");
+
+		fireEvent.play(video);
+		expect(readState()).toContain("playing:true");
+
+		fireEvent.ended(video);
+		expect(readState()).toContain("playing:false");
+		expect(readState()).toContain("playhead:12000000");
 	});
 
 	it("loops only after playback enters the selection", async () => {

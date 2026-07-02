@@ -140,12 +140,13 @@ export function useNativePreviewTransport({
 			if (audioTransportReady) {
 				video.muted = true;
 				multitrackRef.current?.setTime(playheadRef.current / 1_000_000);
-			}
-			await video.play();
-			if (audioTransportReady) {
 				multitrackRef.current?.play();
 				multitrackPlaybackStartedRef.current = true;
+				setIsPlaying(true);
+				await video.play();
+				return;
 			}
+			await video.play();
 			setIsPlaying(true);
 		} catch {
 			multitrackRef.current?.pause();
@@ -342,6 +343,10 @@ export function useNativePreviewTransport({
 	}, [isPlaying, syncPlayheadWithNativeVideo]);
 
 	const handleEnded = useCallback(() => {
+		if (audioTransportReady) {
+			return;
+		}
+
 		const video = videoRef.current;
 
 		if (
@@ -381,14 +386,22 @@ export function useNativePreviewTransport({
 	]);
 
 	const handleNativePause = useCallback(() => {
+		if (audioTransportReady) {
+			return;
+		}
+
 		multitrackRef.current?.pause();
 		multitrackPlaybackStartedRef.current = false;
 		setIsPlaying(false);
-	}, [multitrackRef]);
+	}, [audioTransportReady, multitrackRef]);
 
 	const handleNativePlay = useCallback(() => {
+		if (audioTransportReady) {
+			return;
+		}
+
 		setIsPlaying(true);
-	}, []);
+	}, [audioTransportReady]);
 
 	return {
 		getPlaybackRate,

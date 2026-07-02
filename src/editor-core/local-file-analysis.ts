@@ -1,7 +1,6 @@
 import { planDefaultExportCapability } from "./export-capability";
 import {
 	type AudioMediaTrack,
-	DEFAULT_OUTPUT_PROFILE,
 	type ExportCapability,
 	type FrameTiming,
 	type MediaAssetDraft,
