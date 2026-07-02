@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
+	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
@@ -31,8 +32,12 @@ const adapterMockState = vi.hoisted(() => ({
 	multitracks: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
 		emitCanPlay: () => void;
+		getCurrentTime: ReturnType<typeof vi.fn>;
 		on: ReturnType<typeof vi.fn>;
+		pause: ReturnType<typeof vi.fn>;
+		play: ReturnType<typeof vi.fn>;
 		setAudioRate: ReturnType<typeof vi.fn>;
+		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackVolume: ReturnType<typeof vi.fn>;
 	}>,
@@ -188,6 +193,7 @@ import type {
 	BrowserAudioPreviewSource,
 	BrowserAudioPreviewSourcesResult,
 } from "./browser-audio-preview-sources.types";
+import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
 import { NativePreviewPlayer } from "./native-preview-player";
 
 function normalizeMockPlayerSrc(src: unknown): string | undefined {
@@ -228,11 +234,13 @@ beforeEach(() => {
 	adapterMockState.multitrackCreate.mockReset();
 	adapterMockState.multitrackCreate.mockImplementation(() => {
 		let canPlayHandler: (() => void) | undefined;
+		let currentTimeSeconds = 0;
 		const multitrack = {
 			destroy: vi.fn(),
 			emitCanPlay: () => {
 				canPlayHandler?.();
 			},
+			getCurrentTime: vi.fn(() => currentTimeSeconds),
 			on: vi.fn((eventName: string, handler: () => void) => {
 				if (eventName === "canplay") {
 					canPlayHandler = handler;
@@ -240,7 +248,12 @@ beforeEach(() => {
 
 				return vi.fn();
 			}),
+			pause: vi.fn(),
+			play: vi.fn(),
 			setAudioRate: vi.fn(),
+			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
+				currentTimeSeconds = nextCurrentTimeSeconds;
+			},
 			setTime: vi.fn(),
 			setTrackVolume: vi.fn(),
 		};
@@ -605,6 +618,83 @@ describe("NativePreviewPlayer", () => {
 		expect(Array.from(channelModeRequest?.trackIds ?? [])).toEqual(["audio-1"]);
 	});
 
+	it("keeps sync fixture preview aligned after audio mix changes", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const syncFixture = syncFlashClickFixture();
+		const syncEvent = syncFixture.expected.syncEventsUs?.[2];
+		const onPreviewPlayheadChange = vi.fn();
+
+		if (!syncEvent) {
+			throw new Error("Expected the sync fixture to define a third event.");
+		}
+
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
+			createPreparedAudioPreviewSourcesForRequest(request),
+		);
+
+		render(
+			<AudioMasterPlayerProbe
+				asset={readySyncAssetWithTwoAudioTracks}
+				onPreviewPlayheadChange={onPreviewPlayheadChange}
+				selection={syncFixture.selections.full}
+				source={syncPreviewSource}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(adapterMockState.multitracks).toHaveLength(1);
+		});
+		await act(async () => {
+			adapterMockState.multitracks[0].emitCanPlay();
+		});
+
+		fireEvent.change(screen.getByLabelText("Voice volume"), {
+			target: { value: "50" },
+		});
+		fireEvent.click(
+			screen.getByRole("button", { name: "Exclude Voice from mix" }),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Solo Voice" }));
+		fireEvent.change(screen.getByLabelText("Voice channel fix"), {
+			target: { value: "use-left-as-mono" },
+		});
+
+		await waitFor(() => {
+			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+		});
+		await waitFor(() => {
+			expect(adapterMockState.multitracks).toHaveLength(2);
+		});
+
+		const remadeMultitrack = adapterMockState.multitracks[1];
+		await act(async () => {
+			remadeMultitrack.emitCanPlay();
+		});
+
+		const video = screen.getByLabelText(
+			"Preview for sync-flash-click.mp4",
+		) as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		video.currentTime = 0;
+		remadeMultitrack.setCurrentTimeSeconds(syncEvent.audioClickUs / 1_000_000);
+		runNextPreviewFrame(frameCallbacks);
+
+		expect(video.currentTime).toBe(syncEvent.visualFlashUs / 1_000_000);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:03.000",
+		);
+		expect(onPreviewPlayheadChange).toHaveBeenCalledWith(
+			syncEvent.audioClickUs,
+		);
+	});
+
 	it("keeps Playhead seek, Selection commit, and Selection range move channels separate in the lower region", () => {
 		const onSelectionEndRequested = vi.fn();
 		const onSelectionRangeMoveRequested = vi.fn();
@@ -926,15 +1016,25 @@ function createPlayerElement(
 	);
 }
 
-function AudioMasterPlayerProbe() {
+function AudioMasterPlayerProbe({
+	asset = readyAssetWithTwoAudioTracks,
+	onPreviewPlayheadChange,
+	selection: playerSelection = selection,
+	source = previewSource,
+}: {
+	asset?: ReadyMediaAsset;
+	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
+	selection?: Selection;
+	source?: Blob;
+} = {}) {
 	const [audioMix, setAudioMix] = useState(() =>
-		createDefaultAudioMix(readyAssetWithTwoAudioTracks),
+		createDefaultAudioMix(asset),
 	);
 
 	return (
 		<>
 			<NativePreviewPlayer
-				asset={readyAssetWithTwoAudioTracks}
+				asset={asset}
 				audioMix={audioMix}
 				onAudioTrackChannelModeChange={(trackId, channelMode) => {
 					setAudioMix((currentAudioMix) =>
@@ -955,12 +1055,13 @@ function AudioMasterPlayerProbe() {
 						}),
 					);
 				}}
+				onPreviewPlayheadChange={onPreviewPlayheadChange}
 				onSelectionEndRequested={() => {}}
 				onSelectionRangeMoveRequested={() => {}}
 				onSelectionResetRequested={() => {}}
 				onSelectionStartRequested={() => {}}
-				selection={selection}
-				source={previewSource}
+				selection={playerSelection}
+				source={source}
 			/>
 			<output aria-label="audio mix snapshot">
 				{formatAudioMixSnapshot(audioMix)}
@@ -1184,7 +1285,35 @@ const readyAssetWithAudio = {
 	},
 } satisfies ReadyMediaAsset;
 
+const readySyncAssetWithTwoAudioTracks = {
+	...readyAssetWithTwoAudioTracks,
+	durationUs: syncFlashClickFixture().expected.durationUs,
+	id: "sync-asset",
+	label: "sync-flash-click.mp4",
+	provenance: {
+		fileName: "sync-flash-click.mp4",
+		mimeType: "video/mp4",
+		sizeBytes: 1_024,
+	},
+} satisfies ReadyMediaAsset;
+
 const selection = {
 	endUs: 12_000_000,
 	startUs: 0,
 } satisfies Selection;
+
+const syncPreviewSource = new File(["sync video"], "sync-flash-click.mp4", {
+	type: "video/mp4",
+});
+
+function syncFlashClickFixture() {
+	const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
+		(candidate) => candidate.id === "mp4-sync-flash-click",
+	);
+
+	if (!fixture) {
+		throw new Error("Expected the sync flash/click fixture to be registered.");
+	}
+
+	return fixture;
+}

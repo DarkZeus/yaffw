@@ -12,12 +12,17 @@ The repeatable real-media fixtures live under
 - `tiny-video-only.mp4`: 2.0 seconds, 160x90 H.264 video, no audio.
 - `tiny-video-with-audio.mp4`: 2.0 seconds, 160x90 H.264 video, AAC audio.
 - `tiny-video-only.webm`: 2.0 seconds, 160x90 VP8 video, no audio.
-- `sync-flash-click.mp4`: 10.0 seconds, 160x90 H.264 video with AAC audio. It has full-frame white flashes and matching 100 ms, 1 kHz audio beeps once per second from 1.0s through 9.0s for manual preview A/V sync checks.
+- `sync-flash-click.mp4`: 10.0 seconds, 160x90 H.264 video with AAC audio. It has full-frame white flashes and matching 100 ms, 1 kHz audio beeps once per second from 1.0s through 9.0s for preview A/V sync regression checks.
 
 The generated-media inspector reads these fixtures through Mediabunny and
 reports container, duration, track inventory, and primary video dimensions. The
 normal fast test loop covers those measured facts without requiring a manual
 download delivery action.
+
+The sync flash/click fixture is also registered as preview sync regression
+coverage. Its known event timestamps and the manual QA path are recorded in the
+fixture catalog, with the browser-rendering checklist in
+`docs/preview-sync-regression.md`.
 
 ## Browser artifact harness
 

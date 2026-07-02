@@ -1,5 +1,15 @@
 import type { Selection } from "@/editor-core/model";
 
+export type SyncFlashClickEvent = {
+	audioClickUs: number;
+	visualFlashUs: number;
+};
+
+export type PreviewSyncRegressionScenario =
+	| "audio-mix-changes"
+	| "play-pause-seek-frame-step"
+	| "selection-loop";
+
 export type ExportCorrectnessFixture = {
 	container: "mp4" | "webm";
 	expected: {
@@ -7,15 +17,18 @@ export type ExportCorrectnessFixture = {
 		durationUs: number;
 		mimeTypePrefix: string;
 		syncEventDurationUs?: number;
-		syncEventsUs?: Array<{
-			audioClickUs: number;
-			visualFlashUs: number;
-		}>;
+		syncEventsUs?: SyncFlashClickEvent[];
 		videoTrackCount: number;
 	};
 	fileName: string;
 	id: string;
 	label: string;
+	previewSync?: {
+		eventDurationUs: number;
+		eventsUs: SyncFlashClickEvent[];
+		manualQaDocumentPath: string;
+		regressionScenarios: PreviewSyncRegressionScenario[];
+	};
 	publicPath: string;
 	selections: {
 		full: Selection;
@@ -148,6 +161,16 @@ export const EXPORT_CORRECTNESS_FIXTURES = [
 		fileName: "sync-flash-click.mp4",
 		id: "mp4-sync-flash-click",
 		label: "Sync flash/click MP4",
+		previewSync: {
+			eventDurationUs: SYNC_FLASH_CLICK_EVENT_DURATION_US,
+			eventsUs: SYNC_FLASH_CLICK_EVENTS_US,
+			manualQaDocumentPath: "docs/preview-sync-regression.md",
+			regressionScenarios: [
+				"play-pause-seek-frame-step",
+				"selection-loop",
+				"audio-mix-changes",
+			],
+		},
 		publicPath: "/export-correctness-fixtures/sync-flash-click.mp4",
 		selections: {
 			full: {
