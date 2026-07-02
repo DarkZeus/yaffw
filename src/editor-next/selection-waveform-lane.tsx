@@ -71,7 +71,7 @@ export function WaveformLane({
 			}}
 		>
 			<div
-				className="sticky left-0 z-[60] flex min-h-24 min-w-0 flex-col gap-1.5 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
+				className="sticky left-0 z-40 flex min-h-24 min-w-0 flex-col gap-1.5 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
 				<div className="flex min-w-0 items-start justify-between gap-1.5">

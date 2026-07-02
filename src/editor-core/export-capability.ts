@@ -54,16 +54,10 @@ export type ExportCapabilityReview =
 type ExportCapabilityPlanningAsset = Pick<
 	ReadyMediaAsset,
 	"durationUs" | "frameTiming" | "tracks"
-> & {
-	exportCapability: {
-		profile: DefaultOutputProfile;
-		supported: boolean;
-	};
-};
+>;
 
 type PlanDefaultExportCapabilityOptions = {
 	asset: ExportCapabilityPlanningAsset;
-	defaultProfileExportable?: boolean;
 	profile?: DefaultOutputProfile;
 	rangeAccuracy?: ExportRangeAccuracyReport;
 	runtime: RuntimeSupport;
@@ -72,7 +66,6 @@ type PlanDefaultExportCapabilityOptions = {
 
 export function planDefaultExportCapability({
 	asset,
-	defaultProfileExportable = asset.exportCapability.supported,
 	profile = DEFAULT_OUTPUT_PROFILE,
 	rangeAccuracy,
 	runtime,
@@ -87,17 +80,6 @@ export function planDefaultExportCapability({
 			reason:
 				"This runtime cannot export with the default MP4/H.264/AAC profile.",
 			technicalDetails: runtime.reason,
-		});
-	}
-
-	if (!defaultProfileExportable) {
-		return unsupportedReview({
-			plannedOutput,
-			profile,
-			reason:
-				"This file cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
-			technicalDetails:
-				"The default output profile is unavailable for this media asset, and editor-next does not silently fall back to another output format.",
 		});
 	}
 

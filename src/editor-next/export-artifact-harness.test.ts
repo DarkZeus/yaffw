@@ -143,7 +143,7 @@ describe("fixture catalog export artifact harness", () => {
 			total: 4,
 			unsupported: 1,
 		});
-		expect(run).toHaveBeenCalledTimes(3);
+		expect(run).toHaveBeenCalledTimes(4);
 
 		const videoOnly = exportedCatalogResult(catalog, "mp4-video-only");
 		expect(videoOnly.report.inspection.container).toBe("mp4");
@@ -181,12 +181,12 @@ describe("fixture catalog export artifact harness", () => {
 		);
 
 		const webm = unsupportedCatalogResult(catalog, "webm-video-only");
-		expect(webm.failure.stage).toBe("asset-capability");
+		expect(webm.failure.stage).toBe("export-runner");
 		expect(webm.failure.reason).toBe(
-			"This file cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
+			"Fixture export failed before generated media could be inspected.",
 		);
 		expect(webm.failure.technicalDetails).toContain(
-			"does not silently fall back",
+			"WebM input cannot be exported",
 		);
 	});
 });
@@ -277,14 +277,12 @@ const supportedRuntime = evaluateRuntimeSupport({
 
 const supportedInspection = {
 	audioTracks: [],
-	defaultProfileExportable: true,
 	durationUs: 2_000_000,
 	frameTiming: {
 		fps: 25,
 		frameDurationUs: 40_000,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc1.42c00d",
@@ -319,7 +317,7 @@ function inspectionForFixtureLabel(label: string): LocalMediaAssetInspection {
 							sampleRate: 44_100,
 						},
 					],
-		defaultProfileExportable: fixture.container === "mp4",
+		durationUs: fixture.expected.durationUs,
 		videoTracks: [
 			{
 				codec: fixture.container === "mp4" ? "avc1.42c00d" : "vp8",

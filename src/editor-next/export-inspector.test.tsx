@@ -52,6 +52,12 @@ describe("ExportInspectorPanel", () => {
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
 		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
 		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();
+		expect(within(exportInspector).getByText("Quality settings")).toBeTruthy();
+		expect(
+			within(exportInspector).getByRole("button", {
+				name: "Quality choices",
+			}),
+		).toBeTruthy();
 		expect(within(exportInspector).queryByText("Selected range")).toBeNull();
 		expect(within(exportInspector).getByText("Format")).toBeTruthy();
 		expect(
@@ -71,18 +77,10 @@ describe("ExportInspectorPanel", () => {
 		expect(onStartExport).toHaveBeenCalledTimes(1);
 	});
 
-	it("renders blocked export review with a disabled start action", () => {
+	it("opens the restored quality choices mock from the export tab", () => {
 		render(
 			<ExportInspectorPanel
-				asset={{
-					...readyAsset,
-					exportCapability: {
-						profile: DEFAULT_OUTPUT_PROFILE,
-						reason: "The browser cannot encode this source.",
-						supported: false,
-						technicalDetails: "VideoEncoder rejected the source.",
-					},
-				}}
+				asset={readyAsset}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -92,12 +90,51 @@ describe("ExportInspectorPanel", () => {
 			/>,
 		);
 
+		fireEvent.click(screen.getByRole("button", { name: "Quality choices" }));
+
+		const qualityDialog = screen.getByRole("dialog", {
+			name: "Export Quality Settings",
+		});
+		expect(within(qualityDialog).getByText("Resolution")).toBeTruthy();
+		expect(within(qualityDialog).getByText("Bitrate")).toBeTruthy();
+		expect(within(qualityDialog).getByText("Codec & Container")).toBeTruthy();
+		expect(within(qualityDialog).getByText("GPU Acceleration")).toBeTruthy();
+		expect(within(qualityDialog).getByText("Frame Interpolation")).toBeTruthy();
+
+		fireEvent.click(
+			within(qualityDialog).getByRole("button", {
+				name: /720p/,
+			}),
+		);
+		fireEvent.click(
+			within(qualityDialog).getByRole("button", {
+				name: "Apply choices",
+			}),
+		);
+
+		const qualityMock = screen.getByLabelText("Quality settings panel");
+		expect(within(qualityMock).getByText("720p")).toBeTruthy();
+	});
+
+	it("renders blocked export review with a disabled start action", () => {
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onStartExport={() => undefined}
+				runtime={supportedRuntime}
+				selection={invalidSelection}
+			/>,
+		);
+
 		const exportInspector = screen.getByLabelText("Export inspector");
 		expect(within(exportInspector).getAllByText("Blocked").length).toBe(2);
 		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
 		expect(
 			within(exportInspector).getByText(
-				"The default output profile is unavailable for this media asset, and editor-next does not silently fall back to another output format.",
+				`Expected selection inside [0, ${readyAsset.durationUs}], got [${invalidSelection.startUs}, ${invalidSelection.endUs}].`,
 			),
 		).toBeTruthy();
 		expect(
@@ -322,6 +359,11 @@ const readyAsset = {
 const fullSelection = {
 	endUs: 12_000_000,
 	startUs: 0,
+} satisfies Selection;
+
+const invalidSelection = {
+	endUs: 12_000_001,
+	startUs: 1_000_000,
 } satisfies Selection;
 
 const generatedMedia = {

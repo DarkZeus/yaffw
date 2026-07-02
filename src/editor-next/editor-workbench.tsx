@@ -366,10 +366,9 @@ function NonReadyImportSurface({
 						className="text-sm font-medium"
 						htmlFor="editor-next-local-file"
 					>
-						Local video file
+						Local media file
 					</label>
 					<Input
-						accept="video/*"
 						disabled={!session.importEnabled}
 						id="editor-next-local-file"
 						key={localFileInputKey}
@@ -394,13 +393,13 @@ function workbenchNonReadyStateCopy(session: NonReadyEditorSession) {
 		case "empty":
 			return {
 				description:
-					"Choose or drop one local video file to create a media asset draft.",
+					"Choose or drop one local media file to create a media asset draft.",
 				title: "No media asset loaded",
 			};
 		case "failure":
 			return {
 				description:
-					"Choose another local video file after reviewing the analysis details below.",
+					"Choose another local media file after reviewing the analysis details below.",
 				title: "Media asset analysis failed",
 			};
 		case "loading":

@@ -1,8 +1,8 @@
 import { planDefaultExportCapability } from "./export-capability";
-import { isPlausibleVideoDraft } from "./local-file-import";
 import {
 	type AudioMediaTrack,
 	DEFAULT_OUTPUT_PROFILE,
+	type ExportCapability,
 	type FrameTiming,
 	type MediaAssetDraft,
 	type ReadyMediaAsset,
@@ -31,10 +31,8 @@ export type AudioTrackInspection = {
 
 export type LocalMediaAssetInspection = {
 	audioTracks: AudioTrackInspection[];
-	defaultProfileExportable: boolean;
 	durationUs: number;
 	frameTiming?: FrameTiming;
-	previewable: boolean;
 	videoTracks: VideoTrackInspection[];
 };
 
@@ -63,15 +61,6 @@ export async function analyzeLocalMediaAssetDraft(
 	draft: MediaAssetDraft,
 	options: LocalMediaAssetAnalysisOptions,
 ): Promise<LocalMediaAssetAnalysisResult> {
-	if (!isPlausibleVideoDraft(draft)) {
-		return unsupported(
-			"This file does not look like a supported video file.",
-			`MIME type ${draft.provenance.mimeType ?? "(missing)"} and file name ${
-				draft.label
-			} were not recognized as a local video container.`,
-		);
-	}
-
 	let inspection: LocalMediaAssetInspection;
 
 	try {
@@ -98,34 +87,20 @@ export async function analyzeLocalMediaAssetDraft(
 		endUs: inspection.durationUs,
 		startUs: 0,
 	};
-	const exportCapability = planDefaultExportCapability({
+	const exportCapabilityReview = planDefaultExportCapability({
 		asset: {
 			durationUs: inspection.durationUs,
-			exportCapability: {
-				profile: DEFAULT_OUTPUT_PROFILE,
-				supported: inspection.defaultProfileExportable,
-			},
 			frameTiming,
 			tracks,
 		},
-		defaultProfileExportable: inspection.defaultProfileExportable,
 		runtime: options.runtime,
 		selection,
 	});
-
-	if (!exportCapability.supported) {
-		return unsupported(
-			exportCapability.reason,
-			exportCapability.technicalDetails,
-		);
-	}
+	const exportCapability = exportCapabilityFromReview(exportCapabilityReview);
 
 	const asset: ReadyMediaAsset = {
 		durationUs: inspection.durationUs,
-		exportCapability: {
-			profile: DEFAULT_OUTPUT_PROFILE,
-			supported: true,
-		},
+		exportCapability,
 		frameTiming,
 		id: options.createAssetId(),
 		label: draft.label,
@@ -137,6 +112,24 @@ export async function analyzeLocalMediaAssetDraft(
 		asset,
 		selection,
 		status: "ready",
+	};
+}
+
+function exportCapabilityFromReview(
+	review: ReturnType<typeof planDefaultExportCapability>,
+): ExportCapability {
+	if (review.supported) {
+		return {
+			profile: review.profile,
+			supported: true,
+		};
+	}
+
+	return {
+		profile: review.profile,
+		reason: review.reason,
+		supported: false,
+		technicalDetails: review.technicalDetails,
 	};
 }
 
@@ -168,14 +161,6 @@ function validateInspection(
 		return {
 			message: "This file does not contain a supported video track.",
 			technicalDetails: "Analysis did not find any video tracks.",
-		};
-	}
-
-	if (!inspection.previewable) {
-		return {
-			message: "This file cannot be previewed in this runtime.",
-			technicalDetails:
-				"The analyzed video track is not decodable by the current browser media APIs.",
 		};
 	}
 

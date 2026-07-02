@@ -79,7 +79,6 @@ describe("useSingleAssetEditingSession", () => {
 		await act(async () => {
 			inspections[0]?.deferred.resolve({
 				...supportedInspection,
-				previewable: false,
 			});
 			await firstImport;
 		});
@@ -182,8 +181,7 @@ function SingleAssetEditingSessionProbe({
 			cancelSupported: true,
 			run: async () => ({
 				blob:
-					generatedBlob ??
-					new Blob(["generated media"], { type: "video/mp4" }),
+					generatedBlob ?? new Blob(["generated media"], { type: "video/mp4" }),
 			}),
 		},
 		deliverGeneratedMedia,
@@ -249,14 +247,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 12_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",

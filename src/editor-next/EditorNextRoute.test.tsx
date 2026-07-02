@@ -52,7 +52,7 @@ describe("EditorNextRoute", () => {
 		);
 
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
-		expect(screen.getByLabelText("Local video file")).toBeTruthy();
+		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
@@ -69,7 +69,7 @@ describe("EditorNextRoute", () => {
 				screen.getByLabelText("Preview for stalker-patch-1.5-teaser.mp4"),
 			).toBeTruthy();
 		});
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 		expect(
 			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
 		).toBeGreaterThan(0);
@@ -99,7 +99,7 @@ describe("EditorNextRoute", () => {
 		const alert = screen.getByRole("alert");
 
 		expect(alert.textContent).toContain("WebCodecs");
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 	});
 
 	it("renders importing and analyzing inside the workbench preview region", async () => {
@@ -114,7 +114,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "loading.mp4", { type: "video/mp4" })],
 			},
@@ -127,7 +127,7 @@ describe("EditorNextRoute", () => {
 			screen.getByText("Preparing media asset draft loading.mp4."),
 		).toBeTruthy();
 		expect(
-			(screen.getByLabelText("Local video file") as HTMLInputElement).disabled,
+			(screen.getByLabelText("Local media file") as HTMLInputElement).disabled,
 		).toBe(true);
 
 		inspection.resolve(supportedInspection);
@@ -146,7 +146,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "picked.mp4", { type: "video/mp4" })],
 			},
@@ -157,7 +157,7 @@ describe("EditorNextRoute", () => {
 		});
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
 
 		openExportTab();
@@ -186,7 +186,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "center-preview.mp4", { type: "video/mp4" }),
@@ -300,7 +300,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "overflow.mp4", { type: "video/mp4" })],
 			},
@@ -365,7 +365,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "picked.mp4", { type: "video/mp4" })],
 			},
@@ -447,7 +447,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "close-cancelled.mp4", { type: "video/mp4" }),
@@ -467,7 +467,7 @@ describe("EditorNextRoute", () => {
 		expect(
 			screen.getByLabelText("Preview for close-cancelled.mp4"),
 		).toBeTruthy();
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 		expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 	});
 
@@ -492,7 +492,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "close-confirmed.mp4", { type: "video/mp4" }),
@@ -555,7 +555,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["first video"], "reimport-first.mp4", {
@@ -579,13 +579,13 @@ describe("EditorNextRoute", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByLabelText("Local video file")).toBeTruthy();
+			expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		});
 		expect(confirmClose).toHaveBeenCalledTimes(1);
 		expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:first-preview");
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["second video"], "reimport-second.mp4", {
@@ -630,7 +630,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "close-disabled.mp4", { type: "video/mp4" }),
@@ -680,7 +680,7 @@ describe("EditorNextRoute", () => {
 
 		expect(dispatchBeforeUnload()).toBe(false);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "beforeunload.mp4", { type: "video/mp4" })],
 			},
@@ -715,7 +715,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "remount.mp4", { type: "video/mp4" })],
 			},
@@ -758,7 +758,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "uncancellable.mp4", { type: "video/mp4" }),
@@ -802,7 +802,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "timeline.mp4", { type: "video/mp4" })],
 			},
@@ -871,7 +871,7 @@ describe("EditorNextRoute", () => {
 		});
 
 		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
 	});
 
@@ -889,7 +889,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["audio"], "audio-only.mp4", { type: "video/mp4" })],
 			},
@@ -923,14 +923,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 12_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",

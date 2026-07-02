@@ -105,7 +105,7 @@ describe("Editor workbench", () => {
 		expect(alert.textContent).toContain("WebCodecs");
 		expect(screen.getByText("Runtime blocked")).toBeTruthy();
 		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
 		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 	});
@@ -134,12 +134,12 @@ describe("Editor workbench", () => {
 		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
-		expect(screen.getByLabelText("Local video file")).toBeTruthy();
+		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(screen.getByTestId("editor-next-drop-zone")).toBeTruthy();
 		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
 		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "picked.mp4", { type: "video/mp4" })],
 			},
@@ -172,7 +172,7 @@ describe("Editor workbench", () => {
 			screen.getByText("Preparing media asset draft loading.mp4."),
 		).toBeTruthy();
 		expect(
-			(screen.getByLabelText("Local video file") as HTMLInputElement).disabled,
+			(screen.getByLabelText("Local media file") as HTMLInputElement).disabled,
 		).toBe(true);
 	});
 
@@ -251,7 +251,7 @@ describe("Editor workbench", () => {
 		).toBeTruthy();
 
 		expect(screen.getByLabelText("Preview slot")).toBeTruthy();
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 	});
 });
 

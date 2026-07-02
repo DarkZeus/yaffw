@@ -14,6 +14,7 @@ import type {
 	ExportInspectorStatusViewModel,
 } from "./export-inspector-presenter.types";
 import type { ExportInspectorPanelProps } from "./export-inspector.types";
+import { ExportQualitySettingsMock } from "./export-quality-settings-mock";
 
 export function ExportInspectorPanel({
 	asset,
@@ -89,6 +90,7 @@ export function ExportInspectorPanel({
 					capability={viewModel.capability}
 					checks={viewModel.runtimeChecks}
 				/>
+				<ExportQualitySettingsMock asset={asset} />
 				<ExportJobStatus
 					deliveryAction={deliveryAction}
 					onDownloadGeneratedMedia={onDownloadGeneratedMedia}

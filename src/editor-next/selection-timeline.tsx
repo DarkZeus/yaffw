@@ -684,7 +684,7 @@ export function SelectionTimeline({
 						>
 							<div
 								aria-hidden="true"
-								className="sticky left-0 z-[60] h-12 border-r border-workbench-border bg-workbench-ruler"
+								className="sticky left-0 z-40 h-12 border-r border-workbench-border bg-workbench-ruler"
 							/>
 							<button
 								aria-label="Seek timeline ruler"
@@ -846,7 +846,7 @@ export function SelectionTimeline({
 								)}
 								<button
 									aria-label="Playhead handle"
-									className={`absolute -top-2 bottom-0 z-50 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
+									className={`absolute -top-2 bottom-0 z-30 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
 									onMouseDown={(event) => {
 										if (shouldUseMouseFallback()) {
 											beginPlayheadDrag(event);
@@ -1025,7 +1025,7 @@ function VideoThumbnailStrip({
 			}}
 		>
 			<div
-				className="sticky left-0 z-[60] flex min-h-20 min-w-0 flex-col justify-center gap-1 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
+				className="sticky left-0 z-40 flex min-h-20 min-w-0 flex-col justify-center gap-1 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
 				data-testid="video-thumbnail-lane-header"
 			>
 				<div className="flex min-w-0 items-center gap-2">

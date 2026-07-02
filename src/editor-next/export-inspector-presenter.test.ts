@@ -59,22 +59,14 @@ describe("export inspector presenter", () => {
 		});
 	});
 
-	it("derives a blocked review without placing capability policy in the UI", () => {
+	it("derives a blocked review for impossible selections", () => {
 		const viewModel = createExportInspectorViewModel({
-			asset: {
-				...readyAsset,
-				exportCapability: {
-					profile: DEFAULT_OUTPUT_PROFILE,
-					reason: "The browser cannot encode this source.",
-					supported: false,
-					technicalDetails: "VideoEncoder.isConfigSupported rejected h264.",
-				},
-			},
+			asset: readyAsset,
 			exportState: {
 				status: "reviewing",
 			},
 			runtime: supportedRuntime,
-			selection: fullSelection,
+			selection: invalidSelection,
 		});
 
 		expect(viewModel.badge).toEqual({
@@ -91,11 +83,9 @@ describe("export inspector presenter", () => {
 				label: "Format",
 				value: "MP4 / H.264 video / AAC audio",
 			},
-			reason:
-				"This file cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
+			reason: "The current selection is outside the active media asset.",
 			supported: false,
-			technicalDetails:
-				"The default output profile is unavailable for this media asset, and editor-next does not silently fall back to another output format.",
+			technicalDetails: `Expected selection inside [0, ${readyAsset.durationUs}], got [${invalidSelection.startUs}, ${invalidSelection.endUs}].`,
 		});
 		expect(viewModel.action).toEqual({
 			disabled: true,
@@ -309,6 +299,11 @@ const readyAsset = {
 const fullSelection = {
 	endUs: 12_000_000,
 	startUs: 0,
+} satisfies Selection;
+
+const invalidSelection = {
+	endUs: 12_000_001,
+	startUs: 1_000_000,
 } satisfies Selection;
 
 const generatedMedia = {

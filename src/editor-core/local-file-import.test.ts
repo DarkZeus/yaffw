@@ -9,7 +9,7 @@ import type { LocalFileSource, MediaAssetDraft } from "./model";
 import { evaluateRuntimeSupport } from "./runtime-capabilities";
 
 describe("local media asset analysis", () => {
-	it("turns a supported local video with audio into a ready media asset", async () => {
+	it("turns a readable local media file with audio into a ready media asset", async () => {
 		const draft = createLocalMediaAssetDraft(
 			{
 				lastModified: 1_715_000_000_000,
@@ -35,14 +35,12 @@ describe("local media asset analysis", () => {
 						sampleRate: 48_000,
 					},
 				],
-				defaultProfileExportable: true,
 				durationUs: 12_000_000,
 				frameTiming: {
 					fps: 30,
 					frameDurationUs: 33_333,
 					source: "known",
 				},
-				previewable: true,
 				videoTracks: [
 					{
 						codec: "avc",
@@ -79,7 +77,7 @@ describe("local media asset analysis", () => {
 		});
 	});
 
-	it("accepts video-only files when preview and default export are available", async () => {
+	it("accepts video-only files when default export is available", async () => {
 		const result = await analyzeLocalMediaAssetDraft(
 			draftFor({
 				name: "screen-only.webm",
@@ -108,10 +106,10 @@ describe("local media asset analysis", () => {
 		});
 	});
 
-	it("analyzes plausible video containers when the MIME type is generic", async () => {
+	it("delegates generic media files to the Mediabunny inspector", async () => {
 		const result = await analyzeLocalMediaAssetDraft(
 			draftFor({
-				name: "camera-export.mov",
+				name: "camera-export.m3u8",
 				type: "application/octet-stream",
 			}),
 			{
@@ -122,6 +120,38 @@ describe("local media asset analysis", () => {
 		);
 
 		expect(result.status).toBe("ready");
+	});
+
+	it("preserves non-default video codec facts without rejecting import", async () => {
+		const result = await analyzeLocalMediaAssetDraft(
+			draftFor({
+				name: "camera-export-hevc.mov",
+				type: "video/quicktime",
+			}),
+			{
+				createAssetId: () => "asset-preview-blocked",
+				inspect: async () => ({
+					...supportedInspection,
+					videoTracks: [
+						{
+							codec: "hevc",
+							height: 1080,
+							id: "video-1",
+							label: "Main",
+							width: 1920,
+						},
+					],
+				}),
+				runtime: supportedRuntime,
+			},
+		);
+
+		expect(result.status).toBe("ready");
+		if (result.status !== "ready") {
+			throw new Error(`Expected ready analysis, got ${result.status}`);
+		}
+
+		expect(result.asset.tracks.video[0]?.codec).toBe("hevc");
 	});
 
 	it("rejects audio-only files before they enter the ready editor", async () => {
@@ -181,29 +211,42 @@ describe("local media asset analysis", () => {
 		expect(result.failure.technicalDetails).toContain("could not parse");
 	});
 
-	it("rejects files without default-profile export capability", async () => {
+	it("keeps default export capability startable for non-default audio codecs", async () => {
 		const result = await analyzeLocalMediaAssetDraft(
 			draftFor({
-				name: "unsupported-export.mp4",
+				name: "he-aac-source.mp4",
 				type: "video/mp4",
 			}),
 			{
-				createAssetId: () => "asset-export-blocked",
+				createAssetId: () => "asset-he-aac",
 				inspect: async () => ({
 					...supportedInspection,
-					defaultProfileExportable: false,
+					audioTracks: [
+						{
+							channels: 2,
+							codec: "mp4a.40.5",
+							id: "audio-1",
+							label: "Audio 1",
+							sampleRate: 22_050,
+						},
+					],
 				}),
 				runtime: supportedRuntime,
 			},
 		);
 
-		expect(result.status).toBe("unsupported");
-		if (result.status !== "unsupported") {
-			throw new Error(`Expected unsupported analysis, got ${result.status}`);
+		expect(result.status).toBe("ready");
+		if (result.status !== "ready") {
+			throw new Error(`Expected ready analysis, got ${result.status}`);
 		}
 
-		expect(result.failure.message).toContain("default MP4/H.264/AAC");
-		expect(result.failure.technicalDetails).toContain("default output profile");
+		expect(result.asset.tracks.audio[0]).toEqual(
+			expect.objectContaining({
+				codec: "mp4a.40.5",
+				sampleRate: 22_050,
+			}),
+		);
+		expect(result.asset.exportCapability.supported).toBe(true);
 	});
 });
 
@@ -218,14 +261,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 12_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",

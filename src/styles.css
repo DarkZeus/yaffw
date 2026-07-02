@@ -252,6 +252,51 @@ code {
 }
 
 @layer components {
+	.quality-settings-dialog {
+		color-scheme: dark;
+		--workbench: oklch(0.115 0.012 230);
+		--workbench-foreground: oklch(0.94 0.018 88);
+		--workbench-viewer: oklch(0.095 0.012 230);
+		--workbench-timeline: oklch(0.125 0.014 230);
+		--workbench-timeline-foreground: var(--workbench-foreground);
+		--workbench-ruler: oklch(0.155 0.016 226);
+		--workbench-lane: oklch(0.14 0.013 230);
+		--workbench-lane-alt: oklch(0.18 0.017 222);
+		--workbench-lane-foreground: var(--workbench-foreground);
+		--workbench-inspector: oklch(0.12 0.012 230);
+		--workbench-transport: oklch(0.16 0.016 220);
+		--workbench-border: oklch(0.275 0.026 215);
+		--workbench-border-strong: oklch(0.39 0.055 190);
+		--workbench-focus: oklch(0.76 0.14 178);
+		--workbench-hover: oklch(0.19 0.025 215);
+		--workbench-selected: oklch(0.74 0.14 178);
+		--workbench-selected-foreground: oklch(0.08 0.014 220);
+		--workbench-disabled: oklch(0.2 0.012 230);
+		--workbench-loading: oklch(0.25 0.018 220);
+		--workbench-progress: oklch(0.78 0.16 178);
+		--workbench-playhead: oklch(0.66 0.2 28);
+		--workbench-destructive: oklch(0.58 0.19 28);
+		--workbench-waveform: oklch(0.72 0.13 178);
+		--workbench-waveform-guide: oklch(0.44 0.04 178);
+		--background: var(--workbench-inspector);
+		--foreground: var(--workbench-foreground);
+		--card: var(--workbench-lane);
+		--card-foreground: var(--workbench-foreground);
+		--popover: var(--workbench-lane);
+		--popover-foreground: var(--workbench-foreground);
+		--primary: var(--workbench-selected);
+		--primary-foreground: var(--workbench-selected-foreground);
+		--secondary: var(--workbench-transport);
+		--secondary-foreground: var(--workbench-foreground);
+		--muted: var(--workbench-hover);
+		--muted-foreground: oklch(0.72 0.025 210);
+		--accent: var(--workbench-hover);
+		--accent-foreground: var(--workbench-foreground);
+		--border: var(--workbench-border);
+		--input: var(--workbench-border-strong);
+		--ring: var(--workbench-focus);
+	}
+
 	.selection-waveform-surface ::part(editor-selection-region) {
 		box-sizing: border-box;
 		border-top: 2px solid var(--workbench-selected);

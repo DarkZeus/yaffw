@@ -7,12 +7,14 @@ import { DEFAULT_OUTPUT_PROFILE } from "./model";
 import { evaluateRuntimeSupport } from "./runtime-capabilities";
 
 describe("default export capability planning", () => {
-	it("rejects unsupported default-profile export without falling back to another format", () => {
+	it("rejects selections outside the active media asset", () => {
 		const review = planDefaultExportCapability({
 			asset: readyAsset,
-			defaultProfileExportable: false,
 			runtime: supportedRuntime,
-			selection: fullSelection,
+			selection: {
+				endUs: readyAsset.durationUs + 1,
+				startUs: 1_000_000,
+			},
 		});
 
 		expect(review.supported).toBe(false);
@@ -22,8 +24,8 @@ describe("default export capability planning", () => {
 
 		expect(review.profile).toEqual(DEFAULT_OUTPUT_PROFILE);
 		expect(review.plannedOutput.label).toBe("MP4 / H.264 video / AAC audio");
-		expect(review.reason).toContain("default MP4/H.264/AAC profile");
-		expect(review.technicalDetails).toContain("does not silently fall back");
+		expect(review.reason).toContain("outside the active media asset");
+		expect(review.technicalDetails).toContain("Expected selection inside");
 		expect(review.plannedOutput.container).toBe("mp4");
 	});
 

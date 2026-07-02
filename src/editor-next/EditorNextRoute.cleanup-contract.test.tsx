@@ -170,7 +170,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "close-contract.mp4", {
@@ -284,7 +284,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["first video"], "replace-first.mp4", {
@@ -305,13 +305,13 @@ describe("EditorNextRoute cleanup contract", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByLabelText("Local video file")).toBeTruthy();
+			expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		});
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
 			"blob:preview:replace-first.mp4",
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["second video"], "replace-second.mp4", {
@@ -405,7 +405,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [
 					new File(["video"], "generated-invalidation.mp4", {
@@ -471,14 +471,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 12_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",

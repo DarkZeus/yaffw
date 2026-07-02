@@ -56,7 +56,7 @@ describe("editor-next export recovery", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "failure.mp4", { type: "video/mp4" })],
 			},
@@ -88,7 +88,7 @@ describe("editor-next export recovery", () => {
 		expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
 		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
 
-		const localFileInput = screen.queryByLabelText("Local video file");
+		const localFileInput = screen.queryByLabelText("Local media file");
 		if (localFileInput instanceof HTMLElement) {
 			fireEvent.blur(localFileInput);
 		}
@@ -132,7 +132,7 @@ describe("editor-next export recovery", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "cancel.mp4", { type: "video/mp4" })],
 			},
@@ -181,14 +181,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 2_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",

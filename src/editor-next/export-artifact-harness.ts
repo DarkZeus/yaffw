@@ -159,6 +159,20 @@ async function runExportArtifactHarness({
 		);
 	}
 
+	const exportReadiness = planDefaultExportCapability({
+		asset: analysis.asset,
+		runtime,
+		selection,
+	});
+
+	if (!exportReadiness.supported) {
+		throw new ExportArtifactHarnessFailure(
+			"asset-capability",
+			exportReadiness.reason,
+			exportReadiness.technicalDetails,
+		);
+	}
+
 	const progress: ExportProgress[] = [];
 	const exportSignal = signal ?? new AbortController().signal;
 	let exportResult: Awaited<ReturnType<DefaultExportRunner["run"]>>;

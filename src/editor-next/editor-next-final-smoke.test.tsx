@@ -53,7 +53,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 
 		expect(screen.getAllByText("Runtime blocked").length).toBeGreaterThan(0);
 		expect(screen.getByRole("alert").textContent).toContain("WebCodecs");
-		expect(screen.queryByLabelText("Local video file")).toBeNull();
+		expect(screen.queryByLabelText("Local media file")).toBeNull();
 	});
 
 	it("smokes local import, selection, export progress, explicit delivery, and close cleanup", async () => {
@@ -96,7 +96,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 
 		expect(dispatchBeforeUnload()).toBe(false);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["video"], "final-smoke.mp4", { type: "video/mp4" })],
 			},
@@ -136,7 +136,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(screen.queryByText("Custom output")).toBeNull();
 		expect(screen.queryByText("Target bitrate")).toBeNull();
 
-		const localFileInput = screen.queryByLabelText("Local video file");
+		const localFileInput = screen.queryByLabelText("Local media file");
 		if (localFileInput instanceof HTMLElement) {
 			fireEvent.blur(localFileInput);
 		}
@@ -239,7 +239,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 			/>,
 		);
 
-		fireEvent.change(screen.getByLabelText("Local video file"), {
+		fireEvent.change(screen.getByLabelText("Local media file"), {
 			target: {
 				files: [new File(["audio"], "audio-only.mp4", { type: "video/mp4" })],
 			},
@@ -281,14 +281,12 @@ const supportedInspection = {
 			sampleRate: 48_000,
 		},
 	],
-	defaultProfileExportable: true,
 	durationUs: 2_000_000,
 	frameTiming: {
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",
 	},
-	previewable: true,
 	videoTracks: [
 		{
 			codec: "avc",
