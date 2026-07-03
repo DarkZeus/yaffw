@@ -1352,10 +1352,19 @@ function lastOutputGain(
 
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];
-	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+	const timelineFrameCallbacks: FrameRequestCallback[] = [];
+	const requestPreviewAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
 		frameCallbacks.push(callback);
 		return frameCallbacks.length;
 	});
+	const requestAnimationFrame = (callback: FrameRequestCallback) => {
+		if (callback.name === "updateLivePlayheadHandle") {
+			timelineFrameCallbacks.push(callback);
+			return 10_000 + timelineFrameCallbacks.length;
+		}
+
+		return requestPreviewAnimationFrame(callback);
+	};
 	const cancelAnimationFrame = vi.fn();
 	vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
 	vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
@@ -1363,7 +1372,7 @@ function stubPreviewAnimationFrames() {
 	return {
 		cancelAnimationFrame,
 		frameCallbacks,
-		requestAnimationFrame,
+		requestAnimationFrame: requestPreviewAnimationFrame,
 	};
 }
 

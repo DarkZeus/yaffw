@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import {
+	act,
 	cleanup,
 	render,
 	screen,
@@ -66,6 +67,37 @@ describe("SelectionTimeline live playhead render isolation", () => {
 		);
 		expect(buttonRenderStats.renderCount).toBe(buttonRenderCountAfterReady);
 	});
+
+	it("moves the live playhead handle on animation frames without React rerenders", async () => {
+		let livePlayheadUs = 0;
+		const { frameCallbacks, requestAnimationFrame } =
+			stubTimelineAnimationFrames();
+		const view = render(
+			createTimelineElement({
+				playheadUs: 0,
+				readLivePlayheadUs: () => livePlayheadUs,
+			}),
+		);
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		await waitFor(() => {
+			expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
+		});
+		const buttonRenderCountAfterReady = buttonRenderStats.renderCount;
+		const playheadHandle = screen.getByLabelText("Playhead handle");
+
+		livePlayheadUs = 600_000;
+		act(() => {
+			runNextTimelineFrame(frameCallbacks);
+		});
+
+		expect(playheadHandle.style.left).toBe("5%");
+		expect(buttonRenderStats.renderCount).toBe(buttonRenderCountAfterReady);
+
+		view.unmount();
+	});
 });
 
 const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
@@ -81,7 +113,13 @@ const timelineCallbacks = {
 	onSelectionStartCommitRequested: () => {},
 };
 
-function createTimelineElement({ playheadUs }: { playheadUs: number }) {
+function createTimelineElement({
+	playheadUs,
+	readLivePlayheadUs,
+}: {
+	playheadUs: number;
+	readLivePlayheadUs?: () => number;
+}) {
 	return (
 		<SelectionTimeline
 			asset={readyAsset}
@@ -99,6 +137,7 @@ function createTimelineElement({ playheadUs }: { playheadUs: number }) {
 			}
 			playheadUpdatesAreLive
 			playheadUs={playheadUs}
+			readLivePlayheadUs={readLivePlayheadUs}
 			selection={selection}
 			source={source}
 			videoStripThumbnailLoader={videoStripThumbnailLoader}
@@ -217,4 +256,31 @@ function mockThumbnailObjectUrls() {
 		configurable: true,
 		value: vi.fn(),
 	});
+}
+
+function stubTimelineAnimationFrames() {
+	const frameCallbacks: FrameRequestCallback[] = [];
+	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+		frameCallbacks.push(callback);
+		return frameCallbacks.length;
+	});
+	const cancelAnimationFrame = vi.fn();
+
+	vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+	vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+
+	return {
+		frameCallbacks,
+		requestAnimationFrame,
+	};
+}
+
+function runNextTimelineFrame(frameCallbacks: FrameRequestCallback[]) {
+	const callback = frameCallbacks.shift();
+
+	if (!callback) {
+		throw new Error("Expected a pending timeline animation frame");
+	}
+
+	callback(16);
 }

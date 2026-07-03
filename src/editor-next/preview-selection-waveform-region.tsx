@@ -14,6 +14,7 @@ export function PreviewSelectionWaveformRegion({
 	onSoloedAudioTrackChange,
 	playheadUs,
 	playheadUpdatesAreLive,
+	readLivePlayheadUs,
 	selection,
 	selectionEditingDisabled,
 	soloedAudioTrackId,
@@ -37,6 +38,7 @@ export function PreviewSelectionWaveformRegion({
 				onSelectionStartCommitRequested={onSelectionStartCommitRequested}
 				playheadUs={playheadUs}
 				playheadUpdatesAreLive={playheadUpdatesAreLive}
+				readLivePlayheadUs={readLivePlayheadUs}
 				selection={selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				soloedAudioTrackId={soloedAudioTrackId}

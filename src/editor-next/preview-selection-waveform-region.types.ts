@@ -18,6 +18,7 @@ export type PreviewSelectionWaveformRegionProps = {
 	onSoloedAudioTrackChange: (trackId: string | null) => void;
 	playheadUs: MediaTimeUs;
 	playheadUpdatesAreLive: boolean;
+	readLivePlayheadUs: () => MediaTimeUs;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
 	soloedAudioTrackId: string | null;

@@ -13,6 +13,7 @@ import {
 	memo,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -85,6 +86,7 @@ export function SelectionTimeline({
 	onSoloedAudioTrackChange,
 	playheadUs,
 	playheadUpdatesAreLive = false,
+	readLivePlayheadUs,
 	selection,
 	selectionEditingDisabled = false,
 	soloedAudioTrackId = null,
@@ -93,6 +95,7 @@ export function SelectionTimeline({
 	waveformLaneLoader = loadBrowserWaveformLane,
 }: SelectionTimelineProps) {
 	const trackRef = useRef<HTMLButtonElement | null>(null);
+	const playheadHandleRef = useRef<HTMLButtonElement | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 	const dragAnimationFrameRef = useRef<number | null>(null);
 	const latestDragClientXRef = useRef<number | null>(null);
@@ -516,6 +519,56 @@ export function SelectionTimeline({
 		!selectionEditInProgress && !playheadUpdatesAreLive
 			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
+	useLayoutEffect(() => {
+		const playheadHandle = playheadHandleRef.current;
+		const livePlayheadReader = readLivePlayheadUs;
+
+		if (!playheadHandle) {
+			return;
+		}
+
+		if (
+			!playheadUpdatesAreLive ||
+			selectionEditInProgress ||
+			!livePlayheadReader
+		) {
+			playheadHandle.style.left = `${playheadPercent}%`;
+			return;
+		}
+
+		const livePlayheadHandle = playheadHandle;
+		const readLivePlayheadUsForFrame = livePlayheadReader;
+		let animationFrameId: number | null = null;
+		let cancelled = false;
+
+		function updateLivePlayheadHandle() {
+			if (cancelled) {
+				return;
+			}
+
+			livePlayheadHandle.style.left = `${mediaTimeToPercent(
+				readLivePlayheadUsForFrame(),
+				asset.durationUs,
+			)}%`;
+			animationFrameId = requestTimelineFrame(updateLivePlayheadHandle);
+		}
+
+		updateLivePlayheadHandle();
+
+		return () => {
+			cancelled = true;
+
+			if (animationFrameId !== null) {
+				cancelTimelineFrame(animationFrameId);
+			}
+		};
+	}, [
+		asset.durationUs,
+		playheadPercent,
+		playheadUpdatesAreLive,
+		readLivePlayheadUs,
+		selectionEditInProgress,
+	]);
 	const centerPlayheadInScrollContainer = useCallback(
 		(behavior: ScrollBehavior) => {
 			const scrollContainer = scrollContainerRef.current;
@@ -785,6 +838,7 @@ export function SelectionTimeline({
 										}
 									}}
 									onPointerDown={beginPlayheadDrag}
+									ref={playheadHandleRef}
 									style={{ left: `${playheadPercent}%` }}
 									type="button"
 								>

@@ -352,6 +352,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onSelectionStartCommitRequested={onSelectionStartRequested}
 					playheadUs={playheadUs}
 					playheadUpdatesAreLive={isPlaying}
+					readLivePlayheadUs={getPlayheadUs}
 					selection={selection}
 					selectionEditingDisabled={selectionEditingDisabled}
 					soloedAudioTrackId={soloedAudioTrackId}
