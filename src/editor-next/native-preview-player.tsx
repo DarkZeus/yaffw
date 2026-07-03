@@ -48,12 +48,18 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<MediaPlayerInstance | null>(null);
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
+	const audioMixRef = useRef(audioMix);
+	const audioMonitoringStatusRef = useRef<PreviewAudioMonitoringStatus>("idle");
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
 	const previewMeteringClockRef = useRef({
 		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
-		getPlayheadUs: () => getPlayheadUsRef.current(),
+		getMeteringStatus: () => audioMonitoringStatusRef.current,
+		readMeterSnapshot: () =>
+			previewAudioEngineRef.current?.readMeterSnapshot({
+				outputChannels: audioMixRef.current.outputChannels,
+			}) ?? null,
 	});
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
@@ -67,6 +73,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		controlledSoloedAudioTrackId === undefined
 			? localSoloedAudioTrackId
 			: controlledSoloedAudioTrackId;
+	audioMixRef.current = audioMix;
+	audioMonitoringStatusRef.current = audioMonitoringStatus;
 	const handleSoloedAudioTrackChange = useCallback(
 		(trackId: string | null) => {
 			setLocalSoloedAudioTrackId((currentTrackId) =>

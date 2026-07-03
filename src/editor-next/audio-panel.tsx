@@ -28,7 +28,6 @@ import type {
 	LivePreviewMeteringCombinedState,
 	LivePreviewMeteringTrackState,
 } from "./preview-metering-live";
-import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
 import { useLivePreviewMetering } from "./use-live-preview-metering";
 
 export type AudioPanelProps = {
@@ -47,7 +46,6 @@ export type AudioPanelProps = {
 	previewMetering?: {
 		clock?: LivePreviewMeteringClock | null;
 		onTrackRetry?: (trackId: string) => void;
-		trackStates: PreviewMeteringTrackStates;
 	};
 	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	soloedAudioTrackId?: string | null;
@@ -64,8 +62,6 @@ const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
 	{ label: "Center both sides", value: "average-to-mono" },
 ];
 
-const EMPTY_PREVIEW_METERING_TRACK_STATES = {};
-
 export const AudioPanel = memo(function AudioPanel({
 	asset,
 	audioEditingDisabled = false,
@@ -80,13 +76,16 @@ export const AudioPanel = memo(function AudioPanel({
 	const defaultAudioMix = useMemo(() => createDefaultAudioMix(asset), [asset]);
 	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
+	const audioTrackIds = useMemo(
+		() => audioTracks.map((track) => track.id),
+		[audioTracks],
+	);
 	const livePreviewMetering = useLivePreviewMetering({
 		audioMix,
 		clock: previewMetering?.clock,
 		enabled: Boolean(previewMetering),
+		knownTrackIds: audioTrackIds,
 		soloedAudioTrackId,
-		trackStates:
-			previewMetering?.trackStates ?? EMPTY_PREVIEW_METERING_TRACK_STATES,
 	});
 
 	return (
@@ -508,7 +507,7 @@ function createTrackMeterDisplay({
 		return {
 			channels: [],
 			excluded: false,
-			message: "Preparing decoded samples",
+			message: "Preparing preview meters",
 			state: "preparing",
 			statusLabel: "Preparing",
 		};

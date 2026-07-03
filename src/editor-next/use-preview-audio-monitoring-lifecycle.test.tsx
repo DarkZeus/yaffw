@@ -11,6 +11,7 @@ import type {
 } from "@/editor-core/model";
 
 import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 import type { PreviewAudioEngineFactory } from "./use-preview-audio-monitoring-lifecycle.types";
 import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
@@ -227,15 +228,19 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
-				0,
-				0.25,
-			);
+			expect(
+				createdPreviewAudioEngines[0]?.setTrackVolumeGain,
+			).toHaveBeenCalledWith(0, 0.25);
+			expect(
+				createdPreviewAudioEngines[0]?.setTrackMonitorGain,
+			).toHaveBeenCalledWith(0, 1);
+			expect(
+				createdPreviewAudioEngines[0]?.setTrackVolumeGain,
+			).toHaveBeenCalledWith(1, 0.0625);
+			expect(
+				createdPreviewAudioEngines[0]?.setTrackMonitorGain,
+			).toHaveBeenCalledWith(1, 0);
 		});
-		expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
-			1,
-			0,
-		);
 		expect(
 			createdPreviewAudioEngines[0]?.setTrackChannelMode,
 		).toHaveBeenCalledWith(0, "use-left-as-mono");
@@ -402,7 +407,8 @@ function createAudioMix(
 		}
 
 		audioDecision.include = decision.include;
-		audioDecision.channelMode = decision.channelMode ?? audioDecision.channelMode;
+		audioDecision.channelMode =
+			decision.channelMode ?? audioDecision.channelMode;
 		audioDecision.volumePercent = decision.volumePercent;
 	}
 
@@ -431,14 +437,41 @@ function lastTrackGain(
 	previewAudioEngine: PreviewAudioEngineSpy | undefined,
 	trackIndex: number,
 ) {
+	return (
+		lastTrackVolumeGain(previewAudioEngine, trackIndex) *
+		lastTrackMonitorGain(previewAudioEngine, trackIndex)
+	);
+}
+
+function lastTrackVolumeGain(
+	previewAudioEngine: PreviewAudioEngineSpy | undefined,
+	trackIndex: number,
+) {
 	const calls =
-		previewAudioEngine?.setTrackGain.mock.calls.filter(
+		previewAudioEngine?.setTrackVolumeGain.mock.calls.filter(
 			([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
 		) ?? [];
 	const lastCall = calls.at(-1);
 
 	if (!lastCall) {
-		throw new Error(`No gain call found for track ${trackIndex}.`);
+		throw new Error(`No volume gain call found for track ${trackIndex}.`);
+	}
+
+	return lastCall[1];
+}
+
+function lastTrackMonitorGain(
+	previewAudioEngine: PreviewAudioEngineSpy | undefined,
+	trackIndex: number,
+) {
+	const calls =
+		previewAudioEngine?.setTrackMonitorGain.mock.calls.filter(
+			([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
+		) ?? [];
+	const lastCall = calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error(`No monitor gain call found for track ${trackIndex}.`);
 	}
 
 	return lastCall[1];
@@ -462,13 +495,24 @@ function createPreviewAudioEngineSpy() {
 		getCurrentTime: vi.fn(() => 0),
 		pause: vi.fn(),
 		play: vi.fn(),
+		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setTime: vi.fn(),
 		setTrackChannelMode: vi.fn(),
-		setTrackGain: vi.fn(),
+		setTrackMonitorGain: vi.fn(),
+		setTrackVolumeGain: vi.fn(),
 	};
 }
+
+const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
+	combinedState: {
+		channels: [],
+		partial: false,
+		status: "ready",
+	},
+	trackStates: {},
+};
 
 function createDeferred<T>() {
 	let resolve!: (value: T | PromiseLike<T>) => void;

@@ -17,6 +17,9 @@ export type PreviewAudioEngine = {
 	getCurrentTime: () => number;
 	pause: () => void;
 	play: () => Promise<void>;
+	readMeterSnapshot: (
+		options: ReadPreviewAudioEngineMeterSnapshotOptions,
+	) => PreviewAudioEngineMeterSnapshot;
 	setOutputGain: (gain: number) => void;
 	setPlaybackRate: (playbackRate: number) => void;
 	setTime: (timeSeconds: number) => void;
@@ -24,7 +27,46 @@ export type PreviewAudioEngine = {
 		trackIndex: number,
 		channelMode: AudioTrackChannelMode,
 	) => void;
-	setTrackGain: (trackIndex: number, gain: number) => void;
+	setTrackMonitorGain: (trackIndex: number, gain: number) => void;
+	setTrackVolumeGain: (trackIndex: number, gain: number) => void;
+};
+
+export type ReadPreviewAudioEngineMeterSnapshotOptions = {
+	outputChannels: number;
+};
+
+export type PreviewAudioEngineMeterChannel = {
+	label: string;
+	peak: number;
+};
+
+export type PreviewAudioEngineTrackMeterState =
+	| {
+			channels: PreviewAudioEngineMeterChannel[];
+			status: "ready";
+			trackId: string;
+	  }
+	| {
+			reason: string;
+			status: "unavailable";
+			trackId: string;
+	  };
+
+export type PreviewAudioEngineCombinedMeterState =
+	| {
+			channels: PreviewAudioEngineMeterChannel[];
+			partial: boolean;
+			reason?: string;
+			status: "ready";
+	  }
+	| {
+			reason: string;
+			status: "unavailable";
+	  };
+
+export type PreviewAudioEngineMeterSnapshot = {
+	combinedState: PreviewAudioEngineCombinedMeterState;
+	trackStates: Record<string, PreviewAudioEngineTrackMeterState>;
 };
 
 export type PreviewAudioContextLike = {
@@ -77,14 +119,24 @@ type PreviewAudioEngineTrack = {
 	channelMode: AudioTrackChannelMode;
 	channelRouting: PreviewAudioTrackChannelRouting;
 	gainNode: PreviewAudioGainNodeLike;
+	monitorGain: number;
 	resource: PreviewAudioResource;
 	sourceNode: PreviewAudioBufferSourceNodeLike | null;
+	trackVolumeGain: number;
 };
 
 type PreviewAudioTrackChannelRouting = {
 	dispose: () => void;
 	inputNode: PreviewAudioNodeLike;
 };
+
+type PreviewAudioMeterPlan = {
+	labels: string[];
+	outputChannels: number;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+};
+
+const PREVIEW_AUDIO_METERING_PEAK_WINDOW_SECONDS = 0.05;
 
 export function canUsePreviewAudioEngine(asset: ReadyMediaAsset) {
 	return (
@@ -114,7 +166,19 @@ export async function createPreviewAudioEngine({
 	});
 }
 
-export function previewTrackGainForAudioTrackSource({
+export function previewTrackVolumeGainForAudioTrackSource({
+	audioMix,
+	source,
+}: {
+	audioMix: AudioMix;
+	source: BrowserAudioPreviewSource;
+}) {
+	const decision = audioMix.tracks[source.trackId];
+
+	return audioTrackVolumePercentToGain(decision?.volumePercent ?? 100);
+}
+
+export function previewTrackMonitorGainForAudioTrackSource({
 	audioMix,
 	soloedAudioTrackId,
 	source,
@@ -133,7 +197,7 @@ export function previewTrackGainForAudioTrackSource({
 		return 0;
 	}
 
-	return audioTrackVolumePercentToGain(decision?.volumePercent ?? 100);
+	return 1;
 }
 
 export function previewOutputGainForAudioMonitoring({
@@ -174,9 +238,16 @@ export function applyPreviewAudioEngineMix({
 			sourceIndex,
 			audioMix.tracks[source.trackId]?.channelMode ?? "preserve",
 		);
-		previewAudioEngine.setTrackGain(
+		previewAudioEngine.setTrackVolumeGain(
 			sourceIndex,
-			previewTrackGainForAudioTrackSource({
+			previewTrackVolumeGainForAudioTrackSource({
+				audioMix,
+				source,
+			}),
+		);
+		previewAudioEngine.setTrackMonitorGain(
+			sourceIndex,
+			previewTrackMonitorGainForAudioTrackSource({
 				audioMix,
 				soloedAudioTrackId,
 				source,
@@ -217,8 +288,10 @@ function createPreparedPreviewAudioEngine({
 				resource,
 			}),
 			gainNode,
+			monitorGain: 0,
 			resource,
 			sourceNode: null,
+			trackVolumeGain: 1,
 		};
 	});
 	let currentTimeSeconds = 0;
@@ -293,6 +366,63 @@ function createPreparedPreviewAudioEngine({
 		}
 	}
 
+	function readMeterSnapshot({
+		outputChannels,
+	}: ReadPreviewAudioEngineMeterSnapshotOptions): PreviewAudioEngineMeterSnapshot {
+		const outputChannelCount =
+			normalizePreviewAudioMeterOutputChannelCount(outputChannels);
+		const playheadSeconds = getCurrentTime();
+		const trackStates: Record<string, PreviewAudioEngineTrackMeterState> = {};
+		const readyTracks = tracks.map((track) => ({
+			...track,
+			meterPlan: createPreviewAudioMeterPlan({
+				audioBuffer: track.resource.buffer,
+				channelMode: track.channelMode,
+				outputChannelCount,
+			}),
+		}));
+
+		for (const track of readyTracks) {
+			const peaks = playing
+				? samplePreviewAudioTrackPeakWindow({
+						meterPlan: track.meterPlan,
+						playheadSeconds,
+						resource: track.resource,
+						trackGain: track.trackVolumeGain,
+					})
+				: Array.from({ length: track.meterPlan.outputChannels }, () => 0);
+
+			trackStates[track.resource.source.trackId] = {
+				channels: createPreviewAudioMeterChannels({
+					labels: track.meterPlan.labels,
+					peaks,
+				}),
+				status: "ready",
+				trackId: track.resource.source.trackId,
+			};
+		}
+
+		const combinedPeaks = playing
+			? sampleCombinedPreviewAudioPeakWindow({
+					outputChannelCount,
+					playheadSeconds,
+					tracks: readyTracks,
+				})
+			: Array.from({ length: outputChannelCount }, () => 0);
+
+		return {
+			combinedState: {
+				channels: createPreviewAudioMeterChannels({
+					labels: createPreviewOutputChannelLabels(outputChannelCount),
+					peaks: combinedPeaks,
+				}),
+				partial: false,
+				status: "ready",
+			},
+			trackStates,
+		};
+	}
+
 	return {
 		destroy() {
 			if (destroyed) {
@@ -335,6 +465,7 @@ function createPreparedPreviewAudioEngine({
 			playing = true;
 			startTrackSources();
 		},
+		readMeterSnapshot,
 		setPlaybackRate(nextPlaybackRate: number) {
 			if (!playing) {
 				playbackRate = clampPlaybackRate(nextPlaybackRate);
@@ -357,7 +488,10 @@ function createPreparedPreviewAudioEngine({
 
 			startTrackSources();
 		},
-		setTrackChannelMode(trackIndex: number, channelMode: AudioTrackChannelMode) {
+		setTrackChannelMode(
+			trackIndex: number,
+			channelMode: AudioTrackChannelMode,
+		) {
 			const track = tracks[trackIndex];
 
 			if (!track || track.channelMode === channelMode) {
@@ -382,16 +516,33 @@ function createPreparedPreviewAudioEngine({
 				startTrackSources();
 			}
 		},
-		setTrackGain(trackIndex: number, gain: number) {
+		setTrackMonitorGain(trackIndex: number, gain: number) {
 			const track = tracks[trackIndex];
 
 			if (!track) {
 				return;
 			}
 
-			track.gainNode.gain.value = clampPreviewVolume(gain);
+			track.monitorGain = clampPreviewVolume(gain);
+			updatePreviewAudioTrackGainNode(track);
+		},
+		setTrackVolumeGain(trackIndex: number, gain: number) {
+			const track = tracks[trackIndex];
+
+			if (!track) {
+				return;
+			}
+
+			track.trackVolumeGain = clampPreviewVolume(gain);
+			updatePreviewAudioTrackGainNode(track);
 		},
 	};
+}
+
+function updatePreviewAudioTrackGainNode(track: PreviewAudioEngineTrack) {
+	track.gainNode.gain.value =
+		clampPreviewVolume(track.trackVolumeGain) *
+		clampPreviewVolume(track.monitorGain);
 }
 
 function createPreviewAudioTrackChannelRouting({
@@ -460,7 +611,10 @@ function createPreviewAudioTrackChannelRouting({
 		}
 
 		const merger = audioContext.createChannelMerger(
-			Math.max(2, outputChannelCountForMode(resource.buffer, resolvedChannelMode)),
+			Math.max(
+				2,
+				outputChannelCountForMode(resource.buffer, resolvedChannelMode),
+			),
 		);
 		createdNodes.push(merger);
 		splitter.connect(merger, sourceChannelIndex, 0);
@@ -527,6 +681,352 @@ function sourceChannelIndexForMode(
 	return 0;
 }
 
+function createPreviewAudioMeterPlan({
+	audioBuffer,
+	channelMode,
+	outputChannelCount,
+}: {
+	audioBuffer: AudioBuffer;
+	channelMode: AudioTrackChannelMode;
+	outputChannelCount: number;
+}): PreviewAudioMeterPlan {
+	const resolvedMode = resolvePreviewAudioChannelMode({
+		audioBuffer,
+		channelMode,
+	});
+	const transformedOutputChannels = outputChannelCountForMode(
+		audioBuffer,
+		resolvedMode,
+	);
+	const meterOutputChannels = outputChannelCountForPreviewAudioMeterMode({
+		outputChannelCount,
+		resolvedMode,
+		transformedOutputChannels,
+	});
+
+	return {
+		labels: createPreviewAudioMeterChannelLabels({
+			audioBuffer,
+			outputChannels: meterOutputChannels,
+			resolvedMode,
+		}),
+		outputChannels: meterOutputChannels,
+		resolvedMode,
+	};
+}
+
+function outputChannelCountForPreviewAudioMeterMode({
+	outputChannelCount,
+	resolvedMode,
+	transformedOutputChannels,
+}: {
+	outputChannelCount: number;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+	transformedOutputChannels: number;
+}): number {
+	if (
+		resolvedMode === "use-left-as-mono" ||
+		resolvedMode === "use-right-as-mono" ||
+		resolvedMode === "average-to-mono"
+	) {
+		return Math.max(1, outputChannelCount);
+	}
+
+	return transformedOutputChannels;
+}
+
+function samplePreviewAudioTrackPeakWindow({
+	meterPlan,
+	playheadSeconds,
+	resource,
+	trackGain,
+}: {
+	meterPlan: PreviewAudioMeterPlan;
+	playheadSeconds: number;
+	resource: PreviewAudioResource;
+	trackGain: number;
+}): number[] {
+	const audioBuffer = resource.buffer;
+	const centerFrame = Math.round(
+		(playheadSeconds - resource.source.startPositionSeconds) *
+			audioBuffer.sampleRate,
+	);
+	const halfWindowFrames = Math.max(
+		1,
+		Math.round(
+			(PREVIEW_AUDIO_METERING_PEAK_WINDOW_SECONDS / 2) * audioBuffer.sampleRate,
+		),
+	);
+	const startFrame = Math.max(0, centerFrame - halfWindowFrames);
+	const endFrame = Math.min(audioBuffer.length, centerFrame + halfWindowFrames);
+
+	if (startFrame >= endFrame) {
+		return Array.from({ length: meterPlan.outputChannels }, () => 0);
+	}
+
+	const channelData = readPreviewAudioBufferChannelData(audioBuffer);
+
+	return Array.from({ length: meterPlan.outputChannels }, (_, channelIndex) => {
+		let peak = 0;
+
+		for (let frameIndex = startFrame; frameIndex < endFrame; frameIndex += 1) {
+			peak = Math.max(
+				peak,
+				Math.abs(
+					readPreviewAudioTransformedSample({
+						channelData,
+						channelIndex,
+						frameIndex,
+						resolvedMode: meterPlan.resolvedMode,
+					}),
+				),
+			);
+		}
+
+		return peak * clampPreviewVolume(trackGain);
+	});
+}
+
+function sampleCombinedPreviewAudioPeakWindow({
+	outputChannelCount,
+	playheadSeconds,
+	tracks,
+}: {
+	outputChannelCount: number;
+	playheadSeconds: number;
+	tracks: Array<
+		PreviewAudioEngineTrack & {
+			meterPlan: PreviewAudioMeterPlan;
+		}
+	>;
+}): number[] {
+	const referenceSampleRate = Math.max(
+		1,
+		...tracks.map((track) => track.resource.buffer.sampleRate),
+	);
+	const frameCount = Math.max(
+		1,
+		Math.round(
+			PREVIEW_AUDIO_METERING_PEAK_WINDOW_SECONDS * referenceSampleRate,
+		),
+	);
+	const startSeconds =
+		playheadSeconds - PREVIEW_AUDIO_METERING_PEAK_WINDOW_SECONDS / 2;
+	const peaks = Array.from({ length: outputChannelCount }, () => 0);
+	const tracksWithChannelData = tracks.map((track) => ({
+		...track,
+		channelData: readPreviewAudioBufferChannelData(track.resource.buffer),
+	}));
+
+	for (let frameOffset = 0; frameOffset < frameCount; frameOffset += 1) {
+		const sampleTimeSeconds = startSeconds + frameOffset / referenceSampleRate;
+
+		for (
+			let outputChannelIndex = 0;
+			outputChannelIndex < outputChannelCount;
+			outputChannelIndex += 1
+		) {
+			let mixedSample = 0;
+
+			for (const track of tracksWithChannelData) {
+				const frameIndex = Math.round(
+					(sampleTimeSeconds - track.resource.source.startPositionSeconds) *
+						track.resource.buffer.sampleRate,
+				);
+
+				mixedSample +=
+					readPreviewAudioTrackSampleForOutputChannel({
+						channelData: track.channelData,
+						frameIndex,
+						meterPlan: track.meterPlan,
+						outputChannelIndex,
+					}) *
+					clampPreviewVolume(track.trackVolumeGain) *
+					clampPreviewVolume(track.monitorGain);
+			}
+
+			peaks[outputChannelIndex] = Math.max(
+				peaks[outputChannelIndex] ?? 0,
+				Math.abs(mixedSample),
+			);
+		}
+	}
+
+	return peaks;
+}
+
+function readPreviewAudioTrackSampleForOutputChannel({
+	channelData,
+	frameIndex,
+	meterPlan,
+	outputChannelIndex,
+}: {
+	channelData: Float32Array[];
+	frameIndex: number;
+	meterPlan: PreviewAudioMeterPlan;
+	outputChannelIndex: number;
+}): number {
+	const bufferLength = channelData[0]?.length ?? 0;
+
+	if (frameIndex < 0 || frameIndex >= bufferLength) {
+		return 0;
+	}
+
+	const transformedChannelIndex =
+		meterPlan.outputChannels === 1
+			? 0
+			: Math.min(outputChannelIndex, meterPlan.outputChannels - 1);
+
+	return readPreviewAudioTransformedSample({
+		channelData,
+		channelIndex: transformedChannelIndex,
+		frameIndex,
+		resolvedMode: meterPlan.resolvedMode,
+	});
+}
+
+function readPreviewAudioBufferChannelData(
+	audioBuffer: AudioBuffer,
+): Float32Array[] {
+	return Array.from({ length: audioBuffer.numberOfChannels }, (_, channel) =>
+		audioBuffer.getChannelData(channel),
+	);
+}
+
+function readPreviewAudioTransformedSample({
+	channelData,
+	channelIndex,
+	frameIndex,
+	resolvedMode,
+}: {
+	channelData: Float32Array[];
+	channelIndex: number;
+	frameIndex: number;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+}): number {
+	if (resolvedMode === "preserve") {
+		return readPreviewAudioSourceSample(channelData, channelIndex, frameIndex);
+	}
+
+	if (
+		resolvedMode === "use-left-as-mono" ||
+		resolvedMode === "duplicate-left-to-stereo"
+	) {
+		return readPreviewAudioSourceSample(channelData, 0, frameIndex);
+	}
+
+	if (
+		resolvedMode === "use-right-as-mono" ||
+		resolvedMode === "duplicate-right-to-stereo"
+	) {
+		return readPreviewAudioSourceSample(
+			channelData,
+			Math.min(1, channelData.length - 1),
+			frameIndex,
+		);
+	}
+
+	if (resolvedMode === "average-to-mono") {
+		let sample = 0;
+
+		for (let channel = 0; channel < channelData.length; channel += 1) {
+			sample += readPreviewAudioSourceSample(channelData, channel, frameIndex);
+		}
+
+		return sample / Math.max(1, channelData.length);
+	}
+
+	return readPreviewAudioSourceSample(channelData, channelIndex, frameIndex);
+}
+
+function readPreviewAudioSourceSample(
+	channelData: Float32Array[],
+	channelIndex: number,
+	frameIndex: number,
+): number {
+	const sourceChannel = Math.min(channelIndex, channelData.length - 1);
+
+	return channelData[sourceChannel]?.[frameIndex] ?? 0;
+}
+
+function createPreviewAudioMeterChannels({
+	labels,
+	peaks,
+}: {
+	labels: string[];
+	peaks: number[];
+}): PreviewAudioEngineMeterChannel[] {
+	return peaks.map((peak, channelIndex) => ({
+		label: labels[channelIndex] ?? `Ch ${channelIndex + 1}`,
+		peak: Number.isFinite(peak) ? Math.max(0, peak) : 0,
+	}));
+}
+
+function createPreviewAudioMeterChannelLabels({
+	audioBuffer,
+	outputChannels,
+	resolvedMode,
+}: {
+	audioBuffer: AudioBuffer;
+	outputChannels: number;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+}): string[] {
+	if (
+		resolvedMode === "use-left-as-mono" ||
+		resolvedMode === "use-right-as-mono" ||
+		resolvedMode === "average-to-mono"
+	) {
+		return outputChannels === 1
+			? ["Mono"]
+			: createPreviewOutputChannelLabels(outputChannels);
+	}
+
+	if (
+		outputChannels === 2 &&
+		(resolvedMode === "duplicate-left-to-stereo" ||
+			resolvedMode === "duplicate-right-to-stereo")
+	) {
+		return ["Left", "Right"];
+	}
+
+	return Array.from({ length: outputChannels }, (_, channelIndex) =>
+		formatPreviewAudioSourceChannelLabel(
+			audioBuffer.numberOfChannels,
+			channelIndex,
+		),
+	);
+}
+
+function formatPreviewAudioSourceChannelLabel(
+	channelCount: number,
+	channelIndex: number,
+): string {
+	if (channelCount === 1) {
+		return "Mono";
+	}
+
+	if (channelCount === 2) {
+		return channelIndex === 0 ? "Left" : "Right";
+	}
+
+	return `Ch ${channelIndex + 1}`;
+}
+
+function createPreviewOutputChannelLabels(outputChannels: number): string[] {
+	if (outputChannels === 1) {
+		return ["Mono"];
+	}
+
+	if (outputChannels === 2) {
+		return ["Left", "Right"];
+	}
+
+	return Array.from(
+		{ length: outputChannels },
+		(_, channelIndex) => `Ch ${channelIndex + 1}`,
+	);
+}
+
 function disconnectPreviewAudioNodes(nodes: PreviewAudioNodeLike[]) {
 	for (const node of nodes) {
 		node.disconnect?.();
@@ -560,6 +1060,14 @@ function clampPreviewTime(timeSeconds: number) {
 	}
 
 	return Math.max(0, timeSeconds);
+}
+
+function normalizePreviewAudioMeterOutputChannelCount(outputChannels: number) {
+	if (!Number.isFinite(outputChannels)) {
+		return 2;
+	}
+
+	return Math.max(1, Math.min(8, Math.round(outputChannels)));
 }
 
 function clampPreviewVolume(volume: number) {

@@ -16,10 +16,8 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import { AudioPanel } from "./audio-panel";
-import type {
-	PreviewMeteringPreparedTrack,
-	PreviewMeteringTrackStates,
-} from "./preview-metering-preparation.types";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
+import type { LivePreviewMeteringClock } from "./preview-metering-live";
 
 afterEach(() => {
 	cleanup();
@@ -198,17 +196,28 @@ describe("AudioPanel", () => {
 
 	it("renders controlled preview metering ready and preparing states without live peak values yet", () => {
 		const previewMetering = {
-			trackStates: {
-				"audio-desktop": {
-					status: "preparing",
-					trackId: "audio-desktop",
+			clock: createMeteringClock({
+				snapshot: {
+					combinedState: {
+						channels: [
+							{ label: "Left", peak: 0 },
+							{ label: "Right", peak: 0 },
+						],
+						partial: false,
+						status: "ready",
+					},
+					trackStates: {
+						"audio-voice": {
+							channels: [
+								{ label: "Left", peak: 0 },
+								{ label: "Right", peak: 0 },
+							],
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
 				},
-				"audio-voice": {
-					prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
-					status: "ready",
-					trackId: "audio-voice",
-				},
-			} satisfies PreviewMeteringTrackStates,
+			}),
 		};
 
 		render(<AudioPanel asset={readyAsset} previewMetering={previewMetering} />);
@@ -226,26 +235,43 @@ describe("AudioPanel", () => {
 		expect(within(voiceStrip).getByText("Ready")).toBeTruthy();
 		expect(desktopMeter.getAttribute("data-state")).toBe("preparing");
 		expect(
-			within(desktopMeter).getByText("Preparing decoded samples"),
+			within(desktopMeter).getByText("Preparing preview meters"),
 		).toBeTruthy();
 	});
 
 	it("keeps unavailable meter layout stable and owns retry outside the reusable meter", () => {
 		const onTrackRetry = vi.fn();
 		const previewMetering = {
+			clock: createMeteringClock({
+				snapshot: {
+					combinedState: {
+						channels: [
+							{ label: "Left", peak: 0 },
+							{ label: "Right", peak: 0 },
+						],
+						partial: true,
+						reason:
+							"Some monitored tracks are unavailable: Desktop decode failed",
+						status: "ready",
+					},
+					trackStates: {
+						"audio-desktop": {
+							reason: "Desktop decode failed",
+							status: "unavailable",
+							trackId: "audio-desktop",
+						},
+						"audio-voice": {
+							channels: [
+								{ label: "Left", peak: 0 },
+								{ label: "Right", peak: 0 },
+							],
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
+				},
+			}),
 			onTrackRetry,
-			trackStates: {
-				"audio-desktop": {
-					reason: "Desktop decode failed",
-					status: "unavailable",
-					trackId: "audio-desktop",
-				},
-				"audio-voice": {
-					prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
-					status: "ready",
-					trackId: "audio-voice",
-				},
-			} satisfies PreviewMeteringTrackStates,
 		};
 
 		render(
@@ -304,17 +330,14 @@ describe("AudioPanel", () => {
 				asset={readyAsset}
 				audioMix={audioMix}
 				previewMetering={{
-					clock: {
-						getIsPlaying: () => true,
-						getPlayheadUs: () => 100_000,
-					},
-					trackStates: {
-						"audio-voice": {
-							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
-							status: "ready",
-							trackId: "audio-voice",
-						},
-					},
+					clock: createMeteringClock({
+						snapshot: createMeterSnapshot({
+							combinedPeaks: [0.25, 0.25],
+							trackPeaks: {
+								"audio-voice": [0.25, 0.25],
+							},
+						}),
+					}),
 				}}
 			/>,
 		);
@@ -344,22 +367,15 @@ describe("AudioPanel", () => {
 			<AudioPanel
 				asset={readyAsset}
 				previewMetering={{
-					clock: {
-						getIsPlaying: () => true,
-						getPlayheadUs: () => 100_000,
-					},
-					trackStates: {
-						"audio-desktop": {
-							prepared: createPreparedTrack("audio-desktop", ["Left", "Right"]),
-							status: "ready",
-							trackId: "audio-desktop",
-						},
-						"audio-voice": {
-							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
-							status: "ready",
-							trackId: "audio-voice",
-						},
-					},
+					clock: createMeteringClock({
+						snapshot: createMeterSnapshot({
+							combinedPeaks: [1, 0.5],
+							trackPeaks: {
+								"audio-desktop": [0.5, 0.25],
+								"audio-voice": [0.5, 0.25],
+							},
+						}),
+					}),
 				}}
 			/>,
 		);
@@ -402,22 +418,35 @@ describe("AudioPanel", () => {
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
 				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
 				previewMetering={{
-					clock: {
-						getIsPlaying: () => true,
-						getPlayheadUs: () => 100_000,
-					},
-					trackStates: {
-						"audio-desktop": {
-							reason: "Desktop decode failed",
-							status: "unavailable",
-							trackId: "audio-desktop",
+					clock: createMeteringClock({
+						snapshot: {
+							combinedState: {
+								channels: [
+									{ label: "Left", peak: 0.5 },
+									{ label: "Right", peak: 0 },
+								],
+								partial: true,
+								reason:
+									"Some monitored tracks are unavailable: Desktop decode failed",
+								status: "ready",
+							},
+							trackStates: {
+								"audio-desktop": {
+									reason: "Desktop decode failed",
+									status: "unavailable",
+									trackId: "audio-desktop",
+								},
+								"audio-voice": {
+									channels: [
+										{ label: "Left", peak: 0.5 },
+										{ label: "Right", peak: 0 },
+									],
+									status: "ready",
+									trackId: "audio-voice",
+								},
+							},
 						},
-						"audio-voice": {
-							prepared: createPreparedTrack("audio-voice", ["Left", "Right"]),
-							status: "ready",
-							trackId: "audio-voice",
-						},
-					},
+					}),
 				}}
 			/>,
 		);
@@ -517,57 +546,53 @@ const readyAsset = {
 	},
 } satisfies ReadyMediaAsset;
 
-function createPreparedTrack(
-	trackId: "audio-voice" | "audio-desktop",
-	channelLabels: string[],
-): PreviewMeteringPreparedTrack {
-	const trackIndex = trackId === "audio-voice" ? 0 : 1;
-
+function createMeteringClock({
+	isPlaying = true,
+	snapshot,
+	status = "ready",
+}: {
+	isPlaying?: boolean;
+	snapshot: PreviewAudioEngineMeterSnapshot | null;
+	status?: ReturnType<LivePreviewMeteringClock["getMeteringStatus"]>;
+}): LivePreviewMeteringClock {
 	return {
-		audioBuffer: createTestAudioBuffer(channelLabels.length),
-		channelLabels,
-		startPositionSeconds: 0,
-		track: readyAsset.tracks.audio[trackIndex],
-		trackId,
-		trackIndex,
+		getIsPlaying: () => isPlaying,
+		getMeteringStatus: () => status,
+		readMeterSnapshot: () => snapshot,
 	};
 }
 
-function createTestAudioBuffer(numberOfChannels: number): AudioBuffer {
-	const length = 200;
-	const channelData = Array.from(
-		{ length: numberOfChannels },
-		(_, channelIndex) => {
-			const data = new Float32Array(length);
-			data[100] = channelIndex === 0 ? 1 : 0.25;
-			return data;
-		},
-	);
-
+function createMeterSnapshot({
+	combinedPeaks,
+	trackPeaks,
+}: {
+	combinedPeaks: [number, number];
+	trackPeaks: Partial<
+		Record<"audio-voice" | "audio-desktop", [number, number]>
+	>;
+}): PreviewAudioEngineMeterSnapshot {
 	return {
-		copyFromChannel(destination, channelNumber, startInChannel = 0) {
-			destination.set(
-				channelData[channelNumber]?.subarray(
-					startInChannel,
-					startInChannel + destination.length,
-				) ?? new Float32Array(destination.length),
-			);
+		combinedState: {
+			channels: createMeterChannels(combinedPeaks),
+			partial: false,
+			status: "ready",
 		},
-		copyToChannel(source, channelNumber, startInChannel = 0) {
-			channelData[channelNumber]?.set(source, startInChannel);
-		},
-		duration: length / 1_000,
-		getChannelData(channelNumber) {
-			const data = channelData[channelNumber];
+		trackStates: Object.fromEntries(
+			Object.entries(trackPeaks).map(([trackId, peaks]) => [
+				trackId,
+				{
+					channels: createMeterChannels(peaks),
+					status: "ready",
+					trackId,
+				},
+			]),
+		),
+	};
+}
 
-			if (!data) {
-				throw new Error(`Missing channel ${channelNumber}.`);
-			}
-
-			return data;
-		},
-		length,
-		numberOfChannels,
-		sampleRate: 1_000,
-	} as AudioBuffer;
+function createMeterChannels(peaks: [number, number]) {
+	return [
+		{ label: "Left", peak: peaks[0] },
+		{ label: "Right", peak: peaks[1] },
+	];
 }

@@ -19,6 +19,7 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
 	children?: ReactNode;
@@ -35,12 +36,14 @@ const adapterMockState = vi.hoisted(() => ({
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
+		readMeterSnapshot: ReturnType<typeof vi.fn>;
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackChannelMode: ReturnType<typeof vi.fn>;
-		setTrackGain: ReturnType<typeof vi.fn>;
+		setTrackMonitorGain: ReturnType<typeof vi.fn>;
+		setTrackVolumeGain: ReturnType<typeof vi.fn>;
 	}>,
 }));
 
@@ -175,7 +178,8 @@ vi.mock("@vidstack/react/player/layouts/default", async () => {
 });
 
 vi.mock("./preview-audio-engine", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./preview-audio-engine")>();
+	const actual =
+		await importOriginal<typeof import("./preview-audio-engine")>();
 
 	return {
 		...actual,
@@ -247,6 +251,7 @@ beforeEach(() => {
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
 			pause: vi.fn(),
 			play: vi.fn(),
+			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 			setPlaybackRate: vi.fn(),
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
@@ -254,7 +259,8 @@ beforeEach(() => {
 			setOutputGain: vi.fn(),
 			setTime: vi.fn(),
 			setTrackChannelMode: vi.fn(),
-			setTrackGain: vi.fn(),
+			setTrackMonitorGain: vi.fn(),
+			setTrackVolumeGain: vi.fn(),
 		};
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 
@@ -735,7 +741,9 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		video.currentTime = 0;
-		previewAudioEngine.setCurrentTimeSeconds(syncEvent.audioClickUs / 1_000_000);
+		previewAudioEngine.setCurrentTimeSeconds(
+			syncEvent.audioClickUs / 1_000_000,
+		);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(syncEvent.visualFlashUs / 1_000_000);
@@ -1213,17 +1221,52 @@ function readAudioMixSnapshot() {
 	return screen.getByLabelText("audio mix snapshot").textContent ?? "";
 }
 
+const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
+	combinedState: {
+		channels: [],
+		partial: false,
+		status: "ready",
+	},
+	trackStates: {},
+};
+
 function lastTrackGain(
 	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
 	trackIndex: number,
 ) {
-	const calls = previewAudioEngine.setTrackGain.mock.calls.filter(
+	return (
+		lastTrackVolumeGain(previewAudioEngine, trackIndex) *
+		lastTrackMonitorGain(previewAudioEngine, trackIndex)
+	);
+}
+
+function lastTrackVolumeGain(
+	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
+	trackIndex: number,
+) {
+	const calls = previewAudioEngine.setTrackVolumeGain.mock.calls.filter(
 		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
 	);
 	const lastCall = calls.at(-1);
 
 	if (!lastCall) {
-		throw new Error(`No gain call found for track ${trackIndex}.`);
+		throw new Error(`No volume gain call found for track ${trackIndex}.`);
+	}
+
+	return lastCall[1];
+}
+
+function lastTrackMonitorGain(
+	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
+	trackIndex: number,
+) {
+	const calls = previewAudioEngine.setTrackMonitorGain.mock.calls.filter(
+		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
+	);
+	const lastCall = calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error(`No monitor gain call found for track ${trackIndex}.`);
 	}
 
 	return lastCall[1];

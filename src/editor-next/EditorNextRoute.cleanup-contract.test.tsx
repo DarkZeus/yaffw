@@ -19,6 +19,7 @@ import type {
 	BrowserAudioPreviewSource,
 	BrowserAudioPreviewSourcesResult,
 } from "./browser-audio-preview-sources.types";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 import { loadBrowserWaveformLane } from "./selection-waveform-lanes";
 
 const adapterMockState = vi.hoisted(() => ({
@@ -28,11 +29,13 @@ const adapterMockState = vi.hoisted(() => ({
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
+		readMeterSnapshot: ReturnType<typeof vi.fn>;
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackChannelMode: ReturnType<typeof vi.fn>;
-		setTrackGain: ReturnType<typeof vi.fn>;
+		setTrackMonitorGain: ReturnType<typeof vi.fn>;
+		setTrackVolumeGain: ReturnType<typeof vi.fn>;
 	}>,
 	wavesurferCreate: vi.fn(),
 	wavesurfers: [] as Array<{
@@ -62,7 +65,8 @@ vi.mock("./selection-waveform-lanes", async (importOriginal) => {
 });
 
 vi.mock("./preview-audio-engine", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./preview-audio-engine")>();
+	const actual =
+		await importOriginal<typeof import("./preview-audio-engine")>();
 
 	return {
 		...actual,
@@ -122,11 +126,13 @@ beforeEach(() => {
 			getCurrentTime: vi.fn(() => 0),
 			pause: vi.fn(),
 			play: vi.fn(),
+			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 			setOutputGain: vi.fn(),
 			setPlaybackRate: vi.fn(),
 			setTime: vi.fn(),
 			setTrackChannelMode: vi.fn(),
-			setTrackGain: vi.fn(),
+			setTrackMonitorGain: vi.fn(),
+			setTrackVolumeGain: vi.fn(),
 		};
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 
@@ -149,6 +155,15 @@ beforeEach(() => {
 		status: "ready",
 	});
 });
+
+const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
+	combinedState: {
+		channels: [],
+		partial: false,
+		status: "ready",
+	},
+	trackStates: {},
+};
 
 afterEach(() => {
 	cleanup();

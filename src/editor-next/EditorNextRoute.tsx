@@ -31,7 +31,6 @@ import { MediaAssetContextPanel } from "./media-asset-context";
 import { NativePreviewPlayer } from "./native-preview-player";
 import type { LivePreviewMeteringClock } from "./preview-metering-live";
 import type { SingleAssetEditingSessionCommands } from "./single-asset-editing-session.types";
-import { usePreviewMeteringPreparation } from "./use-preview-metering-preparation";
 import { useSingleAssetEditingSession } from "./use-single-asset-editing-session";
 
 export function EditorNextRoute({
@@ -89,18 +88,6 @@ export function EditorNextRoute({
 		: undefined;
 	const activeAssetId =
 		displayedSession.status === "ready" ? displayedSession.asset.id : null;
-	const previewMeteringPreparation = usePreviewMeteringPreparation({
-		activeMediaAssetCleanupScope: visualFixtureActive
-			? undefined
-			: (activeMediaAssetCleanupScope ?? undefined),
-		asset: displayedSession.status === "ready" ? displayedSession.asset : null,
-		enabled:
-			displayedSession.status === "ready" && Boolean(displayedPreviewSource),
-		source:
-			displayedSession.status === "ready" && displayedPreviewSource
-				? displayedPreviewSource
-				: null,
-	});
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
 	const [previewMeteringClock, setPreviewMeteringClock] =
 		useState<LivePreviewMeteringClock | null>(null);
@@ -110,14 +97,8 @@ export function EditorNextRoute({
 	const previewMetering = useMemo(
 		() => ({
 			clock: previewMeteringClock,
-			onTrackRetry: previewMeteringPreparation.retryTrack,
-			trackStates: previewMeteringPreparation.trackStates,
 		}),
-		[
-			previewMeteringClock,
-			previewMeteringPreparation.retryTrack,
-			previewMeteringPreparation.trackStates,
-		],
+		[previewMeteringClock],
 	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>

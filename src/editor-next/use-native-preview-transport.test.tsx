@@ -14,7 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Selection } from "@/editor-core/model";
 
 import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
-import type { PreviewAudioEngine } from "./preview-audio-engine";
+import type {
+	PreviewAudioEngine,
+	PreviewAudioEngineMeterSnapshot,
+} from "./preview-audio-engine";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 
 const play = vi.fn().mockResolvedValue(undefined);
@@ -42,7 +45,9 @@ describe("useNativePreviewTransport", () => {
 	it("drives native preview commands through the video and previewAudioEngine refs", async () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -90,7 +95,9 @@ describe("useNativePreviewTransport", () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 		play.mockReturnValueOnce(playStarted.promise);
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
 
@@ -118,7 +125,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 2.06,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -139,7 +148,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 2,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -206,7 +217,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 5,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -227,7 +240,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 0,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -250,7 +265,9 @@ describe("useNativePreviewTransport", () => {
 			setTimeUpdatesCurrentTime: true,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -276,7 +293,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 0,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -296,7 +315,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 3,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -426,7 +447,9 @@ describe("useNativePreviewTransport", () => {
 		});
 
 		video.currentTime = 0;
-		previewAudioEngine.setCurrentTimeSeconds(firstEvent.audioClickUs / 1_000_000);
+		previewAudioEngine.setCurrentTimeSeconds(
+			firstEvent.audioClickUs / 1_000_000,
+		);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(firstEvent.visualFlashUs / 1_000_000);
@@ -596,7 +619,9 @@ describe("useNativePreviewTransport", () => {
 			currentTimeSeconds: 3,
 		});
 
-		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -740,6 +765,7 @@ function createPreviewAudioEngineSpy({
 		getCurrentTime: vi.fn(() => currentTime),
 		pause: vi.fn(),
 		play: vi.fn(),
+		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
@@ -751,13 +777,23 @@ function createPreviewAudioEngineSpy({
 			}
 		}),
 		setTrackChannelMode: vi.fn(),
-		setTrackGain: vi.fn(),
+		setTrackMonitorGain: vi.fn(),
+		setTrackVolumeGain: vi.fn(),
 	};
 }
 
 function readState() {
 	return screen.getByLabelText("transport state").textContent ?? "";
 }
+
+const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
+	combinedState: {
+		channels: [],
+		partial: false,
+		status: "ready",
+	},
+	trackStates: {},
+};
 
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];

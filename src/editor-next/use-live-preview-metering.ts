@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { AudioMix } from "@/editor-core/model";
 import type { PreviewLevelMeterChannel } from "./preview-level-meter";
@@ -8,7 +8,6 @@ import {
 	type LivePreviewMeteringState,
 	createLivePreviewMeteringTrackStates,
 } from "./preview-metering-live";
-import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
 
 const EMPTY_LIVE_PREVIEW_METERING_STATE = {
 	combinedState: {
@@ -30,19 +29,21 @@ export type UseLivePreviewMeteringOptions = {
 	audioMix: AudioMix;
 	clock?: LivePreviewMeteringClock | null;
 	enabled: boolean;
+	knownTrackIds: string[];
 	now?: () => number;
 	soloedAudioTrackId: string | null;
-	trackStates: PreviewMeteringTrackStates;
 };
 
 export function useLivePreviewMetering({
 	audioMix,
 	clock,
 	enabled,
+	knownTrackIds,
 	now = previewNowMs,
 	soloedAudioTrackId,
-	trackStates,
 }: UseLivePreviewMeteringOptions): LivePreviewMeteringState {
+	const knownTrackIdsKey = knownTrackIds.join("\u0000");
+	const stableKnownTrackIds = useMemo(() => knownTrackIds, [knownTrackIdsKey]);
 	const clipHoldStateRef = useRef<LivePreviewMeteringClipHoldState>({});
 	const liveMeteringStateRef = useRef<LivePreviewMeteringState>(
 		EMPTY_LIVE_PREVIEW_METERING_STATE,
@@ -94,15 +95,20 @@ export function useLivePreviewMetering({
 			}
 
 			const isPlaying = clock?.getIsPlaying() ?? false;
+			const nowMs = now();
 
 			const result = createLivePreviewMeteringTrackStates({
-				audioMix,
+				excludedTrackIds: createExcludedTrackIds({
+					audioMix,
+					knownTrackIds: stableKnownTrackIds,
+					soloedAudioTrackId,
+				}),
 				isPlaying,
-				nowMs: now(),
-				playheadUs: clock?.getPlayheadUs() ?? 0,
+				knownTrackIds: stableKnownTrackIds,
+				meterSnapshot: clock?.readMeterSnapshot() ?? null,
+				meteringStatus: clock?.getMeteringStatus() ?? "idle",
+				nowMs,
 				previousClipHoldState: clipHoldStateRef.current,
-				soloedAudioTrackId,
-				trackStates,
 			});
 			clipHoldStateRef.current = result.clipHoldState;
 			const targetMeteringState = {
@@ -110,14 +116,13 @@ export function useLivePreviewMetering({
 				trackStates: result.trackStates,
 			} satisfies LivePreviewMeteringState;
 			const displayTimestampMs =
-				isPlaying && typeof timestampMs === "number" ? timestampMs : null;
+				typeof timestampMs === "number" ? timestampMs : nowMs;
 			const elapsedDisplayMs =
 				displayTimestampMs !== null && lastDisplayUpdateTimestampMs !== null
 					? displayTimestampMs - lastDisplayUpdateTimestampMs
 					: null;
 			const displayMeteringState = smoothLivePreviewMeteringState({
 				elapsedMs: elapsedDisplayMs,
-				isPlaying,
 				previousState: liveMeteringStateRef.current,
 				targetState: targetMeteringState,
 			});
@@ -126,10 +131,6 @@ export function useLivePreviewMetering({
 
 			if (displayTimestampMs !== null) {
 				lastDisplayUpdateTimestampMs = displayTimestampMs;
-			}
-
-			if (!isPlaying) {
-				lastDisplayUpdateTimestampMs = null;
 			}
 
 			scheduleNextUpdate(isPlaying);
@@ -148,23 +149,21 @@ export function useLivePreviewMetering({
 				cancelPausedPreviewMeteringPoll(timeoutId);
 			}
 		};
-	}, [audioMix, clock, enabled, now, soloedAudioTrackId, trackStates]);
+	}, [audioMix, clock, enabled, now, soloedAudioTrackId, stableKnownTrackIds]);
 
 	return liveMeteringState;
 }
 
 function smoothLivePreviewMeteringState({
 	elapsedMs,
-	isPlaying,
 	previousState,
 	targetState,
 }: {
 	elapsedMs: number | null;
-	isPlaying: boolean;
 	previousState: LivePreviewMeteringState;
 	targetState: LivePreviewMeteringState;
 }): LivePreviewMeteringState {
-	if (!isPlaying || elapsedMs === null || elapsedMs <= 0) {
+	if (elapsedMs === null || elapsedMs <= 0) {
 		return targetState;
 	}
 
@@ -180,6 +179,24 @@ function smoothLivePreviewMeteringState({
 			targetStates: targetState.trackStates,
 		}),
 	};
+}
+
+function createExcludedTrackIds({
+	audioMix,
+	knownTrackIds,
+	soloedAudioTrackId,
+}: {
+	audioMix: AudioMix;
+	knownTrackIds: string[];
+	soloedAudioTrackId: string | null;
+}): ReadonlySet<string> {
+	return new Set(
+		knownTrackIds.filter((trackId) => {
+			const decision = audioMix.tracks[trackId];
+
+			return decision?.include === false && soloedAudioTrackId !== trackId;
+		}),
+	);
 }
 
 function smoothCombinedState({

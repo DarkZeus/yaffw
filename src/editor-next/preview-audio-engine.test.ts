@@ -7,7 +7,8 @@ import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.
 import {
 	createPreviewAudioEngine,
 	previewOutputGainForAudioMonitoring,
-	previewTrackGainForAudioTrackSource,
+	previewTrackMonitorGainForAudioTrackSource,
+	previewTrackVolumeGainForAudioTrackSource,
 } from "./preview-audio-engine";
 
 describe("createPreviewAudioEngine", () => {
@@ -23,8 +24,10 @@ describe("createPreviewAudioEngine", () => {
 
 		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
 
-		engine.setTrackGain(0, 0.5);
-		engine.setTrackGain(1, 0.25);
+		engine.setTrackVolumeGain(0, 0.5);
+		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackVolumeGain(1, 0.25);
+		engine.setTrackMonitorGain(1, 1);
 		engine.setOutputGain(0.6);
 		engine.setPlaybackRate(1.5);
 		engine.setTime(0.5);
@@ -98,7 +101,59 @@ describe("createPreviewAudioEngine", () => {
 		);
 	});
 
-	it("resolves track and output gains from audio mix decisions and preview-only monitoring state", () => {
+	it("reads meter taps after channel handling and Track volume but before output gain", async () => {
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createAudioBufferStub({
+					channels: [[[4_800, 1]], [[4_800, 0.25]]],
+				}),
+				createAudioBufferStub({
+					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
+				}),
+			],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			sources: [
+				createAudioPreviewSource("audio-1", 0),
+				createAudioPreviewSource("audio-2", 0),
+			],
+		});
+
+		engine.setTime(0.1);
+		engine.setTrackChannelMode(0, "use-left-as-mono");
+		engine.setTrackVolumeGain(0, 0.25);
+		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackVolumeGain(1, 0.5);
+		engine.setTrackMonitorGain(1, 1);
+		engine.setOutputGain(0);
+		await engine.play();
+
+		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		const voiceState = snapshot.trackStates["audio-1"];
+		const desktopState = snapshot.trackStates["audio-2"];
+
+		expect(voiceState?.status).toBe("ready");
+		expect(desktopState?.status).toBe("ready");
+		if (voiceState?.status !== "ready" || desktopState?.status !== "ready") {
+			throw new Error("Expected ready engine meter taps.");
+		}
+		expect(voiceState.channels.map((channel) => channel.peak)).toEqual([
+			0.25, 0.25,
+		]);
+		expect(desktopState.channels.map((channel) => channel.peak)).toEqual([
+			0.25, 0.125,
+		]);
+		expect(snapshot.combinedState.status).toBe("ready");
+		if (snapshot.combinedState.status !== "ready") {
+			throw new Error("Expected ready combined engine meter tap.");
+		}
+		expect(
+			snapshot.combinedState.channels.map((channel) => channel.peak),
+		).toEqual([0.5, 0.375]);
+	});
+
+	it("resolves Track volume, monitored-mix, and output gains independently", () => {
 		const source = createAudioPreviewSource("audio-1", 1.25);
 		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
 		const audioDecision = audioMix.tracks["audio-1"];
@@ -110,12 +165,18 @@ describe("createPreviewAudioEngine", () => {
 		audioDecision.volumePercent = 50;
 
 		expect(
-			previewTrackGainForAudioTrackSource({
+			previewTrackVolumeGainForAudioTrackSource({
+				audioMix,
+				source,
+			}),
+		).toBeCloseTo(0.25);
+		expect(
+			previewTrackMonitorGainForAudioTrackSource({
 				audioMix,
 				soloedAudioTrackId: null,
 				source,
 			}),
-		).toBeCloseTo(0.25);
+		).toBe(1);
 
 		expect(
 			previewOutputGainForAudioMonitoring({
@@ -133,7 +194,13 @@ describe("createPreviewAudioEngine", () => {
 		audioDecision.include = false;
 
 		expect(
-			previewTrackGainForAudioTrackSource({
+			previewTrackVolumeGainForAudioTrackSource({
+				audioMix,
+				source,
+			}),
+		).toBeCloseTo(0.25);
+		expect(
+			previewTrackMonitorGainForAudioTrackSource({
 				audioMix,
 				soloedAudioTrackId: null,
 				source,
@@ -141,14 +208,14 @@ describe("createPreviewAudioEngine", () => {
 		).toBe(0);
 
 		expect(
-			previewTrackGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackSource({
 				audioMix,
 				soloedAudioTrackId: "audio-1",
 				source,
 			}),
-		).toBeCloseTo(0.25);
+		).toBe(1);
 		expect(
-			previewTrackGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackSource({
 				audioMix,
 				soloedAudioTrackId: "audio-1",
 				source: createAudioPreviewSource("audio-2", 1.25),
@@ -178,7 +245,11 @@ function createAudioPreviewSource(
 	};
 }
 
-function createAudioContextSpy() {
+function createAudioContextSpy({
+	audioBuffers = [createAudioBufferStub()],
+}: {
+	audioBuffers?: AudioBuffer[];
+} = {}) {
 	const destination = createAudioNodeSpy();
 	const context = {
 		close: vi.fn(),
@@ -229,7 +300,9 @@ function createAudioContextSpy() {
 			}
 		>,
 		currentTime: 0,
-		decodeAudioData: vi.fn(async () => createAudioBufferStub()),
+		decodeAudioData: vi.fn(
+			async () => audioBuffers.shift() ?? createAudioBufferStub(),
+		),
 		destination,
 		resume: vi.fn(),
 	};
@@ -244,11 +317,46 @@ function createAudioNodeSpy() {
 	};
 }
 
-function createAudioBufferStub(): AudioBuffer {
+function createAudioBufferStub({
+	channels = [[], []],
+}: {
+	channels?: Array<Array<[number, number]>>;
+} = {}): AudioBuffer {
+	const length = 480_000;
+	const channelData = channels.map((peaks) => {
+		const data = new Float32Array(length);
+
+		for (const [frameIndex, value] of peaks) {
+			data[frameIndex] = value;
+		}
+
+		return data;
+	});
+
 	return {
+		copyFromChannel(destination, channelNumber, startInChannel = 0) {
+			destination.set(
+				channelData[channelNumber]?.subarray(
+					startInChannel,
+					startInChannel + destination.length,
+				) ?? new Float32Array(destination.length),
+			);
+		},
+		copyToChannel(source, channelNumber, startInChannel = 0) {
+			channelData[channelNumber]?.set(source, startInChannel);
+		},
 		duration: 10,
-		length: 480_000,
-		numberOfChannels: 2,
+		getChannelData(channelNumber) {
+			const data = channelData[channelNumber];
+
+			if (!data) {
+				throw new Error(`Missing channel ${channelNumber}.`);
+			}
+
+			return data;
+		},
+		length,
+		numberOfChannels: channelData.length,
 		sampleRate: 48_000,
 	} as AudioBuffer;
 }

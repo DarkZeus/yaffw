@@ -4,7 +4,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AudioMix } from "@/editor-core/model";
-import type { PreviewMeteringTrackStates } from "./preview-metering-preparation.types";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
+import type { LivePreviewMeteringClock } from "./preview-metering-live";
 import { useLivePreviewMetering } from "./use-live-preview-metering";
 
 const frameCallbacks: FrameRequestCallback[] = [];
@@ -43,152 +44,85 @@ afterEach(() => {
 });
 
 describe("useLivePreviewMetering", () => {
-	it("updates prepared meter values on every animation frame", () => {
-		let playheadUs = 100_000;
-		const clock = {
+	it("updates displayed meter values from Preview audio engine snapshots", () => {
+		let currentNowMs = 0;
+		let snapshot = createReadySnapshot(0.25);
+		const clock = createMeteringClock({
 			getIsPlaying: () => true,
-			getPlayheadUs: () => playheadUs,
-		};
+			readMeterSnapshot: () => snapshot,
+		});
 
-		render(
-			<LivePreviewMeteringProbe
-				audioMix={audioMix}
-				clock={clock}
-				trackStates={trackStates}
-			/>,
-		);
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
 
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
 			-12.04,
 			2,
 		);
 
-		playheadUs = 150_000;
-		act(() => {
-			frameCallbacks.shift()?.(16);
-		});
-
-		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
-		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
-
-		playheadUs = 100_000;
-		act(() => {
-			frameCallbacks.shift()?.(32);
-		});
-
-		const secondFramePeak = Number(
-			screen.getByLabelText("voice peak").textContent,
-		);
-
-		expect(secondFramePeak).toBeLessThan(0);
-		expect(secondFramePeak).toBeGreaterThan(-12.04);
-
-		act(() => {
-			frameCallbacks.shift()?.(80);
-		});
-
-		const releasedPeak = Number(
-			screen.getByLabelText("voice peak").textContent,
-		);
-
-		expect(releasedPeak).toBeLessThan(0);
-		expect(releasedPeak).toBeLessThan(secondFramePeak);
-		expect(releasedPeak).toBeGreaterThan(-12.04);
-		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
-	});
-
-	it("uses fast attack and slower release for displayed peak values", () => {
-		let playheadUs = 100_000;
-		const clock = {
-			getIsPlaying: () => true,
-			getPlayheadUs: () => playheadUs,
-		};
-
-		render(
-			<LivePreviewMeteringProbe
-				audioMix={audioMix}
-				clock={clock}
-				trackStates={trackStates}
-			/>,
-		);
-
-		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
-			-12.04,
-			2,
-		);
-
-		act(() => {
-			frameCallbacks.shift()?.(16);
-		});
-
-		playheadUs = 150_000;
+		snapshot = createReadySnapshot(1);
+		currentNowMs = 80;
 		act(() => {
 			frameCallbacks.shift()?.(80);
 		});
 
 		const attackPeak = Number(screen.getByLabelText("voice peak").textContent);
-		expect(attackPeak).toBeLessThan(0);
+		expect(attackPeak).toBeLessThanOrEqual(0);
 		expect(attackPeak).toBeGreaterThan(-1);
-		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
-
-		playheadUs = 100_000;
-		act(() => {
-			frameCallbacks.shift()?.(144);
-		});
-
-		const releasePeak = Number(screen.getByLabelText("voice peak").textContent);
-		expect(releasePeak).toBeLessThan(attackPeak);
-		expect(releasePeak).toBeGreaterThan(-12.04);
 		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
 	});
 
-	it("uses low-frequency paused polling instead of an animation-frame loop", () => {
-		let isPlaying = false;
-		const clock = {
+	it("decays displayed meters toward silence after playback stops", () => {
+		let currentNowMs = 0;
+		let isPlaying = true;
+		const clock = createMeteringClock({
 			getIsPlaying: () => isPlaying,
-			getPlayheadUs: () => 100_000,
-		};
+			readMeterSnapshot: () => createReadySnapshot(1),
+		});
 
-		render(
-			<LivePreviewMeteringProbe
-				audioMix={audioMix}
-				clock={clock}
-				trackStates={trackStates}
-			/>,
-		);
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
+
+		isPlaying = false;
+		currentNowMs = 250;
+		act(() => {
+			frameCallbacks.shift()?.(250);
+		});
+
+		const decayedPeak = Number(screen.getByLabelText("voice peak").textContent);
+		expect(decayedPeak).toBeLessThan(0);
+		expect(decayedPeak).toBeGreaterThan(-72);
+		expect(timeoutCallbacks).toHaveLength(1);
+	});
+
+	it("uses low-frequency paused polling instead of an animation-frame loop", () => {
+		const clock = createMeteringClock({
+			getIsPlaying: () => false,
+			readMeterSnapshot: () => createReadySnapshot(1),
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={fixedNow} />);
 
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(-72);
 		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
 		expect(timeoutCallbacks).toHaveLength(1);
-
-		isPlaying = true;
-		act(() => {
-			timeoutCallbacks.shift()?.();
-		});
-
-		expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
 	});
 });
 
 function LivePreviewMeteringProbe({
-	audioMix,
 	clock,
-	trackStates,
+	now = () => 0,
 }: {
-	audioMix: AudioMix;
-	clock: {
-		getIsPlaying: () => boolean;
-		getPlayheadUs: () => number;
-	};
-	trackStates: PreviewMeteringTrackStates;
+	clock: LivePreviewMeteringClock;
+	now?: () => number;
 }) {
 	const liveMetering = useLivePreviewMetering({
 		audioMix,
 		clock,
 		enabled: true,
-		now: fixedNow,
+		knownTrackIds: ["audio-voice"],
+		now,
 		soloedAudioTrackId: null,
-		trackStates,
 	});
 	const voiceState = liveMetering.trackStates["audio-voice"];
 	const voicePeak =
@@ -206,6 +140,43 @@ function LivePreviewMeteringProbe({
 	);
 }
 
+function createMeteringClock({
+	getIsPlaying,
+	readMeterSnapshot,
+}: {
+	getIsPlaying: () => boolean;
+	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot | null;
+}): LivePreviewMeteringClock {
+	return {
+		getIsPlaying,
+		getMeteringStatus: () => "ready",
+		readMeterSnapshot,
+	};
+}
+
+function createReadySnapshot(peak: number): PreviewAudioEngineMeterSnapshot {
+	return {
+		combinedState: {
+			channels: [
+				{ label: "Left", peak },
+				{ label: "Right", peak },
+			],
+			partial: false,
+			status: "ready",
+		},
+		trackStates: {
+			"audio-voice": {
+				channels: [
+					{ label: "Left", peak },
+					{ label: "Right", peak },
+				],
+				status: "ready",
+				trackId: "audio-voice",
+			},
+		},
+	};
+}
+
 const audioMix = {
 	finalPeakGuardDb: -1,
 	outputChannels: 2,
@@ -220,49 +191,5 @@ const audioMix = {
 } satisfies AudioMix;
 
 function fixedNow() {
-	return 1_000;
-}
-
-const trackStates = {
-	"audio-voice": {
-		prepared: {
-			audioBuffer: createTestAudioBuffer(),
-			channelLabels: ["Left"],
-			startPositionSeconds: 0,
-			track: {
-				channels: 1,
-				id: "audio-voice",
-				kind: "audio",
-				label: "Voice",
-			},
-			trackId: "audio-voice",
-			trackIndex: 0,
-		},
-		status: "ready",
-		trackId: "audio-voice",
-	},
-} satisfies PreviewMeteringTrackStates;
-
-function createTestAudioBuffer(): AudioBuffer {
-	const data = new Float32Array(200);
-	data[100] = 0.25;
-	data[150] = 1;
-
-	return {
-		copyFromChannel(destination, _channelNumber, startInChannel = 0) {
-			destination.set(
-				data.subarray(startInChannel, startInChannel + destination.length),
-			);
-		},
-		copyToChannel(source, _channelNumber, startInChannel = 0) {
-			data.set(source, startInChannel);
-		},
-		duration: 0.2,
-		getChannelData() {
-			return data;
-		},
-		length: 200,
-		numberOfChannels: 1,
-		sampleRate: 1_000,
-	} as AudioBuffer;
+	return 0;
 }

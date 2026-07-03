@@ -1,35 +1,15 @@
-import { audioTrackVolumePercentToGain } from "@/editor-core/audio-mix";
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	MediaTimeUs,
-} from "@/editor-core/model";
-import {
-	outputChannelCountForMode,
-	resolveChannelTransform,
-} from "./browser-audio-mix";
-import type { ResolvedChannelTransform } from "./browser-audio-mix.types";
+import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 import type { PreviewLevelMeterChannel } from "./preview-level-meter";
 import { previewPeakMeterVisualRange } from "./preview-level-meter";
-import type {
-	PreviewMeteringPreparedTrack,
-	PreviewMeteringTrackStates,
-} from "./preview-metering-preparation.types";
 
-const PREVIEW_METERING_PEAK_WINDOW_US = 50_000;
 const PREVIEW_METERING_CLIP_HOLD_MS = 750;
 const COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY = "__combined-preview-output__";
-const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
-const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
-const trackChannelPlanCache = new WeakMap<
-	AudioBuffer,
-	Map<string, TrackChannelPlan>
->();
-const channelAnalysisNotNeeded = {
-	channels: [],
-	oneSidedStereo: null,
-	reason: "not-needed-for-metering-mode",
-} satisfies ResolvedChannelTransform["analysis"];
+
+export type LivePreviewMeteringSourceStatus =
+	| "failed"
+	| "idle"
+	| "preparing"
+	| "ready";
 
 export type LivePreviewMeteringTrackState =
 	| {
@@ -76,7 +56,8 @@ export type LivePreviewMeteringState = {
 
 export type LivePreviewMeteringClock = {
 	getIsPlaying: () => boolean;
-	getPlayheadUs: () => MediaTimeUs;
+	getMeteringStatus: () => LivePreviewMeteringSourceStatus;
+	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot | null;
 };
 
 export type LivePreviewMeteringClipHoldState = Record<
@@ -85,13 +66,13 @@ export type LivePreviewMeteringClipHoldState = Record<
 >;
 
 export type CreateLivePreviewMeteringTrackStatesOptions = {
-	audioMix: AudioMix;
+	excludedTrackIds?: ReadonlySet<string>;
 	isPlaying: boolean;
+	knownTrackIds: string[];
+	meterSnapshot: PreviewAudioEngineMeterSnapshot | null;
+	meteringStatus: LivePreviewMeteringSourceStatus;
 	nowMs: number;
-	playheadUs: MediaTimeUs;
 	previousClipHoldState?: LivePreviewMeteringClipHoldState;
-	soloedAudioTrackId: string | null;
-	trackStates: PreviewMeteringTrackStates;
 };
 
 export type LivePreviewMeteringTrackStatesResult = {
@@ -99,61 +80,46 @@ export type LivePreviewMeteringTrackStatesResult = {
 } & LivePreviewMeteringState;
 
 export function createLivePreviewMeteringTrackStates({
-	audioMix,
+	excludedTrackIds = new Set(),
 	isPlaying,
+	knownTrackIds,
+	meterSnapshot,
+	meteringStatus,
 	nowMs,
-	playheadUs,
 	previousClipHoldState = {},
-	soloedAudioTrackId,
-	trackStates,
 }: CreateLivePreviewMeteringTrackStatesOptions): LivePreviewMeteringTrackStatesResult {
+	if (meteringStatus === "failed") {
+		return createUnavailableLivePreviewMeteringState(knownTrackIds);
+	}
+
+	if (meteringStatus !== "ready" || !meterSnapshot) {
+		return createPreparingLivePreviewMeteringState(knownTrackIds);
+	}
+
 	const clipHoldState: LivePreviewMeteringClipHoldState = {};
-	const liveTrackStates: LivePreviewMeteringTrackStates = {};
+	const trackStates: LivePreviewMeteringTrackStates = {};
+	const trackIds = createMeteredTrackIds(knownTrackIds, meterSnapshot);
 
-	for (const [trackId, state] of Object.entries(trackStates)) {
-		if (state.status !== "ready") {
-			liveTrackStates[trackId] = state;
-			continue;
-		}
+	for (const trackId of trackIds) {
+		const snapshotState = meterSnapshot.trackStates[trackId];
 
-		const decision = audioMix.tracks[trackId];
-		const excluded =
-			decision?.include === false && soloedAudioTrackId !== trackId;
-		const channelMode = decision?.channelMode ?? "preserve";
-		const channelPlan = createTrackChannelPlan({
-			channelMode,
-			meterOutputChannels: normalizeOutputChannelCount(audioMix.outputChannels),
-			prepared: state.prepared,
-		});
-
-		if (!isPlaying || excluded) {
-			liveTrackStates[trackId] = {
-				channels: channelPlan.labels.map((label) => ({
-					clipHeld: false,
-					label,
-					peakDb: previewPeakMeterVisualRange.floorDb,
-				})),
-				excluded,
-				status: "ready",
+		if (!snapshotState) {
+			trackStates[trackId] = {
+				status: "preparing",
 				trackId,
 			};
 			continue;
 		}
 
-		const volumeGain = audioTrackVolumePercentToGain(
-			decision?.volumePercent ?? 100,
-		);
-		const peaks = sampleTrackPeakWindow({
-			channelPlan,
-			playheadUs,
-			prepared: state.prepared,
-			volumeGain,
-		});
+		if (snapshotState.status === "unavailable") {
+			trackStates[trackId] = snapshotState;
+			continue;
+		}
 
-		const meteredChannels = createMeterChannelsFromLinearPeaks({
-			labels: channelPlan.labels,
+		const meteredChannels = createMeterChannelsFromEnginePeaks({
+			channels: snapshotState.channels,
+			isPlaying,
 			nowMs,
-			peaks,
 			previousClipHoldByChannel: previousClipHoldState[trackId],
 		});
 
@@ -161,315 +127,144 @@ export function createLivePreviewMeteringTrackStates({
 			clipHoldState[trackId] = meteredChannels.clipHoldByChannel;
 		}
 
-		liveTrackStates[trackId] = {
+		trackStates[trackId] = {
 			channels: meteredChannels.channels,
-			excluded: false,
+			excluded: excludedTrackIds.has(trackId),
 			status: "ready",
 			trackId,
 		};
 	}
 
-	const combinedResult = createCombinedPreviewMeteringState({
-		audioMix,
+	const combinedState = createCombinedLivePreviewMeteringState({
 		isPlaying,
+		meterSnapshot,
 		nowMs,
-		playheadUs,
 		previousClipHoldByChannel:
 			previousClipHoldState[COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY],
-		soloedAudioTrackId,
-		trackStates,
 	});
 
-	if (Object.keys(combinedResult.clipHoldByChannel).length > 0) {
+	if (Object.keys(combinedState.clipHoldByChannel).length > 0) {
 		clipHoldState[COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY] =
-			combinedResult.clipHoldByChannel;
+			combinedState.clipHoldByChannel;
 	}
 
 	return {
-		combinedState: combinedResult.state,
 		clipHoldState,
-		trackStates: liveTrackStates,
+		combinedState: combinedState.state,
+		trackStates,
 	};
 }
 
-type CombinedPreviewMeteringStateResult = {
+function createPreparingLivePreviewMeteringState(
+	knownTrackIds: string[],
+): LivePreviewMeteringTrackStatesResult {
+	return {
+		clipHoldState: {},
+		combinedState: {
+			reason: "Preparing engine meter taps",
+			status: "preparing",
+		},
+		trackStates: Object.fromEntries(
+			knownTrackIds.map((trackId) => [
+				trackId,
+				{
+					status: "preparing",
+					trackId,
+				} satisfies LivePreviewMeteringTrackState,
+			]),
+		),
+	};
+}
+
+function createUnavailableLivePreviewMeteringState(
+	knownTrackIds: string[],
+): LivePreviewMeteringTrackStatesResult {
+	const reason = "Preview audio engine meter taps unavailable";
+
+	return {
+		clipHoldState: {},
+		combinedState: {
+			reason,
+			status: "unavailable",
+		},
+		trackStates: Object.fromEntries(
+			knownTrackIds.map((trackId) => [
+				trackId,
+				{
+					reason,
+					status: "unavailable",
+					trackId,
+				} satisfies LivePreviewMeteringTrackState,
+			]),
+		),
+	};
+}
+
+function createMeteredTrackIds(
+	knownTrackIds: string[],
+	meterSnapshot: PreviewAudioEngineMeterSnapshot,
+) {
+	return Array.from(
+		new Set([...knownTrackIds, ...Object.keys(meterSnapshot.trackStates)]),
+	);
+}
+
+function createCombinedLivePreviewMeteringState({
+	isPlaying,
+	meterSnapshot,
+	nowMs,
+	previousClipHoldByChannel,
+}: {
+	isPlaying: boolean;
+	meterSnapshot: PreviewAudioEngineMeterSnapshot;
+	nowMs: number;
+	previousClipHoldByChannel?: Record<number, number>;
+}): {
 	clipHoldByChannel: Record<number, number>;
 	state: LivePreviewMeteringCombinedState;
-};
-
-type AudiblePreparedTrack = {
-	channelPlan: TrackChannelPlan;
-	prepared: PreviewMeteringPreparedTrack;
-	volumeGain: number;
-};
-
-type AudiblePreparedTrackWithChannelData = AudiblePreparedTrack & {
-	channelData: Float32Array[];
-};
-
-function createCombinedPreviewMeteringState({
-	audioMix,
-	isPlaying,
-	nowMs,
-	playheadUs,
-	previousClipHoldByChannel,
-	soloedAudioTrackId,
-	trackStates,
-}: CreateLivePreviewMeteringTrackStatesOptions & {
-	previousClipHoldByChannel?: Record<number, number>;
-}): CombinedPreviewMeteringStateResult {
-	const outputChannelCount = normalizeOutputChannelCount(
-		audioMix.outputChannels,
-	);
-	const outputLabels = createPreviewOutputChannelLabels(outputChannelCount);
-	const monitoredTrackIds = new Set([
-		...Object.keys(audioMix.tracks),
-		...Object.keys(trackStates),
-	]);
-	const readyTracks: AudiblePreparedTrack[] = [];
-	const nonReadyAudibleStates: PreviewMeteringTrackStates[string][] = [];
-
-	for (const trackId of monitoredTrackIds) {
-		const decision = audioMix.tracks[trackId];
-
-		if (
-			!isTrackAudibleInPreviewMonitoring({
-				decision,
-				soloedAudioTrackId,
-				trackId,
-			})
-		) {
-			continue;
-		}
-
-		const state = trackStates[trackId] ?? {
-			status: "preparing",
-			trackId,
-		};
-
-		if (state.status !== "ready") {
-			nonReadyAudibleStates.push(state);
-			continue;
-		}
-
-		const channelMode = decision?.channelMode ?? "preserve";
-		readyTracks.push({
-			channelPlan: createTrackChannelPlan({
-				channelMode,
-				meterOutputChannels: outputChannelCount,
-				prepared: state.prepared,
-			}),
-			prepared: state.prepared,
-			volumeGain: audioTrackVolumePercentToGain(decision?.volumePercent ?? 100),
-		});
-	}
-
-	if (readyTracks.length === 0 && nonReadyAudibleStates.length > 0) {
+} {
+	if (meterSnapshot.combinedState.status === "unavailable") {
 		return {
 			clipHoldByChannel: {},
-			state: createCombinedNonReadyState(nonReadyAudibleStates),
+			state: meterSnapshot.combinedState,
 		};
 	}
 
-	const peaks =
-		isPlaying && readyTracks.length > 0
-			? sampleCombinedOutputPeakWindow({
-					outputChannelCount,
-					playheadUs,
-					tracks: readyTracks,
-				})
-			: Array.from({ length: outputChannelCount }, () => 0);
-	const meteredChannels = createMeterChannelsFromLinearPeaks({
-		labels: outputLabels,
+	const meteredChannels = createMeterChannelsFromEnginePeaks({
+		channels: meterSnapshot.combinedState.channels,
+		isPlaying,
 		nowMs,
-		peaks,
 		previousClipHoldByChannel,
 	});
-	const reason =
-		nonReadyAudibleStates.length > 0
-			? createCombinedPartialReason(nonReadyAudibleStates)
-			: undefined;
 
 	return {
 		clipHoldByChannel: meteredChannels.clipHoldByChannel,
 		state: {
 			channels: meteredChannels.channels,
-			partial: nonReadyAudibleStates.length > 0,
-			reason,
+			partial: meterSnapshot.combinedState.partial,
+			reason: meterSnapshot.combinedState.reason,
 			status: "ready",
 		},
 	};
 }
 
-function isTrackAudibleInPreviewMonitoring({
-	decision,
-	soloedAudioTrackId,
-	trackId,
-}: {
-	decision: AudioMix["tracks"][string] | undefined;
-	soloedAudioTrackId: string | null;
-	trackId: string;
-}) {
-	const volumePercent = decision?.volumePercent ?? 100;
-
-	if (volumePercent <= 0) {
-		return false;
-	}
-
-	if (soloedAudioTrackId) {
-		return trackId === soloedAudioTrackId;
-	}
-
-	return decision?.include !== false;
-}
-
-function createCombinedNonReadyState(
-	states: PreviewMeteringTrackStates[string][],
-): LivePreviewMeteringCombinedState {
-	const unavailableState = states.find(
-		(state) => state.status === "unavailable",
-	);
-
-	if (unavailableState?.status === "unavailable") {
-		return {
-			reason: createCombinedPartialReason(states),
-			status: "unavailable",
-		};
-	}
-
-	return {
-		reason: "Preparing monitored tracks",
-		status: "preparing",
-	};
-}
-
-function createCombinedPartialReason(
-	states: PreviewMeteringTrackStates[string][],
-): string {
-	const unavailableReasons = states.flatMap((state) =>
-		state.status === "unavailable" ? [state.reason] : [],
-	);
-
-	if (unavailableReasons.length > 0) {
-		return `Some monitored tracks are unavailable: ${unavailableReasons.join(
-			"; ",
-		)}`;
-	}
-
-	return "Some monitored tracks are still preparing";
-}
-
-function sampleCombinedOutputPeakWindow({
-	outputChannelCount,
-	playheadUs,
-	tracks,
-}: {
-	outputChannelCount: number;
-	playheadUs: MediaTimeUs;
-	tracks: AudiblePreparedTrack[];
-}): number[] {
-	const referenceSampleRate = Math.max(
-		1,
-		...tracks.map((track) => track.prepared.audioBuffer.sampleRate),
-	);
-	const frameCount = Math.max(
-		1,
-		Math.round(
-			(PREVIEW_METERING_PEAK_WINDOW_US / 1_000_000) * referenceSampleRate,
-		),
-	);
-	const startSeconds =
-		playheadUs / 1_000_000 - PREVIEW_METERING_PEAK_WINDOW_US / 1_000_000 / 2;
-	const peaks = Array.from({ length: outputChannelCount }, () => 0);
-	const tracksWithChannelData: AudiblePreparedTrackWithChannelData[] =
-		tracks.map((track) => ({
-			...track,
-			channelData: readAudioBufferChannelData(track.prepared.audioBuffer),
-		}));
-
-	for (let frameOffset = 0; frameOffset < frameCount; frameOffset += 1) {
-		const sampleTimeSeconds = startSeconds + frameOffset / referenceSampleRate;
-
-		for (
-			let outputChannelIndex = 0;
-			outputChannelIndex < outputChannelCount;
-			outputChannelIndex += 1
-		) {
-			let mixedSample = 0;
-
-			for (const track of tracksWithChannelData) {
-				const frameIndex = Math.round(
-					(sampleTimeSeconds - track.prepared.startPositionSeconds) *
-						track.prepared.audioBuffer.sampleRate,
-				);
-
-				mixedSample +=
-					readTrackSampleForOutputChannel({
-						channelData: track.channelData,
-						channelPlan: track.channelPlan,
-						frameIndex,
-						outputChannelIndex,
-					}) *
-					track.channelPlan.compensationGain *
-					track.volumeGain;
-			}
-
-			peaks[outputChannelIndex] = Math.max(
-				peaks[outputChannelIndex] ?? 0,
-				Math.abs(mixedSample),
-			);
-		}
-	}
-
-	return peaks;
-}
-
-function readTrackSampleForOutputChannel({
-	channelData,
-	channelPlan,
-	frameIndex,
-	outputChannelIndex,
-}: {
-	channelData: Float32Array[];
-	channelPlan: TrackChannelPlan;
-	frameIndex: number;
-	outputChannelIndex: number;
-}): number {
-	const bufferLength = channelData[0]?.length ?? 0;
-
-	if (frameIndex < 0 || frameIndex >= bufferLength) {
-		return 0;
-	}
-
-	const transformedChannelIndex =
-		channelPlan.outputChannels === 1
-			? 0
-			: Math.min(outputChannelIndex, channelPlan.outputChannels - 1);
-
-	return readTransformedSample({
-		channelData,
-		channelIndex: transformedChannelIndex,
-		frameIndex,
-		resolvedMode: channelPlan.resolvedMode,
-	});
-}
-
-function createMeterChannelsFromLinearPeaks({
-	labels,
+function createMeterChannelsFromEnginePeaks({
+	channels,
+	isPlaying,
 	nowMs,
-	peaks,
 	previousClipHoldByChannel = {},
 }: {
-	labels: string[];
+	channels: { label: string; peak: number }[];
+	isPlaying: boolean;
 	nowMs: number;
-	peaks: number[];
 	previousClipHoldByChannel?: Record<number, number>;
 }): {
 	channels: PreviewLevelMeterChannel[];
 	clipHoldByChannel: Record<number, number>;
 } {
 	const clipHoldByChannel: Record<number, number> = {};
-	const channels = peaks.map((peak, channelIndex) => {
+	const meteredChannels = channels.map((channel, channelIndex) => {
+		const peak = isPlaying ? channel.peak : 0;
 		const clipped = peak >= 1;
 		const lastClipMs = clipped
 			? nowMs
@@ -484,345 +279,15 @@ function createMeterChannelsFromLinearPeaks({
 
 		return {
 			clipHeld,
-			label: labels[channelIndex] ?? `Ch ${channelIndex + 1}`,
+			label: channel.label,
 			peakDb: linearPeakToDb(peak),
 		};
 	});
 
 	return {
-		channels,
+		channels: meteredChannels,
 		clipHoldByChannel,
 	};
-}
-
-function normalizeOutputChannelCount(outputChannels: number): number {
-	if (!Number.isFinite(outputChannels)) {
-		return 2;
-	}
-
-	return Math.max(1, Math.min(8, Math.round(outputChannels)));
-}
-
-function createPreviewOutputChannelLabels(outputChannels: number): string[] {
-	if (outputChannels === 1) {
-		return ["Mono"];
-	}
-
-	if (outputChannels === 2) {
-		return ["Left", "Right"];
-	}
-
-	return Array.from(
-		{ length: outputChannels },
-		(_, channelIndex) => `Ch ${channelIndex + 1}`,
-	);
-}
-
-type TrackChannelPlan = {
-	compensationGain: number;
-	labels: string[];
-	outputChannels: number;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-};
-
-function createTrackChannelPlan({
-	channelMode,
-	meterOutputChannels,
-	prepared,
-}: {
-	channelMode: AudioTrackChannelMode;
-	meterOutputChannels: number;
-	prepared: PreviewMeteringPreparedTrack;
-}): TrackChannelPlan {
-	const cacheKey = createTrackChannelPlanCacheKey({
-		channelLabels: prepared.channelLabels,
-		channelMode,
-		meterOutputChannels,
-	});
-	const cachedPlan = trackChannelPlanCache
-		.get(prepared.audioBuffer)
-		?.get(cacheKey);
-
-	if (cachedPlan) {
-		return cachedPlan;
-	}
-
-	const channelTransform = resolveMeteringChannelTransform(
-		prepared.audioBuffer,
-		channelMode,
-	);
-	const transformedOutputChannels = outputChannelCountForMode(
-		prepared.audioBuffer,
-		channelTransform.resolvedMode,
-	);
-	const outputChannels = outputChannelCountForMeteringMode({
-		meterOutputChannels,
-		resolvedMode: channelTransform.resolvedMode,
-		transformedOutputChannels,
-	});
-
-	const plan = {
-		compensationGain: channelCompensationGain({
-			channelTransform,
-			outputChannels,
-		}),
-		labels: createChannelLabels({
-			channelLabels: prepared.channelLabels,
-			outputChannels,
-			resolvedMode: channelTransform.resolvedMode,
-		}),
-		outputChannels,
-		resolvedMode: channelTransform.resolvedMode,
-	};
-	const plansForBuffer =
-		trackChannelPlanCache.get(prepared.audioBuffer) ?? new Map();
-
-	plansForBuffer.set(cacheKey, plan);
-	trackChannelPlanCache.set(prepared.audioBuffer, plansForBuffer);
-
-	return plan;
-}
-
-function createTrackChannelPlanCacheKey({
-	channelLabels,
-	channelMode,
-	meterOutputChannels,
-}: {
-	channelLabels: string[];
-	channelMode: AudioTrackChannelMode;
-	meterOutputChannels: number;
-}): string {
-	return `${channelMode}:${meterOutputChannels}:${channelLabels.join("\u0000")}`;
-}
-
-function outputChannelCountForMeteringMode({
-	meterOutputChannels,
-	resolvedMode,
-	transformedOutputChannels,
-}: {
-	meterOutputChannels: number;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-	transformedOutputChannels: number;
-}): number {
-	if (
-		resolvedMode === "use-left-as-mono" ||
-		resolvedMode === "use-right-as-mono" ||
-		resolvedMode === "average-to-mono"
-	) {
-		return Math.max(1, meterOutputChannels);
-	}
-
-	return transformedOutputChannels;
-}
-
-function resolveMeteringChannelTransform(
-	audioBuffer: AudioBuffer,
-	requestedMode: AudioTrackChannelMode,
-): ResolvedChannelTransform {
-	if (requestedMode === "preserve" || requestedMode === "average-to-mono") {
-		return {
-			analysis: channelAnalysisNotNeeded,
-			requestedMode,
-			resolvedMode: requestedMode,
-		};
-	}
-
-	return resolveChannelTransform(audioBuffer, requestedMode);
-}
-
-function sampleTrackPeakWindow({
-	channelPlan,
-	playheadUs,
-	prepared,
-	volumeGain,
-}: {
-	channelPlan: TrackChannelPlan;
-	playheadUs: MediaTimeUs;
-	prepared: PreviewMeteringPreparedTrack;
-	volumeGain: number;
-}): number[] {
-	const audioBuffer = prepared.audioBuffer;
-	const playheadSeconds =
-		playheadUs / 1_000_000 - prepared.startPositionSeconds;
-	const centerFrame = Math.round(playheadSeconds * audioBuffer.sampleRate);
-	const halfWindowFrames = Math.max(
-		1,
-		Math.round(
-			(PREVIEW_METERING_PEAK_WINDOW_US / 1_000_000 / 2) *
-				audioBuffer.sampleRate,
-		),
-	);
-	const startFrame = Math.max(0, centerFrame - halfWindowFrames);
-	const endFrame = Math.min(audioBuffer.length, centerFrame + halfWindowFrames);
-
-	if (startFrame >= endFrame) {
-		return Array.from({ length: channelPlan.outputChannels }, () => 0);
-	}
-
-	const channelData = readAudioBufferChannelData(audioBuffer);
-
-	return Array.from(
-		{ length: channelPlan.outputChannels },
-		(_, channelIndex) => {
-			let peak = 0;
-
-			for (
-				let frameIndex = startFrame;
-				frameIndex < endFrame;
-				frameIndex += 1
-			) {
-				peak = Math.max(
-					peak,
-					Math.abs(
-						readTransformedSample({
-							channelData,
-							channelIndex,
-							frameIndex,
-							resolvedMode: channelPlan.resolvedMode,
-						}),
-					),
-				);
-			}
-
-			return peak * channelPlan.compensationGain * volumeGain;
-		},
-	);
-}
-
-function readAudioBufferChannelData(audioBuffer: AudioBuffer): Float32Array[] {
-	return Array.from({ length: audioBuffer.numberOfChannels }, (_, channel) =>
-		audioBuffer.getChannelData(channel),
-	);
-}
-
-function readTransformedSample({
-	channelData,
-	channelIndex,
-	frameIndex,
-	resolvedMode,
-}: {
-	channelData: Float32Array[];
-	channelIndex: number;
-	frameIndex: number;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-}): number {
-	if (resolvedMode === "preserve") {
-		return readSourceSample(channelData, channelIndex, frameIndex);
-	}
-
-	if (
-		resolvedMode === "use-left-as-mono" ||
-		resolvedMode === "duplicate-left-to-stereo"
-	) {
-		return readSourceSample(channelData, 0, frameIndex);
-	}
-
-	if (
-		resolvedMode === "use-right-as-mono" ||
-		resolvedMode === "duplicate-right-to-stereo"
-	) {
-		return readSourceSample(
-			channelData,
-			Math.min(1, channelData.length - 1),
-			frameIndex,
-		);
-	}
-
-	if (resolvedMode === "average-to-mono") {
-		let sample = 0;
-
-		for (let channel = 0; channel < channelData.length; channel += 1) {
-			sample += readSourceSample(channelData, channel, frameIndex);
-		}
-
-		return sample / Math.max(1, channelData.length);
-	}
-
-	return readSourceSample(channelData, channelIndex, frameIndex);
-}
-
-function readSourceSample(
-	channelData: Float32Array[],
-	channelIndex: number,
-	frameIndex: number,
-): number {
-	const sourceChannel = Math.min(channelIndex, channelData.length - 1);
-
-	return channelData[sourceChannel]?.[frameIndex] ?? 0;
-}
-
-function createChannelLabels({
-	channelLabels,
-	outputChannels,
-	resolvedMode,
-}: {
-	channelLabels: string[];
-	outputChannels: number;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-}): string[] {
-	if (
-		resolvedMode === "use-left-as-mono" ||
-		resolvedMode === "use-right-as-mono" ||
-		resolvedMode === "average-to-mono"
-	) {
-		return outputChannels === 1
-			? ["Mono"]
-			: createPreviewOutputChannelLabels(outputChannels);
-	}
-
-	if (
-		outputChannels === 2 &&
-		(resolvedMode === "duplicate-left-to-stereo" ||
-			resolvedMode === "duplicate-right-to-stereo")
-	) {
-		return ["Left", "Right"];
-	}
-
-	return Array.from(
-		{ length: outputChannels },
-		(_, channelIndex) =>
-			channelLabels[channelIndex] ?? `Ch ${channelIndex + 1}`,
-	);
-}
-
-function channelCompensationGain({
-	channelTransform,
-	outputChannels,
-}: {
-	channelTransform: ResolvedChannelTransform;
-	outputChannels: number;
-}): number {
-	const effectiveOutputChannels =
-		channelTransform.resolvedMode === "use-left-as-mono" ||
-		channelTransform.resolvedMode === "use-right-as-mono" ||
-		channelTransform.resolvedMode === "duplicate-left-to-stereo" ||
-		channelTransform.resolvedMode === "duplicate-right-to-stereo"
-			? Math.max(2, outputChannels)
-			: outputChannels;
-	const sourceChannelMode =
-		channelTransform.resolvedMode === "use-left-as-mono" ||
-		channelTransform.resolvedMode === "use-right-as-mono" ||
-		channelTransform.resolvedMode === "duplicate-left-to-stereo" ||
-		channelTransform.resolvedMode === "duplicate-right-to-stereo";
-
-	if (!sourceChannelMode || channelTransform.analysis.oneSidedStereo === null) {
-		return 1;
-	}
-
-	const activeInputChannelCount = channelTransform.analysis.channels.filter(
-		(channel) =>
-			channel.peak >= ONE_SIDED_ACTIVE_PEAK_THRESHOLD ||
-			channel.rms >= ONE_SIDED_ACTIVE_RMS_THRESHOLD,
-	).length;
-
-	if (
-		activeInputChannelCount !== 1 ||
-		effectiveOutputChannels <= activeInputChannelCount
-	) {
-		return 1;
-	}
-
-	return Math.sqrt(activeInputChannelCount / effectiveOutputChannels);
 }
 
 function linearPeakToDb(peak: number): number {
