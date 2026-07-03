@@ -90,7 +90,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("muted:false");
 	});
 
-	it("starts audio-master playback without waiting for native video playback", async () => {
+	it("waits for native video playback before starting the audio-master clock", async () => {
 		const playStarted = createDeferred<void>();
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 		play.mockReturnValueOnce(playStarted.promise);
@@ -108,16 +108,76 @@ describe("useNativePreviewTransport", () => {
 			"muted",
 			true,
 		);
-		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(0);
-		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
-		expect(readState()).toContain("playing:true");
+		expect(previewAudioEngine.setTime).not.toHaveBeenCalled();
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:false");
 
 		await act(async () => {
 			playStarted.resolve();
 			await playStarted.promise;
 		});
 
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(0);
+		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 		expect(readState()).toContain("playing:true");
+	});
+
+	it("does not advance the audio clock or seek the video follower while resumed native playback is still pending", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+		const resumedNativePlayback = createDeferred<void>();
+		play.mockResolvedValueOnce(undefined);
+		play.mockReturnValueOnce(resumedNativePlayback.promise);
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+
+		previewAudioEngine.setCurrentTimeSeconds(5);
+		currentTimeWrites.setNativeCurrentTime(5);
+		runNextPreviewFrame(frameCallbacks, 250);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		expect(readState()).toContain("playing:false");
+		currentTimeWrites.clear();
+		previewAudioEngine.play.mockClear();
+		const animationFrameRequestsBeforeResume =
+			requestAnimationFrame.mock.calls.length;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		expect(readState()).toContain("playing:false");
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
+		expect(requestAnimationFrame).toHaveBeenCalledTimes(
+			animationFrameRequestsBeforeResume,
+		);
+
+		previewAudioEngine.setCurrentTimeSeconds(5.3);
+		runNextPreviewFrame(frameCallbacks, 500);
+
+		expect(currentTimeWrites.values()).toEqual([]);
+
+		await act(async () => {
+			resumedNativePlayback.resolve();
+			await resumedNativePlayback.promise;
+		});
+
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 	});
 
 	it("does not chase small custom-audio clock drift with native video seeks during playback", async () => {

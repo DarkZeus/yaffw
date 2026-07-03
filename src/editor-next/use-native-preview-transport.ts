@@ -222,12 +222,32 @@ export function useNativePreviewTransport({
 
 		try {
 			if (audioMasterClockActive) {
+				const playheadSeconds = playheadRef.current / 1_000_000;
+
 				video.muted = true;
-				previewAudioEngineRef.current?.setTime(playheadRef.current / 1_000_000);
+				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
+					video,
+					playheadRef.current,
+				)
+					? playheadSeconds
+					: null;
+				await video.play();
+
+				if (!playbackStartIsCurrent()) {
+					return;
+				}
+
+				previewAudioEngineRef.current?.setTime(playheadSeconds);
 				await previewAudioEngineRef.current?.play();
+
+				if (!playbackStartIsCurrent()) {
+					previewAudioEngineRef.current?.pause();
+					previewAudioEnginePlaybackStartedRef.current = false;
+					return;
+				}
+
 				previewAudioEnginePlaybackStartedRef.current = true;
 				setIsPlaying(true);
-				await video.play();
 				return;
 			}
 
