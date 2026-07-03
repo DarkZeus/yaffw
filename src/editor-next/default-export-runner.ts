@@ -12,7 +12,10 @@ import {
 	type VideoCodec,
 } from "mediabunny";
 
-import { audioMixHasIncludedTracks } from "@/editor-core/audio-mix";
+import {
+	audioMixPlanHasIncludedTracks,
+	createAudioMixPlan,
+} from "@/editor-core/audio-mix-plan";
 import { renderBrowserAudioMix } from "./browser-audio-mix";
 import type {
 	DefaultExportRunner,
@@ -67,7 +70,12 @@ async function runBrowserDefaultExport({
 		source,
 	});
 
-	if (!audioMixHasIncludedTracks(audioMix)) {
+	const mixPlan = createAudioMixPlan({
+		audioMix,
+		trackIds: Object.keys(audioMix.tracks),
+	});
+
+	if (!audioMixPlanHasIncludedTracks(mixPlan)) {
 		return videoOnlyResult;
 	}
 

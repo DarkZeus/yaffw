@@ -2,10 +2,14 @@ import { ALL_FORMATS, AudioSampleSink, BlobSource, Input } from "mediabunny";
 
 import {
 	DEFAULT_AUDIO_MIX_FINAL_PEAK_GUARD_DB,
-	audioTrackVolumePercentToGain,
 } from "@/editor-core/audio-mix";
+import {
+	audioMixPlanTrackIsIncluded,
+	audioMixPlanTrackOutputChannelCount,
+	createAudioMixPlan,
+	type AudioMixPlanTrack,
+} from "@/editor-core/audio-mix-plan";
 import type {
-	AudioMixTrackDecision,
 	AudioTrackChannelMode,
 } from "@/editor-core/model";
 
@@ -41,9 +45,16 @@ export async function renderBrowserAudioMix({
 			}),
 		);
 		const inputTracks = await input.getAudioTracks();
+		const trackIdsWithDecisions = inputTracks
+			.map((track) => String(track.id))
+			.filter((trackId) => Boolean(audioMix.tracks[trackId]));
+		const mixPlan = createAudioMixPlan({
+			audioMix,
+			trackIds: trackIdsWithDecisions,
+		});
 		const selectedTracks = inputTracks
 			.map((track, trackIndex) => ({
-				decision: audioMix.tracks[String(track.id)],
+				planTrack: mixPlan.tracksById[String(track.id)],
 				track,
 				trackIndex,
 			}))
@@ -51,10 +62,10 @@ export async function renderBrowserAudioMix({
 				(
 					candidate,
 				): candidate is typeof candidate & {
-					decision: AudioMixTrackDecision;
+					planTrack: AudioMixPlanTrack;
 				} =>
-					Boolean(candidate.decision?.include) &&
-					(candidate.decision?.volumePercent ?? 0) > 0,
+					Boolean(candidate.planTrack) &&
+					audioMixPlanTrackIsIncluded(candidate.planTrack),
 			);
 
 		if (selectedTracks.length === 0) {
@@ -65,7 +76,7 @@ export async function renderBrowserAudioMix({
 		const endSeconds = selection.endUs / 1_000_000;
 		const decodedTracks = [];
 
-		for (const { decision, track } of selectedTracks) {
+		for (const { planTrack, track } of selectedTracks) {
 			throwIfAborted(signal);
 			const decoded = await decodeAudioTrackRange({
 				endSeconds,
@@ -80,8 +91,8 @@ export async function renderBrowserAudioMix({
 			}
 
 			decodedTracks.push({
-				decision,
 				decoded,
+				planTrack,
 			});
 		}
 
@@ -90,7 +101,7 @@ export async function renderBrowserAudioMix({
 		}
 
 		const sampleRate = decodedTracks[0]?.decoded.sampleRate ?? 48_000;
-		const outputChannels = audioMix.outputChannels;
+		const outputChannels = mixPlan.outputChannels;
 		const durationSeconds = Math.max(0, endSeconds - startSeconds);
 		const frameCount = Math.max(1, Math.ceil(durationSeconds * sampleRate));
 		const context = new OfflineAudioContext(
@@ -99,12 +110,12 @@ export async function renderBrowserAudioMix({
 			sampleRate,
 		);
 
-		for (const { decision, decoded } of decodedTracks) {
+		for (const { planTrack, decoded } of decodedTracks) {
 			throwIfAborted(signal);
 
 			const channelTransform = resolveChannelTransform(
 				decoded,
-				decision.channelMode,
+				planTrack.channelMode,
 			);
 			const transformed = createTransformedAudioBuffer(decoded, {
 				channelMode: channelTransform.resolvedMode,
@@ -120,7 +131,7 @@ export async function renderBrowserAudioMix({
 			});
 			const volumeAdjusted = applyGainToAudioBuffer(
 				channelCompensated,
-				audioTrackVolumePercentToGain(decision.volumePercent),
+				planTrack.trackVolumeGain,
 			);
 			const sourceNode = context.createBufferSource();
 			sourceNode.buffer = volumeAdjusted;
@@ -132,7 +143,7 @@ export async function renderBrowserAudioMix({
 		throwIfAborted(signal);
 		const peakSafe = createPeakSafeAudioBuffer(
 			rendered,
-			audioMix.finalPeakGuardDb,
+			mixPlan.finalPeakGuardDb,
 		);
 
 		return {
@@ -329,18 +340,10 @@ export function outputChannelCountForMode(
 	audioBuffer: AudioBuffer,
 	channelMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">,
 ): number {
-	if (
-		channelMode === "duplicate-left-to-stereo" ||
-		channelMode === "duplicate-right-to-stereo"
-	) {
-		return Math.max(2, audioBuffer.numberOfChannels);
-	}
-
-	if (channelMode === "preserve") {
-		return audioBuffer.numberOfChannels;
-	}
-
-	return 1;
+	return audioMixPlanTrackOutputChannelCount({
+		inputChannelCount: audioBuffer.numberOfChannels,
+		resolvedChannelMode: channelMode,
+	});
 }
 
 export function createChannelCompensatedAudioBuffer({

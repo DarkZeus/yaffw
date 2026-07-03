@@ -1,14 +1,15 @@
-import { audioTrackVolumePercentToGain } from "@/editor-core/audio-mix";
+import {
+	audioMixPlanTrackOutputChannelCount,
+	createAudioMixPlan,
+	type AudioMixPlanTrack,
+} from "@/editor-core/audio-mix-plan";
 import type {
 	AudioMix,
 	AudioTrackChannelMode,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
 
-import {
-	outputChannelCountForMode,
-	resolveChannelTransform,
-} from "./browser-audio-mix";
+import { resolveChannelTransform } from "./browser-audio-mix";
 import type { ResolvedChannelTransform } from "./browser-audio-mix.types";
 import type {
 	PreviewAudioResource,
@@ -229,9 +230,12 @@ export function previewTrackVolumeGainForAudioTrackResource({
 	audioMix: AudioMix;
 	resource: PreviewAudioResource;
 }) {
-	const decision = audioMix.tracks[resource.trackId];
+	const plan = createAudioMixPlan({
+		audioMix,
+		trackIds: [resource.trackId],
+	});
 
-	return audioTrackVolumePercentToGain(decision?.volumePercent ?? 100);
+	return plan.tracksById[resource.trackId]?.trackVolumeGain ?? 1;
 }
 
 export function previewTrackMonitorGainForAudioTrackResource({
@@ -243,17 +247,16 @@ export function previewTrackMonitorGainForAudioTrackResource({
 	soloedAudioTrackId?: string | null;
 	resource: PreviewAudioResource;
 }) {
-	const decision = audioMix.tracks[resource.trackId];
+	const plan = createAudioMixPlan({
+		audioMix,
+		trackIds: [resource.trackId],
+	});
+	const trackPlan = plan.tracksById[resource.trackId];
 
-	if (soloedAudioTrackId && resource.trackId !== soloedAudioTrackId) {
-		return 0;
-	}
-
-	if (!soloedAudioTrackId && decision?.include === false) {
-		return 0;
-	}
-
-	return 1;
+	return previewTrackMonitorGainForAudioMixPlanTrack({
+		soloedAudioTrackId,
+		trackPlan,
+	});
 }
 
 export function previewOutputGainForAudioMonitoring({
@@ -268,6 +271,24 @@ export function previewOutputGainForAudioMonitoring({
 	}
 
 	return clampPreviewVolume(volume);
+}
+
+function previewTrackMonitorGainForAudioMixPlanTrack({
+	soloedAudioTrackId,
+	trackPlan,
+}: {
+	soloedAudioTrackId?: string | null;
+	trackPlan: AudioMixPlanTrack | undefined;
+}) {
+	if (soloedAudioTrackId && trackPlan?.trackId !== soloedAudioTrackId) {
+		return 0;
+	}
+
+	if (!soloedAudioTrackId && trackPlan?.include === false) {
+		return 0;
+	}
+
+	return 1;
 }
 
 export function applyPreviewAudioEngineMix({
@@ -289,24 +310,27 @@ export function applyPreviewAudioEngineMix({
 		previewOutputGainForAudioMonitoring({ muted, volume }),
 	);
 
+	const mixPlan = createAudioMixPlan({
+		audioMix,
+		trackIds: resources.map((resource) => resource.trackId),
+	});
+
 	resources.forEach((resource, resourceIndex) => {
+		const trackPlan = mixPlan.tracksById[resource.trackId];
+
 		previewAudioEngine.setTrackChannelMode(
 			resourceIndex,
-			audioMix.tracks[resource.trackId]?.channelMode ?? "preserve",
+			trackPlan?.channelMode ?? "preserve",
 		);
 		previewAudioEngine.setTrackVolumeGain(
 			resourceIndex,
-			previewTrackVolumeGainForAudioTrackResource({
-				audioMix,
-				resource,
-			}),
+			trackPlan?.trackVolumeGain ?? 1,
 		);
 		previewAudioEngine.setTrackMonitorGain(
 			resourceIndex,
-			previewTrackMonitorGainForAudioTrackResource({
-				audioMix,
+			previewTrackMonitorGainForAudioMixPlanTrack({
 				soloedAudioTrackId,
-				resource,
+				trackPlan,
 			}),
 		);
 	});
@@ -792,10 +816,10 @@ function createPreviewAudioTrackChannelRouting({
 		}
 
 		const merger = audioContext.createChannelMerger(
-			Math.max(
-				2,
-				outputChannelCountForMode(resource.buffer, resolvedChannelMode),
-			),
+			audioMixPlanTrackOutputChannelCount({
+				inputChannelCount: resource.buffer.numberOfChannels,
+				resolvedChannelMode,
+			}),
 		);
 		createdNodes.push(merger);
 		splitter.connect(merger, sourceChannelIndex, 0);
@@ -875,10 +899,10 @@ function createPreviewAudioMeterPlan({
 		audioBuffer,
 		channelMode,
 	});
-	const transformedOutputChannels = outputChannelCountForMode(
-		audioBuffer,
-		resolvedMode,
-	);
+	const transformedOutputChannels = audioMixPlanTrackOutputChannelCount({
+		inputChannelCount: audioBuffer.numberOfChannels,
+		resolvedChannelMode: resolvedMode,
+	});
 	const meterOutputChannels = outputChannelCountForPreviewAudioMeterMode({
 		outputChannelCount,
 		resolvedMode,

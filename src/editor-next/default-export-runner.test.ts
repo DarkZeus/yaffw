@@ -281,6 +281,21 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 	});
 
+	it("keeps an all-excluded Audio mix as a valid video-only export", async () => {
+		const result = await browserDefaultExportRunner.run(
+			createExportRequest({
+				audioMix: excludedAudioMix,
+			}),
+		);
+
+		await expect(result.blob.arrayBuffer()).resolves.toHaveProperty(
+			"byteLength",
+			3,
+		);
+		expect(browserAudioMixMock.renderBrowserAudioMix).not.toHaveBeenCalled();
+		expect(mediabunnyMock.inputs).toHaveLength(1);
+	});
+
 	it("cancels and closes mixed-audio mux resources after mux failure", async () => {
 		const failure = new Error("Packet mux failed.");
 		const videoTrack = createVideoTrack();
@@ -458,6 +473,19 @@ const includedAudioMix = {
 		"audio-1": {
 			channelMode: "preserve",
 			include: true,
+			trackId: "audio-1",
+			volumePercent: 100,
+		},
+	},
+} as const;
+
+const excludedAudioMix = {
+	finalPeakGuardDb: -1,
+	outputChannels: 2,
+	tracks: {
+		"audio-1": {
+			channelMode: "preserve",
+			include: false,
 			trackId: "audio-1",
 			volumePercent: 100,
 		},
