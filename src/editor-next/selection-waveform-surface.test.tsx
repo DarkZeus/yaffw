@@ -3,10 +3,8 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-	WaveformSurface,
-	createWavesurferPeaksFromSamples,
-} from "./selection-waveform-surface";
+import { createWavesurferPeaksFromSamples } from "./selection-waveform-surface.peaks";
+import { WaveformSurface } from "./selection-waveform-surface";
 
 const mockState = vi.hoisted(() => ({
 	regionsPlugins: [] as Array<{

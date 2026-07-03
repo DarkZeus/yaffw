@@ -13,7 +13,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AppSidebar, getAppSidebarItems } from "./components/app-sidebar";
+import { AppSidebar } from "./components/app-sidebar";
+import { getAppSidebarItems } from "./components/app-sidebar-items";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { routeTree } from "./routeTree.gen";
 

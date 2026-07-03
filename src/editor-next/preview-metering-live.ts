@@ -1,6 +1,6 @@
 import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
-import type { PreviewLevelMeterChannel } from "./preview-level-meter";
-import { previewPeakMeterVisualRange } from "./preview-level-meter";
+import { previewPeakMeterVisualRange } from "./preview-level-meter.constants";
+import type { PreviewLevelMeterChannel } from "./preview-level-meter.types";
 
 const PREVIEW_METERING_CLIP_HOLD_MS = 750;
 const COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY = "__combined-preview-output__";

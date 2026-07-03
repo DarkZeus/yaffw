@@ -3,10 +3,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-	WaveformLane,
-	createWaveformLaneIdentityViewModel,
-} from "./selection-waveform-lane";
+import { createWaveformLaneIdentityViewModel } from "./selection-waveform-lane.identity";
+import { WaveformLane } from "./selection-waveform-lane";
 
 afterEach(() => {
 	cleanup();

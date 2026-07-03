@@ -3,12 +3,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { PreviewLevelMeter } from "./preview-level-meter";
 import {
-	PreviewLevelMeter,
 	previewPeakMeterClipDb,
 	previewPeakMeterVisualRange,
 	previewPeakMeterZones,
-} from "./preview-level-meter";
+} from "./preview-level-meter.constants";
 
 afterEach(() => {
 	cleanup();

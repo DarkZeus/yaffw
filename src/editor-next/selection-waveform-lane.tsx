@@ -9,8 +9,8 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { createWaveformLaneIdentityViewModel } from "./selection-waveform-lane.identity";
 import type {
-	WaveformLaneIdentityInput,
 	WaveformLaneIdentityViewModel,
 	WaveformLaneProps,
 } from "./selection-waveform-lane.types";
@@ -220,61 +220,4 @@ function LaneStatus({
 			Loading
 		</Badge>
 	);
-}
-
-export function createWaveformLaneIdentityViewModel({
-	status,
-	track,
-	trackIndex,
-}: WaveformLaneIdentityInput): WaveformLaneIdentityViewModel {
-	const title = track.label?.trim() || `Unnamed audio lane ${trackIndex + 1}`;
-
-	return {
-		metadata: [
-			formatTrackCodec(track.codec),
-			formatTrackChannels(track.channels),
-		],
-		status: formatWaveformLaneStatus(status),
-		title,
-	};
-}
-
-function formatTrackCodec(codec: string | undefined) {
-	const normalizedCodec = codec?.trim();
-
-	if (!normalizedCodec) {
-		return "Codec unknown";
-	}
-
-	return normalizedCodec.toUpperCase();
-}
-
-function formatTrackChannels(channels: number | undefined) {
-	if (!channels || channels <= 0) {
-		return "Channels unknown";
-	}
-
-	return channels === 1 ? "1 channel" : `${channels} channels`;
-}
-
-function formatWaveformLaneStatus(
-	status: WaveformLaneState["status"],
-): WaveformLaneIdentityViewModel["status"] {
-	switch (status) {
-		case "loading":
-			return {
-				label: "Loading waveform",
-				tone: "pending",
-			};
-		case "ready":
-			return {
-				label: "Waveform ready",
-				tone: "ready",
-			};
-		case "unavailable":
-			return {
-				label: "Waveform generation failed",
-				tone: "unavailable",
-			};
-	}
 }

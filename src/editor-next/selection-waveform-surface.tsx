@@ -12,6 +12,7 @@ import type {
 	WaveformRendererStatus,
 	WaveformSurfaceProps,
 } from "./selection-waveform-surface.types";
+import { createWavesurferPeaksFromSamples } from "./selection-waveform-surface.peaks";
 
 const WAVEFORM_HEIGHT_PX = 48;
 const WAVEFORM_COLOR_FALLBACK = "#57bab6";
@@ -71,14 +72,6 @@ export function WaveformSurface({
 			) : null}
 		</div>
 	);
-}
-
-export function createWavesurferPeaksFromSamples(samples: WaveformSamples) {
-	if (samples.length === 0) {
-		return new Float32Array([0]);
-	}
-
-	return Float32Array.from(samples, (sample) => clampAmplitude(sample));
 }
 
 function useWavesurferWaveform({
@@ -576,18 +569,6 @@ function cancelWaveformFrame(frameId: number) {
 	}
 
 	window.clearTimeout(frameId);
-}
-
-function clampAmplitude(sample: number) {
-	if (!Number.isFinite(sample) || sample <= 0) {
-		return 0;
-	}
-
-	if (sample >= 1) {
-		return 1;
-	}
-
-	return sample;
 }
 
 function cssTokenColor(

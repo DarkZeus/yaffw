@@ -12,6 +12,12 @@ const download = new Hono()
 // In-memory progress tracking
 const progressTracking = new Map()
 
+const speedUnitMultipliers = new Map([
+  ['MiB/s', 1],
+  ['KiB/s', 1 / 1024],
+  ['B/s', 1 / (1024 * 1024)],
+])
+
 // Helper function to generate progress ID
 const generateProgressId = () => {
   return 'progress_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
@@ -112,12 +118,12 @@ const downloadWithYtDlp = (url, outputPath, progressCallback = null) => {
               let speed = null
               if (speedStr && speedStr !== 'N/A' && speedStr !== 'Unknown') {
                 // Convert speed string to MB/s number
-                if (speedStr.includes('MiB/s')) {
-                  speed = parseFloat(speedStr.replace('MiB/s', '').trim())
-                } else if (speedStr.includes('KiB/s')) {
-                  speed = parseFloat(speedStr.replace('KiB/s', '').trim()) / 1024
-                } else if (speedStr.includes('B/s')) {
-                  speed = parseFloat(speedStr.replace('B/s', '').trim()) / (1024 * 1024)
+                const speedMatch = speedStr.trim().match(/^([\d.]+)\s*(MiB\/s|KiB\/s|B\/s)$/)
+                const speedMultiplier = speedMatch
+                  ? speedUnitMultipliers.get(speedMatch[2])
+                  : undefined
+                if (speedMatch && speedMultiplier !== undefined) {
+                  speed = parseFloat(speedMatch[1]) * speedMultiplier
                 }
               }
               
@@ -556,4 +562,4 @@ download.post('/bulk', async (c) => {
   }
 })
 
-export default download 
+export default download

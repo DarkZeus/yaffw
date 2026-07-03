@@ -1,74 +1,27 @@
 import type { CSSProperties } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+	previewPeakMeterVisualRange,
+	previewPeakMeterZones,
+} from "./preview-level-meter.constants";
+import type {
+	PreviewLevelMeterChannel,
+	PreviewLevelMeterOrientation,
+	PreviewLevelMeterProps,
+	PreviewLevelMeterState,
+	PreviewLevelMeterVisualRange,
+	PreviewLevelMeterZone,
+} from "./preview-level-meter.types";
 
-export type PreviewLevelMeterState = "preparing" | "ready" | "unavailable";
-
-export type PreviewLevelMeterOrientation = "vertical" | "horizontal";
-
-export type PreviewLevelMeterChannel = {
-	clipHeld: boolean;
-	label?: string;
-	peakDb: number;
-};
-
-export type PreviewLevelMeterVisualRange = {
-	ceilingDb: number;
-	floorDb: number;
-};
-
-export type PreviewLevelMeterZone = {
-	className: string;
-	fromDb: number;
-	id: string;
-	label: string;
-	toDb: number;
-};
-
-export type PreviewLevelMeterProps = {
-	channelWidthRem?: number;
-	channels: PreviewLevelMeterChannel[];
-	label: string;
-	message?: string;
-	orientation?: PreviewLevelMeterOrientation;
-	showChannelLabels?: boolean;
-	showTickLabels?: boolean;
-	state: PreviewLevelMeterState;
-	ticks?: number[];
-	visualRange?: PreviewLevelMeterVisualRange;
-	zones?: PreviewLevelMeterZone[];
-};
-
-export const previewPeakMeterVisualRange = {
-	ceilingDb: 0,
-	floorDb: -72,
-} satisfies PreviewLevelMeterVisualRange;
-
-export const previewPeakMeterClipDb = 0;
-
-export const previewPeakMeterZones = [
-	{
-		className: "bg-emerald-500/80",
-		fromDb: -72,
-		id: "green",
-		label: "Green",
-		toDb: -20,
-	},
-	{
-		className: "bg-yellow-400/85",
-		fromDb: -20,
-		id: "yellow",
-		label: "Yellow",
-		toDb: -9,
-	},
-	{
-		className: "bg-red-500/85",
-		fromDb: -9,
-		id: "red",
-		label: "Red",
-		toDb: 0,
-	},
-] satisfies PreviewLevelMeterZone[];
+export type {
+	PreviewLevelMeterChannel,
+	PreviewLevelMeterOrientation,
+	PreviewLevelMeterProps,
+	PreviewLevelMeterState,
+	PreviewLevelMeterVisualRange,
+	PreviewLevelMeterZone,
+} from "./preview-level-meter.types";
 
 const defaultPreviewLevelMeterTicks = [0, -9, -20, -40, -72];
 
