@@ -740,6 +740,7 @@ function createPreviewAudioEngineSpy({
 		getCurrentTime: vi.fn(() => currentTime),
 		pause: vi.fn(),
 		play: vi.fn(),
+		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 			currentTime = nextCurrentTimeSeconds;
@@ -749,6 +750,8 @@ function createPreviewAudioEngineSpy({
 				currentTime = nextCurrentTimeSeconds;
 			}
 		}),
+		setTrackChannelMode: vi.fn(),
+		setTrackGain: vi.fn(),
 	};
 }
 

@@ -242,7 +242,9 @@ export function remuxCandidatesForAudioPreviewCodec(
 export function shouldPrepareTransformedAudioPreviewSource(
 	channelMode: AudioTrackChannelMode,
 ): channelMode is Exclude<AudioTrackChannelMode, "preserve"> {
-	return channelMode !== "preserve";
+	void channelMode;
+
+	return false;
 }
 
 async function prepareAudioPreviewTrackSource({

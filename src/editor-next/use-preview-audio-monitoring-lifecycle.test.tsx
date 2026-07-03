@@ -58,6 +58,12 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(createdPreviewAudioEngines[0]?.setPlaybackRate).toHaveBeenCalledWith(
 			1.5,
 		);
+		expect(createdPreviewAudioEngines[0]?.setOutputGain).toHaveBeenCalledWith(
+			1,
+		);
+		expect(
+			createdPreviewAudioEngines[0]?.setTrackChannelMode,
+		).toHaveBeenCalledWith(0, "preserve");
 	});
 
 	it("destroys the previous engine when prepared sources change", async () => {
@@ -193,13 +199,15 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(screen.queryByLabelText("audio monitoring ready")).toBeNull();
 	});
 
-	it("applies preview volume, audio mix volume, include decisions, mute, and preview-only solo inside the lifecycle", async () => {
+	it("applies audio mix decisions, channel handling, and preview-only monitoring inside the lifecycle", async () => {
 		const audioMix = createAudioMix({
 			"audio-1": {
+				channelMode: "use-left-as-mono",
 				include: true,
 				volumePercent: 50,
 			},
 			"audio-2": {
+				channelMode: "preserve",
 				include: false,
 				volumePercent: 25,
 			},
@@ -221,12 +229,18 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		await waitFor(() => {
 			expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
 				0,
-				0.2,
+				0.25,
 			);
 		});
 		expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
 			1,
 			0,
+		);
+		expect(
+			createdPreviewAudioEngines[0]?.setTrackChannelMode,
+		).toHaveBeenCalledWith(0, "use-left-as-mono");
+		expect(createdPreviewAudioEngines[0]?.setOutputGain).toHaveBeenCalledWith(
+			0.8,
 		);
 
 		rerender(
@@ -239,9 +253,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBe(0);
-			expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBe(0);
+			expect(lastOutputGain(createdPreviewAudioEngines[0])).toBe(0);
 		});
+		expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBeCloseTo(0.25);
+		expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBe(0);
 
 		rerender(
 			<PreviewAudioMonitoringProbe
@@ -253,9 +268,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
+			expect(lastOutputGain(createdPreviewAudioEngines[0])).toBe(0.8);
 			expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBe(0);
 			expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBeCloseTo(
-				0.05,
+				0.0625,
 			);
 		});
 		expect(audioMix.tracks["audio-2"]?.include).toBe(false);
@@ -367,7 +383,14 @@ function failedAudioSourcesState(): BrowserAudioPreviewSourcesState {
 }
 
 function createAudioMix(
-	decisions: Record<string, { include: boolean; volumePercent: number }>,
+	decisions: Record<
+		string,
+		{
+			channelMode?: AudioMix["tracks"][string]["channelMode"];
+			include: boolean;
+			volumePercent: number;
+		}
+	>,
 ) {
 	const audioMix = createDefaultAudioMix(readyAssetWithAudio);
 
@@ -379,6 +402,7 @@ function createAudioMix(
 		}
 
 		audioDecision.include = decision.include;
+		audioDecision.channelMode = decision.channelMode ?? audioDecision.channelMode;
 		audioDecision.volumePercent = decision.volumePercent;
 	}
 
@@ -420,6 +444,16 @@ function lastTrackGain(
 	return lastCall[1];
 }
 
+function lastOutputGain(previewAudioEngine: PreviewAudioEngineSpy | undefined) {
+	const lastCall = previewAudioEngine?.setOutputGain.mock.calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error("No output gain call found.");
+	}
+
+	return lastCall[0];
+}
+
 type PreviewAudioEngineSpy = ReturnType<typeof createPreviewAudioEngineSpy>;
 
 function createPreviewAudioEngineSpy() {
@@ -428,8 +462,10 @@ function createPreviewAudioEngineSpy() {
 		getCurrentTime: vi.fn(() => 0),
 		pause: vi.fn(),
 		play: vi.fn(),
+		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setTime: vi.fn(),
+		setTrackChannelMode: vi.fn(),
 		setTrackGain: vi.fn(),
 	};
 }

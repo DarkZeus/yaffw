@@ -13,10 +13,10 @@ import {
 import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 
 describe("BrowserAudioPreviewSourceCache", () => {
-	it("plans only missing track variants and reuses cached preserve sources", () => {
+	it("plans only missing source tracks and reuses cached sources across channel decisions", () => {
 		const revokeSources = vi.fn();
 		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const preservePlanKey = createBrowserAudioPreviewSourcePlanKey({
+		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
@@ -25,7 +25,7 @@ describe("BrowserAudioPreviewSourceCache", () => {
 
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: preservePlanKey,
+			planKey: sourcePlanKey,
 		});
 
 		expect(Array.from(preservePlan.missingTrackIds)).toEqual([
@@ -42,16 +42,16 @@ describe("BrowserAudioPreviewSourceCache", () => {
 		cache.storePreparedSources({
 			plan: preservePlan,
 			sources: [
-				createPreviewSource("audio-1", "preserve"),
-				createPreviewSource("audio-2", "preserve"),
+				createPreviewSource("audio-1"),
+				createPreviewSource("audio-2"),
 			],
 		});
 
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: preservePlanKey })
+				.plan({ asset: readyAsset, planKey: sourcePlanKey })
 				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:preserve", "blob:audio-2:preserve"]);
+		).toEqual(["blob:audio-1:source", "blob:audio-2:source"]);
 
 		const fixedVoicePlan = cache.plan({
 			asset: readyAsset,
@@ -61,42 +61,38 @@ describe("BrowserAudioPreviewSourceCache", () => {
 			}),
 		});
 
-		expect(Array.from(fixedVoicePlan.missingTrackIds)).toEqual(["audio-1"]);
+		expect(Array.from(fixedVoicePlan.missingTrackIds)).toEqual([]);
 		expect(fixedVoicePlan.cachedSources.map((source) => source.url)).toEqual([
-			"blob:audio-2:preserve",
+			"blob:audio-1:source",
+			"blob:audio-2:source",
 		]);
-
-		cache.storePreparedSources({
-			plan: fixedVoicePlan,
-			sources: [createPreviewSource("audio-1", "use-left-as-mono")],
-		});
 
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: preservePlanKey })
+				.plan({ asset: readyAsset, planKey: sourcePlanKey })
 				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:preserve", "blob:audio-2:preserve"]);
+		).toEqual(["blob:audio-1:source", "blob:audio-2:source"]);
 		expect(revokeSources).not.toHaveBeenCalled();
 	});
 
 	it("disposes cached preview resources when the media asset source changes", () => {
 		const revokeSources = vi.fn();
 		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const preservePlanKey = createBrowserAudioPreviewSourcePlanKey({
+		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: preservePlanKey,
+			planKey: sourcePlanKey,
 		});
 
 		cache.resetForMediaAssetSource({ asset: readyAsset, source });
 		cache.storePreparedSources({
 			plan: preservePlan,
 			sources: [
-				createPreviewSource("audio-1", "preserve"),
-				createPreviewSource("audio-2", "preserve"),
+				createPreviewSource("audio-1"),
+				createPreviewSource("audio-2"),
 			],
 		});
 
@@ -110,41 +106,41 @@ describe("BrowserAudioPreviewSourceCache", () => {
 
 		expect(revokeSources).toHaveBeenCalledWith({
 			sources: [
-				expect.objectContaining({ url: "blob:audio-1:preserve" }),
-				expect.objectContaining({ url: "blob:audio-2:preserve" }),
+				expect.objectContaining({ url: "blob:audio-1:source" }),
+				expect.objectContaining({ url: "blob:audio-2:source" }),
 			],
 		});
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: preservePlanKey })
+				.plan({ asset: readyAsset, planKey: sourcePlanKey })
 				.cachedSources.map((source) => source.url),
 		).toEqual([]);
 	});
 
-	it("revokes only the superseded source when replacing a prepared variant", () => {
+	it("revokes only the superseded source when replacing a prepared source", () => {
 		const revokeSources = vi.fn();
 		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const preservePlanKey = createBrowserAudioPreviewSourcePlanKey({
+		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: preservePlanKey,
+			planKey: sourcePlanKey,
 		});
 
 		cache.resetForMediaAssetSource({ asset: readyAsset, source });
 		cache.storePreparedSources({
 			plan: preservePlan,
 			sources: [
-				createPreviewSource("audio-1", "preserve"),
-				createPreviewSource("audio-2", "preserve"),
+				createPreviewSource("audio-1"),
+				createPreviewSource("audio-2"),
 			],
 		});
 
 		const replacement = {
-			...createPreviewSource("audio-1", "preserve"),
-			url: "blob:audio-1:preserve:replacement",
+			...createPreviewSource("audio-1"),
+			url: "blob:audio-1:source:replacement",
 		};
 
 		cache.storePreparedSources({
@@ -153,20 +149,17 @@ describe("BrowserAudioPreviewSourceCache", () => {
 		});
 
 		expect(revokeSources).toHaveBeenCalledWith({
-			sources: [expect.objectContaining({ url: "blob:audio-1:preserve" })],
+			sources: [expect.objectContaining({ url: "blob:audio-1:source" })],
 		});
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: preservePlanKey })
+				.plan({ asset: readyAsset, planKey: sourcePlanKey })
 				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:preserve:replacement", "blob:audio-2:preserve"]);
+		).toEqual(["blob:audio-1:source:replacement", "blob:audio-2:source"]);
 	});
 });
 
-function createPreviewSource(
-	trackId: string,
-	channelMode: AudioTrackChannelMode,
-): BrowserAudioPreviewSource {
+function createPreviewSource(trackId: string): BrowserAudioPreviewSource {
 	return {
 		blob: new Blob(["audio"], { type: "audio/mp4" }),
 		byteLength: 5,
@@ -180,7 +173,7 @@ function createPreviewSource(
 		},
 		trackId,
 		trackIndex: trackId === "audio-1" ? 0 : 1,
-		url: `blob:${trackId}:${channelMode}`,
+		url: `blob:${trackId}:source`,
 	};
 }
 

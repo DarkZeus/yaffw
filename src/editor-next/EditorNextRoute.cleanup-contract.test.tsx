@@ -28,8 +28,10 @@ const adapterMockState = vi.hoisted(() => ({
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
+		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setTime: ReturnType<typeof vi.fn>;
+		setTrackChannelMode: ReturnType<typeof vi.fn>;
 		setTrackGain: ReturnType<typeof vi.fn>;
 	}>,
 	wavesurferCreate: vi.fn(),
@@ -120,8 +122,10 @@ beforeEach(() => {
 			getCurrentTime: vi.fn(() => 0),
 			pause: vi.fn(),
 			play: vi.fn(),
+			setOutputGain: vi.fn(),
 			setPlaybackRate: vi.fn(),
 			setTime: vi.fn(),
+			setTrackChannelMode: vi.fn(),
 			setTrackGain: vi.fn(),
 		};
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);

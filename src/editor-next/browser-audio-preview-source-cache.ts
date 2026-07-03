@@ -1,8 +1,5 @@
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
+import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
 
 import type {
 	BrowserAudioPreviewSourceCacheOptions,
@@ -18,20 +15,12 @@ import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.
 
 export function createBrowserAudioPreviewSourcePlanKey({
 	asset,
-	audioMix,
 }: {
 	asset: ReadyMediaAsset;
 	audioMix: AudioMix;
 }): BrowserAudioPreviewSourcePlanKey {
 	return JSON.stringify({
-		finalPeakGuardDb: audioMix.finalPeakGuardDb,
-		tracks: asset.tracks.audio.map(
-			(track) =>
-				[
-					track.id,
-					audioMix.tracks[track.id]?.channelMode ?? "preserve",
-				] satisfies [string, AudioTrackChannelMode],
-		),
+		tracks: asset.tracks.audio.map((track) => track.id),
 	} satisfies BrowserAudioPreviewSourcePlanData);
 }
 
@@ -145,18 +134,14 @@ function createAudioPreviewSourceRequests({
 	planKey: BrowserAudioPreviewSourcePlanKey;
 }): BrowserAudioPreviewSourceRequest[] {
 	const planData = parseBrowserAudioPreviewSourcePlanKey(planKey);
-	const channelModes = new Map(planData.tracks);
+	const plannedTrackIds = new Set(planData.tracks);
 
-	return asset.tracks.audio.map((track) => {
-		const channelMode = channelModes.get(track.id) ?? "preserve";
-		const peakGuardKey =
-			channelMode === "preserve" ? "source" : String(planData.finalPeakGuardDb);
-
-		return {
-			cacheKey: `${track.id}:${channelMode}:${peakGuardKey}`,
+	return asset.tracks.audio
+		.filter((track) => plannedTrackIds.has(track.id))
+		.map((track) => ({
+			cacheKey: `${track.id}:source`,
 			trackId: track.id,
-		};
-	});
+		}));
 }
 
 function collectCachedAudioPreviewSources({
@@ -180,24 +165,9 @@ function createAudioPreviewMixSnapshot({
 	asset: ReadyMediaAsset;
 	planKey: BrowserAudioPreviewSourcePlanKey;
 }): AudioMix {
-	const planData = parseBrowserAudioPreviewSourcePlanKey(planKey);
-	const channelModes = new Map(planData.tracks);
+	parseBrowserAudioPreviewSourcePlanKey(planKey);
 
-	return {
-		finalPeakGuardDb: planData.finalPeakGuardDb,
-		outputChannels: 2,
-		tracks: Object.fromEntries(
-			asset.tracks.audio.map((track) => [
-				track.id,
-				{
-					channelMode: channelModes.get(track.id) ?? "preserve",
-					include: true,
-					trackId: track.id,
-					volumePercent: 100,
-				},
-			]),
-		),
-	};
+	return createDefaultAudioMix(asset);
 }
 
 function parseBrowserAudioPreviewSourcePlanKey(

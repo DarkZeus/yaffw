@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
-	applyPreviewAudioEngineGains,
+	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine as createDefaultPreviewAudioEngine,
 	setPreviewAudioEnginePlaybackRate,
 	type PreviewAudioEngine,
@@ -89,7 +89,7 @@ export function usePreviewAudioMonitoringLifecycle({
 					previewAudioEngine,
 					getPlaybackRate(),
 				);
-				applyPreviewAudioEngineGains({
+				applyPreviewAudioEngineMix({
 					...audioControlsRef.current,
 					previewAudioEngine,
 					sources: audioPreviewSources.sources,
@@ -126,7 +126,7 @@ export function usePreviewAudioMonitoringLifecycle({
 			return;
 		}
 
-		applyPreviewAudioEngineGains({
+		applyPreviewAudioEngineMix({
 			audioMix,
 			muted,
 			previewAudioEngine,

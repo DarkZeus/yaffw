@@ -34,13 +34,13 @@ describe("remuxCandidatesForAudioPreviewCodec", () => {
 });
 
 describe("shouldPrepareTransformedAudioPreviewSource", () => {
-	it("uses decoded preview sources for explicit channel fixes, including auto-fix", () => {
+	it("keeps preview resources source-derived for every channel mode", () => {
 		expect(shouldPrepareTransformedAudioPreviewSource("preserve")).toBe(false);
 		expect(
 			shouldPrepareTransformedAudioPreviewSource("auto-one-sided-stereo"),
-		).toBe(true);
+		).toBe(false);
 		expect(shouldPrepareTransformedAudioPreviewSource("use-left-as-mono")).toBe(
-			true,
+			false,
 		);
 	});
 });

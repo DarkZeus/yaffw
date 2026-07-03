@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe("useBrowserAudioPreviewSources", () => {
-	it("prepares only missing track variants and reuses the recorded source when switching back to preserve", async () => {
+	it("prepares source tracks once and reuses them across channel decisions", async () => {
 		const prepareRuns: Array<{
 			deferred: Deferred<BrowserAudioPreviewSourcesResult>;
 			request: PrepareRequest;
@@ -88,7 +88,7 @@ describe("useBrowserAudioPreviewSources", () => {
 
 		await waitFor(() => {
 			expect(readState()).toBe(
-				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
 			);
 		});
 
@@ -100,32 +100,19 @@ describe("useBrowserAudioPreviewSources", () => {
 
 		await waitFor(() => {
 			expect(readState()).toBe(
-				"loading|preparing:audio-1|sources:blob:audio-2:preserve",
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
 			);
 		});
-		expect(prepareRuns).toHaveLength(2);
-		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
-			"audio-1",
-		]);
-
-		prepareRuns[1].deferred.resolve(
-			createPreparedSourcesResult(prepareRuns[1].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|sources:blob:audio-1:use-left-as-mono,blob:audio-2:preserve",
-			);
-		});
+		expect(prepareRuns).toHaveLength(1);
 
 		rerender(<AudioPreviewSourcesProbe audioMix={createAudioMix()} />);
 
 		await waitFor(() => {
 			expect(readState()).toBe(
-				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
 			);
 		});
-		expect(prepareRuns).toHaveLength(2);
+		expect(prepareRuns).toHaveLength(1);
 		expect(revokeBrowserAudioPreviewSourcesMock).not.toHaveBeenCalled();
 	});
 
@@ -146,7 +133,7 @@ describe("useBrowserAudioPreviewSources", () => {
 
 		await waitFor(() => {
 			expect(readState()).toBe(
-				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
 			);
 		});
 
@@ -154,8 +141,8 @@ describe("useBrowserAudioPreviewSources", () => {
 
 		expect(revokeBrowserAudioPreviewSourcesMock).toHaveBeenCalledWith({
 			sources: [
-				expect.objectContaining({ url: "blob:audio-1:preserve" }),
-				expect.objectContaining({ url: "blob:audio-2:preserve" }),
+				expect.objectContaining({ url: "blob:audio-1:source" }),
+				expect.objectContaining({ url: "blob:audio-2:source" }),
 			],
 		});
 	});
@@ -217,8 +204,8 @@ describe("useBrowserAudioPreviewSources", () => {
 		await waitFor(() => {
 			expect(revokeBrowserAudioPreviewSourcesMock).toHaveBeenCalledWith({
 				sources: [
-					expect.objectContaining({ url: "blob:audio-1:preserve" }),
-					expect.objectContaining({ url: "blob:audio-2:preserve" }),
+					expect.objectContaining({ url: "blob:audio-1:source" }),
+					expect.objectContaining({ url: "blob:audio-2:source" }),
 				],
 			});
 		});
@@ -230,7 +217,7 @@ describe("useBrowserAudioPreviewSources", () => {
 
 		await waitFor(() => {
 			expect(readState()).toBe(
-				"ready|sources:blob:audio-1:preserve,blob:audio-2:preserve",
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
 			);
 		});
 	});
@@ -293,8 +280,6 @@ function createPreparedSourcesResult(
 			.filter((track) => trackIds.has(track.id))
 			.map((track, trackIndex) =>
 				createPreviewSource({
-					channelMode:
-						request.audioMix.tracks[track.id]?.channelMode ?? "preserve",
 					trackId: track.id,
 					trackIndex,
 				}),
@@ -303,11 +288,9 @@ function createPreparedSourcesResult(
 }
 
 function createPreviewSource({
-	channelMode,
 	trackId,
 	trackIndex,
 }: {
-	channelMode: AudioTrackChannelMode;
 	trackId: string;
 	trackIndex: number;
 }): BrowserAudioPreviewSource {
@@ -324,7 +307,7 @@ function createPreviewSource({
 		},
 		trackId,
 		trackIndex,
-		url: `blob:${trackId}:${channelMode}`,
+		url: `blob:${trackId}:source`,
 	};
 }
 

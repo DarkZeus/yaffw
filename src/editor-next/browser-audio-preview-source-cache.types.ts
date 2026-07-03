@@ -1,8 +1,4 @@
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
 
 import type { createBrowserAudioPreviewSourceCache } from "./browser-audio-preview-source-cache";
 import type { revokeBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
@@ -23,8 +19,7 @@ export type BrowserAudioPreviewSourcePlan = {
 export type BrowserAudioPreviewSourcePlanKey = string;
 
 export type BrowserAudioPreviewSourcePlanData = {
-	finalPeakGuardDb: number;
-	tracks: Array<[string, AudioTrackChannelMode]>;
+	tracks: string[];
 };
 
 export type BrowserAudioPreviewSourceCacheOwner = {

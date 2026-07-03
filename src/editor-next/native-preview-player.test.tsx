@@ -35,9 +35,11 @@ const adapterMockState = vi.hoisted(() => ({
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
+		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
 		setTime: ReturnType<typeof vi.fn>;
+		setTrackChannelMode: ReturnType<typeof vi.fn>;
 		setTrackGain: ReturnType<typeof vi.fn>;
 	}>,
 }));
@@ -249,7 +251,9 @@ beforeEach(() => {
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
 			},
+			setOutputGain: vi.fn(),
 			setTime: vi.fn(),
+			setTrackChannelMode: vi.fn(),
 			setTrackGain: vi.fn(),
 		};
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);
@@ -574,6 +578,7 @@ describe("NativePreviewPlayer", () => {
 			expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
 			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 		});
+		expect(lastOutputGain(previewAudioEngine)).toBe(1);
 		expect(video.muted).toBe(true);
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:true:preserve:100|audio-2:true:preserve:100",
@@ -584,9 +589,10 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.5);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
+			expect(lastOutputGain(previewAudioEngine)).toBeCloseTo(0.5);
 		});
+		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
+		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 
 		fireEvent.change(screen.getByLabelText("Playback speed"), {
 			target: { value: "1.5" },
@@ -598,9 +604,10 @@ describe("NativePreviewPlayer", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 
 		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(0);
+			expect(lastOutputGain(previewAudioEngine)).toBe(0);
 		});
+		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
+		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 		expect(video.muted).toBe(true);
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:true:preserve:100|audio-2:true:preserve:100",
@@ -616,8 +623,9 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.125);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
+			expect(lastOutputGain(previewAudioEngine)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.25);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 		});
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:true:preserve:50|audio-2:true:preserve:100",
@@ -630,7 +638,7 @@ describe("NativePreviewPlayer", () => {
 
 		await waitFor(() => {
 			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 		});
 
 		fireEvent.click(
@@ -638,7 +646,7 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.125);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.25);
 			expect(lastTrackGain(previewAudioEngine, 1)).toBe(0);
 		});
 		expect(readAudioMixSnapshot()).toBe(
@@ -653,14 +661,12 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+			expect(previewAudioEngine.setTrackChannelMode).toHaveBeenCalledWith(
+				0,
+				"use-left-as-mono",
+			);
 		});
-		const channelModeRequest =
-			prepareBrowserAudioPreviewSourcesMock.mock.calls[1]?.[0];
-		expect(channelModeRequest?.audioMix.tracks["audio-1"]?.channelMode).toBe(
-			"use-left-as-mono",
-		);
-		expect(Array.from(channelModeRequest?.trackIds ?? [])).toEqual(["audio-1"]);
+		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("keeps sync fixture preview aligned after audio mix changes", async () => {
@@ -710,13 +716,14 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+			expect(
+				adapterMockState.previewAudioEngines[0]?.setTrackChannelMode,
+			).toHaveBeenCalledWith(0, "use-left-as-mono");
 		});
-		await waitFor(() => {
-			expect(adapterMockState.previewAudioEngines).toHaveLength(2);
-		});
+		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 
-		const remadePreviewAudioEngine = adapterMockState.previewAudioEngines[1];
+		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
 
 		const video = screen.getByLabelText(
 			"Preview for sync-flash-click.mp4",
@@ -728,9 +735,7 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		video.currentTime = 0;
-		remadePreviewAudioEngine.setCurrentTimeSeconds(
-			syncEvent.audioClickUs / 1_000_000,
-		);
+		previewAudioEngine.setCurrentTimeSeconds(syncEvent.audioClickUs / 1_000_000);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(syncEvent.visualFlashUs / 1_000_000);
@@ -1222,6 +1227,18 @@ function lastTrackGain(
 	}
 
 	return lastCall[1];
+}
+
+function lastOutputGain(
+	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
+) {
+	const lastCall = previewAudioEngine.setOutputGain.mock.calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error("No output gain call found.");
+	}
+
+	return lastCall[0];
 }
 
 function stubPreviewAnimationFrames() {

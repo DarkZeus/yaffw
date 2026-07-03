@@ -6,7 +6,8 @@ import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
 import {
 	createPreviewAudioEngine,
-	previewGainForAudioTrackSource,
+	previewOutputGainForAudioMonitoring,
+	previewTrackGainForAudioTrackSource,
 } from "./preview-audio-engine";
 
 describe("createPreviewAudioEngine", () => {
@@ -24,6 +25,7 @@ describe("createPreviewAudioEngine", () => {
 
 		engine.setTrackGain(0, 0.5);
 		engine.setTrackGain(1, 0.25);
+		engine.setOutputGain(0.6);
 		engine.setPlaybackRate(1.5);
 		engine.setTime(0.5);
 		await engine.play();
@@ -33,8 +35,9 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.createdSources[0]?.playbackRate.value).toBe(1.5);
 		expect(context.createdSources[0]?.start).toHaveBeenCalledWith(0, 0.5);
 		expect(context.createdSources[1]?.start).toHaveBeenCalledWith(0.5, 0);
-		expect(context.createdGains[0]?.gain.value).toBe(0.5);
-		expect(context.createdGains[1]?.gain.value).toBe(0.25);
+		expect(context.createdGains[0]?.gain.value).toBe(0.6);
+		expect(context.createdGains[1]?.gain.value).toBe(0.5);
+		expect(context.createdGains[2]?.gain.value).toBe(0.25);
 
 		context.currentTime = 2;
 		expect(engine.getCurrentTime()).toBe(3.5);
@@ -51,7 +54,51 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.close).toHaveBeenCalledTimes(1);
 	});
 
-	it("resolves preview gains from audio mix decisions and preview-only monitoring state", () => {
+	it("routes channel handling through the graph without decoding another preview resource", async () => {
+		const context = createAudioContextSpy();
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			sources: [createAudioPreviewSource("audio-1", 0)],
+		});
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+
+		engine.setTrackChannelMode(0, "use-left-as-mono");
+		await engine.play();
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+		expect(context.createdSplitters).toHaveLength(1);
+		expect(context.createdSources[0]?.connect).toHaveBeenCalledWith(
+			context.createdSplitters[0],
+		);
+		expect(context.createdSplitters[0]?.connect).toHaveBeenCalledWith(
+			context.createdGains[1],
+			0,
+			0,
+		);
+
+		engine.setTrackChannelMode(0, "duplicate-right-to-stereo");
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
+		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
+		expect(context.createdSplitters).toHaveLength(2);
+		expect(context.createdMergers).toHaveLength(1);
+		expect(context.createdSplitters[1]?.connect).toHaveBeenCalledWith(
+			context.createdMergers[0],
+			1,
+			0,
+		);
+		expect(context.createdSplitters[1]?.connect).toHaveBeenCalledWith(
+			context.createdMergers[0],
+			1,
+			1,
+		);
+		expect(context.createdMergers[0]?.connect).toHaveBeenCalledWith(
+			context.createdGains[1],
+		);
+	});
+
+	it("resolves track and output gains from audio mix decisions and preview-only monitoring state", () => {
 		const source = createAudioPreviewSource("audio-1", 1.25);
 		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
 		const audioDecision = audioMix.tracks["audio-1"];
@@ -63,43 +110,48 @@ describe("createPreviewAudioEngine", () => {
 		audioDecision.volumePercent = 50;
 
 		expect(
-			previewGainForAudioTrackSource({
+			previewTrackGainForAudioTrackSource({
 				audioMix,
-				muted: false,
 				soloedAudioTrackId: null,
 				source,
-				volume: 0.8,
 			}),
-		).toBeCloseTo(0.2);
-
-		audioDecision.include = false;
+		).toBeCloseTo(0.25);
 
 		expect(
-			previewGainForAudioTrackSource({
-				audioMix,
+			previewOutputGainForAudioMonitoring({
 				muted: false,
-				soloedAudioTrackId: null,
-				source,
+				volume: 0.8,
+			}),
+		).toBeCloseTo(0.8);
+		expect(
+			previewOutputGainForAudioMonitoring({
+				muted: true,
 				volume: 0.8,
 			}),
 		).toBe(0);
 
+		audioDecision.include = false;
+
 		expect(
-			previewGainForAudioTrackSource({
+			previewTrackGainForAudioTrackSource({
 				audioMix,
-				muted: false,
+				soloedAudioTrackId: null,
+				source,
+			}),
+		).toBe(0);
+
+		expect(
+			previewTrackGainForAudioTrackSource({
+				audioMix,
 				soloedAudioTrackId: "audio-1",
 				source,
-				volume: 0.8,
 			}),
-		).toBeCloseTo(0.2);
+		).toBeCloseTo(0.25);
 		expect(
-			previewGainForAudioTrackSource({
+			previewTrackGainForAudioTrackSource({
 				audioMix,
-				muted: false,
 				soloedAudioTrackId: "audio-1",
 				source: createAudioPreviewSource("audio-2", 1.25),
-				volume: 0.8,
 			}),
 		).toBe(0);
 	});
@@ -142,6 +194,18 @@ function createAudioContextSpy() {
 
 			return source;
 		}),
+		createChannelMerger: vi.fn(() => {
+			const merger = createAudioNodeSpy();
+			context.createdMergers.push(merger);
+
+			return merger;
+		}),
+		createChannelSplitter: vi.fn(() => {
+			const splitter = createAudioNodeSpy();
+			context.createdSplitters.push(splitter);
+
+			return splitter;
+		}),
 		createGain: vi.fn(() => {
 			const gain = {
 				...createAudioNodeSpy(),
@@ -154,6 +218,8 @@ function createAudioContextSpy() {
 		createdGains: [] as Array<
 			ReturnType<typeof createAudioNodeSpy> & { gain: { value: number } }
 		>,
+		createdMergers: [] as Array<ReturnType<typeof createAudioNodeSpy>>,
+		createdSplitters: [] as Array<ReturnType<typeof createAudioNodeSpy>>,
 		createdSources: [] as Array<
 			ReturnType<typeof createAudioNodeSpy> & {
 				buffer: AudioBuffer | null;
