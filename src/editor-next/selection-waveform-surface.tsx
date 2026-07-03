@@ -13,7 +13,7 @@ import type {
 	WaveformSurfaceProps,
 } from "./selection-waveform-surface.types";
 
-const WAVEFORM_HEIGHT_PX = 40;
+const WAVEFORM_HEIGHT_PX = 48;
 const WAVEFORM_COLOR_FALLBACK = "#57bab6";
 const WAVEFORM_GUIDE_COLOR_FALLBACK = "#64748b";
 const SELECTION_REGION_COLOR = "rgba(87, 186, 182, 0.22)";
@@ -55,7 +55,7 @@ export function WaveformSurface({
 	return (
 		<div
 			aria-label={`${label} waveform detail`}
-			className="selection-waveform-surface absolute inset-x-0 top-3 bottom-3 h-[calc(100%-1.5rem)] w-full"
+			className="selection-waveform-surface absolute inset-x-0 top-1 bottom-1 h-[calc(100%-0.5rem)] w-full"
 			data-renderer={rendererStatus}
 			data-sample-count={samples.length}
 		>

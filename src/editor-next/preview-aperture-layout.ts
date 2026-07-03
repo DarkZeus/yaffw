@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 import type {
@@ -15,6 +15,7 @@ export function usePreviewApertureLayout(
 	const previewSurfaceRef = useRef<HTMLElement | null>(null);
 	const [previewSurfaceSize, setPreviewSurfaceSize] =
 		useState<PreviewApertureSurfaceSize | null>(null);
+	const previewApertureAspectRatio = getPreviewApertureAspectRatio(asset);
 
 	useLayoutEffect(() => {
 		const previewSurface = previewSurfaceRef.current;
@@ -50,11 +51,17 @@ export function usePreviewApertureLayout(
 		};
 	}, []);
 
+	const previewApertureStyle = useMemo(
+		() =>
+			createPreviewApertureStyle({
+				aspectRatio: previewApertureAspectRatio,
+				surfaceSize: previewSurfaceSize,
+			}),
+		[previewApertureAspectRatio, previewSurfaceSize],
+	);
+
 	return {
-		previewApertureStyle: createPreviewApertureStyle({
-			aspectRatio: getPreviewApertureAspectRatio(asset),
-			surfaceSize: previewSurfaceSize,
-		}),
+		previewApertureStyle,
 		previewSurfaceRef,
 	};
 }

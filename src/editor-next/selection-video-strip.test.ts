@@ -1,6 +1,10 @@
 /* @vitest-environment jsdom */
 
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import {
 	clearVideoStripThumbnailCache,
@@ -9,7 +13,12 @@ import {
 	createVideoStripThumbnailWindow,
 	loadBrowserVideoStripThumbnails,
 	loadVideoStripThumbnailsOnCurrentThread,
+	useVideoStripThumbnails,
 } from "./selection-video-strip";
+import type {
+	VideoStripThumbnailLoader,
+	VideoStripThumbnailWindow,
+} from "./selection-video-strip.types";
 
 const mediabunnyMock = vi.hoisted(() => ({
 	canvases: [] as Array<{
@@ -68,9 +77,92 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	cleanup();
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
+
+function VideoStripThumbnailProbe({
+	asset,
+	source,
+	thumbnailWindow,
+	videoStripThumbnailLoader,
+}: {
+	asset: ReadyMediaAsset;
+	source: Blob;
+	thumbnailWindow: VideoStripThumbnailWindow | null;
+	videoStripThumbnailLoader: VideoStripThumbnailLoader;
+}) {
+	const state = useVideoStripThumbnails({
+		asset,
+		source,
+		thumbnailWindow,
+		videoStripThumbnailLoader,
+	});
+	const frameCount =
+		state.status === "ready" || state.status === "loading"
+			? state.frames.length
+			: 0;
+
+	return createElement(
+		"output",
+		{ "aria-label": "video strip status" },
+		`${state.status}:${frameCount}`,
+	);
+}
+
+function screenText(label: string) {
+	return screen.getByLabelText(label).textContent ?? "";
+}
+
+const readyAsset = {
+	durationUs: 12_000_000,
+	exportCapability: {
+		profile: {
+			audioCodec: "aac",
+			container: "mp4",
+			videoCodec: "h264",
+		},
+		supported: true,
+	},
+	frameTiming: {
+		fps: 30,
+		frameDurationUs: 33_333,
+		source: "known",
+	},
+	id: "asset-1",
+	label: "clip.mp4",
+	provenance: {
+		fileName: "clip.mp4",
+		mimeType: "video/mp4",
+		sizeBytes: 1_024,
+	},
+	tracks: {
+		audio: [],
+		video: [
+			{
+				id: "video-1",
+				kind: "video",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
+function mockThumbnailObjectUrls() {
+	let objectUrlIndex = 0;
+
+	Object.defineProperty(URL, "createObjectURL", {
+		configurable: true,
+		value: vi.fn(() => {
+			objectUrlIndex += 1;
+			return `blob:thumbnail-${objectUrlIndex}`;
+		}),
+	});
+	Object.defineProperty(URL, "revokeObjectURL", {
+		configurable: true,
+		value: vi.fn(),
+	});
+}
 
 describe("video strip thumbnail generation", () => {
 	it("creates evenly spaced thumbnail timestamps", () => {
@@ -127,6 +219,76 @@ describe("video strip thumbnail generation", () => {
 		expect(zoomedWindow?.timestampsUs[0]).toBeLessThan(
 			zoomedWindow?.visibleStartUs ?? 0,
 		);
+	});
+
+	it("keeps loaded thumbnails when viewport jitter stays inside the overscanned window", async () => {
+		mockThumbnailObjectUrls();
+		const source = new Blob(["video"], { type: "video/mp4" });
+		const initialWindow = createVideoStripThumbnailWindow({
+			assetDurationUs: readyAsset.durationUs,
+			frameDurationUs: readyAsset.frameTiming.frameDurationUs,
+			viewport: {
+				scrollLeftPx: 0,
+				trackWidthPx: 1_280,
+				viewportWidthPx: 640,
+			},
+		});
+		const jitteredWindow = createVideoStripThumbnailWindow({
+			assetDurationUs: readyAsset.durationUs,
+			frameDurationUs: readyAsset.frameTiming.frameDurationUs,
+			viewport: {
+				scrollLeftPx: 0,
+				trackWidthPx: 1_250,
+				viewportWidthPx: 625,
+			},
+		});
+		const videoStripThumbnailLoader = vi.fn<VideoStripThumbnailLoader>(
+			async ({ timestampsUs }) => ({
+				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${timestampUs}-${index}`], {
+						type: "image/jpeg",
+					}),
+					index,
+					timestampUs,
+				})),
+				status: "ready",
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			}),
+		);
+
+		if (!initialWindow || !jitteredWindow) {
+			throw new Error("Expected thumbnail windows.");
+		}
+		expect(jitteredWindow.key).not.toBe(initialWindow.key);
+
+		const view = render(
+			createElement(VideoStripThumbnailProbe, {
+				asset: readyAsset,
+				source,
+				thumbnailWindow: initialWindow,
+				videoStripThumbnailLoader,
+			}),
+		);
+
+		await waitFor(() => {
+			expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(1);
+			expect(screenText("video strip status")).toBe("ready:3");
+		});
+
+		view.rerender(
+			createElement(VideoStripThumbnailProbe, {
+				asset: readyAsset,
+				source,
+				thumbnailWindow: jitteredWindow,
+				videoStripThumbnailLoader,
+			}),
+		);
+
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(1);
+		expect(screenText("video strip status")).toBe("ready:3");
 	});
 
 	it("extracts video thumbnails through Mediabunny CanvasSink", async () => {

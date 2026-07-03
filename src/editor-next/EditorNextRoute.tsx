@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
@@ -29,6 +30,7 @@ import { deliverBrowserGeneratedMedia } from "./generated-media-delivery";
 import { MediaAssetContextPanel } from "./media-asset-context";
 import { NativePreviewPlayer } from "./native-preview-player";
 import type { LivePreviewMeteringClock } from "./preview-metering-live";
+import type { SingleAssetEditingSessionCommands } from "./single-asset-editing-session.types";
 import { usePreviewMeteringPreparation } from "./use-preview-metering-preparation";
 import { useSingleAssetEditingSession } from "./use-single-asset-editing-session";
 
@@ -67,6 +69,7 @@ export function EditorNextRoute({
 		now,
 		runtime,
 	});
+	const stableCommands = useStableEditorCommands(commands);
 	const visualFixture = useMemo(
 		() => createEditorWorkbenchVisualFixture(runtime),
 		[runtime],
@@ -103,6 +106,18 @@ export function EditorNextRoute({
 		useState<LivePreviewMeteringClock | null>(null);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
+	);
+	const previewMetering = useMemo(
+		() => ({
+			clock: previewMeteringClock,
+			onTrackRetry: previewMeteringPreparation.retryTrack,
+			trackStates: previewMeteringPreparation.trackStates,
+		}),
+		[
+			previewMeteringClock,
+			previewMeteringPreparation.retryTrack,
+			previewMeteringPreparation.trackStates,
+		],
 	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
@@ -143,7 +158,7 @@ export function EditorNextRoute({
 		}
 
 		event.currentTarget.blur();
-		void commands.importLocalFile(file);
+		void stableCommands.importLocalFile(file);
 	}
 
 	function handleLocalFileDropped(event: DragEvent<HTMLElement>) {
@@ -155,7 +170,7 @@ export function EditorNextRoute({
 			return;
 		}
 
-		void commands.importLocalFile(file);
+		void stableCommands.importLocalFile(file);
 	}
 
 	const readyMediaAssetContext =
@@ -163,7 +178,7 @@ export function EditorNextRoute({
 			<MediaAssetContextPanel
 				asset={displayedSession.asset}
 				closeFileDisabled={!canCloseEditorSession(displayedSession)}
-				onCloseFileRequested={commands.requestCloseFile}
+				onCloseFileRequested={stableCommands.requestCloseFile}
 				selection={displayedSession.selection}
 			/>
 		) : null;
@@ -176,13 +191,12 @@ export function EditorNextRoute({
 				asset={displayedSession.asset}
 				audioEditingDisabled={selectionEditingDisabled}
 				audioMix={displayedSession.audioMix}
-				onAudioTrackChannelModeChange={commands.setAudioTrackChannelMode}
-				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
-				onAudioTrackVolumePercentChange={commands.setAudioTrackVolumePercent}
-				previewMetering={{
-					...previewMeteringPreparation,
-					clock: previewMeteringClock,
-				}}
+				onAudioTrackChannelModeChange={stableCommands.setAudioTrackChannelMode}
+				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
+				onAudioTrackVolumePercentChange={
+					stableCommands.setAudioTrackVolumePercent
+				}
+				previewMetering={previewMetering}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				soloedAudioTrackId={soloedAudioTrackId}
 			/>
@@ -197,13 +211,13 @@ export function EditorNextRoute({
 				}
 				asset={displayedSession.asset}
 				audioMix={displayedSession.audioMix}
-				onAudioTrackIncludedChange={commands.setAudioTrackIncluded}
+				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
-				onSelectionEndRequested={commands.setSelectionEndFromPlayhead}
-				onSelectionRangeMoveRequested={commands.moveSelectionRange}
-				onSelectionReplaceRequested={commands.setSelectionRange}
-				onSelectionResetRequested={commands.resetSelection}
-				onSelectionStartRequested={commands.setSelectionStartFromPlayhead}
+				onSelectionEndRequested={stableCommands.setSelectionEndFromPlayhead}
+				onSelectionRangeMoveRequested={stableCommands.moveSelectionRange}
+				onSelectionReplaceRequested={stableCommands.setSelectionRange}
+				onSelectionResetRequested={stableCommands.resetSelection}
+				onSelectionStartRequested={stableCommands.setSelectionStartFromPlayhead}
 				onPreviewMeteringClockChange={handlePreviewMeteringClockChange}
 				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				previewPosterSrc={displayedPreviewPosterSrc}
@@ -219,10 +233,10 @@ export function EditorNextRoute({
 			<ExportInspectorPanel
 				asset={displayedSession.asset}
 				exportState={displayedSession.export}
-				onCancelExport={commands.cancelDefaultExport}
-				onDownloadGeneratedMedia={commands.downloadGeneratedMedia}
+				onCancelExport={stableCommands.cancelDefaultExport}
+				onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}
 				onStartExport={() => {
-					void commands.startDefaultExport();
+					void stableCommands.startDefaultExport();
 				}}
 				runtime={displayedSession.runtime}
 				selection={displayedSession.selection}
@@ -276,4 +290,38 @@ function createBrowserId(prefix: string): string {
 	return `${prefix}-${Date.now().toString(36)}-${Math.random()
 		.toString(36)
 		.slice(2)}`;
+}
+
+function useStableEditorCommands(
+	commands: SingleAssetEditingSessionCommands,
+): SingleAssetEditingSessionCommands {
+	const commandsRef = useRef(commands);
+	commandsRef.current = commands;
+
+	return useMemo(
+		() => ({
+			cancelDefaultExport: () => commandsRef.current.cancelDefaultExport(),
+			downloadGeneratedMedia: (generatedMedia) =>
+				commandsRef.current.downloadGeneratedMedia(generatedMedia),
+			importLocalFile: (file) => commandsRef.current.importLocalFile(file),
+			moveSelectionRange: (deltaUs) =>
+				commandsRef.current.moveSelectionRange(deltaUs),
+			requestCloseFile: () => commandsRef.current.requestCloseFile(),
+			resetSelection: () => commandsRef.current.resetSelection(),
+			setAudioTrackChannelMode: (trackId, channelMode) =>
+				commandsRef.current.setAudioTrackChannelMode(trackId, channelMode),
+			setAudioTrackIncluded: (trackId, include) =>
+				commandsRef.current.setAudioTrackIncluded(trackId, include),
+			setAudioTrackVolumePercent: (trackId, volumePercent) =>
+				commandsRef.current.setAudioTrackVolumePercent(trackId, volumePercent),
+			setSelectionEndFromPlayhead: (playheadUs) =>
+				commandsRef.current.setSelectionEndFromPlayhead(playheadUs),
+			setSelectionRange: (selection) =>
+				commandsRef.current.setSelectionRange(selection),
+			setSelectionStartFromPlayhead: (playheadUs) =>
+				commandsRef.current.setSelectionStartFromPlayhead(playheadUs),
+			startDefaultExport: () => commandsRef.current.startDefaultExport(),
+		}),
+		[],
+	);
 }

@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("useLivePreviewMetering", () => {
-	it("throttles prepared meter value updates on animation frames", () => {
+	it("updates prepared meter values on every animation frame", () => {
 		let playheadUs = 100_000;
 		const clock = {
 			getIsPlaying: () => true,
@@ -76,16 +76,70 @@ describe("useLivePreviewMetering", () => {
 			frameCallbacks.shift()?.(32);
 		});
 
-		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
+		const secondFramePeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+
+		expect(secondFramePeak).toBeLessThan(0);
+		expect(secondFramePeak).toBeGreaterThan(-12.04);
 
 		act(() => {
 			frameCallbacks.shift()?.(80);
 		});
 
+		const releasedPeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+
+		expect(releasedPeak).toBeLessThan(0);
+		expect(releasedPeak).toBeLessThan(secondFramePeak);
+		expect(releasedPeak).toBeGreaterThan(-12.04);
+		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
+	});
+
+	it("uses fast attack and slower release for displayed peak values", () => {
+		let playheadUs = 100_000;
+		const clock = {
+			getIsPlaying: () => true,
+			getPlayheadUs: () => playheadUs,
+		};
+
+		render(
+			<LivePreviewMeteringProbe
+				audioMix={audioMix}
+				clock={clock}
+				trackStates={trackStates}
+			/>,
+		);
+
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
 			-12.04,
 			2,
 		);
+
+		act(() => {
+			frameCallbacks.shift()?.(16);
+		});
+
+		playheadUs = 150_000;
+		act(() => {
+			frameCallbacks.shift()?.(80);
+		});
+
+		const attackPeak = Number(screen.getByLabelText("voice peak").textContent);
+		expect(attackPeak).toBeLessThan(0);
+		expect(attackPeak).toBeGreaterThan(-1);
+		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
+
+		playheadUs = 100_000;
+		act(() => {
+			frameCallbacks.shift()?.(144);
+		});
+
+		const releasePeak = Number(screen.getByLabelText("voice peak").textContent);
+		expect(releasePeak).toBeLessThan(attackPeak);
+		expect(releasePeak).toBeGreaterThan(-12.04);
+		expect(screen.getByLabelText("voice clip").textContent).toBe("held");
 	});
 
 	it("uses low-frequency paused polling instead of an animation-frame loop", () => {

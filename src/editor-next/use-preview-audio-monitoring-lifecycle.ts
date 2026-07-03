@@ -30,6 +30,12 @@ export function usePreviewAudioMonitoringLifecycle({
 		providedMultitrackContainerRef ?? ownedMultitrackContainerRef;
 	const multitrackRef = providedMultitrackRef ?? ownedMultitrackRef;
 	const [ready, setReady] = useState(false);
+	const audioControlsRef = useRef({
+		audioMix,
+		muted,
+		soloedAudioTrackId,
+		volume,
+	});
 	const setMonitoringReady = useCallback(
 		(nextReady: boolean) => {
 			setReady(nextReady);
@@ -37,6 +43,12 @@ export function usePreviewAudioMonitoringLifecycle({
 		},
 		[onReadyChange],
 	);
+	audioControlsRef.current = {
+		audioMix,
+		muted,
+		soloedAudioTrackId,
+		volume,
+	};
 
 	useEffect(() => {
 		const container = multitrackContainerRef.current;
@@ -91,6 +103,11 @@ export function usePreviewAudioMonitoringLifecycle({
 
 						multitrack.setTime(getPlayheadUs() / 1_000_000);
 						setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
+						applyMultitrackPreviewVolumes({
+							...audioControlsRef.current,
+							multitrack,
+							sources: audioPreviewSources.sources,
+						});
 						setMonitoringReady(true);
 					}),
 				);

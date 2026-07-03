@@ -264,6 +264,36 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		});
 		expect(audioMix.tracks["audio-2"]?.include).toBe(false);
 	});
+
+	it("applies initial track volumes before reporting audio monitoring ready", async () => {
+		const onReadyChange = vi.fn((nextReady: boolean) => {
+			if (!nextReady) {
+				return;
+			}
+
+			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(1);
+			expect(lastTrackVolume(createdMultitracks[0], 1)).toBe(1);
+		});
+
+		render(
+			<PreviewAudioMonitoringProbe
+				onReadyChange={onReadyChange}
+				state={readyAudioSourcesState([
+					createAudioPreviewSource("audio-1"),
+					createAudioPreviewSource("audio-2"),
+				])}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+		});
+		createdMultitracks[0].emitCanPlay();
+
+		await waitFor(() => {
+			expect(onReadyChange).toHaveBeenCalledWith(true);
+		});
+	});
 });
 
 function PreviewAudioMonitoringProbe({
@@ -271,6 +301,7 @@ function PreviewAudioMonitoringProbe({
 	getPlaybackRate = DEFAULT_GET_PLAYBACK_RATE,
 	getPlayheadUs = DEFAULT_GET_PLAYHEAD_US,
 	muted = false,
+	onReadyChange,
 	soloedAudioTrackId = null,
 	state,
 	volume = 1,
@@ -279,6 +310,7 @@ function PreviewAudioMonitoringProbe({
 	getPlaybackRate?: () => number;
 	getPlayheadUs?: () => MediaTimeUs;
 	muted?: boolean;
+	onReadyChange?: (ready: boolean) => void;
 	soloedAudioTrackId?: string | null;
 	state: BrowserAudioPreviewSourcesState;
 	volume?: number;
@@ -289,6 +321,7 @@ function PreviewAudioMonitoringProbe({
 		getPlaybackRate,
 		getPlayheadUs,
 		muted,
+		onReadyChange,
 		soloedAudioTrackId,
 		volume,
 	});

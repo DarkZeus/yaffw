@@ -1,13 +1,17 @@
 import {
+	AlertCircle,
 	AlertTriangle,
 	AudioLines,
 	Brackets,
 	FileVideo,
+	Loader2,
 	PackageCheck,
 	Scissors,
 	ShieldCheck,
+	Upload,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState } from "react";
+import type { DragEvent, ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +23,7 @@ import {
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EditorSessionState } from "@/editor-core/session";
+import { cn } from "@/lib/utils";
 import type {
 	EditorSessionShellProps,
 	EditorWorkbenchFrameProps,
@@ -30,6 +35,21 @@ type NonReadyEditorSession = Exclude<
 	EditorSessionShellProps["session"],
 	{ status: "ready" }
 >;
+
+const supportedFormatLabels = ["MP4", "AVI", "MOV", "MKV", "WebM"];
+const supportedVideoExtensions = [
+	".mp4",
+	".avi",
+	".mov",
+	".mkv",
+	".webm",
+	".m4v",
+	".3gp",
+];
+const supportedVideoAcceptAttribute = [
+	"video/*",
+	...supportedVideoExtensions,
+].join(",");
 
 export function EditorWorkbenchFrame({
 	activeAsset,
@@ -363,39 +383,225 @@ function NonReadyImportSurface({
 	session: NonReadyEditorSession;
 }) {
 	const copy = workbenchNonReadyStateCopy(session);
+	const isProcessing = session.status === "loading";
+	const [dragState, setDragState] = useState<"idle" | "active" | "reject">(
+		"idle",
+	);
+	const [, setDragDepth] = useState(0);
+
+	function resetDragState() {
+		setDragDepth(0);
+		setDragState("idle");
+	}
+
+	function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
+		event.preventDefault();
+
+		if (!session.importEnabled) {
+			return;
+		}
+
+		setDragDepth((currentDepth) => currentDepth + 1);
+		setDragState(
+			isRejectedDataTransfer(event.dataTransfer) ? "reject" : "active",
+		);
+	}
+
+	function handleDragOver(event: DragEvent<HTMLLabelElement>) {
+		event.preventDefault();
+
+		if (!session.importEnabled) {
+			event.dataTransfer.dropEffect = "none";
+			return;
+		}
+
+		const rejected = isRejectedDataTransfer(event.dataTransfer);
+		event.dataTransfer.dropEffect = rejected ? "none" : "copy";
+		setDragState(rejected ? "reject" : "active");
+	}
+
+	function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
+		event.preventDefault();
+
+		if (!session.importEnabled) {
+			return;
+		}
+
+		setDragDepth((currentDepth) => {
+			const nextDepth = Math.max(0, currentDepth - 1);
+			if (nextDepth === 0) {
+				setDragState("idle");
+			}
+			return nextDepth;
+		});
+	}
+
+	function handleDrop(event: DragEvent<HTMLLabelElement>) {
+		event.preventDefault();
+
+		if (!session.importEnabled) {
+			resetDragState();
+			return;
+		}
+
+		const file = event.dataTransfer.files[0];
+		if (!file || !isSupportedVideoFile(file)) {
+			resetDragState();
+			return;
+		}
+
+		resetDragState();
+		onLocalFileDropped(event);
+	}
 
 	return (
-		<div
-			className="grid min-h-full place-items-center rounded-md border border-dashed border-workbench-border-strong bg-background/55 p-6"
-			data-testid="editor-next-drop-zone"
-			onDragOver={(event) => event.preventDefault()}
-			onDrop={onLocalFileDropped}
-		>
-			<div className="flex w-full max-w-xl flex-col gap-5">
-				<div className="grid gap-2">
+		<div className="grid min-h-full place-items-center rounded-md border border-workbench-border bg-workbench-viewer p-3 sm:p-6">
+			<div className="flex w-full max-w-2xl flex-col gap-4">
+				<header className="grid gap-1 text-center">
 					<h3 className="text-xl font-semibold tracking-tight">{copy.title}</h3>
 					<p className="text-sm leading-6 text-muted-foreground">
 						{copy.description}
 					</p>
-				</div>
-				<div className="grid gap-2">
-					<label
-						className="text-sm font-medium"
-						htmlFor="editor-next-local-file"
-					>
-						Local media file
-					</label>
+				</header>
+				<label
+					aria-disabled={!session.importEnabled}
+					className={cn(
+						"relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-workbench-border-strong bg-workbench-inspector/55 p-8 text-center transition-[background-color,border-color,opacity,box-shadow,transform] duration-300 sm:p-12",
+						dragState === "active" &&
+							"border-workbench-selected bg-workbench-selected/5 shadow-lg shadow-black/20",
+						dragState === "reject" &&
+							"border-destructive bg-destructive/10 shadow-lg shadow-destructive/10",
+						isProcessing && "cursor-not-allowed opacity-60",
+						!isProcessing &&
+							dragState === "idle" &&
+							"hover:border-workbench-selected/70 hover:bg-workbench-hover/35",
+					)}
+					data-testid="editor-next-drop-zone"
+					htmlFor="editor-next-local-file"
+					onDragEnter={handleDragEnter}
+					onDragLeave={handleDragLeave}
+					onDragOver={handleDragOver}
+					onDrop={handleDrop}
+				>
 					<Input
+						accept={supportedVideoAcceptAttribute}
+						aria-label="Local media file"
+						className="sr-only"
 						disabled={!session.importEnabled}
 						id="editor-next-local-file"
 						key={localFileInputKey}
 						onChange={onLocalFileSelected}
 						type="file"
 					/>
-				</div>
+					<div className="space-y-4">
+						<div className="flex justify-center">
+							<div
+								className={cn(
+									"rounded-full p-6 transition-[background-color,transform] duration-300",
+									dragState === "reject" && "bg-destructive/10",
+									dragState === "active" &&
+										"scale-110 bg-workbench-selected/10",
+									dragState === "idle" && "bg-workbench-hover",
+								)}
+							>
+								<ImportSurfaceIcon
+									dragState={dragState}
+									isProcessing={isProcessing}
+								/>
+							</div>
+						</div>
+
+						<div className="space-y-2">
+							<h4
+								className={cn(
+									"text-xl font-semibold tracking-tight transition-colors duration-300",
+									dragState === "reject" && "text-destructive",
+									dragState === "active" && "text-workbench-selected",
+									isProcessing && "text-workbench-selected",
+								)}
+							>
+								{dragState === "reject"
+									? "Invalid file type"
+									: dragState === "active"
+										? "Drop your video here!"
+										: isProcessing
+											? "Processing file..."
+											: "Drop your video or click to browse"}
+							</h4>
+							<p className="text-sm text-muted-foreground">
+								{dragState === "reject"
+									? "Please select a valid video file"
+									: dragState === "active"
+										? "Release to upload"
+										: isProcessing
+											? "Please wait..."
+											: "Upload from your device"}
+							</p>
+						</div>
+
+						{!isProcessing ? (
+							<div className="flex flex-wrap justify-center gap-2">
+								{supportedFormatLabels.map((format) => (
+									<Badge
+										className="border-workbench-border bg-workbench-hover/70 font-mono text-[10px] text-muted-foreground"
+										key={format}
+										variant="secondary"
+									>
+										{format}
+									</Badge>
+								))}
+							</div>
+						) : null}
+					</div>
+				</label>
 				<SessionStatusLine session={session} />
 			</div>
 		</div>
+	);
+}
+
+function ImportSurfaceIcon({
+	dragState,
+	isProcessing,
+}: {
+	dragState: "idle" | "active" | "reject";
+	isProcessing: boolean;
+}) {
+	if (dragState === "reject") {
+		return <AlertCircle className="size-12 text-destructive" />;
+	}
+
+	if (dragState === "active") {
+		return (
+			<FileVideo className="size-12 animate-bounce text-workbench-selected" />
+		);
+	}
+
+	if (isProcessing) {
+		return <Loader2 className="size-12 animate-spin text-workbench-selected" />;
+	}
+
+	return <Upload className="size-12 text-muted-foreground" />;
+}
+
+function isRejectedDataTransfer(dataTransfer: DataTransfer): boolean {
+	const fileItems = Array.from(dataTransfer.items).filter(
+		(item) => item.kind === "file",
+	);
+
+	return fileItems.some(
+		(item) => item.type !== "" && !item.type.startsWith("video/"),
+	);
+}
+
+function isSupportedVideoFile(file: File): boolean {
+	if (file.type.startsWith("video/")) {
+		return true;
+	}
+
+	const normalizedName = file.name.toLowerCase();
+	return supportedVideoExtensions.some((extension) =>
+		normalizedName.endsWith(extension),
 	);
 }
 

@@ -55,16 +55,34 @@ describe("AudioPanel", () => {
 		const combinedStrip = within(audioPanel).getByLabelText(
 			"Combined preview strip",
 		);
+		const stripBank = within(audioPanel).getByLabelText(
+			"Audio channel strip bank",
+		);
 
 		expect(within(audioPanel).queryByText("No audio tracks")).toBeNull();
+		expect(stripBank.className).toContain("flex");
+		expect(stripBank.className).toContain("w-max");
+		expect(stripBank.className).not.toContain("min-w-full");
+		expect(voiceStrip.className).toContain("w-32");
+		expect(voiceStrip.className).toContain("h-[24rem]");
+		expect(combinedStrip.className).toContain("w-28");
+		expect(combinedStrip.className).toContain("h-[24rem]");
 		expect(within(voiceStrip).getByText("Voice")).toBeTruthy();
 		expect(within(voiceStrip).getByText("AAC / 2 channels / eng")).toBeTruthy();
 		expect(
 			within(voiceStrip).getByLabelText("Voice preview meter"),
 		).toBeTruthy();
+		const voiceMeterChannels = within(voiceStrip).getByLabelText(
+			"Voice preview meter channels",
+		);
+		expect(
+			(voiceMeterChannels.firstElementChild as HTMLElement).style
+				.gridTemplateColumns,
+		).toBe("repeat(2, 0.7rem)");
 		expect(
 			within(voiceStrip).getByRole("meter", { name: "Left level" }),
 		).toBeTruthy();
+		expect(within(voiceStrip).queryByText("Left")).toBeNull();
 		expect(within(desktopStrip).getByText("Desktop")).toBeTruthy();
 		expect(
 			within(desktopStrip).getByLabelText("Desktop preview meter"),
@@ -81,6 +99,11 @@ describe("AudioPanel", () => {
 		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
 		expect(within(audioPanel).queryByText(/routing/i)).toBeNull();
 		expect(within(audioPanel).queryByText(/bus/i)).toBeNull();
+		expect(within(audioPanel).queryByText("A1")).toBeNull();
+		expect(within(audioPanel).queryByText("Mix")).toBeNull();
+		expect(within(audioPanel).queryByText("Out")).toBeNull();
+		expect(within(audioPanel).queryByText("Solo")).toBeNull();
+		expect(within(audioPanel).queryByText("vol")).toBeNull();
 	});
 
 	it("exposes per-track Audio mix and preview monitoring controls", () => {
@@ -116,6 +139,10 @@ describe("AudioPanel", () => {
 		const voiceVolume = within(voiceStrip).getByRole("slider", {
 			name: "Voice track volume",
 		});
+		const voiceMeter = within(voiceStrip).getByLabelText("Voice preview meter");
+		const voiceControls = within(voiceStrip).getByLabelText(
+			"Voice audio controls",
+		);
 		const voiceChannelHandling = within(voiceStrip).getByLabelText(
 			"Voice channel handling",
 		);
@@ -125,6 +152,10 @@ describe("AudioPanel", () => {
 		expect((voiceChannelHandling as HTMLSelectElement).value).toBe(
 			"use-left-as-mono",
 		);
+		expect(
+			voiceMeter.compareDocumentPosition(voiceControls) &
+				Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 
 		fireEvent.change(voiceVolume, { target: { value: "37" } });
 		expect(onAudioTrackVolumePercentChange).toHaveBeenCalledWith(
@@ -231,7 +262,7 @@ describe("AudioPanel", () => {
 			"Desktop preview meter",
 		);
 
-		expect(desktopStrip.className).toContain("min-h-40");
+		expect(desktopStrip.className).toContain("h-[24rem]");
 		expect(desktopMeter.getAttribute("data-state")).toBe("unavailable");
 		expect(
 			within(desktopStrip).getByText("Desktop decode failed"),
@@ -294,14 +325,18 @@ describe("AudioPanel", () => {
 			expect(
 				Number(
 					within(voiceMeter)
-						.getByRole("meter", { name: "Mono level" })
+						.getByRole("meter", { name: "Left level" })
 						.getAttribute("aria-valuenow"),
 				),
 			).toBeCloseTo(-12.04, 2);
 		});
 		expect(
-			within(voiceMeter).queryByRole("meter", { name: "Left level" }),
-		).toBeNull();
+			Number(
+				within(voiceMeter)
+					.getByRole("meter", { name: "Right level" })
+					.getAttribute("aria-valuenow"),
+			),
+		).toBeCloseTo(-12.04, 2);
 	});
 
 	it("renders live combined Preview output meter values as stereo channels", async () => {

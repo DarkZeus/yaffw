@@ -1,9 +1,8 @@
 # Preview clock invariant
 
-This document records the final preview clock invariant for PRD #53 after the
-audio-master preview clock implementation landed through issues #54 through
-#59. It is the authority-boundary companion to the manual sync regression path
-in `docs/preview-sync-regression.md`.
+This document records the preview clock invariant for editor-next. It is the
+authority-boundary companion to the manual sync regression path in
+`docs/preview-sync-regression.md`.
 
 ## Ownership boundaries
 
@@ -66,10 +65,10 @@ the active Media asset.
 
 Export jobs continue to use the original source media plus the committed
 Selection and Audio mix decisions from the Single-asset editing session.
-Preview clock ownership, native-video follower correction, WaveSurfer rendering,
-preview volume, preview mute, and preview-only solo do not redefine export
-inputs. Export precision and Generated media inspection remain separate export
-concerns.
+Preview clock ownership, native-video follower correction, WaveSurfer
+rendering, preview volume, preview mute, and preview-only solo do not redefine
+export inputs. Export precision and Generated media inspection remain separate
+export concerns.
 
 ## Regression path
 
@@ -81,7 +80,7 @@ on real browser media rendering:
 
 - play, pause, seek, and frame-step keep the audio click timestamp, Playhead,
   and visual flash timestamp aligned
-- selection-loop playback uses the authoritative audio clock at the loop
+- selection-loop playback uses the authoritative audio-master clock at the loop
   boundary
 - Audio mix changes, including Track volume, include/exclude, preview solo, and
   channel handling, keep preview audio monitoring on the audio-master clock

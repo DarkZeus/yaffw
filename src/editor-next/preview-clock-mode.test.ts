@@ -6,10 +6,21 @@ import { resolvePreviewClockMode } from "./preview-clock-mode";
 import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
 
 describe("resolvePreviewClockMode", () => {
-	it("uses audio-master only after audio preview sources and monitoring are ready", () => {
+	it("uses audio-master after preview audio sources and monitoring are ready", () => {
 		expect(
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
+				audioMonitoringReady: true,
+				audioPreviewSources: readyAudioSourcesState(),
+				audioPreviewTransportSupported: true,
+			}),
+		).toBe("audio-master");
+	});
+
+	it("uses audio-master for multi-track assets when preview audio is ready", () => {
+		expect(
+			resolvePreviewClockMode({
+				asset: readyAssetWithTwoAudioTracks,
 				audioMonitoringReady: true,
 				audioPreviewSources: readyAudioSourcesState(),
 				audioPreviewTransportSupported: true,
@@ -148,6 +159,27 @@ const readyAssetWithAudio = {
 				id: "audio-1",
 				kind: "audio",
 				label: "Voice",
+			},
+		],
+	},
+} satisfies ReadyMediaAsset;
+
+const readyAssetWithTwoAudioTracks = {
+	...readyAssetWithoutAudio,
+	tracks: {
+		...readyAssetWithoutAudio.tracks,
+		audio: [
+			{
+				codec: "aac",
+				id: "audio-1",
+				kind: "audio",
+				label: "Voice",
+			},
+			{
+				codec: "aac",
+				id: "audio-2",
+				kind: "audio",
+				label: "Desktop",
 			},
 		],
 	},

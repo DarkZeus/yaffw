@@ -272,8 +272,9 @@ _Avoid_: first-slice requirement, automatic fallback
 - Editor-next requires a **Supported runtime**; if WebCodecs is unavailable, the app should block access to the editor workflow with a clear unsupported-runtime message.
 - Editor-next is Chromium-first; other browsers are supported only when they provide the needed standards-based media API surface.
 - Runtime entry checks verify basic browser media API support; asset-specific **Export capability** is computed after a media asset is analyzed.
-- In the first slice, a **Ready media asset** must be previewable, have known duration and enough track inventory to edit, and be exportable with the default output profile.
-- If a media asset cannot become ready because default export is unsupported, the UI shows a plain failure message with technical details available on demand.
+- In the first slice, a **Ready media asset** must be readable by the import adapter, have known positive duration, and contain at least one video **Media track**; preview decoding, waveform extraction, video-strip extraction, and export runner success are downstream outcomes, not readiness gates.
+- If a media asset cannot become ready because it is unreadable, audio-only, or has no video **Media track**, the UI shows a plain failure message with technical details available on demand.
+- A **Ready media asset** should not be blocked from export by codec/container preflight guesses; if the export runner fails, the failure is reported as an **Export job** result with technical details.
 - The first slice targets video media with optional audio tracks; video-only media is supported, while audio-only media is deferred and should fail with a clear unsupported-file message.
 - **Asset analysis** records such as metadata, frame rate, track inventory, waveform data, and export capability belong around a **Media asset**; none of them replace it as the editor's central concept.
 - A **Single-asset editing session** owns the active **Media asset** and the **Editing decisions** for that asset.
@@ -385,7 +386,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Playback speed** applies to the whole preview; in mix-capable preview mode, the multitrack audio transport and synchronized video renderer should use the same speed value or explicitly reject unsupported speed values.
 - For video-only media, the native video element may remain the preview transport authority.
 - **Output settings** are **Editing decisions** even when the UI only supports default output.
-- The **Default output profile** prefers MP4 with H.264 video and AAC audio when the current **Runtime capability** supports it; browser-friendly alternatives such as WebM are fallbacks.
+- The **Default output profile** is MP4 with H.264 video and AAC audio when the current **Runtime capability** supports it; editor-next does not silently fall back to another generated-media format.
 - Under the **Default output profile**, included audio tracks are mixed into one generated AAC audio track; preserving separate audio tracks is a future advanced export behavior.
 - If all audio tracks are excluded by **Audio mix decisions**, export remains valid and produces generated media with no audio track.
 - The first-slice **Default output profile** does not include a user-defined target bitrate; source bitrate may only be used as an export-runner hint if the runtime needs one.
@@ -416,8 +417,8 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Export cancellation** is available only when the active export runner can stop safely; the UI should not imply cancellation when it is unsupported.
 - The first slice disables editing changes while an **Export job** is running.
 - **Runtime capability** determines which import, preview, analysis, and export paths are available; it does not create a separate editor model.
-- **Export capability** is checked before an **Export job** starts and should expose the planned export strategy, expected precision, and user-facing reason.
-- If the default output profile is unavailable for the active asset and runtime, the asset does not enter the ready editor in the first slice.
+- **Export capability** is checked before an **Export job** starts and should expose the planned export strategy, expected precision, and user-facing reason without using codec/container preflight guesses to block otherwise valid media.
+- If the default output runner cannot convert or mux the active asset, the asset remains ready and the failure is reported on the **Export job**.
 - The first-slice **Export review** should make export strategy and precision visible without introducing custom output controls.
 - **Export review** should describe export strategies in product language such as fast export or precision export, while implementation labels may remain technical.
 - The first-slice **Export review** shows the chosen export strategy; it does not let the user manually choose between strategies.

@@ -296,10 +296,13 @@ describe("createLivePreviewMeteringTrackStates", () => {
 			throw new Error("Expected ready live metering state.");
 		}
 
-		expect(voiceState.channels).toHaveLength(1);
-		expect(voiceState.channels[0]?.label).toBe("Mono");
+		expect(voiceState.channels).toHaveLength(2);
+		expect(voiceState.channels[0]?.label).toBe("Left");
+		expect(voiceState.channels[1]?.label).toBe("Right");
 		expect(voiceState.channels[0]?.peakDb).toBeCloseTo(-12.04, 2);
+		expect(voiceState.channels[1]?.peakDb).toBeCloseTo(-12.04, 2);
 		expect(voiceState.channels[0]?.clipHeld).toBe(false);
+		expect(voiceState.channels[1]?.clipHeld).toBe(false);
 	});
 
 	it("uses the 50 ms playhead window and floors ready meters while paused", () => {

@@ -120,7 +120,11 @@ export function createLivePreviewMeteringTrackStates({
 		const excluded =
 			decision?.include === false && soloedAudioTrackId !== trackId;
 		const channelMode = decision?.channelMode ?? "preserve";
-		const channelPlan = createTrackChannelPlan(state.prepared, channelMode);
+		const channelPlan = createTrackChannelPlan({
+			channelMode,
+			meterOutputChannels: normalizeOutputChannelCount(audioMix.outputChannels),
+			prepared: state.prepared,
+		});
 
 		if (!isPlaying || excluded) {
 			liveTrackStates[trackId] = {
@@ -250,7 +254,11 @@ function createCombinedPreviewMeteringState({
 
 		const channelMode = decision?.channelMode ?? "preserve";
 		readyTracks.push({
-			channelPlan: createTrackChannelPlan(state.prepared, channelMode),
+			channelPlan: createTrackChannelPlan({
+				channelMode,
+				meterOutputChannels: outputChannelCount,
+				prepared: state.prepared,
+			}),
 			prepared: state.prepared,
 			volumeGain: audioTrackVolumePercentToGain(decision?.volumePercent ?? 100),
 		});
@@ -517,13 +525,19 @@ type TrackChannelPlan = {
 	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
 };
 
-function createTrackChannelPlan(
-	prepared: PreviewMeteringPreparedTrack,
-	channelMode: AudioTrackChannelMode,
-): TrackChannelPlan {
+function createTrackChannelPlan({
+	channelMode,
+	meterOutputChannels,
+	prepared,
+}: {
+	channelMode: AudioTrackChannelMode;
+	meterOutputChannels: number;
+	prepared: PreviewMeteringPreparedTrack;
+}): TrackChannelPlan {
 	const cacheKey = createTrackChannelPlanCacheKey({
 		channelLabels: prepared.channelLabels,
 		channelMode,
+		meterOutputChannels,
 	});
 	const cachedPlan = trackChannelPlanCache
 		.get(prepared.audioBuffer)
@@ -537,10 +551,15 @@ function createTrackChannelPlan(
 		prepared.audioBuffer,
 		channelMode,
 	);
-	const outputChannels = outputChannelCountForMode(
+	const transformedOutputChannels = outputChannelCountForMode(
 		prepared.audioBuffer,
 		channelTransform.resolvedMode,
 	);
+	const outputChannels = outputChannelCountForMeteringMode({
+		meterOutputChannels,
+		resolvedMode: channelTransform.resolvedMode,
+		transformedOutputChannels,
+	});
 
 	const plan = {
 		compensationGain: channelCompensationGain({
@@ -567,11 +586,33 @@ function createTrackChannelPlan(
 function createTrackChannelPlanCacheKey({
 	channelLabels,
 	channelMode,
+	meterOutputChannels,
 }: {
 	channelLabels: string[];
 	channelMode: AudioTrackChannelMode;
+	meterOutputChannels: number;
 }): string {
-	return `${channelMode}:${channelLabels.join("\u0000")}`;
+	return `${channelMode}:${meterOutputChannels}:${channelLabels.join("\u0000")}`;
+}
+
+function outputChannelCountForMeteringMode({
+	meterOutputChannels,
+	resolvedMode,
+	transformedOutputChannels,
+}: {
+	meterOutputChannels: number;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+	transformedOutputChannels: number;
+}): number {
+	if (
+		resolvedMode === "use-left-as-mono" ||
+		resolvedMode === "use-right-as-mono" ||
+		resolvedMode === "average-to-mono"
+	) {
+		return Math.max(1, meterOutputChannels);
+	}
+
+	return transformedOutputChannels;
 }
 
 function resolveMeteringChannelTransform(
@@ -724,7 +765,9 @@ function createChannelLabels({
 		resolvedMode === "use-right-as-mono" ||
 		resolvedMode === "average-to-mono"
 	) {
-		return ["Mono"];
+		return outputChannels === 1
+			? ["Mono"]
+			: createPreviewOutputChannelLabels(outputChannels);
 	}
 
 	if (

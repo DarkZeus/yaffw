@@ -20,6 +20,7 @@ const mockState = vi.hoisted(() => ({
 		destroyed: boolean;
 		emit: (event: string, ...args: unknown[]) => void;
 		listenerCount: (event: string) => number;
+		options: Record<string, unknown>;
 	}>,
 }));
 
@@ -180,6 +181,7 @@ describe("createWavesurferPeaksFromSamples", () => {
 		);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+		expect(mockState.wavesurfers[0]?.options.height).toBe(48);
 		act(() => {
 			mockState.wavesurfers[0]?.emit("redrawcomplete");
 		});

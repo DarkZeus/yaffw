@@ -56,7 +56,12 @@ export function useVideoStripThumbnails({
 	const requestWindowRef = useRef<VideoStripThumbnailWindow | null>(
 		thumbnailWindow,
 	);
-	if (requestWindowRef.current?.key !== thumbnailWindow?.key) {
+	if (
+		shouldReplaceVideoStripThumbnailRequestWindow(
+			requestWindowRef.current,
+			thumbnailWindow,
+		)
+	) {
 		requestWindowRef.current = thumbnailWindow;
 	}
 	const requestWindow = requestWindowRef.current;
@@ -254,6 +259,45 @@ export function useVideoStripThumbnails({
 	]);
 
 	return state;
+}
+
+function shouldReplaceVideoStripThumbnailRequestWindow(
+	currentWindow: VideoStripThumbnailWindow | null,
+	nextWindow: VideoStripThumbnailWindow | null,
+) {
+	if (currentWindow === nextWindow) {
+		return false;
+	}
+
+	if (!currentWindow || !nextWindow) {
+		return currentWindow !== nextWindow;
+	}
+
+	if (currentWindow.key === nextWindow.key) {
+		return false;
+	}
+
+	if (currentWindow.assetDurationUs !== nextWindow.assetDurationUs) {
+		return true;
+	}
+
+	const currentFrameStepUs = Math.max(1, currentWindow.frameStepUs);
+	const nextFrameStepUs = Math.max(1, nextWindow.frameStepUs);
+	const frameStepDeltaRatio =
+		Math.abs(currentFrameStepUs - nextFrameStepUs) /
+		Math.max(currentFrameStepUs, nextFrameStepUs);
+
+	if (frameStepDeltaRatio > 0.12) {
+		return true;
+	}
+
+	const coveragePaddingUs = Math.max(currentFrameStepUs, nextFrameStepUs);
+
+	return (
+		nextWindow.visibleStartUs <
+			currentWindow.windowStartUs - coveragePaddingUs ||
+		nextWindow.visibleEndUs > currentWindow.windowEndUs + coveragePaddingUs
+	);
 }
 
 export async function loadBrowserVideoStripThumbnails(
@@ -482,6 +526,7 @@ export function createVideoStripThumbnailWindow({
 	});
 
 	return {
+		assetDurationUs,
 		frameStepUs,
 		key: [
 			assetDurationUs,

@@ -137,6 +137,9 @@ describe("Editor workbench", () => {
 		expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(screen.getByTestId("editor-next-drop-zone")).toBeTruthy();
+		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
+		expect(screen.queryByText("or download from URL")).toBeNull();
+		expect(screen.queryByPlaceholderText(/youtube/i)).toBeNull();
 		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
 		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
 

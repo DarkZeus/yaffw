@@ -11,6 +11,7 @@ import {
 	VolumeX,
 } from "lucide-react";
 import type { ChangeEvent, ReactNode } from "react";
+import { memo } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -18,7 +19,7 @@ import type { PreviewTransportRegionProps } from "./preview-transport-region.typ
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
-export function PreviewTransportRegion({
+export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 	isPlaying,
 	muted,
 	onPlaybackRateChange,
@@ -165,7 +166,7 @@ export function PreviewTransportRegion({
 			</div>
 		</section>
 	);
-}
+});
 
 function PreviewIconButton({
 	children,

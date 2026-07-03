@@ -21,7 +21,9 @@ const EMPTY_LIVE_PREVIEW_METERING_STATE = {
 	},
 	trackStates: {},
 } satisfies LivePreviewMeteringState;
-const LIVE_PREVIEW_METERING_UI_INTERVAL_MS = 50;
+const LIVE_PREVIEW_METERING_ATTACK_MS = 20;
+const LIVE_PREVIEW_METERING_RELEASE_MS = 220;
+const LIVE_PREVIEW_METERING_SNAP_THRESHOLD_DB = 0.05;
 const PAUSED_PREVIEW_METERING_POLL_INTERVAL_MS = 250;
 
 export type UseLivePreviewMeteringOptions = {
@@ -60,7 +62,7 @@ export function useLivePreviewMetering({
 		let cancelled = false;
 		let frameId: number | null = null;
 		let timeoutId: number | null = null;
-		let lastPlayingUpdateTimestampMs: number | null = null;
+		let lastDisplayUpdateTimestampMs: number | null = null;
 
 		function commitLiveMeteringState(nextState: LivePreviewMeteringState) {
 			if (
@@ -93,17 +95,6 @@ export function useLivePreviewMetering({
 
 			const isPlaying = clock?.getIsPlaying() ?? false;
 
-			if (
-				isPlaying &&
-				typeof timestampMs === "number" &&
-				lastPlayingUpdateTimestampMs !== null &&
-				timestampMs - lastPlayingUpdateTimestampMs <
-					LIVE_PREVIEW_METERING_UI_INTERVAL_MS
-			) {
-				scheduleNextUpdate(isPlaying);
-				return;
-			}
-
 			const result = createLivePreviewMeteringTrackStates({
 				audioMix,
 				isPlaying,
@@ -114,17 +105,31 @@ export function useLivePreviewMetering({
 				trackStates,
 			});
 			clipHoldStateRef.current = result.clipHoldState;
-			commitLiveMeteringState({
+			const targetMeteringState = {
 				combinedState: result.combinedState,
 				trackStates: result.trackStates,
+			} satisfies LivePreviewMeteringState;
+			const displayTimestampMs =
+				isPlaying && typeof timestampMs === "number" ? timestampMs : null;
+			const elapsedDisplayMs =
+				displayTimestampMs !== null && lastDisplayUpdateTimestampMs !== null
+					? displayTimestampMs - lastDisplayUpdateTimestampMs
+					: null;
+			const displayMeteringState = smoothLivePreviewMeteringState({
+				elapsedMs: elapsedDisplayMs,
+				isPlaying,
+				previousState: liveMeteringStateRef.current,
+				targetState: targetMeteringState,
 			});
 
-			if (isPlaying && typeof timestampMs === "number") {
-				lastPlayingUpdateTimestampMs = timestampMs;
+			commitLiveMeteringState(displayMeteringState);
+
+			if (displayTimestampMs !== null) {
+				lastDisplayUpdateTimestampMs = displayTimestampMs;
 			}
 
 			if (!isPlaying) {
-				lastPlayingUpdateTimestampMs = null;
+				lastDisplayUpdateTimestampMs = null;
 			}
 
 			scheduleNextUpdate(isPlaying);
@@ -146,6 +151,152 @@ export function useLivePreviewMetering({
 	}, [audioMix, clock, enabled, now, soloedAudioTrackId, trackStates]);
 
 	return liveMeteringState;
+}
+
+function smoothLivePreviewMeteringState({
+	elapsedMs,
+	isPlaying,
+	previousState,
+	targetState,
+}: {
+	elapsedMs: number | null;
+	isPlaying: boolean;
+	previousState: LivePreviewMeteringState;
+	targetState: LivePreviewMeteringState;
+}): LivePreviewMeteringState {
+	if (!isPlaying || elapsedMs === null || elapsedMs <= 0) {
+		return targetState;
+	}
+
+	return {
+		combinedState: smoothCombinedState({
+			elapsedMs,
+			previousState: previousState.combinedState,
+			targetState: targetState.combinedState,
+		}),
+		trackStates: smoothTrackStateRecords({
+			elapsedMs,
+			previousStates: previousState.trackStates,
+			targetStates: targetState.trackStates,
+		}),
+	};
+}
+
+function smoothCombinedState({
+	elapsedMs,
+	previousState,
+	targetState,
+}: {
+	elapsedMs: number;
+	previousState: LivePreviewMeteringState["combinedState"];
+	targetState: LivePreviewMeteringState["combinedState"];
+}): LivePreviewMeteringState["combinedState"] {
+	if (previousState.status !== "ready" || targetState.status !== "ready") {
+		return targetState;
+	}
+
+	return {
+		...targetState,
+		channels: smoothMeterChannels({
+			elapsedMs,
+			previousChannels: previousState.channels,
+			targetChannels: targetState.channels,
+		}),
+	};
+}
+
+function smoothTrackStateRecords({
+	elapsedMs,
+	previousStates,
+	targetStates,
+}: {
+	elapsedMs: number;
+	previousStates: LivePreviewMeteringState["trackStates"];
+	targetStates: LivePreviewMeteringState["trackStates"];
+}): LivePreviewMeteringState["trackStates"] {
+	const smoothedStates: LivePreviewMeteringState["trackStates"] = {};
+
+	for (const [trackId, targetState] of Object.entries(targetStates)) {
+		const previousState = previousStates[trackId];
+
+		if (
+			!previousState ||
+			previousState.status !== "ready" ||
+			targetState.status !== "ready"
+		) {
+			smoothedStates[trackId] = targetState;
+			continue;
+		}
+
+		smoothedStates[trackId] = {
+			...targetState,
+			channels: smoothMeterChannels({
+				elapsedMs,
+				previousChannels: previousState.channels,
+				targetChannels: targetState.channels,
+			}),
+		};
+	}
+
+	return smoothedStates;
+}
+
+function smoothMeterChannels({
+	elapsedMs,
+	previousChannels,
+	targetChannels,
+}: {
+	elapsedMs: number;
+	previousChannels: PreviewLevelMeterChannel[];
+	targetChannels: PreviewLevelMeterChannel[];
+}): PreviewLevelMeterChannel[] {
+	if (previousChannels.length !== targetChannels.length) {
+		return targetChannels;
+	}
+
+	return targetChannels.map((targetChannel, channelIndex) => {
+		const previousChannel = previousChannels[channelIndex];
+
+		if (!previousChannel || previousChannel.label !== targetChannel.label) {
+			return targetChannel;
+		}
+
+		return {
+			...targetChannel,
+			peakDb: smoothPeakDb({
+				elapsedMs,
+				previousPeakDb: previousChannel.peakDb,
+				targetPeakDb: targetChannel.peakDb,
+			}),
+		};
+	});
+}
+
+function smoothPeakDb({
+	elapsedMs,
+	previousPeakDb,
+	targetPeakDb,
+}: {
+	elapsedMs: number;
+	previousPeakDb: number;
+	targetPeakDb: number;
+}): number {
+	if (!Number.isFinite(previousPeakDb) || !Number.isFinite(targetPeakDb)) {
+		return targetPeakDb;
+	}
+
+	const timeConstantMs =
+		targetPeakDb >= previousPeakDb
+			? LIVE_PREVIEW_METERING_ATTACK_MS
+			: LIVE_PREVIEW_METERING_RELEASE_MS;
+	const alpha = 1 - Math.exp(-elapsedMs / timeConstantMs);
+	const smoothedPeakDb =
+		previousPeakDb + (targetPeakDb - previousPeakDb) * alpha;
+
+	return Math.abs(targetPeakDb - smoothedPeakDb) <=
+		LIVE_PREVIEW_METERING_SNAP_THRESHOLD_DB
+		? targetPeakDb
+		: smoothedPeakDb;
 }
 
 function requestPreviewMeteringFrame(

@@ -1,5 +1,5 @@
 import { CircleDot, Maximize2 } from "lucide-react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 
 import {
 	type ChapterOption,
@@ -59,15 +59,6 @@ export function PreviewViewerRegion({
 		[asset, previewSourceMimeType, previewUrl],
 	);
 
-	function handleProviderChange(provider: MediaProviderAdapter | null) {
-		if (isHLSProvider(provider)) {
-			provider.config = {
-				...provider.config,
-				enableWorker: true,
-			};
-		}
-	}
-
 	return (
 		<section
 			aria-label="Workbench center region"
@@ -115,79 +106,136 @@ export function PreviewViewerRegion({
 						</Button>
 					</div>
 				</div>
-				<section
-					aria-label="Preview viewer surface"
-					className="grid min-h-0 flex-1 place-items-center overflow-hidden bg-workbench-viewer p-3 xl:p-4"
-					ref={previewSurfaceRef}
-				>
-					<section
-						aria-label="Preview aperture"
-						className="relative max-h-full w-full overflow-hidden border border-workbench-border-strong bg-black shadow-2xl"
-						style={previewApertureStyle}
-					>
-						<MediaPlayer
-							aria-label={`Preview for ${asset.label}`}
-							className="h-full w-full bg-black text-white"
-							crossOrigin
-							muted={mediaMuted}
-							onEnded={onEnded}
-							onPause={onNativePause}
-							onPlay={onNativePlay}
-							onSeeked={onSyncPlayhead}
-							onTimeUpdate={onSyncPlayhead}
-							onProviderChange={handleProviderChange}
-							playsInline
-							preload="metadata"
-							ref={videoRef}
-							src={playerSrc}
-							title={asset.label}
-							viewType={asset.tracks.video.length > 0 ? "video" : "audio"}
-						>
-							<MediaProvider
-								mediaProps={{
-									className: "h-full w-full bg-black object-contain",
-								}}
-							>
-								{previewPosterSrc ? (
-									<Poster
-										alt=""
-										className="vds-poster h-full w-full object-contain"
-										src={previewPosterSrc}
-									/>
-								) : null}
-							</MediaProvider>
-							<DefaultVideoLayout
-								icons={defaultLayoutIcons}
-								slots={{
-									chaptersMenu: (
-										<PreviewChaptersMenu
-											onChapterSelected={onChapterSelectionRequested}
-										/>
-									),
-									largeLayout: {
-										muteButton: null,
-										volumeSlider: null,
-									},
-									muteButton: null,
-									smallLayout: {
-										muteButton: null,
-										volumeSlider: null,
-									},
-									volumeSlider: null,
-								}}
-							/>
-						</MediaPlayer>
-						<div
-							aria-hidden="true"
-							className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden opacity-0"
-							data-testid="multitrack-preview-transport"
-							ref={multitrackContainerRef}
-						/>
-					</section>
-				</section>
+				<PreviewMediaSurface
+					asset={asset}
+					mediaMuted={mediaMuted}
+					multitrackContainerRef={multitrackContainerRef}
+					onChapterSelectionRequested={onChapterSelectionRequested}
+					onEnded={onEnded}
+					onNativePause={onNativePause}
+					onNativePlay={onNativePlay}
+					onSyncPlayhead={onSyncPlayhead}
+					playerSrc={playerSrc}
+					previewApertureStyle={previewApertureStyle}
+					previewPosterSrc={previewPosterSrc}
+					previewSurfaceRef={previewSurfaceRef}
+					videoRef={videoRef}
+				/>
 			</section>
 		</section>
 	);
+}
+
+const PreviewMediaSurface = memo(function PreviewMediaSurface({
+	asset,
+	mediaMuted,
+	multitrackContainerRef,
+	onChapterSelectionRequested,
+	onEnded,
+	onNativePause,
+	onNativePlay,
+	onSyncPlayhead,
+	playerSrc,
+	previewApertureStyle,
+	previewPosterSrc,
+	previewSurfaceRef,
+	videoRef,
+}: {
+	asset: ReadyMediaAsset;
+	mediaMuted: boolean;
+	multitrackContainerRef: PreviewViewerRegionProps["multitrackContainerRef"];
+	onChapterSelectionRequested?: (selection: Selection) => void;
+	onEnded: () => void;
+	onNativePause: () => void;
+	onNativePlay: () => void;
+	onSyncPlayhead: () => void;
+	playerSrc: PlayerSrc | undefined;
+	previewApertureStyle: PreviewViewerRegionProps["previewApertureStyle"];
+	previewPosterSrc?: string;
+	previewSurfaceRef: PreviewViewerRegionProps["previewSurfaceRef"];
+	videoRef: PreviewViewerRegionProps["videoRef"];
+}) {
+	return (
+		<section
+			aria-label="Preview viewer surface"
+			className="grid min-h-0 flex-1 place-items-center overflow-hidden bg-workbench-viewer p-3 xl:p-4"
+			ref={previewSurfaceRef}
+		>
+			<section
+				aria-label="Preview aperture"
+				className="relative max-h-full w-full overflow-hidden border border-workbench-border-strong bg-black shadow-2xl"
+				style={previewApertureStyle}
+			>
+				<MediaPlayer
+					aria-label={`Preview for ${asset.label}`}
+					className="h-full w-full bg-black text-white"
+					crossOrigin
+					muted={mediaMuted}
+					onEnded={onEnded}
+					onPause={onNativePause}
+					onPlay={onNativePlay}
+					onSeeked={onSyncPlayhead}
+					onTimeUpdate={onSyncPlayhead}
+					onProviderChange={handlePreviewProviderChange}
+					playsInline
+					preload="metadata"
+					ref={videoRef}
+					src={playerSrc}
+					title={asset.label}
+					viewType={asset.tracks.video.length > 0 ? "video" : "audio"}
+				>
+					<MediaProvider
+						mediaProps={{
+							className: "h-full w-full bg-black object-contain",
+						}}
+					>
+						{previewPosterSrc ? (
+							<Poster
+								alt=""
+								className="vds-poster h-full w-full object-contain"
+								src={previewPosterSrc}
+							/>
+						) : null}
+					</MediaProvider>
+					<DefaultVideoLayout
+						icons={defaultLayoutIcons}
+						slots={{
+							chaptersMenu: (
+								<PreviewChaptersMenu
+									onChapterSelected={onChapterSelectionRequested}
+								/>
+							),
+							largeLayout: {
+								muteButton: null,
+								volumeSlider: null,
+							},
+							muteButton: null,
+							smallLayout: {
+								muteButton: null,
+								volumeSlider: null,
+							},
+							volumeSlider: null,
+						}}
+					/>
+				</MediaPlayer>
+				<div
+					aria-hidden="true"
+					className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden opacity-0"
+					data-testid="multitrack-preview-transport"
+					ref={multitrackContainerRef}
+				/>
+			</section>
+		</section>
+	);
+});
+
+function handlePreviewProviderChange(provider: MediaProviderAdapter | null) {
+	if (isHLSProvider(provider)) {
+		provider.config = {
+			...provider.config,
+			enableWorker: true,
+		};
+	}
 }
 
 type PreviewChapterSelection = Selection & {

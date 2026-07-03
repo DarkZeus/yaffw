@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 
 import { SelectionTimeline } from "./selection-timeline";
@@ -196,6 +197,65 @@ describe("SelectionTimeline", () => {
 		await new Promise((resolve) => setTimeout(resolve, 30));
 
 		expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not reprocess video thumbnails when only audio mix decisions change", async () => {
+		const videoStripThumbnailLoader = vi.fn(
+			async ({ timestampsUs }: VideoStripThumbnailRequest) => ({
+				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+					imageBlob: new Blob([`thumbnail-${timestampUs}-${index}`], {
+						type: "image/jpeg",
+					}),
+					index,
+					timestampUs,
+				})),
+				status: "ready" as const,
+				thumbnailHeightPx: 54,
+				thumbnailWidthPx: 96,
+			}),
+		);
+		const initialAudioMix = createDefaultAudioMix(readyAsset);
+		const view = renderTimeline({
+			audioMix: initialAudioMix,
+			videoStripThumbnailLoader,
+		});
+
+		await waitFor(() => {
+			expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(1);
+		});
+
+		view.rerender(
+			<SelectionTimeline
+				asset={readyAsset}
+				audioMix={{
+					...initialAudioMix,
+					tracks: {
+						...initialAudioMix.tracks,
+						"audio-1": {
+							...initialAudioMix.tracks["audio-1"],
+							channelMode: "use-left-as-mono",
+						},
+					},
+				}}
+				onPlayheadSeekRequested={() => {}}
+				onSelectionEndCommitRequested={() => {}}
+				onSelectionRangeMoveRequested={() => {}}
+				onSelectionResetRequested={() => {}}
+				onSelectionStartCommitRequested={() => {}}
+				playheadUs={0}
+				selection={selection}
+				source={source}
+				videoStripThumbnailLoader={videoStripThumbnailLoader}
+				waveformLaneLoader={async () => ({
+					samples: [0.4, 0.7, 0.2],
+					status: "ready",
+				})}
+			/>,
+		);
+
+		await new Promise((resolve) => setTimeout(resolve, 30));
+
+		expect(videoStripThumbnailLoader).toHaveBeenCalledTimes(1);
 	});
 
 	it("renders thumbnail slots on the same media-time scale as the timeline", async () => {

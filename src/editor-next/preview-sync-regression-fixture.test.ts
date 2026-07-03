@@ -62,7 +62,9 @@ describe("preview sync regression fixture", () => {
 		expect(normalizedInvariantDocument).toContain(
 			"audio engine is the preview time authority",
 		);
-		expect(normalizedInvariantDocument).toContain("muted visual follower");
+		expect(normalizedInvariantDocument).toContain(
+			"native video is a muted visual follower",
+		);
 		expect(normalizedInvariantDocument).toContain(
 			"WaveSurfer waveform rendering",
 		);

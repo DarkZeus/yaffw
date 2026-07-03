@@ -82,6 +82,7 @@ export type VideoStripThumbnailViewport = {
 };
 
 export type VideoStripThumbnailWindow = {
+	assetDurationUs: MediaTimeUs;
 	frameStepUs: MediaTimeUs;
 	key: string;
 	timestampsUs: MediaTimeUs[];

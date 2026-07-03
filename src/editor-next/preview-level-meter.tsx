@@ -26,10 +26,12 @@ export type PreviewLevelMeterZone = {
 };
 
 export type PreviewLevelMeterProps = {
+	channelWidthRem?: number;
 	channels: PreviewLevelMeterChannel[];
 	label: string;
 	message?: string;
 	orientation?: PreviewLevelMeterOrientation;
+	showChannelLabels?: boolean;
 	showTickLabels?: boolean;
 	state: PreviewLevelMeterState;
 	ticks?: number[];
@@ -71,10 +73,12 @@ export const previewPeakMeterZones = [
 const defaultPreviewLevelMeterTicks = [0, -9, -20, -40, -72];
 
 export function PreviewLevelMeter({
+	channelWidthRem,
 	channels,
 	label,
 	message,
 	orientation = "vertical",
+	showChannelLabels = true,
 	showTickLabels = true,
 	state,
 	ticks = defaultPreviewLevelMeterTicks,
@@ -98,9 +102,11 @@ export function PreviewLevelMeter({
 			{state === "ready" ? (
 				<ReadyPreviewLevelMeter
 					channels={channels}
+					channelWidthRem={channelWidthRem}
 					label={label}
 					orientation={orientation}
 					range={range}
+					showChannelLabels={showChannelLabels}
 					showTickLabels={showTickLabels}
 					ticks={ticks}
 					zones={zones}
@@ -114,17 +120,21 @@ export function PreviewLevelMeter({
 
 function ReadyPreviewLevelMeter({
 	channels,
+	channelWidthRem,
 	label,
 	orientation,
 	range,
+	showChannelLabels,
 	showTickLabels,
 	ticks,
 	zones,
 }: {
 	channels: PreviewLevelMeterChannel[];
+	channelWidthRem?: number;
 	label: string;
 	orientation: PreviewLevelMeterOrientation;
 	range: PreviewLevelMeterVisualRange;
+	showChannelLabels: boolean;
 	showTickLabels: boolean;
 	ticks: number[];
 	zones: PreviewLevelMeterZone[];
@@ -138,7 +148,11 @@ function ReadyPreviewLevelMeter({
 						? "grid-flow-col items-stretch"
 						: "auto-rows-[1.5rem]",
 				)}
-				style={meterChannelsStyle(channels.length, orientation)}
+				style={meterChannelsStyle(
+					channels.length,
+					orientation,
+					channelWidthRem,
+				)}
 			>
 				<ZoneDescriptions zones={zones} />
 				{showTickLabels ? (
@@ -151,6 +165,7 @@ function ReadyPreviewLevelMeter({
 						key={`${channel.label ?? "channel"}-${channelIndex}`}
 						orientation={orientation}
 						range={range}
+						showChannelLabel={showChannelLabels}
 						zones={zones}
 					/>
 				))}
@@ -164,12 +179,14 @@ function PreviewLevelMeterChannelBar({
 	channelIndex,
 	orientation,
 	range,
+	showChannelLabel,
 	zones,
 }: {
 	channel: PreviewLevelMeterChannel;
 	channelIndex: number;
 	orientation: PreviewLevelMeterOrientation;
 	range: PreviewLevelMeterVisualRange;
+	showChannelLabel: boolean;
 	zones: PreviewLevelMeterZone[];
 }) {
 	const channelLabel = channel.label ?? `Channel ${channelIndex + 1}`;
@@ -181,11 +198,15 @@ function PreviewLevelMeterChannelBar({
 			className={cn(
 				"relative z-10 grid min-w-0 gap-1",
 				orientation === "vertical"
-					? "grid-rows-[minmax(0,1fr)_auto]"
-					: "grid-cols-[3rem_minmax(0,1fr)] items-center",
+					? showChannelLabel
+						? "grid-rows-[minmax(0,1fr)_auto]"
+						: "grid-rows-[minmax(0,1fr)]"
+					: showChannelLabel
+						? "grid-cols-[3rem_minmax(0,1fr)] items-center"
+						: "items-center",
 			)}
 		>
-			{orientation === "horizontal" ? (
+			{orientation === "horizontal" && showChannelLabel ? (
 				<div className="truncate text-[10px] leading-none text-muted-foreground">
 					{channelLabel}
 				</div>
@@ -233,7 +254,7 @@ function PreviewLevelMeterChannelBar({
 					</span>
 				) : null}
 			</div>
-			{orientation === "vertical" ? (
+			{orientation === "vertical" && showChannelLabel ? (
 				<div className="truncate text-center text-[10px] leading-none text-muted-foreground">
 					{channelLabel}
 				</div>
@@ -316,7 +337,16 @@ function ZoneDescriptions({ zones }: { zones: PreviewLevelMeterZone[] }) {
 function meterChannelsStyle(
 	channelCount: number,
 	orientation: PreviewLevelMeterOrientation,
+	channelWidthRem?: number,
 ): CSSProperties {
+	if (orientation === "vertical" && Number.isFinite(channelWidthRem)) {
+		const fixedChannelWidthRem = Math.max(channelWidthRem ?? 0, 0.375);
+
+		return {
+			gridTemplateColumns: `repeat(${Math.max(channelCount, 1)}, ${fixedChannelWidthRem}rem)`,
+		};
+	}
+
 	const minimumChannelWidthRem = orientation === "vertical" ? 1.375 : 0;
 	const minimumWidthRem =
 		orientation === "vertical" && channelCount > 2

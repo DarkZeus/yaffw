@@ -1,4 +1,5 @@
 import { Headphones, Loader2, Volume2, VolumeX } from "lucide-react";
+import { memo } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,7 @@ import type {
 import type { WaveformLaneState } from "./selection-waveform-lanes.types";
 import { WaveformSurface } from "./selection-waveform-surface";
 
-export function WaveformLane({
+export const WaveformLane = memo(function WaveformLane({
 	audioDecision,
 	audioPreviewPreparing,
 	durationUs,
@@ -52,88 +53,90 @@ export function WaveformLane({
 			}}
 		>
 			<div
-				className="sticky left-0 z-40 flex min-h-24 min-w-0 flex-col gap-1.5 border-r border-workbench-border bg-workbench-ruler/95 px-2.5 py-2 backdrop-blur"
+				className="sticky left-0 z-40 grid min-h-14 min-w-0 grid-rows-[auto_auto] gap-1 border-r border-workbench-border bg-workbench-ruler/95 px-2 py-1.5 backdrop-blur"
 				data-testid={`waveform-lane-header-${lane.track.id}`}
 			>
-				<div className="flex min-w-0 items-start justify-between gap-1.5">
+				<div className="flex min-w-0 items-start justify-between gap-1">
 					<div className="min-w-0">
-						<div className="truncate text-sm font-medium text-workbench-lane-foreground">
+						<div className="truncate text-xs font-medium leading-4 text-workbench-lane-foreground">
 							{identity.title}
 						</div>
-						<div className="truncate font-mono text-[10px] leading-4 text-muted-foreground">
+						<div className="truncate font-mono text-[9px] leading-3 text-muted-foreground">
 							{metadataLabel}
 						</div>
 					</div>
 					<LaneStatus lane={lane} status={identity.status} />
 				</div>
-				<div className="flex min-w-0 flex-wrap items-center gap-1">
-					<Button
-						aria-label={
-							audioIncluded
-								? `Exclude ${identity.title} from output`
-								: `Include ${identity.title} in output`
-						}
-						aria-pressed={audioIncluded}
-						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
-							audioIncluded
-								? "text-workbench-lane-foreground"
-								: "text-muted-foreground"
-						}`}
-						disabled={selectionEditingDisabled || !onAudioTrackIncludedChange}
-						onClick={(event) => {
-							event.stopPropagation();
-							onAudioTrackIncludedChange?.(lane.track.id, !audioIncluded);
-						}}
-						onPointerDown={(event) => event.stopPropagation()}
-						size="icon"
-						type="button"
-						variant="outline"
-					>
-						{audioIncluded ? (
-							<Volume2 data-icon="inline-start" />
-						) : (
-							<VolumeX data-icon="inline-start" />
-						)}
-					</Button>
-					<Button
-						aria-label={
-							soloActive
-								? `Clear ${identity.title} preview solo`
-								: `Solo ${identity.title} for preview`
-						}
-						aria-pressed={soloActive}
-						className={`size-6 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
-							soloActive
-								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
-								: "text-muted-foreground"
-						}`}
-						disabled={!onSoloedAudioTrackChange}
-						onClick={(event) => {
-							event.stopPropagation();
-							onSoloedAudioTrackChange?.(soloActive ? null : lane.track.id);
-						}}
-						onPointerDown={(event) => event.stopPropagation()}
-						size="icon"
-						type="button"
-						variant="outline"
-					>
-						<Headphones data-icon="inline-start" />
-					</Button>
+				<div className="flex min-w-0 items-center justify-between gap-1">
+					<div className="flex min-w-0 items-center gap-1">
+						<Button
+							aria-label={
+								audioIncluded
+									? `Exclude ${identity.title} from output`
+									: `Include ${identity.title} in output`
+							}
+							aria-pressed={audioIncluded}
+							className={`size-5 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+								audioIncluded
+									? "text-workbench-lane-foreground"
+									: "text-muted-foreground"
+							}`}
+							disabled={selectionEditingDisabled || !onAudioTrackIncludedChange}
+							onClick={(event) => {
+								event.stopPropagation();
+								onAudioTrackIncludedChange?.(lane.track.id, !audioIncluded);
+							}}
+							onPointerDown={(event) => event.stopPropagation()}
+							size="icon"
+							type="button"
+							variant="outline"
+						>
+							{audioIncluded ? (
+								<Volume2 aria-hidden="true" className="size-3" />
+							) : (
+								<VolumeX aria-hidden="true" className="size-3" />
+							)}
+						</Button>
+						<Button
+							aria-label={
+								soloActive
+									? `Clear ${identity.title} preview solo`
+									: `Solo ${identity.title} for preview`
+							}
+							aria-pressed={soloActive}
+							className={`size-5 rounded border-workbench-border bg-workbench-viewer hover:bg-workbench-hover ${
+								soloActive
+									? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
+									: "text-muted-foreground"
+							}`}
+							disabled={!onSoloedAudioTrackChange}
+							onClick={(event) => {
+								event.stopPropagation();
+								onSoloedAudioTrackChange?.(soloActive ? null : lane.track.id);
+							}}
+							onPointerDown={(event) => event.stopPropagation()}
+							size="icon"
+							type="button"
+							variant="outline"
+						>
+							<Headphones aria-hidden="true" className="size-3" />
+						</Button>
+					</div>
+					{audioPreviewPreparing ? (
+						<Badge
+							className="h-5 max-w-[5.75rem] gap-1 truncate border-workbench-progress/45 bg-workbench-progress/15 px-1 text-[9px] leading-none text-workbench-progress"
+							variant="outline"
+						>
+							<Loader2 className="size-2.5 shrink-0 animate-spin" />
+							<span className="truncate">Preparing audio</span>
+						</Badge>
+					) : null}
 				</div>
-				{audioPreviewPreparing ? (
-					<Badge
-						className="w-fit gap-1 border-workbench-progress/45 bg-workbench-progress/15 text-workbench-progress"
-						variant="outline"
-					>
-						<Loader2 className="size-3 animate-spin" />
-						Preparing audio
-					</Badge>
-				) : null}
 			</div>
 			{lane.status === "ready" ? (
 				<button
 					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-full min-h-24 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
+					className="relative block h-full min-h-14 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
 					type="button"
 				>
 					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
@@ -153,7 +156,7 @@ export function WaveformLane({
 			) : (
 				<button
 					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-full min-h-24 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
+					className="relative block h-full min-h-14 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
 					onMouseDown={(event) => {
 						if (typeof window.PointerEvent === "undefined") {
 							onPointerDown(event);
@@ -177,7 +180,7 @@ export function WaveformLane({
 			)}
 		</div>
 	);
-}
+});
 
 function LaneStatus({
 	lane,

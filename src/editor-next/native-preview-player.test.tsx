@@ -516,7 +516,7 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
-	it("keeps audio preview preparation visible and blocks native playback while audio-master is pending", async () => {
+	it("keeps audio preview preparation visible while blocking pending audio-master playback", async () => {
 		const pendingAudioPreview =
 			createDeferred<BrowserAudioPreviewSourcesResult>();
 		prepareBrowserAudioPreviewSourcesMock.mockReturnValueOnce(
@@ -537,7 +537,32 @@ describe("NativePreviewPlayer", () => {
 		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
 	});
 
-	it("applies preview and audio mix controls through the audio-master multitrack adapter", async () => {
+	it("blocks playback while required custom audio monitoring is pending", async () => {
+		const pendingAudioPreview =
+			createDeferred<BrowserAudioPreviewSourcesResult>();
+		prepareBrowserAudioPreviewSourcesMock.mockReturnValueOnce(
+			pendingAudioPreview.promise,
+		);
+		vi.stubGlobal("AudioContext", class AudioContext {});
+
+		render(<AudioMasterPlayerProbe asset={readyAssetWithAudio} />);
+
+		await waitFor(() => {
+			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		});
+
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Set Voice track volume to 50%",
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+		expect(play).not.toHaveBeenCalled();
+		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+	});
+
+	it("applies preview and audio mix controls through the monitored multitrack adapter", async () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
 		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
 			createPreparedAudioPreviewSourcesForRequest(request),
@@ -607,6 +632,7 @@ describe("NativePreviewPlayer", () => {
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:true:preserve:50|audio-2:true:preserve:100",
 		);
+		expect(video.muted).toBe(true);
 
 		fireEvent.click(
 			screen.getByRole("button", { name: "Exclude Voice from output" }),
@@ -974,6 +1000,53 @@ describe("NativePreviewPlayer", () => {
 		);
 		expect(screen.getAllByText("00:00:01.250").length).toBe(1);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
+	});
+
+	it("does not rerender the media player for playback ticks after a timeline seek", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const getBoundingClientRect = vi
+			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+			.mockImplementation(function getElementRect(this: HTMLElement) {
+				if (this.dataset.testid === "selection-timeline-track") {
+					return createTestDomRect({ height: 80, width: 1200 });
+				}
+
+				return createTestDomRect({ height: 0, width: 0 });
+			});
+
+		try {
+			renderPlayer();
+
+			const video = screen.getByLabelText(
+				"Preview for clip.mp4",
+			) as HTMLVideoElement;
+
+			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
+				clientX: 600,
+			});
+			expect(video.currentTime).toBe(6);
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+			await waitFor(() => {
+				expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+			});
+			const mediaPlayerRenderCountAfterPlaybackStart =
+				adapterMockState.mediaPlayerRenderCount;
+
+			video.currentTime = 6.25;
+			runNextPreviewFrame(frameCallbacks);
+
+			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+				"00:00:06.250",
+			);
+			expect(adapterMockState.mediaPlayerRenderCount).toBe(
+				mediaPlayerRenderCountAfterPlaybackStart,
+			);
+		} finally {
+			getBoundingClientRect.mockRestore();
+		}
 	});
 
 	it("requests fullscreen when the native video API is available", () => {

@@ -120,6 +120,16 @@ describe("createWaveformLaneIdentityViewModel", () => {
 			/>,
 		);
 
+		const laneHeader = screen.getByTestId("waveform-lane-header-audio-voice");
+		expect(laneHeader.className).toContain("min-h-14");
+		expect(laneHeader.className).not.toContain("min-h-24");
+		expect(
+			screen.getByLabelText("Seek Voice waveform lane").className,
+		).toContain("min-h-14");
+		expect(
+			screen.getByLabelText("Seek Voice waveform lane").className,
+		).not.toContain("min-h-24");
+
 		fireEvent.click(
 			screen.getByRole("button", { name: "Exclude Voice from output" }),
 		);

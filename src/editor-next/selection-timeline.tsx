@@ -10,6 +10,7 @@ import {
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	type RefObject,
+	memo,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -462,19 +463,30 @@ export function SelectionTimeline({
 		});
 	}
 
-	function seekFromLanePointer(
-		event:
-			| ReactMouseEvent<HTMLButtonElement>
-			| ReactPointerEvent<HTMLButtonElement>,
-	) {
-		onPlayheadSeekRequested(
-			clientXToMediaTime({
-				clientX: event.clientX,
-				durationUs: asset.durationUs,
-				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-			}),
-		);
-	}
+	const seekFromLanePointer = useCallback(
+		(
+			event:
+				| ReactMouseEvent<HTMLButtonElement>
+				| ReactPointerEvent<HTMLButtonElement>,
+		) => {
+			onPlayheadSeekRequested(
+				clientXToMediaTime({
+					clientX: event.clientX,
+					durationUs: asset.durationUs,
+					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+				}),
+			);
+		},
+		[asset.durationUs, onPlayheadSeekRequested],
+	);
+	const seekFromLaneMouseFallback = useCallback(
+		(event: ReactMouseEvent<HTMLButtonElement>) => {
+			if (shouldUseMouseFallback()) {
+				seekFromLanePointer(event);
+			}
+		},
+		[seekFromLanePointer],
+	);
 
 	function shouldUseMouseFallback() {
 		return typeof window.PointerEvent === "undefined";
@@ -688,11 +700,7 @@ export function SelectionTimeline({
 								aria-label="Seek timeline ruler"
 								className="relative block h-12 min-w-0 cursor-crosshair border-0 bg-workbench-ruler p-0 text-left"
 								data-testid="selection-timeline-track"
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										seekFromLanePointer(event);
-									}
-								}}
+								onMouseDown={seekFromLaneMouseFallback}
 								onPointerDown={seekFromLanePointer}
 								ref={trackRef}
 								type="button"
@@ -720,11 +728,7 @@ export function SelectionTimeline({
 						>
 							<VideoThumbnailStrip
 								durationUs={asset.durationUs}
-								onMouseDown={(event) => {
-									if (shouldUseMouseFallback()) {
-										seekFromLanePointer(event);
-									}
-								}}
+								onMouseDown={seekFromLaneMouseFallback}
 								onPointerDown={seekFromLanePointer}
 								laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 								state={videoStripState}
@@ -966,7 +970,7 @@ function useTimelineViewport({
 	return viewport;
 }
 
-function VideoThumbnailStrip({
+const VideoThumbnailStrip = memo(function VideoThumbnailStrip({
 	onMouseDown,
 	onPointerDown,
 	durationUs,
@@ -1085,7 +1089,7 @@ function VideoThumbnailStrip({
 			</button>
 		</div>
 	);
-}
+});
 
 function VideoThumbnailStripStatus({
 	expectedFrameCount,

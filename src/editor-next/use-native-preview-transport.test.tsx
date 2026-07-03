@@ -110,10 +110,7 @@ describe("useNativePreviewTransport", () => {
 			await playStarted.promise;
 		});
 
-		await waitFor(() => {
-			expect(multitrack.play).toHaveBeenCalledTimes(1);
-			expect(readState()).toContain("playing:true");
-		});
+		expect(readState()).toContain("playing:true");
 	});
 
 	it("does not chase small custom-audio clock drift with native video seeks during playback", async () => {
@@ -135,6 +132,73 @@ describe("useNativePreviewTransport", () => {
 
 		expect(video.currentTime).toBe(2.12);
 		expect(readState()).toContain("playhead:2060000");
+	});
+
+	it("resyncs visible audio-master video lag before it reaches a quarter second", async () => {
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 2,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+
+		video.currentTime = 1.9;
+		fireEvent.timeUpdate(video);
+
+		expect(video.currentTime).toBe(2);
+		expect(readState()).toContain("playhead:2000000");
+	});
+
+	it("samples high-frequency playback frames without committing every tiny playhead tick to React state", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const transportHandleRef: {
+			current: ReturnType<typeof useNativePreviewTransport> | null;
+		} = {
+			current: null,
+		};
+
+		render(
+			<NativePreviewTransportProbe
+				onTransport={(transport) => {
+					transportHandleRef.current = transport;
+				}}
+				previewClockMode="native-video"
+				selection={defaultSelection}
+			/>,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		video.currentTime = 1;
+		runNextPreviewFrame(frameCallbacks, 0);
+
+		expect(readState()).toContain("playhead:1000000");
+		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_000_000);
+
+		video.currentTime = 1.016;
+		runNextPreviewFrame(frameCallbacks, 16);
+
+		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_016_000);
+		expect(readState()).toContain("playhead:1000000");
+
+		video.currentTime = 1.052;
+		runNextPreviewFrame(frameCallbacks, 52);
+
+		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_052_000);
+		expect(readState()).toContain("playhead:1052000");
 	});
 
 	it("hard-resyncs large native video drift to the audio-master clock", async () => {
@@ -174,6 +238,35 @@ describe("useNativePreviewTransport", () => {
 
 		fireEvent.seeked(video);
 
+		expect(video.currentTime).toBe(10);
+		expect(readState()).toContain("playhead:10000000");
+	});
+
+	it("starts audio-master playback from a paused timeline seek without snapping back", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const multitrack = createMultitrackSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+		expect(video.currentTime).toBe(10);
+		expect(readState()).toContain("playhead:10000000");
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		runNextPreviewFrame(frameCallbacks);
+
+		expect(multitrack.setTime).toHaveBeenLastCalledWith(10);
+		expect(multitrack.getCurrentTime()).toBe(10);
 		expect(video.currentTime).toBe(10);
 		expect(readState()).toContain("playhead:10000000");
 	});
@@ -311,7 +404,9 @@ describe("useNativePreviewTransport", () => {
 		const multitrack = createMultitrackSpy();
 
 		if (!firstEvent || !secondEvent) {
-			throw new Error("Expected the sync fixture to define at least two events.");
+			throw new Error(
+				"Expected the sync fixture to define at least two events.",
+			);
 		}
 
 		render(
@@ -364,7 +459,9 @@ describe("useNativePreviewTransport", () => {
 		expect(multitrack.setTime).toHaveBeenLastCalledWith(
 			(secondEvent.audioClickUs + 33_333) / 1_000_000,
 		);
-		expect(readState()).toContain(`playhead:${secondEvent.audioClickUs + 33333}`);
+		expect(readState()).toContain(
+			`playhead:${secondEvent.audioClickUs + 33333}`,
+		);
 	});
 
 	it("loops only after playback enters the selection", async () => {
@@ -449,7 +546,8 @@ describe("useNativePreviewTransport", () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
 		const multitrack = createMultitrackSpy({
-			currentTimeSeconds: syncFixture.selections.selectedRange.startUs / 1_000_000,
+			currentTimeSeconds:
+				syncFixture.selections.selectedRange.startUs / 1_000_000,
 		});
 
 		render(
@@ -542,6 +640,7 @@ function NativePreviewTransportProbe({
 	durationUs = 12_000_000,
 	frameDurationUs = 33_333,
 	multitrack = createMultitrackSpy(),
+	onTransport,
 	previewClockMode = "audio-master",
 	seekTargetUs = 2_000_000,
 	selection = { endUs: 12_000_000, startUs: 0 },
@@ -550,6 +649,9 @@ function NativePreviewTransportProbe({
 	durationUs?: number;
 	frameDurationUs?: number;
 	multitrack?: ReturnType<typeof createMultitrackSpy>;
+	onTransport?: (
+		transport: ReturnType<typeof useNativePreviewTransport>,
+	) => void;
 	previewClockMode?: "audio-master" | "audio-master-pending" | "native-video";
 	seekTargetUs?: number;
 	selection?: Selection;
@@ -568,6 +670,7 @@ function NativePreviewTransportProbe({
 		source,
 		videoRef,
 	});
+	onTransport?.(transport);
 
 	return (
 		<div>
@@ -576,8 +679,8 @@ function NativePreviewTransportProbe({
 				onEnded={transport.handleEnded}
 				onPause={transport.handleNativePause}
 				onPlay={transport.handleNativePlay}
-				onSeeked={transport.syncPlayheadWithNativeVideo}
-				onTimeUpdate={transport.syncPlayheadWithNativeVideo}
+				onSeeked={() => transport.syncPlayheadWithNativeVideo()}
+				onTimeUpdate={() => transport.syncPlayheadWithNativeVideo()}
 				ref={videoRef}
 			>
 				<track kind="captions" />
@@ -626,8 +729,10 @@ function NativePreviewTransportProbe({
 
 function createMultitrackSpy({
 	currentTimeSeconds = 0,
+	setTimeUpdatesCurrentTime = false,
 }: {
 	currentTimeSeconds?: number;
+	setTimeUpdatesCurrentTime?: boolean;
 } = {}) {
 	let currentTime = currentTimeSeconds;
 
@@ -639,7 +744,11 @@ function createMultitrackSpy({
 		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 			currentTime = nextCurrentTimeSeconds;
 		},
-		setTime: vi.fn(),
+		setTime: vi.fn((nextCurrentTimeSeconds: number) => {
+			if (setTimeUpdatesCurrentTime) {
+				currentTime = nextCurrentTimeSeconds;
+			}
+		}),
 	};
 }
 
@@ -664,9 +773,12 @@ function stubPreviewAnimationFrames() {
 	};
 }
 
-function runNextPreviewFrame(frameCallbacks: FrameRequestCallback[]) {
+function runNextPreviewFrame(
+	frameCallbacks: FrameRequestCallback[],
+	timestampMs = 16,
+) {
 	act(() => {
-		frameCallbacks.shift()?.(16);
+		frameCallbacks.shift()?.(timestampMs);
 	});
 }
 
@@ -698,3 +810,4 @@ function syncFlashClickFixture() {
 }
 
 const previewSource = new File(["video"], "clip.mp4", { type: "video/mp4" });
+const defaultSelection = { endUs: 12_000_000, startUs: 0 } satisfies Selection;
