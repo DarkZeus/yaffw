@@ -519,58 +519,8 @@ export function SelectionTimeline({
 		!selectionEditInProgress && !playheadUpdatesAreLive
 			? "transition-[left] duration-100 ease-linear motion-reduce:transition-none"
 			: "transition-none";
-	useLayoutEffect(() => {
-		const playheadHandle = playheadHandleRef.current;
-		const livePlayheadReader = readLivePlayheadUs;
-
-		if (!playheadHandle) {
-			return;
-		}
-
-		if (
-			!playheadUpdatesAreLive ||
-			selectionEditInProgress ||
-			!livePlayheadReader
-		) {
-			playheadHandle.style.left = `${playheadPercent}%`;
-			return;
-		}
-
-		const livePlayheadHandle = playheadHandle;
-		const readLivePlayheadUsForFrame = livePlayheadReader;
-		let animationFrameId: number | null = null;
-		let cancelled = false;
-
-		function updateLivePlayheadHandle() {
-			if (cancelled) {
-				return;
-			}
-
-			livePlayheadHandle.style.left = `${mediaTimeToPercent(
-				readLivePlayheadUsForFrame(),
-				asset.durationUs,
-			)}%`;
-			animationFrameId = requestTimelineFrame(updateLivePlayheadHandle);
-		}
-
-		updateLivePlayheadHandle();
-
-		return () => {
-			cancelled = true;
-
-			if (animationFrameId !== null) {
-				cancelTimelineFrame(animationFrameId);
-			}
-		};
-	}, [
-		asset.durationUs,
-		playheadPercent,
-		playheadUpdatesAreLive,
-		readLivePlayheadUs,
-		selectionEditInProgress,
-	]);
 	const centerPlayheadInScrollContainer = useCallback(
-		(behavior: ScrollBehavior) => {
+		(targetPlayheadPercent: number, behavior: ScrollBehavior) => {
 			const scrollContainer = scrollContainerRef.current;
 			const track = trackRef.current;
 
@@ -598,7 +548,7 @@ export function SelectionTimeline({
 			const nextScrollLeft = centeredTimelineScrollLeft({
 				currentScrollLeft: scrollContainer.scrollLeft,
 				maxScrollLeft,
-				playheadPercent,
+				playheadPercent: targetPlayheadPercent,
 				trackWidthPx: trackWidth,
 				viewportWidthPx: viewportWidth,
 			});
@@ -617,19 +567,87 @@ export function SelectionTimeline({
 
 			scrollContainer.scrollLeft = nextScrollLeft;
 		},
-		[playheadPercent, zoom],
+		[zoom],
 	);
+	useLayoutEffect(() => {
+		const playheadHandle = playheadHandleRef.current;
+		const livePlayheadReader = readLivePlayheadUs;
+
+		if (!playheadHandle) {
+			return;
+		}
+
+		if (
+			!playheadUpdatesAreLive ||
+			selectionEditInProgress ||
+			!livePlayheadReader
+		) {
+			playheadHandle.style.left = `${playheadPercent}%`;
+			return;
+		}
+
+		const livePlayheadHandle = playheadHandle;
+		const readLivePlayheadUsForFrame = livePlayheadReader;
+		let animationFrameId: number | null = null;
+		let cancelled = false;
+
+		function updateLivePlayheadHandle() {
+			if (cancelled) {
+				return;
+			}
+
+			const livePlayheadPercent = mediaTimeToPercent(
+				readLivePlayheadUsForFrame(),
+				asset.durationUs,
+			);
+
+			livePlayheadHandle.style.left = `${livePlayheadPercent}%`;
+
+			if (playheadFollowEnabled) {
+				centerPlayheadInScrollContainer(livePlayheadPercent, "auto");
+			}
+
+			animationFrameId = requestTimelineFrame(updateLivePlayheadHandle);
+		}
+
+		updateLivePlayheadHandle();
+
+		return () => {
+			cancelled = true;
+
+			if (animationFrameId !== null) {
+				cancelTimelineFrame(animationFrameId);
+			}
+		};
+	}, [
+		asset.durationUs,
+		centerPlayheadInScrollContainer,
+		playheadPercent,
+		playheadFollowEnabled,
+		playheadUpdatesAreLive,
+		readLivePlayheadUs,
+		selectionEditInProgress,
+	]);
 
 	useEffect(() => {
 		if (!playheadFollowEnabled || selectionEditInProgress) {
 			return;
 		}
 
-		centerPlayheadInScrollContainer(playheadUpdatesAreLive ? "auto" : "smooth");
+		if (playheadUpdatesAreLive && readLivePlayheadUs) {
+			return;
+		}
+
+		centerPlayheadInScrollContainer(
+			playheadPercent,
+			playheadUpdatesAreLive ? "auto" : "smooth",
+		);
 	}, [
 		centerPlayheadInScrollContainer,
+		playheadPercent,
 		playheadFollowEnabled,
 		playheadUpdatesAreLive,
+		readLivePlayheadUs,
 		selectionEditInProgress,
 	]);
 

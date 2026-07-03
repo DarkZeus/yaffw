@@ -3,6 +3,7 @@
 import {
 	act,
 	cleanup,
+	fireEvent,
 	render,
 	screen,
 	waitFor,
@@ -95,6 +96,65 @@ describe("SelectionTimeline live playhead render isolation", () => {
 
 		expect(playheadHandle.style.left).toBe("5%");
 		expect(buttonRenderStats.renderCount).toBe(buttonRenderCountAfterReady);
+
+		view.unmount();
+	});
+
+	it("follows the live playhead on animation frames without React rerenders", async () => {
+		let livePlayheadUs = 0;
+		const { frameCallbacks, requestAnimationFrame } =
+			stubTimelineAnimationFrames();
+		const view = render(
+			createTimelineElement({
+				playheadUs: 0,
+				readLivePlayheadUs: () => livePlayheadUs,
+			}),
+		);
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		await waitFor(() => {
+			expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
+		});
+
+		const scrollContainer = screen.getByTestId("selection-timeline-scroll");
+		const scrollTo = vi.fn(({ left }: ScrollToOptions) => {
+			scrollContainer.scrollLeft = Number(left);
+		});
+		Object.defineProperties(scrollContainer, {
+			clientWidth: {
+				configurable: true,
+				value: 400,
+			},
+			scrollTo: {
+				configurable: true,
+				value: scrollTo,
+			},
+			scrollWidth: {
+				configurable: true,
+				value: 1_600,
+			},
+		});
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Keep playhead centered" }),
+		);
+		const buttonRenderCountAfterFollowToggle = buttonRenderStats.renderCount;
+
+		livePlayheadUs = 6_000_000;
+		act(() => {
+			runNextTimelineFrame(frameCallbacks);
+		});
+
+		expect(scrollTo).toHaveBeenLastCalledWith({
+			behavior: "auto",
+			left: 600,
+		});
+		expect(scrollContainer.scrollLeft).toBe(600);
+		expect(buttonRenderStats.renderCount).toBe(
+			buttonRenderCountAfterFollowToggle,
+		);
 
 		view.unmount();
 	});
@@ -258,13 +318,33 @@ function mockThumbnailObjectUrls() {
 	});
 }
 
+type StubbedTimelineFrame = {
+	callback: FrameRequestCallback;
+	cancelled: boolean;
+	id: number;
+};
+
 function stubTimelineAnimationFrames() {
-	const frameCallbacks: FrameRequestCallback[] = [];
+	const frameCallbacks: StubbedTimelineFrame[] = [];
+	let nextFrameId = 1;
 	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-		frameCallbacks.push(callback);
-		return frameCallbacks.length;
+		const frame = {
+			callback,
+			cancelled: false,
+			id: nextFrameId,
+		};
+
+		nextFrameId += 1;
+		frameCallbacks.push(frame);
+		return frame.id;
 	});
-	const cancelAnimationFrame = vi.fn();
+	const cancelAnimationFrame = vi.fn((frameId: number) => {
+		for (const frame of frameCallbacks) {
+			if (frame.id === frameId) {
+				frame.cancelled = true;
+			}
+		}
+	});
 
 	vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
 	vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
@@ -275,12 +355,15 @@ function stubTimelineAnimationFrames() {
 	};
 }
 
-function runNextTimelineFrame(frameCallbacks: FrameRequestCallback[]) {
-	const callback = frameCallbacks.shift();
+function runNextTimelineFrame(frameCallbacks: StubbedTimelineFrame[]) {
+	while (frameCallbacks.length > 0) {
+		const frame = frameCallbacks.shift();
 
-	if (!callback) {
-		throw new Error("Expected a pending timeline animation frame");
+		if (frame && !frame.cancelled) {
+			frame.callback(16);
+			return;
+		}
 	}
 
-	callback(16);
+	throw new Error("Expected a pending timeline animation frame");
 }
