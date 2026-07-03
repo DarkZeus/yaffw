@@ -6,7 +6,7 @@ import type {
 	CreatePreviewAudioEngineOptions,
 	PreviewAudioEngine,
 } from "./preview-audio-engine";
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
+import type { PreviewAudioResourcesState } from "./use-preview-audio-resources.types";
 
 export type PreviewAudioEngineFactory = (
 	options: CreatePreviewAudioEngineOptions,
@@ -21,7 +21,7 @@ export type PreviewAudioMonitoringStatus =
 
 export type UsePreviewAudioMonitoringLifecycleOptions = {
 	audioMix: AudioMix;
-	audioPreviewSources: BrowserAudioPreviewSourcesState;
+	previewAudioResources: PreviewAudioResourcesState;
 	createPreviewAudioEngine?: PreviewAudioEngineFactory;
 	getPlaybackRate: () => number;
 	getPlayheadUs: () => MediaTimeUs;

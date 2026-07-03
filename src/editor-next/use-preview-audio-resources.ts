@@ -1,42 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-	createBrowserAudioPreviewSourceCache,
-	createBrowserAudioPreviewSourcePlanKey,
-} from "./browser-audio-preview-source-cache";
-import type { BrowserAudioPreviewSourceCache } from "./browser-audio-preview-source-cache.types";
+	createPreviewAudioResourceCache,
+	createPreviewAudioResourcePlanKey,
+} from "./preview-audio-resource-cache";
+import type { PreviewAudioResourceCache } from "./preview-audio-resource-cache.types";
 import {
-	prepareBrowserAudioPreviewSources,
-	revokeBrowserAudioPreviewSources,
-} from "./browser-audio-preview-sources";
+	preparePreviewAudioResources,
+	revokePreviewAudioResources,
+} from "./preview-audio-resources";
 import type {
-	BrowserAudioPreviewSourcesLifecycle,
-	BrowserAudioPreviewSourcesState,
-	UseBrowserAudioPreviewSourcesOptions,
-} from "./use-browser-audio-preview-sources.types";
+	PreviewAudioResourcesLifecycle,
+	PreviewAudioResourcesState,
+	UsePreviewAudioResourcesOptions,
+} from "./use-preview-audio-resources.types";
 
-export function useBrowserAudioPreviewSources({
+export function usePreviewAudioResources({
 	activeMediaAssetCleanupScope,
 	audioMix,
 	asset,
 	enabled,
 	source,
-}: UseBrowserAudioPreviewSourcesOptions): BrowserAudioPreviewSourcesLifecycle {
-	const sourceCacheRef = useRef<BrowserAudioPreviewSourceCache | null>(null);
+}: UsePreviewAudioResourcesOptions): PreviewAudioResourcesLifecycle {
+	const resourceCacheRef = useRef<PreviewAudioResourceCache | null>(null);
 	const [retryRequest, setRetryRequest] = useState<{
 		requestId: number;
 		trackId: string;
 	} | null>(null);
-	const [state, setState] = useState<BrowserAudioPreviewSourcesState>({
+	const [state, setState] = useState<PreviewAudioResourcesState>({
 		status: "disabled",
 	});
-	const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
+	const resourcePlanKey = createPreviewAudioResourcePlanKey({
 		asset,
 		audioMix,
 	});
 
-	if (!sourceCacheRef.current) {
-		sourceCacheRef.current = createBrowserAudioPreviewSourceCache();
+	if (!resourceCacheRef.current) {
+		resourceCacheRef.current = createPreviewAudioResourceCache();
 	}
 
 	const retryTrack = useCallback((trackId: string) => {
@@ -48,20 +48,20 @@ export function useBrowserAudioPreviewSources({
 
 	useEffect(() => {
 		return () => {
-			sourceCacheRef.current?.dispose();
+			resourceCacheRef.current?.dispose();
 		};
 	}, []);
 
 	useEffect(() => {
-		const sourceCache = sourceCacheRef.current;
+		const resourceCache = resourceCacheRef.current;
 
-		if (!sourceCache || !activeMediaAssetCleanupScope) {
+		if (!resourceCache || !activeMediaAssetCleanupScope) {
 			return;
 		}
 
 		const cleanupRegistration = activeMediaAssetCleanupScope.registerCleanup(
 			() => {
-				sourceCache.dispose();
+				resourceCache.dispose();
 			},
 		);
 
@@ -71,31 +71,31 @@ export function useBrowserAudioPreviewSources({
 	}, [activeMediaAssetCleanupScope]);
 
 	useEffect(() => {
-		const sourceCache = sourceCacheRef.current;
+		const resourceCache = resourceCacheRef.current;
 
 		if (!enabled) {
-			sourceCache?.dispose();
+			resourceCache?.dispose();
 			setRetryRequest(null);
 			setState({ status: "disabled" });
 			return;
 		}
 
-		if (!sourceCache) {
+		if (!resourceCache) {
 			setState({
 				failures: [],
-				reason: "Audio preview source cache is unavailable.",
+				reason: "Preview audio resource cache is unavailable.",
 				status: "failed",
 			});
 			return;
 		}
 
-		sourceCache.resetForMediaAssetSource({ asset, source });
+		resourceCache.resetForMediaAssetSource({ asset, source });
 
 		const abortController = new AbortController();
 		let cancelled = false;
-		const plan = sourceCache.plan({
+		const plan = resourceCache.plan({
 			asset,
-			planKey: sourcePlanKey,
+			planKey: resourcePlanKey,
 		});
 		const retryTrackIds = retryRequest
 			? createRetryTrackIds({
@@ -108,7 +108,7 @@ export function useBrowserAudioPreviewSources({
 		if (trackIdsToPrepare.size === 0) {
 			setState({
 				failures: [],
-				sources: plan.cachedSources,
+				resources: plan.cachedResources,
 				status: "ready",
 			});
 			return;
@@ -116,11 +116,11 @@ export function useBrowserAudioPreviewSources({
 
 		setState({
 			preparingTrackIds: trackIdsToPrepare,
-			sources: plan.cachedSources,
+			resources: plan.cachedResources,
 			status: "loading",
 		});
 
-		void prepareBrowserAudioPreviewSources({
+		void preparePreviewAudioResources({
 			audioMix: plan.audioMix,
 			asset,
 			signal: abortController.signal,
@@ -129,20 +129,20 @@ export function useBrowserAudioPreviewSources({
 		})
 			.then((result) => {
 				if (cancelled) {
-					revokeBrowserAudioPreviewSources({ sources: result.sources });
+					revokePreviewAudioResources({ resources: result.resources });
 					return;
 				}
 
-				sourceCache.storePreparedSources({
+				resourceCache.storePreparedResources({
 					plan,
-					sources: result.sources,
+					resources: result.resources,
 				});
-				const sources = sourceCache.collectSources(plan);
+				const resources = resourceCache.collectResources(plan);
 
-				if (sources.length > 0) {
+				if (resources.length > 0) {
 					setState({
 						failures: result.failures,
-						sources,
+						resources,
 						status: "ready",
 					});
 					return;
@@ -172,7 +172,7 @@ export function useBrowserAudioPreviewSources({
 			cancelled = true;
 			abortController.abort();
 		};
-	}, [asset, enabled, retryRequest, source, sourcePlanKey]);
+	}, [asset, enabled, retryRequest, source, resourcePlanKey]);
 
 	return useMemo(
 		() => ({
@@ -187,7 +187,7 @@ function createRetryTrackIds({
 	asset,
 	retryTrackId,
 }: {
-	asset: UseBrowserAudioPreviewSourcesOptions["asset"];
+	asset: UsePreviewAudioResourcesOptions["asset"];
 	retryTrackId: string;
 }) {
 	const trackIds = new Set<string>();

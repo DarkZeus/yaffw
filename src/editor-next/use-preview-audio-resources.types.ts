@@ -1,37 +1,37 @@
 import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
 
 import type {
-	BrowserAudioPreviewSource,
-	BrowserAudioPreviewSourceFailure,
-} from "./browser-audio-preview-sources.types";
+	PreviewAudioResource,
+	PreviewAudioResourceFailure,
+} from "./preview-audio-resources.types";
 import type { ActiveMediaAssetCleanupScope } from "./active-media-asset-cleanup-scope";
 
-export type BrowserAudioPreviewSourcesState =
+export type PreviewAudioResourcesState =
 	| {
 			status: "disabled";
 	  }
 	| {
 			preparingTrackIds: ReadonlySet<string>;
-			sources: BrowserAudioPreviewSource[];
+			resources: PreviewAudioResource[];
 			status: "loading";
 	  }
 	| {
-			failures: BrowserAudioPreviewSourceFailure[];
-			sources: BrowserAudioPreviewSource[];
+			failures: PreviewAudioResourceFailure[];
+			resources: PreviewAudioResource[];
 			status: "ready";
 	  }
 	| {
-			failures: BrowserAudioPreviewSourceFailure[];
+			failures: PreviewAudioResourceFailure[];
 			reason: string;
 			status: "failed";
 	  };
 
-export type BrowserAudioPreviewSourcesLifecycle =
-	BrowserAudioPreviewSourcesState & {
+export type PreviewAudioResourcesLifecycle =
+	PreviewAudioResourcesState & {
 		retryTrack: (trackId: string) => void;
 	};
 
-export type UseBrowserAudioPreviewSourcesOptions = {
+export type UsePreviewAudioResourcesOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix: AudioMix;
 	asset: ReadyMediaAsset;

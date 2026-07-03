@@ -125,9 +125,6 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.1.10)
-      wavesurfer-multitrack:
-        specifier: ^0.4.12
-        version: 0.4.12
       wavesurfer.js:
         specifier: ^7.11.1
         version: 7.11.1
@@ -2508,9 +2505,6 @@ packages:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
 
-  wavesurfer-multitrack@0.4.12:
-    resolution: {integrity: sha512-szJu3JxKJdJQH3pdGTq0X54sNxSCebg7IIaxsuk/aGFD2F52iI4ogEL7cZXyquM5kOLrrtvv9AbUXIfGM+jIvQ==}
-
   wavesurfer.js@7.11.1:
     resolution: {integrity: sha512-8Q+wwItpjJAlhQ7crQLtKwgfbqqczm5/wx+76K4PptP+MBAjB0OA78+A9OuLnULz/8GpAQ+fKM6s81DonEO0Sg==}
 
@@ -4764,10 +4758,6 @@ snapshots:
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
-
-  wavesurfer-multitrack@0.4.12:
-    dependencies:
-      wavesurfer.js: 7.11.1
 
   wavesurfer.js@7.11.1: {}
 

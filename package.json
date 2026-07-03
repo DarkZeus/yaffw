@@ -59,7 +59,6 @@
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.6",
     "tailwindcss-animate": "^1.0.7",
-    "wavesurfer-multitrack": "^0.4.12",
     "wavesurfer.js": "^7.11.1"
   },
   "devDependencies": {

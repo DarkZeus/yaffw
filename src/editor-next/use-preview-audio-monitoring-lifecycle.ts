@@ -15,7 +15,7 @@ import type {
 
 export function usePreviewAudioMonitoringLifecycle({
 	audioMix,
-	audioPreviewSources,
+	previewAudioResources,
 	createPreviewAudioEngine = createDefaultPreviewAudioEngine,
 	getPlaybackRate,
 	getPlayheadUs,
@@ -56,8 +56,8 @@ export function usePreviewAudioMonitoringLifecycle({
 		const lifecycle = createPreviewAdapterLifecycle();
 
 		if (
-			audioPreviewSources.status !== "ready" ||
-			audioPreviewSources.sources.length === 0
+			previewAudioResources.status !== "ready" ||
+			previewAudioResources.resources.length === 0
 		) {
 			previewAudioEngineRef.current?.destroy();
 			previewAudioEngineRef.current = null;
@@ -69,8 +69,8 @@ export function usePreviewAudioMonitoringLifecycle({
 		lifecycle.registerCleanup(() => setMonitoringStatus("idle"));
 
 		void createPreviewAudioEngine({
-			failures: audioPreviewSources.failures,
-			sources: audioPreviewSources.sources,
+			failures: previewAudioResources.failures,
+			resources: previewAudioResources.resources,
 		})
 			.then((previewAudioEngine) => {
 				if (lifecycle.isDisposed()) {
@@ -93,7 +93,7 @@ export function usePreviewAudioMonitoringLifecycle({
 				applyPreviewAudioEngineMix({
 					...audioControlsRef.current,
 					previewAudioEngine,
-					sources: audioPreviewSources.sources,
+					resources: previewAudioResources.resources,
 				});
 				setMonitoringStatus(previewAudioEngine.getStatus());
 			})
@@ -108,7 +108,7 @@ export function usePreviewAudioMonitoringLifecycle({
 			lifecycle.dispose();
 		};
 	}, [
-		audioPreviewSources,
+		previewAudioResources,
 		createPreviewAudioEngine,
 		getPlaybackRate,
 		getPlayheadUs,
@@ -120,7 +120,7 @@ export function usePreviewAudioMonitoringLifecycle({
 		const previewAudioEngine = previewAudioEngineRef.current;
 
 		if (
-			audioPreviewSources.status !== "ready" ||
+			previewAudioResources.status !== "ready" ||
 			!previewAudioMonitoringStatusIsReady(status) ||
 			!previewAudioEngine
 		) {
@@ -132,12 +132,12 @@ export function usePreviewAudioMonitoringLifecycle({
 			muted,
 			previewAudioEngine,
 			soloedAudioTrackId,
-			sources: audioPreviewSources.sources,
+			resources: previewAudioResources.resources,
 			volume,
 		});
 	}, [
 		audioMix,
-		audioPreviewSources,
+		previewAudioResources,
 		muted,
 		previewAudioEngineRef,
 		soloedAudioTrackId,

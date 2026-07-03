@@ -14,11 +14,11 @@ import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysi
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { EditorNextRoute } from "./EditorNextRoute";
-import { prepareBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
+import { preparePreviewAudioResources } from "./preview-audio-resources";
 import type {
-	BrowserAudioPreviewSource,
-	BrowserAudioPreviewSourcesResult,
-} from "./browser-audio-preview-sources.types";
+	PreviewAudioResource,
+	PreviewAudioResourcesResult,
+} from "./preview-audio-resources.types";
 import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 import { loadBrowserWaveformLane } from "./selection-waveform-lanes";
 
@@ -44,13 +44,13 @@ const adapterMockState = vi.hoisted(() => ({
 	}>,
 }));
 
-vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
+vi.mock("./preview-audio-resources", async (importOriginal) => {
 	const actual =
-		await importOriginal<typeof import("./browser-audio-preview-sources")>();
+		await importOriginal<typeof import("./preview-audio-resources")>();
 
 	return {
 		...actual,
-		prepareBrowserAudioPreviewSources: vi.fn(),
+		preparePreviewAudioResources: vi.fn(),
 	};
 });
 
@@ -97,8 +97,8 @@ vi.mock("wavesurfer.js/plugins/regions", () => ({
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 
-const prepareBrowserAudioPreviewSourcesMock = vi.mocked(
-	prepareBrowserAudioPreviewSources,
+const preparePreviewAudioResourcesMock = vi.mocked(
+	preparePreviewAudioResources,
 );
 const loadBrowserWaveformLaneMock = vi.mocked(loadBrowserWaveformLane);
 
@@ -147,8 +147,8 @@ beforeEach(() => {
 
 		return wavesurfer;
 	});
-	prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
-		createPreparedAudioPreviewSources(request.asset.id),
+	preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+		createPreparedPreviewAudioResources(request.asset.id),
 	);
 	loadBrowserWaveformLaneMock.mockResolvedValue({
 		samples: [0.2, 0.7, 0.4],
@@ -213,7 +213,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			).toBeTruthy();
 		});
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 			expect(loadBrowserWaveformLaneMock).toHaveBeenCalledTimes(1);
 			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 			expect(adapterMockState.wavesurfers).toHaveLength(1);
@@ -272,7 +272,7 @@ describe("EditorNextRoute cleanup contract", () => {
 	it("keeps the next Media asset current when stale preview async work resolves after Close file and re-import", async () => {
 		const audioRuns: Array<{
 			assetId: string;
-			deferred: Deferred<BrowserAudioPreviewSourcesResult>;
+			deferred: Deferred<PreviewAudioResourcesResult>;
 		}> = [];
 		const waveformRuns: Array<{
 			deferred: Deferred<Awaited<ReturnType<typeof loadBrowserWaveformLane>>>;
@@ -283,8 +283,8 @@ describe("EditorNextRoute cleanup contract", () => {
 		let nextAssetId = 0;
 		let nextDraftId = 0;
 		vi.spyOn(window, "confirm").mockReturnValue(true);
-		prepareBrowserAudioPreviewSourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<BrowserAudioPreviewSourcesResult>();
+		preparePreviewAudioResourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<PreviewAudioResourcesResult>();
 			audioRuns.push({
 				assetId: request.asset.id,
 				deferred,
@@ -359,7 +359,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		audioRuns[1]?.deferred.resolve(
-			createPreparedAudioPreviewSources("asset-replace-second"),
+			createPreparedPreviewAudioResources("asset-replace-second"),
 		);
 		waveformRuns[1]?.deferred.resolve({
 			samples: [0.1, 0.8, 0.3],
@@ -372,7 +372,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		audioRuns[0]?.deferred.resolve(
-			createPreparedAudioPreviewSources("asset-replace-first"),
+			createPreparedPreviewAudioResources("asset-replace-first"),
 		);
 		waveformRuns[0]?.deferred.resolve({
 			samples: [0.9, 0.3, 0.2],
@@ -521,12 +521,12 @@ const supportedInspection = {
 	],
 } satisfies LocalMediaAssetInspection;
 
-function createPreparedAudioPreviewSources(
+function createPreparedPreviewAudioResources(
 	assetId: string,
-): BrowserAudioPreviewSourcesResult {
+): PreviewAudioResourcesResult {
 	return {
 		failures: [],
-		sources: [
+		resources: [
 			{
 				blob: new Blob(["audio"], { type: "audio/mp4" }),
 				byteLength: 5,
@@ -543,7 +543,7 @@ function createPreparedAudioPreviewSources(
 				trackId: "audio-1",
 				trackIndex: 0,
 				url: `blob:audio:${assetId}:audio-1`,
-			} satisfies BrowserAudioPreviewSource,
+			} satisfies PreviewAudioResource,
 		],
 	};
 }

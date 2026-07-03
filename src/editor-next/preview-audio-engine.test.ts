@@ -3,12 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type { PreviewAudioResource } from "./preview-audio-resources.types";
 import {
 	createPreviewAudioEngine,
 	previewOutputGainForAudioMonitoring,
-	previewTrackMonitorGainForAudioTrackSource,
-	previewTrackVolumeGainForAudioTrackSource,
+	previewTrackMonitorGainForAudioTrackResource,
+	previewTrackVolumeGainForAudioTrackResource,
 } from "./preview-audio-engine";
 
 describe("createPreviewAudioEngine", () => {
@@ -16,9 +16,9 @@ describe("createPreviewAudioEngine", () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [
-				createAudioPreviewSource("audio-1", 0),
-				createAudioPreviewSource("audio-2", 1.25),
+			resources: [
+				createPreviewAudioResource("audio-1", 0),
+				createPreviewAudioResource("audio-2", 1.25),
 			],
 		});
 
@@ -61,7 +61,7 @@ describe("createPreviewAudioEngine", () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [createAudioPreviewSource("audio-1", 0)],
+			resources: [createPreviewAudioResource("audio-1", 0)],
 		});
 
 		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
@@ -114,9 +114,9 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [
-				createAudioPreviewSource("audio-1", 0),
-				createAudioPreviewSource("audio-2", 0),
+			resources: [
+				createPreviewAudioResource("audio-1", 0),
+				createPreviewAudioResource("audio-2", 0),
 			],
 		});
 
@@ -164,9 +164,9 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [
-				createAudioPreviewSource("audio-1", 0),
-				createAudioPreviewSource("audio-2", 0),
+			resources: [
+				createPreviewAudioResource("audio-1", 0),
+				createPreviewAudioResource("audio-2", 0),
 			],
 		});
 
@@ -214,9 +214,9 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [
-				createAudioPreviewSource("audio-1", 0),
-				createAudioPreviewSource("audio-2", 0),
+			resources: [
+				createPreviewAudioResource("audio-1", 0),
+				createPreviewAudioResource("audio-2", 0),
 			],
 		});
 
@@ -265,9 +265,9 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			sources: [
-				createAudioPreviewSource("audio-1", 0),
-				createAudioPreviewSource("audio-2", 0),
+			resources: [
+				createPreviewAudioResource("audio-1", 0),
+				createPreviewAudioResource("audio-2", 0),
 			],
 		});
 		const retryDecode = createDeferred<AudioBuffer>();
@@ -301,9 +301,9 @@ describe("createPreviewAudioEngine", () => {
 		await expect(
 			createPreviewAudioEngine({
 				createAudioContext: () => context,
-				sources: [
-					createAudioPreviewSource("audio-1", 0),
-					createAudioPreviewSource("audio-2", 0),
+				resources: [
+					createPreviewAudioResource("audio-1", 0),
+					createPreviewAudioResource("audio-2", 0),
 				],
 			}),
 		).rejects.toThrow("No Preview audio resources could be prepared");
@@ -311,7 +311,7 @@ describe("createPreviewAudioEngine", () => {
 	});
 
 	it("resolves Track volume, monitored-mix, and output gains independently", () => {
-		const source = createAudioPreviewSource("audio-1", 1.25);
+		const resource = createPreviewAudioResource("audio-1", 1.25);
 		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
 		const audioDecision = audioMix.tracks["audio-1"];
 
@@ -322,16 +322,16 @@ describe("createPreviewAudioEngine", () => {
 		audioDecision.volumePercent = 50;
 
 		expect(
-			previewTrackVolumeGainForAudioTrackSource({
+			previewTrackVolumeGainForAudioTrackResource({
 				audioMix,
-				source,
+				resource,
 			}),
 		).toBeCloseTo(0.25);
 		expect(
-			previewTrackMonitorGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackResource({
 				audioMix,
 				soloedAudioTrackId: null,
-				source,
+				resource,
 			}),
 		).toBe(1);
 
@@ -351,40 +351,40 @@ describe("createPreviewAudioEngine", () => {
 		audioDecision.include = false;
 
 		expect(
-			previewTrackVolumeGainForAudioTrackSource({
+			previewTrackVolumeGainForAudioTrackResource({
 				audioMix,
-				source,
+				resource,
 			}),
 		).toBeCloseTo(0.25);
 		expect(
-			previewTrackMonitorGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackResource({
 				audioMix,
 				soloedAudioTrackId: null,
-				source,
+				resource,
 			}),
 		).toBe(0);
 
 		expect(
-			previewTrackMonitorGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackResource({
 				audioMix,
 				soloedAudioTrackId: "audio-1",
-				source,
+				resource,
 			}),
 		).toBe(1);
 		expect(
-			previewTrackMonitorGainForAudioTrackSource({
+			previewTrackMonitorGainForAudioTrackResource({
 				audioMix,
 				soloedAudioTrackId: "audio-1",
-				source: createAudioPreviewSource("audio-2", 1.25),
+				resource: createPreviewAudioResource("audio-2", 1.25),
 			}),
 		).toBe(0);
 	});
 });
 
-function createAudioPreviewSource(
+function createPreviewAudioResource(
 	trackId: string,
 	startPositionSeconds: number,
-): BrowserAudioPreviewSource {
+): PreviewAudioResource {
 	return {
 		blob: new Blob([trackId], { type: "audio/wav" }),
 		byteLength: trackId.length,
@@ -507,8 +507,8 @@ function createAudioBufferStub({
 				) ?? new Float32Array(destination.length),
 			);
 		},
-		copyToChannel(source, channelNumber, startInChannel = 0) {
-			channelData[channelNumber]?.set(source, startInChannel);
+		copyToChannel(resource, channelNumber, startInChannel = 0) {
+			channelData[channelNumber]?.set(resource, startInChannel);
 		},
 		duration: 10,
 		getChannelData(channelNumber) {

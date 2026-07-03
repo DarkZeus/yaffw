@@ -113,15 +113,15 @@ afterEach(() => {
 	vi.resetModules();
 });
 
-describe("prepareBrowserAudioPreviewSources cleanup", () => {
+describe("preparePreviewAudioResources cleanup", () => {
 	it("releases remux resources when a track preparation attempt fails", async () => {
 		installMediabunnyMock();
 		mockMedia.encodedAddShouldFail = true;
-		const { prepareBrowserAudioPreviewSources } = await import(
-			"./browser-audio-preview-sources"
+		const { preparePreviewAudioResources } = await import(
+			"./preview-audio-resources"
 		);
 
-		const result = await prepareBrowserAudioPreviewSources({
+		const result = await preparePreviewAudioResources({
 			asset: readyAsset,
 			audioMix: createDefaultAudioMix(readyAsset),
 			createObjectURL: vi.fn(() => "blob:audio-preview"),
@@ -130,7 +130,7 @@ describe("prepareBrowserAudioPreviewSources cleanup", () => {
 			source: new Blob(["video"], { type: "video/mp4" }),
 		});
 
-		expect(result.sources).toEqual([]);
+		expect(result.resources).toEqual([]);
 		expect(result.failures[0]?.reason).toContain("packet add failed");
 		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledTimes(1);
 		expect(mockMedia.outputs).toHaveLength(2);

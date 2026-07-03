@@ -19,7 +19,7 @@ import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
 import { PreviewSelectionWaveformRegion } from "./preview-selection-waveform-region";
 import { PreviewTransportRegion } from "./preview-transport-region";
 import { PreviewViewerRegion } from "./preview-viewer-region";
-import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
+import { usePreviewAudioResources } from "./use-preview-audio-resources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 import type { PreviewAudioMonitoringStatus } from "./use-preview-audio-monitoring-lifecycle.types";
@@ -108,26 +108,26 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	}, [activeMediaAssetCleanupScope, onSoloedAudioTrackChange, source]);
 
 	const audioPreviewTransportSupported = canUsePreviewAudioEngine(asset);
-	const audioPreviewSources = useBrowserAudioPreviewSources({
+	const previewAudioResources = usePreviewAudioResources({
 		activeMediaAssetCleanupScope,
 		audioMix,
 		asset,
 		enabled: audioPreviewTransportSupported,
 		source,
 	});
-	const audioPreviewSourcesRef = useRef(audioPreviewSources);
-	audioPreviewSourcesRef.current = audioPreviewSources;
+	const previewAudioResourcesRef = useRef(previewAudioResources);
+	previewAudioResourcesRef.current = previewAudioResources;
 	const handlePreviewMeteringRetry = useCallback(
 		(trackId: string) => {
-			const audioPreviewSources = audioPreviewSourcesRef.current;
+			const previewAudioResources = previewAudioResourcesRef.current;
 			const sourceFailures =
-				audioPreviewSources.status === "ready" ||
-				audioPreviewSources.status === "failed"
-					? audioPreviewSources.failures
+				previewAudioResources.status === "ready" ||
+				previewAudioResources.status === "failed"
+					? previewAudioResources.failures
 					: [];
 
 			if (sourceFailures.some((failure) => failure.trackId === trackId)) {
-				audioPreviewSources.retryTrack(trackId);
+				previewAudioResources.retryTrack(trackId);
 				return;
 			}
 
@@ -144,8 +144,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		[],
 	);
 	const audioPreviewPreparingTrackIds =
-		audioPreviewSources.status === "loading"
-			? audioPreviewSources.preparingTrackIds
+		previewAudioResources.status === "loading"
+			? previewAudioResources.preparingTrackIds
 			: EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS;
 	const readPreviewAudioMonitoringPlaybackRate = useCallback(
 		() => getPlaybackRateRef.current(),
@@ -161,7 +161,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		audioMonitoringReady:
 			audioMonitoringStatus === "ready" ||
 			audioMonitoringStatus === "degraded",
-		audioPreviewSources,
+		previewAudioResources,
 		audioPreviewTransportSupported,
 	});
 
@@ -222,7 +222,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 
 	usePreviewAudioMonitoringLifecycle({
 		audioMix,
-		audioPreviewSources,
+		previewAudioResources,
 		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
 		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
 		muted,

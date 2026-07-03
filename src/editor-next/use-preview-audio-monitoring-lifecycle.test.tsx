@@ -10,10 +10,10 @@ import type {
 	ReadyMediaAsset,
 } from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type { PreviewAudioResource } from "./preview-audio-resources.types";
 import type { PreviewAudioEngineMeterSnapshot } from "./preview-audio-engine";
 import type { PreviewAudioEngineFactory } from "./use-preview-audio-monitoring-lifecycle.types";
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
+import type { PreviewAudioResourcesState } from "./use-preview-audio-resources.types";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 
 const createPreviewAudioEngineMock = vi.fn<PreviewAudioEngineFactory>();
@@ -42,7 +42,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			<PreviewAudioMonitoringProbe
 				getPlaybackRate={() => 1.5}
 				getPlayheadUs={() => 5_250_000}
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -54,7 +54,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		});
 		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith(
 			expect.objectContaining({
-				sources: [expect.objectContaining({ trackId: "audio-1" })],
+				resources: [expect.objectContaining({ trackId: "audio-1" })],
 			}),
 		);
 		expect(createdPreviewAudioEngines[0]?.setTime).toHaveBeenCalledWith(5.25);
@@ -69,10 +69,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		).toHaveBeenCalledWith(0, "preserve");
 	});
 
-	it("destroys the previous engine when prepared sources change", async () => {
+	it("destroys the previous engine when prepared resources change", async () => {
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -82,7 +82,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 
 		rerender(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-2")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-2")])}
 			/>,
 		);
 
@@ -98,7 +98,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 	it("cleans up when audio source preparation restarts for a new source or asset", async () => {
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -109,7 +109,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		});
 
 		rerender(
-			<PreviewAudioMonitoringProbe state={loadingAudioSourcesState()} />,
+			<PreviewAudioMonitoringProbe state={loadingPreviewAudioResourcesState()} />,
 		);
 
 		await waitFor(() => {
@@ -123,7 +123,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 	it("cleans up the engine when audio source preparation fails", async () => {
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -133,7 +133,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			);
 		});
 
-		rerender(<PreviewAudioMonitoringProbe state={failedAudioSourcesState()} />);
+		rerender(<PreviewAudioMonitoringProbe state={failedPreviewAudioResourcesState()} />);
 
 		await waitFor(() => {
 			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
@@ -151,7 +151,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 
 		render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -186,9 +186,9 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 					trackIndex: 1,
 				},
 			],
-			sources: [createAudioPreviewSource("audio-1")],
+			resources: [createPreviewAudioResource("audio-1")],
 			status: "ready",
-		} satisfies BrowserAudioPreviewSourcesState;
+		} satisfies PreviewAudioResourcesState;
 
 		render(<PreviewAudioMonitoringProbe state={failedSourcesState} />);
 
@@ -202,14 +202,14 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
 			failures: failedSourcesState.failures,
-			sources: [expect.objectContaining({ trackId: "audio-1" })],
+			resources: [expect.objectContaining({ trackId: "audio-1" })],
 		});
 	});
 
 	it("destroys the engine on cleanup", async () => {
 		const { unmount } = render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -230,7 +230,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 		const { unmount } = render(
 			<PreviewAudioMonitoringProbe
-				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+				state={readyPreviewAudioResourcesState([createPreviewAudioResource("audio-1")])}
 			/>,
 		);
 
@@ -256,16 +256,16 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				volumePercent: 25,
 			},
 		});
-		const sources = [
-			createAudioPreviewSource("audio-1"),
-			createAudioPreviewSource("audio-2"),
+		const resources = [
+			createPreviewAudioResource("audio-1"),
+			createPreviewAudioResource("audio-2"),
 		];
-		const readySources = readyAudioSourcesState(sources);
+		const readyResources = readyPreviewAudioResourcesState(resources);
 
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
 				audioMix={audioMix}
-				state={readySources}
+				state={readyResources}
 				volume={0.8}
 			/>,
 		);
@@ -295,7 +295,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			<PreviewAudioMonitoringProbe
 				audioMix={audioMix}
 				muted={true}
-				state={readySources}
+				state={readyResources}
 				volume={0.8}
 			/>,
 		);
@@ -310,7 +310,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			<PreviewAudioMonitoringProbe
 				audioMix={audioMix}
 				soloedAudioTrackId="audio-2"
-				state={readySources}
+				state={readyResources}
 				volume={0.8}
 			/>,
 		);
@@ -338,9 +338,9 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		render(
 			<PreviewAudioMonitoringProbe
 				onReadyChange={onReadyChange}
-				state={readyAudioSourcesState([
-					createAudioPreviewSource("audio-1"),
-					createAudioPreviewSource("audio-2"),
+				state={readyPreviewAudioResourcesState([
+					createPreviewAudioResource("audio-1"),
+					createPreviewAudioResource("audio-2"),
 				])}
 			/>,
 		);
@@ -367,12 +367,12 @@ function PreviewAudioMonitoringProbe({
 	muted?: boolean;
 	onReadyChange?: (ready: boolean) => void;
 	soloedAudioTrackId?: string | null;
-	state: BrowserAudioPreviewSourcesState;
+	state: PreviewAudioResourcesState;
 	volume?: number;
 }) {
 	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
 		audioMix,
-		audioPreviewSources: state,
+		previewAudioResources: state,
 		createPreviewAudioEngine: createPreviewAudioEngineMock,
 		getPlaybackRate,
 		getPlayheadUs,
@@ -394,25 +394,25 @@ function PreviewAudioMonitoringProbe({
 	);
 }
 
-function readyAudioSourcesState(
-	sources: BrowserAudioPreviewSource[],
-): BrowserAudioPreviewSourcesState {
+function readyPreviewAudioResourcesState(
+	resources: PreviewAudioResource[],
+): PreviewAudioResourcesState {
 	return {
 		failures: [],
-		sources,
+		resources,
 		status: "ready",
 	};
 }
 
-function loadingAudioSourcesState(): BrowserAudioPreviewSourcesState {
+function loadingPreviewAudioResourcesState(): PreviewAudioResourcesState {
 	return {
 		preparingTrackIds: new Set(["audio-1"]),
-		sources: [],
+		resources: [],
 		status: "loading",
 	};
 }
 
-function failedAudioSourcesState(): BrowserAudioPreviewSourcesState {
+function failedPreviewAudioResourcesState(): PreviewAudioResourcesState {
 	return {
 		failures: [
 			{
@@ -458,7 +458,7 @@ function createAudioMix(
 	return audioMix;
 }
 
-function createAudioPreviewSource(trackId: string): BrowserAudioPreviewSource {
+function createPreviewAudioResource(trackId: string): PreviewAudioResource {
 	return {
 		blob: new Blob(["audio"], { type: "audio/mp4" }),
 		byteLength: 5,

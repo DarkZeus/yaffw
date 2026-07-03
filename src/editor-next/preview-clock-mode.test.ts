@@ -3,15 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import { resolvePreviewClockMode } from "./preview-clock-mode";
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
+import type { PreviewAudioResourcesState } from "./use-preview-audio-resources.types";
 
 describe("resolvePreviewClockMode", () => {
-	it("uses audio-master after preview audio sources and monitoring are ready", () => {
+	it("uses audio-master after Preview audio resources and monitoring are ready", () => {
 		expect(
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
 				audioMonitoringReady: true,
-				audioPreviewSources: readyAudioSourcesState(),
+				previewAudioResources: readyPreviewAudioResourcesState(),
 				audioPreviewTransportSupported: true,
 			}),
 		).toBe("audio-master");
@@ -22,20 +22,20 @@ describe("resolvePreviewClockMode", () => {
 			resolvePreviewClockMode({
 				asset: readyAssetWithTwoAudioTracks,
 				audioMonitoringReady: true,
-				audioPreviewSources: readyAudioSourcesState(),
+				previewAudioResources: readyPreviewAudioResourcesState(),
 				audioPreviewTransportSupported: true,
 			}),
 		).toBe("audio-master");
 	});
 
-	it("keeps audio assets pending while preview audio sources are loading", () => {
+	it("keeps audio assets pending while Preview audio resources are loading", () => {
 		expect(
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
 				audioMonitoringReady: false,
-				audioPreviewSources: {
+				previewAudioResources: {
 					preparingTrackIds: new Set(["audio-1"]),
-					sources: [],
+					resources: [],
 					status: "loading",
 				},
 				audioPreviewTransportSupported: true,
@@ -48,7 +48,7 @@ describe("resolvePreviewClockMode", () => {
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
 				audioMonitoringReady: false,
-				audioPreviewSources: readyAudioSourcesState(),
+				previewAudioResources: readyPreviewAudioResourcesState(),
 				audioPreviewTransportSupported: true,
 			}),
 		).toBe("audio-master-pending");
@@ -59,7 +59,7 @@ describe("resolvePreviewClockMode", () => {
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
 				audioMonitoringReady: false,
-				audioPreviewSources: {
+				previewAudioResources: {
 					failures: [],
 					reason: "Audio preview is unavailable.",
 					status: "failed",
@@ -75,7 +75,7 @@ describe("resolvePreviewClockMode", () => {
 				asset: readyAssetWithAudio,
 				audioMonitoringFailed: true,
 				audioMonitoringReady: false,
-				audioPreviewSources: readyAudioSourcesState(),
+				previewAudioResources: readyPreviewAudioResourcesState(),
 				audioPreviewTransportSupported: true,
 			}),
 		).toBe("native-video");
@@ -86,7 +86,7 @@ describe("resolvePreviewClockMode", () => {
 			resolvePreviewClockMode({
 				asset: readyAssetWithAudio,
 				audioMonitoringReady: false,
-				audioPreviewSources: { status: "disabled" },
+				previewAudioResources: { status: "disabled" },
 				audioPreviewTransportSupported: false,
 			}),
 		).toBe("native-video");
@@ -97,17 +97,17 @@ describe("resolvePreviewClockMode", () => {
 			resolvePreviewClockMode({
 				asset: readyAssetWithoutAudio,
 				audioMonitoringReady: false,
-				audioPreviewSources: { status: "disabled" },
+				previewAudioResources: { status: "disabled" },
 				audioPreviewTransportSupported: false,
 			}),
 		).toBe("native-video");
 	});
 });
 
-function readyAudioSourcesState(): BrowserAudioPreviewSourcesState {
+function readyPreviewAudioResourcesState(): PreviewAudioResourcesState {
 	return {
 		failures: [],
-		sources: [
+		resources: [
 			{
 				blob: new Blob(["audio"], { type: "audio/mp4" }),
 				byteLength: 5,

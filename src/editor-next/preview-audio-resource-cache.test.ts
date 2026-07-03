@@ -7,16 +7,16 @@ import type {
 } from "@/editor-core/model";
 
 import {
-	createBrowserAudioPreviewSourceCache,
-	createBrowserAudioPreviewSourcePlanKey,
-} from "./browser-audio-preview-source-cache";
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+	createPreviewAudioResourceCache,
+	createPreviewAudioResourcePlanKey,
+} from "./preview-audio-resource-cache";
+import type { PreviewAudioResource } from "./preview-audio-resources.types";
 
-describe("BrowserAudioPreviewSourceCache", () => {
-	it("plans only missing source tracks and reuses cached sources across channel decisions", () => {
-		const revokeSources = vi.fn();
-		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
+describe("PreviewAudioResourceCache", () => {
+	it("plans only missing audio tracks and reuses cached resources across channel decisions", () => {
+		const revokeResources = vi.fn();
+		const cache = createPreviewAudioResourceCache({ revokeResources });
+		const resourcePlanKey = createPreviewAudioResourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
@@ -25,74 +25,74 @@ describe("BrowserAudioPreviewSourceCache", () => {
 
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: sourcePlanKey,
+			planKey: resourcePlanKey,
 		});
 
 		expect(Array.from(preservePlan.missingTrackIds)).toEqual([
 			"audio-1",
 			"audio-2",
 		]);
-		expect(preservePlan.cachedSources).toEqual([]);
+		expect(preservePlan.cachedResources).toEqual([]);
 		expect(preservePlan.audioMix.tracks["audio-1"]?.channelMode).toBe(
 			"preserve",
 		);
 		expect(preservePlan.audioMix.tracks["audio-1"]?.include).toBe(true);
 		expect(preservePlan.audioMix.tracks["audio-1"]?.volumePercent).toBe(100);
 
-		cache.storePreparedSources({
+		cache.storePreparedResources({
 			plan: preservePlan,
-			sources: [
-				createPreviewSource("audio-1"),
-				createPreviewSource("audio-2"),
+			resources: [
+				createPreviewResource("audio-1"),
+				createPreviewResource("audio-2"),
 			],
 		});
 
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: sourcePlanKey })
-				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:source", "blob:audio-2:source"]);
+				.plan({ asset: readyAsset, planKey: resourcePlanKey })
+				.cachedResources.map((resource) => resource.url),
+		).toEqual(["blob:audio-1:resource", "blob:audio-2:resource"]);
 
 		const fixedVoicePlan = cache.plan({
 			asset: readyAsset,
-			planKey: createBrowserAudioPreviewSourcePlanKey({
+			planKey: createPreviewAudioResourcePlanKey({
 				asset: readyAsset,
 				audioMix: createAudioMix({ "audio-1": "use-left-as-mono" }),
 			}),
 		});
 
 		expect(Array.from(fixedVoicePlan.missingTrackIds)).toEqual([]);
-		expect(fixedVoicePlan.cachedSources.map((source) => source.url)).toEqual([
-			"blob:audio-1:source",
-			"blob:audio-2:source",
+		expect(fixedVoicePlan.cachedResources.map((resource) => resource.url)).toEqual([
+			"blob:audio-1:resource",
+			"blob:audio-2:resource",
 		]);
 
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: sourcePlanKey })
-				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:source", "blob:audio-2:source"]);
-		expect(revokeSources).not.toHaveBeenCalled();
+				.plan({ asset: readyAsset, planKey: resourcePlanKey })
+				.cachedResources.map((resource) => resource.url),
+		).toEqual(["blob:audio-1:resource", "blob:audio-2:resource"]);
+		expect(revokeResources).not.toHaveBeenCalled();
 	});
 
 	it("disposes cached preview resources when the media asset source changes", () => {
-		const revokeSources = vi.fn();
-		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
+		const revokeResources = vi.fn();
+		const cache = createPreviewAudioResourceCache({ revokeResources });
+		const resourcePlanKey = createPreviewAudioResourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: sourcePlanKey,
+			planKey: resourcePlanKey,
 		});
 
 		cache.resetForMediaAssetSource({ asset: readyAsset, source });
-		cache.storePreparedSources({
+		cache.storePreparedResources({
 			plan: preservePlan,
-			sources: [
-				createPreviewSource("audio-1"),
-				createPreviewSource("audio-2"),
+			resources: [
+				createPreviewResource("audio-1"),
+				createPreviewResource("audio-2"),
 			],
 		});
 
@@ -104,62 +104,62 @@ describe("BrowserAudioPreviewSourceCache", () => {
 			source,
 		});
 
-		expect(revokeSources).toHaveBeenCalledWith({
-			sources: [
-				expect.objectContaining({ url: "blob:audio-1:source" }),
-				expect.objectContaining({ url: "blob:audio-2:source" }),
+		expect(revokeResources).toHaveBeenCalledWith({
+			resources: [
+				expect.objectContaining({ url: "blob:audio-1:resource" }),
+				expect.objectContaining({ url: "blob:audio-2:resource" }),
 			],
 		});
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: sourcePlanKey })
-				.cachedSources.map((source) => source.url),
+				.plan({ asset: readyAsset, planKey: resourcePlanKey })
+				.cachedResources.map((resource) => resource.url),
 		).toEqual([]);
 	});
 
-	it("revokes only the superseded source when replacing a prepared source", () => {
-		const revokeSources = vi.fn();
-		const cache = createBrowserAudioPreviewSourceCache({ revokeSources });
-		const sourcePlanKey = createBrowserAudioPreviewSourcePlanKey({
+	it("revokes only the superseded resource when replacing a prepared resource", () => {
+		const revokeResources = vi.fn();
+		const cache = createPreviewAudioResourceCache({ revokeResources });
+		const resourcePlanKey = createPreviewAudioResourcePlanKey({
 			asset: readyAsset,
 			audioMix: createAudioMix(),
 		});
 		const preservePlan = cache.plan({
 			asset: readyAsset,
-			planKey: sourcePlanKey,
+			planKey: resourcePlanKey,
 		});
 
 		cache.resetForMediaAssetSource({ asset: readyAsset, source });
-		cache.storePreparedSources({
+		cache.storePreparedResources({
 			plan: preservePlan,
-			sources: [
-				createPreviewSource("audio-1"),
-				createPreviewSource("audio-2"),
+			resources: [
+				createPreviewResource("audio-1"),
+				createPreviewResource("audio-2"),
 			],
 		});
 
 		const replacement = {
-			...createPreviewSource("audio-1"),
-			url: "blob:audio-1:source:replacement",
+			...createPreviewResource("audio-1"),
+			url: "blob:audio-1:resource:replacement",
 		};
 
-		cache.storePreparedSources({
+		cache.storePreparedResources({
 			plan: preservePlan,
-			sources: [replacement],
+			resources: [replacement],
 		});
 
-		expect(revokeSources).toHaveBeenCalledWith({
-			sources: [expect.objectContaining({ url: "blob:audio-1:source" })],
+		expect(revokeResources).toHaveBeenCalledWith({
+			resources: [expect.objectContaining({ url: "blob:audio-1:resource" })],
 		});
 		expect(
 			cache
-				.plan({ asset: readyAsset, planKey: sourcePlanKey })
-				.cachedSources.map((source) => source.url),
-		).toEqual(["blob:audio-1:source:replacement", "blob:audio-2:source"]);
+				.plan({ asset: readyAsset, planKey: resourcePlanKey })
+				.cachedResources.map((resource) => resource.url),
+		).toEqual(["blob:audio-1:resource:replacement", "blob:audio-2:resource"]);
 	});
 });
 
-function createPreviewSource(trackId: string): BrowserAudioPreviewSource {
+function createPreviewResource(trackId: string): PreviewAudioResource {
 	return {
 		blob: new Blob(["audio"], { type: "audio/mp4" }),
 		byteLength: 5,
@@ -173,7 +173,7 @@ function createPreviewSource(trackId: string): BrowserAudioPreviewSource {
 		},
 		trackId,
 		trackIndex: trackId === "audio-1" ? 0 : 1,
-		url: `blob:${trackId}:source`,
+		url: `blob:${trackId}:resource`,
 	};
 }
 

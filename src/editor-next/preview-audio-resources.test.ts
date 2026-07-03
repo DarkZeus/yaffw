@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
 	remuxCandidatesForAudioPreviewCodec,
-	revokeBrowserAudioPreviewSources,
-	shouldPrepareTransformedAudioPreviewSource,
-} from "./browser-audio-preview-sources";
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+	revokePreviewAudioResources,
+	shouldPrepareTransformedPreviewAudioResource,
+} from "./preview-audio-resources";
+import type { PreviewAudioResource } from "./preview-audio-resources.types";
 
 describe("remuxCandidatesForAudioPreviewCodec", () => {
 	it("prefers fast browser-playable audio containers by codec", () => {
@@ -33,27 +33,27 @@ describe("remuxCandidatesForAudioPreviewCodec", () => {
 	});
 });
 
-describe("shouldPrepareTransformedAudioPreviewSource", () => {
+describe("shouldPrepareTransformedPreviewAudioResource", () => {
 	it("keeps preview resources source-derived for every channel mode", () => {
-		expect(shouldPrepareTransformedAudioPreviewSource("preserve")).toBe(false);
+		expect(shouldPrepareTransformedPreviewAudioResource("preserve")).toBe(false);
 		expect(
-			shouldPrepareTransformedAudioPreviewSource("auto-one-sided-stereo"),
+			shouldPrepareTransformedPreviewAudioResource("auto-one-sided-stereo"),
 		).toBe(false);
-		expect(shouldPrepareTransformedAudioPreviewSource("use-left-as-mono")).toBe(
+		expect(shouldPrepareTransformedPreviewAudioResource("use-left-as-mono")).toBe(
 			false,
 		);
 	});
 });
 
-describe("revokeBrowserAudioPreviewSources", () => {
+describe("revokePreviewAudioResources", () => {
 	it("revokes every prepared object URL", () => {
 		const revokeObjectURL = vi.fn();
 
-		revokeBrowserAudioPreviewSources({
+		revokePreviewAudioResources({
 			revokeObjectURL,
-			sources: [
-				createPreviewSource("blob:track-1"),
-				createPreviewSource("blob:track-2"),
+			resources: [
+				createPreviewResource("blob:track-1"),
+				createPreviewResource("blob:track-2"),
 			],
 		});
 
@@ -62,7 +62,7 @@ describe("revokeBrowserAudioPreviewSources", () => {
 	});
 });
 
-function createPreviewSource(url: string): BrowserAudioPreviewSource {
+function createPreviewResource(url: string): PreviewAudioResource {
 	return {
 		blob: new Blob(["audio"], { type: "audio/mp4" }),
 		byteLength: 5,

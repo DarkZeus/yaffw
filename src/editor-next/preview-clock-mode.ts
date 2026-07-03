@@ -1,6 +1,6 @@
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
-import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
+import type { PreviewAudioResourcesState } from "./use-preview-audio-resources.types";
 
 export type PreviewClockMode =
 	| "audio-master"
@@ -11,20 +11,20 @@ export function resolvePreviewClockMode({
 	asset,
 	audioMonitoringFailed = false,
 	audioMonitoringReady,
-	audioPreviewSources,
+	previewAudioResources,
 	audioPreviewTransportSupported,
 }: {
 	asset: ReadyMediaAsset;
 	audioMonitoringFailed?: boolean;
 	audioMonitoringReady: boolean;
-	audioPreviewSources: BrowserAudioPreviewSourcesState;
+	previewAudioResources: PreviewAudioResourcesState;
 	audioPreviewTransportSupported: boolean;
 }): PreviewClockMode {
 	if (asset.tracks.audio.length === 0 || !audioPreviewTransportSupported) {
 		return "native-video";
 	}
 
-	if (audioPreviewSources.status === "failed") {
+	if (previewAudioResources.status === "failed") {
 		return "native-video";
 	}
 
@@ -33,8 +33,8 @@ export function resolvePreviewClockMode({
 	}
 
 	if (
-		audioPreviewSources.status === "ready" &&
-		audioPreviewSources.sources.length > 0 &&
+		previewAudioResources.status === "ready" &&
+		previewAudioResources.resources.length > 0 &&
 		audioMonitoringReady
 	) {
 		return "audio-master";

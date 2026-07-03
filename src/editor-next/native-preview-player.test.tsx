@@ -190,22 +190,22 @@ vi.mock("./preview-audio-engine", async (importOriginal) => {
 	};
 });
 
-vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
+vi.mock("./preview-audio-resources", async (importOriginal) => {
 	const actual =
-		await importOriginal<typeof import("./browser-audio-preview-sources")>();
+		await importOriginal<typeof import("./preview-audio-resources")>();
 
 	return {
 		...actual,
-		prepareBrowserAudioPreviewSources: vi.fn(),
+		preparePreviewAudioResources: vi.fn(),
 	};
 });
 
 import { createActiveMediaAssetCleanupScopeController } from "./active-media-asset-cleanup-scope";
-import { prepareBrowserAudioPreviewSources } from "./browser-audio-preview-sources";
+import { preparePreviewAudioResources } from "./preview-audio-resources";
 import type {
-	BrowserAudioPreviewSource,
-	BrowserAudioPreviewSourcesResult,
-} from "./browser-audio-preview-sources.types";
+	PreviewAudioResource,
+	PreviewAudioResourcesResult,
+} from "./preview-audio-resources.types";
 import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
 import { NativePreviewPlayer } from "./native-preview-player";
 
@@ -231,11 +231,11 @@ const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
 const play = vi.fn().mockResolvedValue(undefined);
 const pause = vi.fn();
-const prepareBrowserAudioPreviewSourcesMock = vi.mocked(
-	prepareBrowserAudioPreviewSources,
+const preparePreviewAudioResourcesMock = vi.mocked(
+	preparePreviewAudioResources,
 );
-type PrepareAudioPreviewSourcesRequest = Parameters<
-	typeof prepareBrowserAudioPreviewSources
+type PreparePreviewAudioResourcesRequest = Parameters<
+	typeof preparePreviewAudioResources
 >[0];
 
 beforeEach(() => {
@@ -282,7 +282,7 @@ beforeEach(() => {
 	revokeObjectURL.mockClear();
 	play.mockClear();
 	pause.mockClear();
-	prepareBrowserAudioPreviewSourcesMock.mockReset();
+	preparePreviewAudioResourcesMock.mockReset();
 });
 
 afterEach(() => {
@@ -523,8 +523,8 @@ describe("NativePreviewPlayer", () => {
 
 	it("keeps audio preview preparation visible while blocking pending audio-master playback", async () => {
 		const pendingAudioPreview =
-			createDeferred<BrowserAudioPreviewSourcesResult>();
-		prepareBrowserAudioPreviewSourcesMock.mockReturnValueOnce(
+			createDeferred<PreviewAudioResourcesResult>();
+		preparePreviewAudioResourcesMock.mockReturnValueOnce(
 			pendingAudioPreview.promise,
 		);
 		vi.stubGlobal("AudioContext", class AudioContext {});
@@ -532,7 +532,7 @@ describe("NativePreviewPlayer", () => {
 		renderPlayer({ asset: readyAssetWithAudio });
 
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 		});
 		expect(screen.getByText("Preparing audio")).toBeTruthy();
 
@@ -544,8 +544,8 @@ describe("NativePreviewPlayer", () => {
 
 	it("blocks playback while required custom audio monitoring is pending", async () => {
 		const pendingAudioPreview =
-			createDeferred<BrowserAudioPreviewSourcesResult>();
-		prepareBrowserAudioPreviewSourcesMock.mockReturnValueOnce(
+			createDeferred<PreviewAudioResourcesResult>();
+		preparePreviewAudioResourcesMock.mockReturnValueOnce(
 			pendingAudioPreview.promise,
 		);
 		vi.stubGlobal("AudioContext", class AudioContext {});
@@ -553,7 +553,7 @@ describe("NativePreviewPlayer", () => {
 		render(<AudioMasterPlayerProbe asset={readyAssetWithAudio} />);
 
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 		});
 
 		fireEvent.click(
@@ -569,8 +569,8 @@ describe("NativePreviewPlayer", () => {
 
 	it("applies preview and audio mix controls through the Preview audio engine", async () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
-		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
-			createPreparedAudioPreviewSourcesForRequest(request),
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
 		);
 
 		render(<AudioMasterPlayerProbe />);
@@ -662,7 +662,7 @@ describe("NativePreviewPlayer", () => {
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:false:preserve:50|audio-2:true:preserve:100",
 		);
-		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 
 		fireEvent.click(
 			screen.getByRole("button", {
@@ -676,10 +676,10 @@ describe("NativePreviewPlayer", () => {
 				"use-left-as-mono",
 			);
 		});
-		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 	});
 
-	it("publishes a retry handler that re-prepares only a failed source track", async () => {
+	it("publishes a retry handler that re-prepares only a failed audio track", async () => {
 		const retryHandlers: Array<((trackId: string) => void) | null> = [];
 		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
 
@@ -688,9 +688,9 @@ describe("NativePreviewPlayer", () => {
 		}
 
 		vi.stubGlobal("AudioContext", class AudioContext {});
-		prepareBrowserAudioPreviewSourcesMock
+		preparePreviewAudioResourcesMock
 			.mockImplementationOnce(async (request) => {
-				const prepared = createPreparedAudioPreviewSourcesForRequest({
+				const prepared = createPreparedPreviewAudioResourcesForRequest({
 					...request,
 					trackIds: new Set(["audio-1"]),
 				});
@@ -704,11 +704,11 @@ describe("NativePreviewPlayer", () => {
 							trackIndex: 1,
 						},
 					],
-					sources: prepared.sources,
+					resources: prepared.resources,
 				};
 			})
 			.mockImplementationOnce(async (request) =>
-				createPreparedAudioPreviewSourcesForRequest(request),
+				createPreparedPreviewAudioResourcesForRequest(request),
 			);
 
 		render(
@@ -729,9 +729,9 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		await waitFor(() => {
-			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(2);
 		});
-		const retryRequest = prepareBrowserAudioPreviewSourcesMock.mock.calls[1]?.[0];
+		const retryRequest = preparePreviewAudioResourcesMock.mock.calls[1]?.[0];
 
 		expect(Array.from(retryRequest?.trackIds ?? [])).toEqual(["audio-2"]);
 	});
@@ -748,8 +748,8 @@ describe("NativePreviewPlayer", () => {
 		}
 
 		vi.stubGlobal("AudioContext", class AudioContext {});
-		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
-			createPreparedAudioPreviewSourcesForRequest(request),
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
 		);
 
 		render(
@@ -787,7 +787,7 @@ describe("NativePreviewPlayer", () => {
 				adapterMockState.previewAudioEngines[0]?.setTrackChannelMode,
 			).toHaveBeenCalledWith(0, "use-left-as-mono");
 		});
-		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 
 		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
@@ -1408,16 +1408,16 @@ function createTestDomRect({
 	} as DOMRect;
 }
 
-function createPreparedAudioPreviewSourcesForRequest(
-	request: PrepareAudioPreviewSourcesRequest,
-): BrowserAudioPreviewSourcesResult {
+function createPreparedPreviewAudioResourcesForRequest(
+	request: PreparePreviewAudioResourcesRequest,
+): PreviewAudioResourcesResult {
 	const requestedTrackIds = request.trackIds
 		? Array.from(request.trackIds)
 		: request.asset.tracks.audio.map((track) => track.id);
 
 	return {
 		failures: [],
-		sources: requestedTrackIds.map((trackId, sourceIndex) => {
+		resources: requestedTrackIds.map((trackId, resourceIndex) => {
 			const track = request.asset.tracks.audio.find(
 				(candidateTrack) => candidateTrack.id === trackId,
 			);
@@ -1437,9 +1437,9 @@ function createPreparedAudioPreviewSourcesForRequest(
 				strategy: "same-codec-remux",
 				track,
 				trackId,
-				trackIndex: sourceIndex,
+				trackIndex: resourceIndex,
 				url: `blob:audio:${request.asset.id}:${trackId}:${channelMode}`,
-			} satisfies BrowserAudioPreviewSource;
+			} satisfies PreviewAudioResource;
 		}),
 	};
 }

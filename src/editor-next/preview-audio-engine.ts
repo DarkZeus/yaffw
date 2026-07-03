@@ -11,9 +11,9 @@ import {
 } from "./browser-audio-mix";
 import type { ResolvedChannelTransform } from "./browser-audio-mix.types";
 import type {
-	BrowserAudioPreviewSource,
-	BrowserAudioPreviewSourceFailure,
-} from "./browser-audio-preview-sources.types";
+	PreviewAudioResource,
+	PreviewAudioResourceFailure,
+} from "./preview-audio-resources.types";
 
 export type PreviewAudioEngine = {
 	destroy: () => void;
@@ -114,17 +114,17 @@ export type PreviewAudioBufferSourceNodeLike = PreviewAudioNodeLike & {
 
 export type CreatePreviewAudioEngineOptions = {
 	createAudioContext?: () => PreviewAudioContextLike;
-	failures?: BrowserAudioPreviewSourceFailure[];
-	sources: BrowserAudioPreviewSource[];
+	failures?: PreviewAudioResourceFailure[];
+	resources: PreviewAudioResource[];
 };
 
-type PreviewAudioResource = {
+type DecodedPreviewAudioResource = {
 	buffer: AudioBuffer;
-	source: BrowserAudioPreviewSource;
+	source: PreviewAudioResource;
 };
 
 type PreviewAudioReadyResourceTrack = {
-	resource: PreviewAudioResource;
+	resource: DecodedPreviewAudioResource;
 	status: "ready";
 	trackId: string;
 	trackIndex: number;
@@ -139,7 +139,7 @@ type PreviewAudioReadyEngineTrack = {
 	channelRouting: PreviewAudioTrackChannelRouting;
 	gainNode: PreviewAudioGainNodeLike;
 	monitorGain: number;
-	resource: PreviewAudioResource;
+	resource: DecodedPreviewAudioResource;
 	sourceNode: PreviewAudioBufferSourceNodeLike | null;
 	status: "ready";
 	trackId: string;
@@ -151,7 +151,7 @@ type PreviewAudioUnavailableEngineTrack = {
 	channelMode: AudioTrackChannelMode;
 	monitorGain: number;
 	reason: string;
-	source?: BrowserAudioPreviewSource;
+	source?: PreviewAudioResource;
 	status: "unavailable";
 	trackId: string;
 	trackIndex: number;
@@ -188,11 +188,11 @@ export function canUsePreviewAudioEngine(asset: ReadyMediaAsset) {
 export async function createPreviewAudioEngine({
 	createAudioContext = createDefaultPreviewAudioContext,
 	failures = [],
-	sources,
+	resources,
 }: CreatePreviewAudioEngineOptions): Promise<PreviewAudioEngine> {
 	const audioContext = createAudioContext();
 	const decodedTracks = await Promise.all(
-		sources.map((source) =>
+		resources.map((source) =>
 			decodePreviewAudioEngineTrack({
 				audioContext,
 				source,
@@ -222,30 +222,30 @@ export async function createPreviewAudioEngine({
 	});
 }
 
-export function previewTrackVolumeGainForAudioTrackSource({
+export function previewTrackVolumeGainForAudioTrackResource({
 	audioMix,
-	source,
+	resource,
 }: {
 	audioMix: AudioMix;
-	source: BrowserAudioPreviewSource;
+	resource: PreviewAudioResource;
 }) {
-	const decision = audioMix.tracks[source.trackId];
+	const decision = audioMix.tracks[resource.trackId];
 
 	return audioTrackVolumePercentToGain(decision?.volumePercent ?? 100);
 }
 
-export function previewTrackMonitorGainForAudioTrackSource({
+export function previewTrackMonitorGainForAudioTrackResource({
 	audioMix,
 	soloedAudioTrackId,
-	source,
+	resource,
 }: {
 	audioMix: AudioMix;
 	soloedAudioTrackId?: string | null;
-	source: BrowserAudioPreviewSource;
+	resource: PreviewAudioResource;
 }) {
-	const decision = audioMix.tracks[source.trackId];
+	const decision = audioMix.tracks[resource.trackId];
 
-	if (soloedAudioTrackId && source.trackId !== soloedAudioTrackId) {
+	if (soloedAudioTrackId && resource.trackId !== soloedAudioTrackId) {
 		return 0;
 	}
 
@@ -275,38 +275,38 @@ export function applyPreviewAudioEngineMix({
 	muted,
 	previewAudioEngine,
 	soloedAudioTrackId,
-	sources,
+	resources,
 	volume,
 }: {
 	audioMix: AudioMix;
 	muted: boolean;
 	previewAudioEngine: PreviewAudioEngine;
 	soloedAudioTrackId?: string | null;
-	sources: BrowserAudioPreviewSource[];
+	resources: PreviewAudioResource[];
 	volume: number;
 }) {
 	previewAudioEngine.setOutputGain(
 		previewOutputGainForAudioMonitoring({ muted, volume }),
 	);
 
-	sources.forEach((source, sourceIndex) => {
+	resources.forEach((resource, resourceIndex) => {
 		previewAudioEngine.setTrackChannelMode(
-			sourceIndex,
-			audioMix.tracks[source.trackId]?.channelMode ?? "preserve",
+			resourceIndex,
+			audioMix.tracks[resource.trackId]?.channelMode ?? "preserve",
 		);
 		previewAudioEngine.setTrackVolumeGain(
-			sourceIndex,
-			previewTrackVolumeGainForAudioTrackSource({
+			resourceIndex,
+			previewTrackVolumeGainForAudioTrackResource({
 				audioMix,
-				source,
+				resource,
 			}),
 		);
 		previewAudioEngine.setTrackMonitorGain(
-			sourceIndex,
-			previewTrackMonitorGainForAudioTrackSource({
+			resourceIndex,
+			previewTrackMonitorGainForAudioTrackResource({
 				audioMix,
 				soloedAudioTrackId,
-				source,
+				resource,
 			}),
 		);
 	});
@@ -735,7 +735,7 @@ function createPreviewAudioTrackChannelRouting({
 	audioContext: PreviewAudioContextLike;
 	channelMode: AudioTrackChannelMode;
 	gainNode: PreviewAudioGainNodeLike;
-	resource: PreviewAudioResource;
+	resource: DecodedPreviewAudioResource;
 }): PreviewAudioTrackChannelRouting {
 	const resolvedChannelMode = resolvePreviewAudioChannelMode({
 		audioBuffer: resource.buffer,
@@ -924,7 +924,7 @@ function samplePreviewAudioTrackPeakWindow({
 }: {
 	meterPlan: PreviewAudioMeterPlan;
 	playheadSeconds: number;
-	resource: PreviewAudioResource;
+	resource: DecodedPreviewAudioResource;
 	trackGain: number;
 }): number[] {
 	const audioBuffer = resource.buffer;
@@ -1219,7 +1219,7 @@ async function decodePreviewAudioEngineTrack({
 	source,
 }: {
 	audioContext: PreviewAudioContextLike;
-	source: BrowserAudioPreviewSource;
+	source: PreviewAudioResource;
 }): Promise<PreviewAudioPreparedTrack> {
 	try {
 		return {
@@ -1244,7 +1244,7 @@ function createUnavailablePreviewAudioTrackFromSource({
 	source,
 }: {
 	reason: string;
-	source: BrowserAudioPreviewSource;
+	source: PreviewAudioResource;
 }): PreviewAudioUnavailableEngineTrack {
 	return {
 		channelMode: "preserve",
@@ -1259,7 +1259,7 @@ function createUnavailablePreviewAudioTrackFromSource({
 }
 
 function createUnavailablePreviewAudioTrackFromFailure(
-	failure: BrowserAudioPreviewSourceFailure,
+	failure: PreviewAudioResourceFailure,
 ): PreviewAudioUnavailableEngineTrack {
 	return {
 		channelMode: "preserve",
@@ -1302,7 +1302,7 @@ function createTotalPreviewAudioResourceFailureReason(
 
 async function decodePreviewAudioResource(
 	audioContext: PreviewAudioContextLike,
-	source: BrowserAudioPreviewSource,
+	source: PreviewAudioResource,
 ) {
 	const audioData = await source.blob.arrayBuffer();
 

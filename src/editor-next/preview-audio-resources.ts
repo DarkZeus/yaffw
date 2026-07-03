@@ -30,19 +30,19 @@ import {
 } from "./browser-audio-mix";
 import type {
 	AudioPreviewTrackMetadata,
-	AudioPreviewTrackSourceOptions,
-	BrowserAudioPreviewSource,
-	BrowserAudioPreviewSourceFailure,
-	BrowserAudioPreviewSourcesRequest,
-	BrowserAudioPreviewSourcesResult,
-	CreateAudioPreviewSourceOptions,
-	CreateTransformedAudioPreviewTrackSourceOptions,
+	PreviewAudioTrackResourceOptions,
+	PreviewAudioResource,
+	PreviewAudioResourceFailure,
+	PreviewAudioResourcesRequest,
+	PreviewAudioResourcesResult,
+	CreatePreviewAudioResourceOptions,
+	CreateTransformedPreviewAudioTrackResourceOptions,
 	InputAudioTrack,
-	PrepareAudioPreviewTrackSourceOptions,
-	PrepareAudioPreviewTrackSourceResult,
-	RemuxAudioPreviewTrackOptions,
+	PreparePreviewAudioTrackResourceOptions,
+	PreparePreviewAudioTrackResourceResult,
+	RemuxPreviewAudioTrackResourceOptions,
 	RemuxCandidate,
-} from "./browser-audio-preview-sources.types";
+} from "./preview-audio-resources.types";
 import {
 	type DisposableMediaCleanup,
 	type DisposableMediaWorkScope,
@@ -50,7 +50,7 @@ import {
 	withDisposableMediaWorkScope,
 } from "./disposable-media-work-scope";
 
-export async function prepareBrowserAudioPreviewSources({
+export async function preparePreviewAudioResources({
 	audioMix,
 	asset,
 	createObjectURL = URL.createObjectURL,
@@ -58,14 +58,14 @@ export async function prepareBrowserAudioPreviewSources({
 	signal,
 	source,
 	trackIds,
-}: BrowserAudioPreviewSourcesRequest): Promise<BrowserAudioPreviewSourcesResult> {
+}: PreviewAudioResourcesRequest): Promise<PreviewAudioResourcesResult> {
 	return withDisposableMediaWorkScope(async (scope) => {
 		throwIfAborted(signal);
 
 		if (asset.tracks.audio.length === 0) {
 			return {
 				failures: [],
-				sources: [],
+				resources: [],
 			};
 		}
 
@@ -75,8 +75,8 @@ export async function prepareBrowserAudioPreviewSources({
 				source: new BlobSource(source),
 			}),
 		);
-		const sources: BrowserAudioPreviewSource[] = [];
-		const failures: BrowserAudioPreviewSourceFailure[] = [];
+		const resources: PreviewAudioResource[] = [];
+		const failures: PreviewAudioResourceFailure[] = [];
 
 		try {
 			const inputTracks = await input.getAudioTracks();
@@ -106,7 +106,7 @@ export async function prepareBrowserAudioPreviewSources({
 					inputTrack,
 					trackIndex,
 				);
-				const preparedSource = await prepareAudioPreviewTrackSource({
+				const preparedResource = await preparePreviewAudioTrackResource({
 					assetTrack,
 					createObjectURL,
 					decision: audioMix.tracks[assetTrack.id],
@@ -119,13 +119,13 @@ export async function prepareBrowserAudioPreviewSources({
 					trackIndex,
 				});
 
-				if (preparedSource.status === "ready") {
-					sources.push(preparedSource.source);
+				if (preparedResource.status === "ready") {
+					resources.push(preparedResource.resource);
 					continue;
 				}
 
 				failures.push({
-					reason: preparedSource.reason,
+					reason: preparedResource.reason,
 					track: assetTrack,
 					trackId: assetTrack.id,
 					trackIndex,
@@ -134,27 +134,27 @@ export async function prepareBrowserAudioPreviewSources({
 
 			return {
 				failures,
-				sources,
+				resources,
 			};
 		} catch (error) {
-			revokeBrowserAudioPreviewSources({
+			revokePreviewAudioResources({
 				revokeObjectURL,
-				sources,
+				resources,
 			});
 			throw error;
 		}
 	});
 }
 
-export function revokeBrowserAudioPreviewSources({
+export function revokePreviewAudioResources({
 	revokeObjectURL = URL.revokeObjectURL,
-	sources,
+	resources,
 }: {
 	revokeObjectURL?: (url: string) => void;
-	sources: BrowserAudioPreviewSource[];
+	resources: PreviewAudioResource[];
 }) {
-	for (const source of sources) {
-		revokeObjectURL(source.url);
+	for (const resource of resources) {
+		revokeObjectURL(resource.url);
 	}
 }
 
@@ -239,7 +239,7 @@ export function remuxCandidatesForAudioPreviewCodec(
 	return [mp4Candidate];
 }
 
-export function shouldPrepareTransformedAudioPreviewSource(
+export function shouldPrepareTransformedPreviewAudioResource(
 	channelMode: AudioTrackChannelMode,
 ): channelMode is Exclude<AudioTrackChannelMode, "preserve"> {
 	void channelMode;
@@ -247,7 +247,7 @@ export function shouldPrepareTransformedAudioPreviewSource(
 	return false;
 }
 
-async function prepareAudioPreviewTrackSource({
+async function preparePreviewAudioTrackResource({
 	assetTrack,
 	createObjectURL,
 	decision,
@@ -258,13 +258,13 @@ async function prepareAudioPreviewTrackSource({
 	signal,
 	track,
 	trackIndex,
-}: PrepareAudioPreviewTrackSourceOptions): Promise<PrepareAudioPreviewTrackSourceResult> {
+}: PreparePreviewAudioTrackResourceOptions): Promise<PreparePreviewAudioTrackResourceResult> {
 	const reasons: string[] = [];
 	const channelMode = decision?.channelMode ?? "preserve";
 
-	if (shouldPrepareTransformedAudioPreviewSource(channelMode)) {
+	if (shouldPrepareTransformedPreviewAudioResource(channelMode)) {
 		try {
-			const source = await createTransformedAudioPreviewTrackSource({
+			const resource = await createTransformedPreviewAudioTrackResource({
 				assetTrack,
 				channelMode,
 				createObjectURL,
@@ -278,7 +278,7 @@ async function prepareAudioPreviewTrackSource({
 			});
 
 			return {
-				source,
+				resource,
 				status: "ready",
 			};
 		} catch (error) {
@@ -290,7 +290,7 @@ async function prepareAudioPreviewTrackSource({
 		throwIfAborted(signal);
 
 		try {
-			const source = await remuxAudioPreviewTrack({
+			const resource = await remuxPreviewAudioTrackResource({
 				assetTrack,
 				candidate,
 				createObjectURL,
@@ -303,7 +303,7 @@ async function prepareAudioPreviewTrackSource({
 			});
 
 			return {
-				source,
+				resource,
 				status: "ready",
 			};
 		} catch (error) {
@@ -312,7 +312,7 @@ async function prepareAudioPreviewTrackSource({
 	}
 
 	try {
-		const source = await createWavAudioPreviewFallback({
+		const resource = await createWavPreviewAudioResourceFallback({
 			assetTrack,
 			createObjectURL,
 			metadata,
@@ -324,7 +324,7 @@ async function prepareAudioPreviewTrackSource({
 		});
 
 		return {
-			source,
+			resource,
 			status: "ready",
 		};
 	} catch (error) {
@@ -332,12 +332,12 @@ async function prepareAudioPreviewTrackSource({
 	}
 
 	return {
-		reason: reasons.join("; ") || "No preview audio source could be prepared.",
+		reason: reasons.join("; ") || "No Preview audio resource could be prepared.",
 		status: "failed",
 	};
 }
 
-async function createTransformedAudioPreviewTrackSource({
+async function createTransformedPreviewAudioTrackResource({
 	assetTrack,
 	channelMode,
 	createObjectURL,
@@ -348,12 +348,12 @@ async function createTransformedAudioPreviewTrackSource({
 	signal,
 	track,
 	trackIndex,
-}: CreateTransformedAudioPreviewTrackSourceOptions): Promise<BrowserAudioPreviewSource> {
+}: CreateTransformedPreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
 	if (!(await track.canDecode())) {
 		throw new Error("Track is not decodable in this browser.");
 	}
 
-	const decoded = await decodeAudioPreviewTrackToBuffer({
+	const decoded = await decodePreviewAudioTrackToBuffer({
 		metadata,
 		scope,
 		signal,
@@ -376,13 +376,13 @@ async function createTransformedAudioPreviewTrackSource({
 		channelCompensated,
 		finalPeakGuardDb,
 	);
-	const encoded = await encodeTransformedAudioPreviewBlob(
+	const encoded = await encodeTransformedPreviewAudioBlob(
 		peakSafe,
 		metadata,
 		scope,
 	);
 
-	return createAudioPreviewSource({
+	return createPreviewAudioResource({
 		assetTrack,
 		blob: encoded.blob,
 		createObjectURL,
@@ -396,7 +396,7 @@ async function createTransformedAudioPreviewTrackSource({
 	});
 }
 
-async function decodeAudioPreviewTrackToBuffer({
+async function decodePreviewAudioTrackToBuffer({
 	metadata,
 	scope,
 	signal,
@@ -478,7 +478,7 @@ async function decodeAudioPreviewTrackToBuffer({
 	return audioBuffer;
 }
 
-async function encodeTransformedAudioPreviewBlob(
+async function encodeTransformedPreviewAudioBlob(
 	audioBuffer: AudioBuffer,
 	metadata: AudioPreviewTrackMetadata,
 	scope: DisposableMediaWorkScope,
@@ -487,7 +487,7 @@ async function encodeTransformedAudioPreviewBlob(
 	extension: string;
 	mimeType: string;
 	strategy: Extract<
-		BrowserAudioPreviewSource["strategy"],
+		PreviewAudioResource["strategy"],
 		"decoded-channel-transform-aac-m4a" | "decoded-channel-transform-wav"
 	>;
 }> {
@@ -530,7 +530,7 @@ async function encodeAudioBufferToM4aBlob(
 		extension: ".m4a",
 		mimeType: "audio/mp4",
 		strategy: "decoded-channel-transform-aac-m4a",
-	} satisfies Awaited<ReturnType<typeof encodeTransformedAudioPreviewBlob>>;
+	} satisfies Awaited<ReturnType<typeof encodeTransformedPreviewAudioBlob>>;
 }
 
 async function encodeAudioBufferToWavBlob(
@@ -562,10 +562,10 @@ async function encodeAudioBufferToWavBlob(
 		extension: ".wav",
 		mimeType: "audio/wav",
 		strategy: "decoded-channel-transform-wav",
-	} satisfies Awaited<ReturnType<typeof encodeTransformedAudioPreviewBlob>>;
+	} satisfies Awaited<ReturnType<typeof encodeTransformedPreviewAudioBlob>>;
 }
 
-async function remuxAudioPreviewTrack({
+async function remuxPreviewAudioTrackResource({
 	assetTrack,
 	candidate,
 	createObjectURL,
@@ -575,7 +575,7 @@ async function remuxAudioPreviewTrack({
 	signal,
 	track,
 	trackIndex,
-}: RemuxAudioPreviewTrackOptions): Promise<BrowserAudioPreviewSource> {
+}: RemuxPreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
 	if (!metadata.codec) {
 		throw new Error("Track codec is unknown.");
 	}
@@ -622,7 +622,7 @@ async function remuxAudioPreviewTrack({
 		throw new Error("Remux output produced no buffer.");
 	}
 
-	return createAudioPreviewSource({
+	return createPreviewAudioResource({
 		assetTrack,
 		blob: new Blob([target.buffer], { type: candidate.mimeType }),
 		createObjectURL,
@@ -636,7 +636,7 @@ async function remuxAudioPreviewTrack({
 	});
 }
 
-async function createWavAudioPreviewFallback({
+async function createWavPreviewAudioResourceFallback({
 	assetTrack,
 	createObjectURL,
 	metadata,
@@ -645,7 +645,7 @@ async function createWavAudioPreviewFallback({
 	signal,
 	track,
 	trackIndex,
-}: AudioPreviewTrackSourceOptions): Promise<BrowserAudioPreviewSource> {
+}: PreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
 	if (!(await track.canDecode())) {
 		throw new Error("Track is not decodable in this browser.");
 	}
@@ -703,7 +703,7 @@ async function createWavAudioPreviewFallback({
 		throw new Error("WAV output produced no buffer.");
 	}
 
-	return createAudioPreviewSource({
+	return createPreviewAudioResource({
 		assetTrack,
 		blob: new Blob([target.buffer], { type: "audio/wav" }),
 		createObjectURL,
@@ -717,7 +717,7 @@ async function createWavAudioPreviewFallback({
 	});
 }
 
-function createAudioPreviewSource({
+function createPreviewAudioResource({
 	assetTrack,
 	blob,
 	createObjectURL,
@@ -728,7 +728,7 @@ function createAudioPreviewSource({
 	scope,
 	strategy,
 	trackIndex,
-}: CreateAudioPreviewSourceOptions): BrowserAudioPreviewSource {
+}: CreatePreviewAudioResourceOptions): PreviewAudioResource {
 	const url = createObjectURL(blob);
 	let transferred = false;
 

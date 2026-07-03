@@ -9,7 +9,7 @@ import type {
 } from "@/editor-core/model";
 import type { DisposableMediaWorkScope } from "./disposable-media-work-scope";
 
-export type BrowserAudioPreviewSource = {
+export type PreviewAudioResource = {
 	blob: Blob;
 	byteLength: number;
 	downloadName: string;
@@ -26,19 +26,19 @@ export type BrowserAudioPreviewSource = {
 	url: string;
 };
 
-export type BrowserAudioPreviewSourceFailure = {
+export type PreviewAudioResourceFailure = {
 	reason: string;
 	track: AudioMediaTrack;
 	trackId: string;
 	trackIndex: number;
 };
 
-export type BrowserAudioPreviewSourcesResult = {
-	failures: BrowserAudioPreviewSourceFailure[];
-	sources: BrowserAudioPreviewSource[];
+export type PreviewAudioResourcesResult = {
+	failures: PreviewAudioResourceFailure[];
+	resources: PreviewAudioResource[];
 };
 
-export type BrowserAudioPreviewSourcesRequest = {
+export type PreviewAudioResourcesRequest = {
 	audioMix: AudioMix;
 	asset: ReadyMediaAsset;
 	createObjectURL?: (blob: Blob) => string;
@@ -67,7 +67,7 @@ export type RemuxCandidate = {
 	mimeType: string;
 };
 
-export type AudioPreviewTrackSourceOptions = {
+export type PreviewAudioTrackResourceOptions = {
 	assetTrack: AudioMediaTrack;
 	createObjectURL: (blob: Blob) => string;
 	metadata: AudioPreviewTrackMetadata;
@@ -78,15 +78,15 @@ export type AudioPreviewTrackSourceOptions = {
 	trackIndex: number;
 };
 
-export type PrepareAudioPreviewTrackSourceOptions =
-	AudioPreviewTrackSourceOptions & {
+export type PreparePreviewAudioTrackResourceOptions =
+	PreviewAudioTrackResourceOptions & {
 		decision: AudioMixTrackDecision | undefined;
 		finalPeakGuardDb: number;
 	};
 
-export type PrepareAudioPreviewTrackSourceResult =
+export type PreparePreviewAudioTrackResourceResult =
 	| {
-			source: BrowserAudioPreviewSource;
+			resource: PreviewAudioResource;
 			status: "ready";
 	  }
 	| {
@@ -94,17 +94,17 @@ export type PrepareAudioPreviewTrackSourceResult =
 			status: "failed";
 	  };
 
-export type CreateTransformedAudioPreviewTrackSourceOptions =
-	AudioPreviewTrackSourceOptions & {
+export type CreateTransformedPreviewAudioTrackResourceOptions =
+	PreviewAudioTrackResourceOptions & {
 		channelMode: Exclude<AudioTrackChannelMode, "preserve">;
 		finalPeakGuardDb: number;
 	};
 
-export type RemuxAudioPreviewTrackOptions = AudioPreviewTrackSourceOptions & {
+export type RemuxPreviewAudioTrackResourceOptions = PreviewAudioTrackResourceOptions & {
 	candidate: RemuxCandidate;
 };
 
-export type CreateAudioPreviewSourceOptions = {
+export type CreatePreviewAudioResourceOptions = {
 	assetTrack: AudioMediaTrack;
 	blob: Blob;
 	createObjectURL: (blob: Blob) => string;
@@ -113,6 +113,6 @@ export type CreateAudioPreviewSourceOptions = {
 	mimeType: string;
 	revokeObjectURL: (url: string) => void;
 	scope: DisposableMediaWorkScope;
-	strategy: BrowserAudioPreviewSource["strategy"];
+	strategy: PreviewAudioResource["strategy"];
 	trackIndex: number;
 };
