@@ -64,6 +64,9 @@ describe("useLivePreviewMetering", () => {
 		act(() => {
 			timeoutCallbacks.shift()?.callback();
 		});
+		act(() => {
+			frameCallbacks.shift()?.(80);
+		});
 
 		const attackPeak = Number(screen.getByLabelText("voice peak").textContent);
 		expect(attackPeak).toBeLessThanOrEqual(0);
@@ -96,7 +99,7 @@ describe("useLivePreviewMetering", () => {
 		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
 	});
 
-	it("does not commit playing meter values to React state at frame cadence", () => {
+	it("animates playing meter values on animation frames between snapshot reads", () => {
 		let currentNowMs = 0;
 		let snapshot = createReadySnapshot(0.25);
 		const clock = createMeteringClock({
@@ -114,7 +117,7 @@ describe("useLivePreviewMetering", () => {
 		snapshot = createReadySnapshot(1);
 		currentNowMs = 16;
 		act(() => {
-			timeoutCallbacks.shift()?.callback();
+			frameCallbacks.shift()?.(16);
 		});
 
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
@@ -126,11 +129,14 @@ describe("useLivePreviewMetering", () => {
 		act(() => {
 			timeoutCallbacks.shift()?.callback();
 		});
+		act(() => {
+			frameCallbacks.shift()?.(64);
+		});
 
 		const committedPeak = Number(
 			screen.getByLabelText("voice peak").textContent,
 		);
-		expect(committedPeak).toBeGreaterThan(-1);
+		expect(committedPeak).toBeGreaterThan(-2);
 	});
 
 	it("does not sample expensive playing meter snapshots at frame cadence", () => {
@@ -148,7 +154,7 @@ describe("useLivePreviewMetering", () => {
 		for (const frameTimestampMs of [16, 32, 48]) {
 			currentNowMs = frameTimestampMs;
 			act(() => {
-				timeoutCallbacks.shift()?.callback();
+				frameCallbacks.shift()?.(frameTimestampMs);
 			});
 		}
 
@@ -162,7 +168,7 @@ describe("useLivePreviewMetering", () => {
 		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
 	});
 
-	it("uses low-frequency playing polling instead of an animation-frame loop", () => {
+	it("uses animation frames for playing display updates and low-frequency polling for snapshots", () => {
 		const clock = createMeteringClock({
 			getIsPlaying: () => true,
 			readMeterSnapshot: () => createReadySnapshot(1),
@@ -170,7 +176,7 @@ describe("useLivePreviewMetering", () => {
 
 		render(<LivePreviewMeteringProbe clock={clock} now={fixedNow} />);
 
-		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+		expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
 		expect(timeoutCallbacks).toHaveLength(1);
 		expect(timeoutCallbacks[0]?.delayMs).toBe(50);
 	});

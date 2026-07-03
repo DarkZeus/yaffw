@@ -92,13 +92,16 @@ describe("AudioPanel live meter render isolation", () => {
 		act(() => {
 			vi.advanceTimersByTime(50);
 		});
+		act(() => {
+			vi.advanceTimersByTime(16);
+		});
 
 		const updatedLeftPeakDb = Number(
 			within(voiceMeter)
 				.getByRole("meter", { name: "Left level" })
 				.getAttribute("aria-valuenow"),
 		);
-		expect(updatedLeftPeakDb).toBeGreaterThan(-2);
+		expect(updatedLeftPeakDb).toBeGreaterThan(-8);
 		expect(updatedLeftPeakDb).not.toBeCloseTo(-12.04, 2);
 		expect(buttonRenderStats.renderCount).toBe(
 			buttonRenderCountAfterInitialMeters,

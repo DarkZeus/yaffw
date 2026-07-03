@@ -63,7 +63,10 @@ export function useLivePreviewMetering({
 
 		let cancelled = false;
 		let timeoutId: number | null = null;
+		let animationFrameId: number | null = null;
 		let lastDisplayUpdateTimestampMs: number | null = null;
+		let lastTargetSampleTimestampMs: number | null = null;
+		let targetMeteringState = liveMeteringStateRef.current;
 
 		function commitLiveMeteringState(nextState: LivePreviewMeteringState) {
 			if (
@@ -76,41 +79,29 @@ export function useLivePreviewMetering({
 			setLiveMeteringState(nextState);
 		}
 
-		function scheduleNextUpdate(isPlaying: boolean) {
+		function scheduleNextPoll(isPlaying: boolean) {
 			if (!clock || cancelled) {
 				return;
 			}
 
 			timeoutId = requestPreviewMeteringPoll(
-				updateLiveMeters,
+				updateLiveMeterTarget,
 				isPlaying
 					? LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS
 					: PAUSED_PREVIEW_METERING_POLL_INTERVAL_MS,
 			);
 		}
 
-		function updateLiveMeters(timestampMs?: number) {
-			if (cancelled) {
+		function scheduleAnimationFrame() {
+			if (!clock || cancelled || animationFrameId !== null) {
 				return;
 			}
 
+			animationFrameId = requestPreviewMeteringFrame(animateLiveMeters);
+		}
+
+		function sampleLiveMeterTarget(displayTimestampMs: number) {
 			const isPlaying = clock?.getIsPlaying() ?? false;
-			const displayTimestampMs =
-				typeof timestampMs === "number" ? timestampMs : now();
-			const elapsedDisplayMs =
-				displayTimestampMs !== null && lastDisplayUpdateTimestampMs !== null
-					? displayTimestampMs - lastDisplayUpdateTimestampMs
-					: null;
-			const shouldCommitDisplay =
-				!isPlaying ||
-				elapsedDisplayMs === null ||
-				elapsedDisplayMs >= LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS;
-
-			if (!shouldCommitDisplay) {
-				scheduleNextUpdate(isPlaying);
-				return;
-			}
-
 			const result = createLivePreviewMeteringTrackStates({
 				excludedTrackIds: createExcludedTrackIds({
 					audioMix,
@@ -125,10 +116,19 @@ export function useLivePreviewMetering({
 				previousClipHoldState: clipHoldStateRef.current,
 			});
 			clipHoldStateRef.current = result.clipHoldState;
-			const targetMeteringState = {
+			targetMeteringState = {
 				combinedState: result.combinedState,
 				trackStates: result.trackStates,
-			} satisfies LivePreviewMeteringState;
+			};
+
+			return isPlaying;
+		}
+
+		function commitSmoothedMeteringState(displayTimestampMs: number) {
+			const elapsedDisplayMs =
+				lastDisplayUpdateTimestampMs !== null
+					? displayTimestampMs - lastDisplayUpdateTimestampMs
+					: null;
 			const displayMeteringState = smoothLivePreviewMeteringState({
 				elapsedMs: elapsedDisplayMs,
 				previousState: liveMeteringStateRef.current,
@@ -136,21 +136,75 @@ export function useLivePreviewMetering({
 			});
 
 			commitLiveMeteringState(displayMeteringState);
-
-			if (displayTimestampMs !== null) {
-				lastDisplayUpdateTimestampMs = displayTimestampMs;
-			}
-
-			scheduleNextUpdate(isPlaying);
+			lastDisplayUpdateTimestampMs = displayTimestampMs;
 		}
 
-		updateLiveMeters();
+		function updateLiveMeterTarget() {
+			if (cancelled) {
+				return;
+			}
+
+			const displayTimestampMs = now();
+			const meterIsPlaying = clock?.getIsPlaying() ?? false;
+			const elapsedSampleMs =
+				lastTargetSampleTimestampMs === null
+					? null
+					: displayTimestampMs - lastTargetSampleTimestampMs;
+
+			if (
+				meterIsPlaying &&
+				elapsedSampleMs !== null &&
+				elapsedSampleMs < LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS
+			) {
+				scheduleAnimationFrame();
+				scheduleNextPoll(meterIsPlaying);
+				return;
+			}
+
+			const isPlaying = sampleLiveMeterTarget(displayTimestampMs);
+			lastTargetSampleTimestampMs = displayTimestampMs;
+
+			if (isPlaying) {
+				if (lastDisplayUpdateTimestampMs === null) {
+					commitLiveMeteringState(targetMeteringState);
+					lastDisplayUpdateTimestampMs = displayTimestampMs;
+				}
+				scheduleAnimationFrame();
+			} else {
+				commitSmoothedMeteringState(displayTimestampMs);
+			}
+
+			scheduleNextPoll(isPlaying);
+		}
+
+		function animateLiveMeters(timestampMs: number) {
+			animationFrameId = null;
+
+			if (cancelled) {
+				return;
+			}
+
+			const isPlaying = clock?.getIsPlaying() ?? false;
+
+			if (!isPlaying) {
+				return;
+			}
+
+			commitSmoothedMeteringState(timestampMs);
+			scheduleAnimationFrame();
+		}
+
+		updateLiveMeterTarget();
 
 		return () => {
 			cancelled = true;
 
 			if (timeoutId !== null) {
 				cancelPreviewMeteringPoll(timeoutId);
+			}
+
+			if (animationFrameId !== null) {
+				cancelPreviewMeteringFrame(animationFrameId);
 			}
 		};
 	}, [audioMix, clock, enabled, now, soloedAudioTrackId, stableKnownTrackIds]);
@@ -337,6 +391,24 @@ function cancelPreviewMeteringPoll(timeoutId: number) {
 	}
 
 	window.clearTimeout(timeoutId);
+}
+
+function requestPreviewMeteringFrame(
+	callback: FrameRequestCallback,
+): number | null {
+	if (typeof window.requestAnimationFrame !== "function") {
+		return null;
+	}
+
+	return window.requestAnimationFrame(callback);
+}
+
+function cancelPreviewMeteringFrame(frameId: number) {
+	if (typeof window.cancelAnimationFrame !== "function") {
+		return;
+	}
+
+	window.cancelAnimationFrame(frameId);
 }
 
 function livePreviewMeteringStatesEqual(
