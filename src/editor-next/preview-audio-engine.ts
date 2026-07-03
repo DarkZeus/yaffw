@@ -10,16 +10,21 @@ import {
 	resolveChannelTransform,
 } from "./browser-audio-mix";
 import type { ResolvedChannelTransform } from "./browser-audio-mix.types";
-import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type {
+	BrowserAudioPreviewSource,
+	BrowserAudioPreviewSourceFailure,
+} from "./browser-audio-preview-sources.types";
 
 export type PreviewAudioEngine = {
 	destroy: () => void;
 	getCurrentTime: () => number;
+	getStatus: () => PreviewAudioEngineStatus;
 	pause: () => void;
 	play: () => Promise<void>;
 	readMeterSnapshot: (
 		options: ReadPreviewAudioEngineMeterSnapshotOptions,
 	) => PreviewAudioEngineMeterSnapshot;
+	retryTrackResource: (trackId: string) => Promise<PreviewAudioEngineStatus>;
 	setOutputGain: (gain: number) => void;
 	setPlaybackRate: (playbackRate: number) => void;
 	setTime: (timeSeconds: number) => void;
@@ -30,6 +35,8 @@ export type PreviewAudioEngine = {
 	setTrackMonitorGain: (trackIndex: number, gain: number) => void;
 	setTrackVolumeGain: (trackIndex: number, gain: number) => void;
 };
+
+export type PreviewAudioEngineStatus = "degraded" | "ready";
 
 export type ReadPreviewAudioEngineMeterSnapshotOptions = {
 	outputChannels: number;
@@ -107,6 +114,7 @@ export type PreviewAudioBufferSourceNodeLike = PreviewAudioNodeLike & {
 
 export type CreatePreviewAudioEngineOptions = {
 	createAudioContext?: () => PreviewAudioContextLike;
+	failures?: BrowserAudioPreviewSourceFailure[];
 	sources: BrowserAudioPreviewSource[];
 };
 
@@ -115,15 +123,44 @@ type PreviewAudioResource = {
 	source: BrowserAudioPreviewSource;
 };
 
-type PreviewAudioEngineTrack = {
+type PreviewAudioReadyResourceTrack = {
+	resource: PreviewAudioResource;
+	status: "ready";
+	trackId: string;
+	trackIndex: number;
+};
+
+type PreviewAudioPreparedTrack =
+	| PreviewAudioReadyResourceTrack
+	| PreviewAudioUnavailableEngineTrack;
+
+type PreviewAudioReadyEngineTrack = {
 	channelMode: AudioTrackChannelMode;
 	channelRouting: PreviewAudioTrackChannelRouting;
 	gainNode: PreviewAudioGainNodeLike;
 	monitorGain: number;
 	resource: PreviewAudioResource;
 	sourceNode: PreviewAudioBufferSourceNodeLike | null;
+	status: "ready";
+	trackId: string;
+	trackIndex: number;
 	trackVolumeGain: number;
 };
+
+type PreviewAudioUnavailableEngineTrack = {
+	channelMode: AudioTrackChannelMode;
+	monitorGain: number;
+	reason: string;
+	source?: BrowserAudioPreviewSource;
+	status: "unavailable";
+	trackId: string;
+	trackIndex: number;
+	trackVolumeGain: number;
+};
+
+type PreviewAudioEngineTrack =
+	| PreviewAudioReadyEngineTrack
+	| PreviewAudioUnavailableEngineTrack;
 
 type PreviewAudioTrackChannelRouting = {
 	dispose: () => void;
@@ -150,19 +187,38 @@ export function canUsePreviewAudioEngine(asset: ReadyMediaAsset) {
 
 export async function createPreviewAudioEngine({
 	createAudioContext = createDefaultPreviewAudioContext,
+	failures = [],
 	sources,
 }: CreatePreviewAudioEngineOptions): Promise<PreviewAudioEngine> {
 	const audioContext = createAudioContext();
-	const resources = await Promise.all(
-		sources.map(async (source) => ({
-			buffer: await decodePreviewAudioResource(audioContext, source),
-			source,
-		})),
+	const decodedTracks = await Promise.all(
+		sources.map((source) =>
+			decodePreviewAudioEngineTrack({
+				audioContext,
+				source,
+			}),
+		),
 	);
+	const readyTrackCount = decodedTracks.filter(
+		(track) => track.status === "ready",
+	).length;
+
+	if (readyTrackCount === 0) {
+		await audioContext.close?.();
+		throw new Error(
+			createTotalPreviewAudioResourceFailureReason([
+				...decodedTracks,
+				...failures.map(createUnavailablePreviewAudioTrackFromFailure),
+			]),
+		);
+	}
 
 	return createPreparedPreviewAudioEngine({
 		audioContext,
-		resources,
+		tracks: [
+			...decodedTracks,
+			...failures.map(createUnavailablePreviewAudioTrackFromFailure),
+		],
 	});
 }
 
@@ -265,16 +321,20 @@ export function setPreviewAudioEnginePlaybackRate(
 
 function createPreparedPreviewAudioEngine({
 	audioContext,
-	resources,
+	tracks: preparedTracks,
 }: {
 	audioContext: PreviewAudioContextLike;
-	resources: PreviewAudioResource[];
+	tracks: PreviewAudioPreparedTrack[];
 }): PreviewAudioEngine {
 	const outputGainNode = audioContext.createGain();
 	outputGainNode.gain.value = 1;
 	outputGainNode.connect(audioContext.destination);
 
-	const tracks: PreviewAudioEngineTrack[] = resources.map((resource) => {
+	const tracks: PreviewAudioEngineTrack[] = preparedTracks.map((track) => {
+		if (track.status === "unavailable") {
+			return track;
+		}
+
 		const gainNode = audioContext.createGain();
 		gainNode.gain.value = 0;
 		gainNode.connect(outputGainNode);
@@ -285,12 +345,15 @@ function createPreparedPreviewAudioEngine({
 				audioContext,
 				channelMode: "preserve",
 				gainNode,
-				resource,
+				resource: track.resource,
 			}),
 			gainNode,
 			monitorGain: 0,
-			resource,
+			resource: track.resource,
 			sourceNode: null,
+			status: "ready",
+			trackId: track.trackId,
+			trackIndex: track.trackIndex,
 			trackVolumeGain: 1,
 		};
 	});
@@ -322,6 +385,10 @@ function createPreparedPreviewAudioEngine({
 
 	function stopTrackSources() {
 		for (const track of tracks) {
+			if (track.status !== "ready") {
+				continue;
+			}
+
 			if (!track.sourceNode) {
 				continue;
 			}
@@ -343,6 +410,10 @@ function createPreparedPreviewAudioEngine({
 		playbackStartMediaTimeSeconds = currentTimeSeconds;
 
 		for (const track of tracks) {
+			if (track.status !== "ready") {
+				continue;
+			}
+
 			const sourceNode = audioContext.createBufferSource();
 			const trackStartSeconds = track.resource.source.startPositionSeconds;
 			const offsetSeconds = currentTimeSeconds - trackStartSeconds;
@@ -373,14 +444,28 @@ function createPreparedPreviewAudioEngine({
 			normalizePreviewAudioMeterOutputChannelCount(outputChannels);
 		const playheadSeconds = getCurrentTime();
 		const trackStates: Record<string, PreviewAudioEngineTrackMeterState> = {};
-		const readyTracks = tracks.map((track) => ({
-			...track,
-			meterPlan: createPreviewAudioMeterPlan({
-				audioBuffer: track.resource.buffer,
-				channelMode: track.channelMode,
-				outputChannelCount,
-			}),
-		}));
+		const readyTracks = tracks.flatMap((track) => {
+			if (track.status !== "ready") {
+				trackStates[track.trackId] = {
+					reason: track.reason,
+					status: "unavailable",
+					trackId: track.trackId,
+				};
+
+				return [];
+			}
+
+			return [
+				{
+					...track,
+					meterPlan: createPreviewAudioMeterPlan({
+						audioBuffer: track.resource.buffer,
+						channelMode: track.channelMode,
+						outputChannelCount,
+					}),
+				},
+			];
+		});
 
 		for (const track of readyTracks) {
 			const peaks = playing
@@ -410,13 +495,19 @@ function createPreparedPreviewAudioEngine({
 				})
 			: Array.from({ length: outputChannelCount }, () => 0);
 
+		const unavailableReasons = createPreviewAudioUnavailableReasons(tracks);
+
 		return {
 			combinedState: {
 				channels: createPreviewAudioMeterChannels({
 					labels: createPreviewOutputChannelLabels(outputChannelCount),
 					peaks: combinedPeaks,
 				}),
-				partial: false,
+				partial: unavailableReasons.length > 0,
+				reason:
+					unavailableReasons.length > 0
+						? `Some monitored tracks are unavailable: ${unavailableReasons.join(", ")}`
+						: undefined,
 				status: "ready",
 			},
 			trackStates,
@@ -434,6 +525,10 @@ function createPreparedPreviewAudioEngine({
 			stopTrackSources();
 
 			for (const track of tracks) {
+				if (track.status !== "ready") {
+					continue;
+				}
+
 				track.channelRouting.dispose();
 				track.gainNode.disconnect?.();
 			}
@@ -442,6 +537,9 @@ function createPreparedPreviewAudioEngine({
 			void audioContext.close?.();
 		},
 		getCurrentTime,
+		getStatus() {
+			return getPreviewAudioEngineStatus(tracks);
+		},
 		pause() {
 			if (destroyed || !playing) {
 				return;
@@ -466,6 +564,67 @@ function createPreparedPreviewAudioEngine({
 			startTrackSources();
 		},
 		readMeterSnapshot,
+		async retryTrackResource(trackId: string) {
+			const trackIndex = tracks.findIndex(
+				(track) => track.status === "unavailable" && track.trackId === trackId,
+			);
+			const track = tracks[trackIndex];
+
+			if (!track || track.status !== "unavailable" || !track.source) {
+				return getPreviewAudioEngineStatus(tracks);
+			}
+
+			const wasPlaying = playing;
+
+			if (wasPlaying) {
+				syncCurrentTimeFromContext();
+				playing = false;
+				stopTrackSources();
+			}
+
+			try {
+				const buffer = await decodePreviewAudioResource(audioContext, track.source);
+				const resource = {
+					buffer,
+					source: track.source,
+				};
+				const gainNode = audioContext.createGain();
+				gainNode.gain.value = 0;
+				gainNode.connect(outputGainNode);
+				const readyTrack: PreviewAudioReadyEngineTrack = {
+					channelMode: track.channelMode,
+					channelRouting: createPreviewAudioTrackChannelRouting({
+						audioContext,
+						channelMode: track.channelMode,
+						gainNode,
+						resource,
+					}),
+					gainNode,
+					monitorGain: track.monitorGain,
+					resource,
+					sourceNode: null,
+					status: "ready",
+					trackId: track.trackId,
+					trackIndex: track.trackIndex,
+					trackVolumeGain: track.trackVolumeGain,
+				};
+
+				updatePreviewAudioTrackGainNode(readyTrack);
+				tracks[trackIndex] = readyTrack;
+			} catch (error) {
+				tracks[trackIndex] = {
+					...track,
+					reason: errorToMessage(error),
+				};
+			}
+
+			if (wasPlaying && !destroyed) {
+				playing = true;
+				startTrackSources();
+			}
+
+			return getPreviewAudioEngineStatus(tracks);
+		},
 		setPlaybackRate(nextPlaybackRate: number) {
 			if (!playing) {
 				playbackRate = clampPlaybackRate(nextPlaybackRate);
@@ -498,6 +657,11 @@ function createPreparedPreviewAudioEngine({
 				return;
 			}
 
+			if (track.status === "unavailable") {
+				track.channelMode = channelMode;
+				return;
+			}
+
 			if (playing) {
 				syncCurrentTimeFromContext();
 				stopTrackSources();
@@ -524,7 +688,9 @@ function createPreparedPreviewAudioEngine({
 			}
 
 			track.monitorGain = clampPreviewVolume(gain);
-			updatePreviewAudioTrackGainNode(track);
+			if (track.status === "ready") {
+				updatePreviewAudioTrackGainNode(track);
+			}
 		},
 		setTrackVolumeGain(trackIndex: number, gain: number) {
 			const track = tracks[trackIndex];
@@ -534,12 +700,14 @@ function createPreparedPreviewAudioEngine({
 			}
 
 			track.trackVolumeGain = clampPreviewVolume(gain);
-			updatePreviewAudioTrackGainNode(track);
+			if (track.status === "ready") {
+				updatePreviewAudioTrackGainNode(track);
+			}
 		},
 	};
 }
 
-function updatePreviewAudioTrackGainNode(track: PreviewAudioEngineTrack) {
+function updatePreviewAudioTrackGainNode(track: PreviewAudioReadyEngineTrack) {
 	track.gainNode.gain.value =
 		clampPreviewVolume(track.trackVolumeGain) *
 		clampPreviewVolume(track.monitorGain);
@@ -795,7 +963,7 @@ function sampleCombinedPreviewAudioPeakWindow({
 	outputChannelCount: number;
 	playheadSeconds: number;
 	tracks: Array<
-		PreviewAudioEngineTrack & {
+		PreviewAudioReadyEngineTrack & {
 			meterPlan: PreviewAudioMeterPlan;
 		}
 	>;
@@ -1033,6 +1201,92 @@ function disconnectPreviewAudioNodes(nodes: PreviewAudioNodeLike[]) {
 	}
 }
 
+async function decodePreviewAudioEngineTrack({
+	audioContext,
+	source,
+}: {
+	audioContext: PreviewAudioContextLike;
+	source: BrowserAudioPreviewSource;
+}): Promise<PreviewAudioPreparedTrack> {
+	try {
+		return {
+			resource: {
+				buffer: await decodePreviewAudioResource(audioContext, source),
+				source,
+			},
+			status: "ready",
+			trackId: source.trackId,
+			trackIndex: source.trackIndex,
+		};
+	} catch (error) {
+		return createUnavailablePreviewAudioTrackFromSource({
+			reason: errorToMessage(error),
+			source,
+		});
+	}
+}
+
+function createUnavailablePreviewAudioTrackFromSource({
+	reason,
+	source,
+}: {
+	reason: string;
+	source: BrowserAudioPreviewSource;
+}): PreviewAudioUnavailableEngineTrack {
+	return {
+		channelMode: "preserve",
+		monitorGain: 0,
+		reason,
+		source,
+		status: "unavailable",
+		trackId: source.trackId,
+		trackIndex: source.trackIndex,
+		trackVolumeGain: 1,
+	};
+}
+
+function createUnavailablePreviewAudioTrackFromFailure(
+	failure: BrowserAudioPreviewSourceFailure,
+): PreviewAudioUnavailableEngineTrack {
+	return {
+		channelMode: "preserve",
+		monitorGain: 0,
+		reason: failure.reason,
+		status: "unavailable",
+		trackId: failure.trackId,
+		trackIndex: failure.trackIndex,
+		trackVolumeGain: 1,
+	};
+}
+
+function getPreviewAudioEngineStatus(
+	tracks: PreviewAudioEngineTrack[],
+): PreviewAudioEngineStatus {
+	return tracks.some((track) => track.status === "unavailable")
+		? "degraded"
+		: "ready";
+}
+
+function createPreviewAudioUnavailableReasons(
+	tracks: Array<PreviewAudioEngineTrack | PreviewAudioPreparedTrack>,
+) {
+	return tracks.flatMap((track) =>
+		track.status === "unavailable" ? [track.reason] : [],
+	);
+}
+
+function createTotalPreviewAudioResourceFailureReason(
+	tracks: PreviewAudioPreparedTrack[],
+) {
+	const reasons = createPreviewAudioUnavailableReasons(tracks);
+
+	if (reasons.length === 0) {
+		return "No Preview audio resources could be prepared.";
+	}
+
+	return `No Preview audio resources could be prepared: ${reasons.join(", ")}`;
+}
+
 async function decodePreviewAudioResource(
 	audioContext: PreviewAudioContextLike,
 	source: BrowserAudioPreviewSource,
@@ -1040,6 +1294,14 @@ async function decodePreviewAudioResource(
 	const audioData = await source.blob.arrayBuffer();
 
 	return audioContext.decodeAudioData(audioData.slice(0));
+}
+
+function errorToMessage(error: unknown) {
+	if (error instanceof Error) {
+		return error.message;
+	}
+
+	return String(error);
 }
 
 function createDefaultPreviewAudioContext(): PreviewAudioContextLike {

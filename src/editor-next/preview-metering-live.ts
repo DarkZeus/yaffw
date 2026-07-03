@@ -6,6 +6,7 @@ const PREVIEW_METERING_CLIP_HOLD_MS = 750;
 const COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY = "__combined-preview-output__";
 
 export type LivePreviewMeteringSourceStatus =
+	| "degraded"
 	| "failed"
 	| "idle"
 	| "preparing"
@@ -92,7 +93,10 @@ export function createLivePreviewMeteringTrackStates({
 		return createUnavailableLivePreviewMeteringState(knownTrackIds);
 	}
 
-	if (meteringStatus !== "ready" || !meterSnapshot) {
+	if (
+		(meteringStatus !== "ready" && meteringStatus !== "degraded") ||
+		!meterSnapshot
+	) {
 		return createPreparingLivePreviewMeteringState(knownTrackIds);
 	}
 

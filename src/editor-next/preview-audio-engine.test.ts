@@ -153,6 +153,124 @@ describe("createPreviewAudioEngine", () => {
 		).toEqual([0.5, 0.375]);
 	});
 
+	it("keeps prepared tracks active in degraded mode when one Preview audio resource fails", async () => {
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createAudioBufferStub({
+					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
+				}),
+			],
+			decodeFailures: [null, new Error("Desktop decode failed")],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			sources: [
+				createAudioPreviewSource("audio-1", 0),
+				createAudioPreviewSource("audio-2", 0),
+			],
+		});
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
+		expect(engine.getStatus()).toBe("degraded");
+
+		engine.setTrackVolumeGain(0, 0.5);
+		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackVolumeGain(1, 0.25);
+		engine.setTrackMonitorGain(1, 1);
+		engine.setTime(0.1);
+		await engine.play();
+
+		expect(context.createdSources).toHaveLength(1);
+		expect(context.createdSources[0]?.start).toHaveBeenCalledWith(0, 0.1);
+
+		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		const voiceState = snapshot.trackStates["audio-1"];
+
+		expect(voiceState?.status).toBe("ready");
+		expect(snapshot.trackStates["audio-2"]).toEqual({
+			reason: "Desktop decode failed",
+			status: "unavailable",
+			trackId: "audio-2",
+		});
+		expect(snapshot.combinedState.status).toBe("ready");
+		if (snapshot.combinedState.status !== "ready") {
+			throw new Error("Expected degraded combined meter state.");
+		}
+		expect(snapshot.combinedState.partial).toBe(true);
+		expect(snapshot.combinedState.reason).toContain("Desktop decode failed");
+	});
+
+	it("retries only a failed Preview audio resource while preserving prepared resources", async () => {
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createAudioBufferStub({
+					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
+				}),
+				createAudioBufferStub({
+					channels: [[[4_800, 0.75]], [[4_800, 0.5]]],
+				}),
+			],
+			decodeFailures: [null, new Error("Desktop decode failed"), null],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			sources: [
+				createAudioPreviewSource("audio-1", 0),
+				createAudioPreviewSource("audio-2", 0),
+			],
+		});
+
+		expect(engine.getStatus()).toBe("degraded");
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
+
+		engine.setTrackVolumeGain(0, 0.5);
+		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackVolumeGain(1, 0.25);
+		engine.setTrackMonitorGain(1, 1);
+		await engine.play();
+
+		expect(context.createdSources).toHaveLength(1);
+
+		await expect(engine.retryTrackResource("audio-2")).resolves.toBe("ready");
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(3);
+		expect(engine.getStatus()).toBe("ready");
+		expect(context.createdSources).toHaveLength(3);
+		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
+		expect(context.createdSources[1]?.start).toHaveBeenCalled();
+		expect(context.createdSources[2]?.start).toHaveBeenCalled();
+		expect(context.createdGains[1]?.gain.value).toBe(0.5);
+		expect(context.createdGains[2]?.gain.value).toBe(0.25);
+
+		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		expect(snapshot.trackStates["audio-2"]?.status).toBe("ready");
+		expect(snapshot.combinedState.status).toBe("ready");
+		if (snapshot.combinedState.status !== "ready") {
+			throw new Error("Expected ready combined meter state.");
+		}
+		expect(snapshot.combinedState.partial).toBe(false);
+	});
+
+	it("rejects total Preview audio engine resource failure so native video can own preview", async () => {
+		const context = createAudioContextSpy({
+			decodeFailures: [
+				new Error("Voice decode failed"),
+				new Error("Desktop decode failed"),
+			],
+		});
+
+		await expect(
+			createPreviewAudioEngine({
+				createAudioContext: () => context,
+				sources: [
+					createAudioPreviewSource("audio-1", 0),
+					createAudioPreviewSource("audio-2", 0),
+				],
+			}),
+		).rejects.toThrow("No Preview audio resources could be prepared");
+		expect(context.close).toHaveBeenCalledTimes(1);
+	});
+
 	it("resolves Track volume, monitored-mix, and output gains independently", () => {
 		const source = createAudioPreviewSource("audio-1", 1.25);
 		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
@@ -247,8 +365,10 @@ function createAudioPreviewSource(
 
 function createAudioContextSpy({
 	audioBuffers = [createAudioBufferStub()],
+	decodeFailures = [],
 }: {
 	audioBuffers?: AudioBuffer[];
+	decodeFailures?: Array<Error | null>;
 } = {}) {
 	const destination = createAudioNodeSpy();
 	const context = {
@@ -300,9 +420,15 @@ function createAudioContextSpy({
 			}
 		>,
 		currentTime: 0,
-		decodeAudioData: vi.fn(
-			async () => audioBuffers.shift() ?? createAudioBufferStub(),
-		),
+		decodeAudioData: vi.fn(async () => {
+			const failure = decodeFailures.shift();
+
+			if (failure) {
+				throw failure;
+			}
+
+			return audioBuffers.shift() ?? createAudioBufferStub();
+		}),
 		destination,
 		resume: vi.fn(),
 	};

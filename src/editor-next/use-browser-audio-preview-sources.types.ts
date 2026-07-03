@@ -26,6 +26,11 @@ export type BrowserAudioPreviewSourcesState =
 			status: "failed";
 	  };
 
+export type BrowserAudioPreviewSourcesLifecycle =
+	BrowserAudioPreviewSourcesState & {
+		retryTrack: (trackId: string) => void;
+	};
+
 export type UseBrowserAudioPreviewSourcesOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix: AudioMix;

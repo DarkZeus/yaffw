@@ -1,6 +1,12 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -221,6 +227,71 @@ describe("useBrowserAudioPreviewSources", () => {
 			);
 		});
 	});
+
+	it("retries only the failed requested track while preserving successful cached sources", async () => {
+		const prepareRuns: Array<{
+			deferred: Deferred<BrowserAudioPreviewSourcesResult>;
+			request: PrepareRequest;
+		}> = [];
+		const failedTrack = readyAsset.tracks.audio[1];
+
+		if (!failedTrack) {
+			throw new Error("Expected Desktop audio track.");
+		}
+
+		prepareBrowserAudioPreviewSourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<BrowserAudioPreviewSourcesResult>();
+			prepareRuns.push({ deferred, request });
+
+			return deferred.promise;
+		});
+
+		render(<AudioPreviewSourcesProbe audioMix={createAudioMix()} />);
+
+		await waitFor(() => {
+			expect(readState()).toBe("loading|preparing:audio-1,audio-2|sources:");
+		});
+
+		prepareRuns[0].deferred.resolve({
+			failures: [
+				{
+					reason: "Desktop source failed",
+					track: failedTrack,
+					trackId: "audio-2",
+					trackIndex: 1,
+				},
+			],
+			sources: [createPreviewSource({ trackId: "audio-1", trackIndex: 0 })],
+		});
+
+		await waitFor(() => {
+			expect(readState()).toBe("ready|sources:blob:audio-1:source");
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
+			"audio-2",
+		]);
+		expect(readState()).toBe(
+			"loading|preparing:audio-2|sources:blob:audio-1:source",
+		);
+
+		prepareRuns[1].deferred.resolve({
+			failures: [],
+			sources: [createPreviewSource({ trackId: "audio-2", trackIndex: 1 })],
+		});
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|sources:blob:audio-1:source,blob:audio-2:source",
+			);
+		});
+		expect(revokeBrowserAudioPreviewSourcesMock).not.toHaveBeenCalled();
+	});
 });
 
 function AudioPreviewSourcesProbe({
@@ -242,7 +313,19 @@ function AudioPreviewSourcesProbe({
 		source: sourceBlob,
 	});
 
-	return <output aria-label="audio preview state">{formatState(state)}</output>;
+	return (
+		<>
+			<output aria-label="audio preview state">{formatState(state)}</output>
+			<button
+				onClick={() => {
+					state.retryTrack("audio-2");
+				}}
+				type="button"
+			>
+				Retry audio-2
+			</button>
+		</>
+	);
 }
 
 function formatState(state: BrowserAudioPreviewSourcesState) {

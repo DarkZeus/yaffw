@@ -36,7 +36,9 @@ const adapterMockState = vi.hoisted(() => ({
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
+		getStatus: ReturnType<typeof vi.fn>;
 		readMeterSnapshot: ReturnType<typeof vi.fn>;
+		retryTrackResource: ReturnType<typeof vi.fn>;
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
@@ -249,9 +251,11 @@ beforeEach(() => {
 		const previewAudioEngine = {
 			destroy: vi.fn(),
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
+			getStatus: vi.fn(() => "ready"),
 			pause: vi.fn(),
 			play: vi.fn(),
 			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
+			retryTrackResource: vi.fn(async () => "ready"),
 			setPlaybackRate: vi.fn(),
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
@@ -673,6 +677,63 @@ describe("NativePreviewPlayer", () => {
 			);
 		});
 		expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("publishes a retry handler that re-prepares only a failed source track", async () => {
+		const retryHandlers: Array<((trackId: string) => void) | null> = [];
+		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
+
+		if (!desktopTrack) {
+			throw new Error("Expected Desktop audio track.");
+		}
+
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		prepareBrowserAudioPreviewSourcesMock
+			.mockImplementationOnce(async (request) => {
+				const prepared = createPreparedAudioPreviewSourcesForRequest({
+					...request,
+					trackIds: new Set(["audio-1"]),
+				});
+
+				return {
+					failures: [
+						{
+							reason: "Desktop source failed",
+							track: desktopTrack,
+							trackId: "audio-2",
+							trackIndex: 1,
+						},
+					],
+					sources: prepared.sources,
+				};
+			})
+			.mockImplementationOnce(async (request) =>
+				createPreparedAudioPreviewSourcesForRequest(request),
+			);
+
+		render(
+			<AudioMasterPlayerProbe
+				onPreviewMeteringRetryChange={(retryTrack) => {
+					retryHandlers.push(retryTrack);
+				}}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
+		});
+		expect(retryHandlers.at(-1)).toEqual(expect.any(Function));
+
+		act(() => {
+			retryHandlers.at(-1)?.("audio-2");
+		});
+
+		await waitFor(() => {
+			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
+		});
+		const retryRequest = prepareBrowserAudioPreviewSourcesMock.mock.calls[1]?.[0];
+
+		expect(Array.from(retryRequest?.trackIds ?? [])).toEqual(["audio-2"]);
 	});
 
 	it("keeps sync fixture preview aligned after audio mix changes", async () => {
@@ -1125,11 +1186,15 @@ function createPlayerElement(
 
 function AudioMasterPlayerProbe({
 	asset = readyAssetWithTwoAudioTracks,
+	onPreviewMeteringRetryChange,
 	onPreviewPlayheadChange,
 	selection: playerSelection = selection,
 	source = previewSource,
 }: {
 	asset?: ReadyMediaAsset;
+	onPreviewMeteringRetryChange?: (
+		retryTrack: ((trackId: string) => void) | null,
+	) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	selection?: Selection;
 	source?: Blob;
@@ -1146,6 +1211,7 @@ function AudioMasterPlayerProbe({
 						updateAudioMixTrack(currentAudioMix, trackId, { include }),
 					);
 				}}
+				onPreviewMeteringRetryChange={onPreviewMeteringRetryChange}
 				onPreviewPlayheadChange={onPreviewPlayheadChange}
 				onSelectionEndRequested={() => {}}
 				onSelectionRangeMoveRequested={() => {}}

@@ -13,6 +13,7 @@ export type PreviewAudioEngineFactory = (
 ) => Promise<PreviewAudioEngine>;
 
 export type PreviewAudioMonitoringStatus =
+	| "degraded"
 	| "failed"
 	| "idle"
 	| "preparing"

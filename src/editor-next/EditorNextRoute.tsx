@@ -91,14 +91,18 @@ export function EditorNextRoute({
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
 	const [previewMeteringClock, setPreviewMeteringClock] =
 		useState<LivePreviewMeteringClock | null>(null);
+	const [previewMeteringRetry, setPreviewMeteringRetry] = useState<
+		((trackId: string) => void) | null
+	>(null);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
 	);
 	const previewMetering = useMemo(
 		() => ({
 			clock: previewMeteringClock,
+			onTrackRetry: previewMeteringRetry ?? undefined,
 		}),
-		[previewMeteringClock],
+		[previewMeteringClock, previewMeteringRetry],
 	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
@@ -118,6 +122,12 @@ export function EditorNextRoute({
 		},
 		[],
 	);
+	const handlePreviewMeteringRetryChange = useCallback(
+		(retryTrack: ((trackId: string) => void) | null) => {
+			setPreviewMeteringRetry(() => retryTrack);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
@@ -129,6 +139,9 @@ export function EditorNextRoute({
 		setPreviewMeteringClock((currentClock) =>
 			activeAssetId === null ? null : currentClock,
 		);
+		if (activeAssetId === null) {
+			setPreviewMeteringRetry(null);
+		}
 	}, [activeAssetId]);
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -200,6 +213,7 @@ export function EditorNextRoute({
 				onSelectionResetRequested={stableCommands.resetSelection}
 				onSelectionStartRequested={stableCommands.setSelectionStartFromPlayhead}
 				onPreviewMeteringClockChange={handlePreviewMeteringClockChange}
+				onPreviewMeteringRetryChange={handlePreviewMeteringRetryChange}
 				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				previewPosterSrc={displayedPreviewPosterSrc}
 				selection={displayedSession.selection}

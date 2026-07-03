@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
 	createBrowserAudioPreviewSourceCache,
@@ -10,6 +10,7 @@ import {
 	revokeBrowserAudioPreviewSources,
 } from "./browser-audio-preview-sources";
 import type {
+	BrowserAudioPreviewSourcesLifecycle,
 	BrowserAudioPreviewSourcesState,
 	UseBrowserAudioPreviewSourcesOptions,
 } from "./use-browser-audio-preview-sources.types";
@@ -20,8 +21,12 @@ export function useBrowserAudioPreviewSources({
 	asset,
 	enabled,
 	source,
-}: UseBrowserAudioPreviewSourcesOptions): BrowserAudioPreviewSourcesState {
+}: UseBrowserAudioPreviewSourcesOptions): BrowserAudioPreviewSourcesLifecycle {
 	const sourceCacheRef = useRef<BrowserAudioPreviewSourceCache | null>(null);
+	const [retryRequest, setRetryRequest] = useState<{
+		requestId: number;
+		trackId: string;
+	} | null>(null);
 	const [state, setState] = useState<BrowserAudioPreviewSourcesState>({
 		status: "disabled",
 	});
@@ -33,6 +38,13 @@ export function useBrowserAudioPreviewSources({
 	if (!sourceCacheRef.current) {
 		sourceCacheRef.current = createBrowserAudioPreviewSourceCache();
 	}
+
+	const retryTrack = useCallback((trackId: string) => {
+		setRetryRequest((currentRequest) => ({
+			requestId: (currentRequest?.requestId ?? 0) + 1,
+			trackId,
+		}));
+	}, []);
 
 	useEffect(() => {
 		return () => {
@@ -63,6 +75,7 @@ export function useBrowserAudioPreviewSources({
 
 		if (!enabled) {
 			sourceCache?.dispose();
+			setRetryRequest(null);
 			setState({ status: "disabled" });
 			return;
 		}
@@ -84,8 +97,15 @@ export function useBrowserAudioPreviewSources({
 			asset,
 			planKey: sourcePlanKey,
 		});
+		const retryTrackIds = retryRequest
+			? createRetryTrackIds({
+					asset,
+					retryTrackId: retryRequest.trackId,
+				})
+			: null;
+		const trackIdsToPrepare = retryTrackIds ?? plan.missingTrackIds;
 
-		if (plan.missingTrackIds.size === 0) {
+		if (trackIdsToPrepare.size === 0) {
 			setState({
 				failures: [],
 				sources: plan.cachedSources,
@@ -95,7 +115,7 @@ export function useBrowserAudioPreviewSources({
 		}
 
 		setState({
-			preparingTrackIds: plan.missingTrackIds,
+			preparingTrackIds: trackIdsToPrepare,
 			sources: plan.cachedSources,
 			status: "loading",
 		});
@@ -105,7 +125,7 @@ export function useBrowserAudioPreviewSources({
 			asset,
 			signal: abortController.signal,
 			source,
-			trackIds: plan.missingTrackIds,
+			trackIds: trackIdsToPrepare,
 		})
 			.then((result) => {
 				if (cancelled) {
@@ -152,9 +172,31 @@ export function useBrowserAudioPreviewSources({
 			cancelled = true;
 			abortController.abort();
 		};
-	}, [asset, enabled, source, sourcePlanKey]);
+	}, [asset, enabled, retryRequest, source, sourcePlanKey]);
 
-	return state;
+	return useMemo(
+		() => ({
+			...state,
+			retryTrack,
+		}),
+		[state, retryTrack],
+	);
+}
+
+function createRetryTrackIds({
+	asset,
+	retryTrackId,
+}: {
+	asset: UseBrowserAudioPreviewSourcesOptions["asset"];
+	retryTrackId: string;
+}) {
+	const trackIds = new Set<string>();
+
+	if (asset.tracks.audio.some((track) => track.id === retryTrackId)) {
+		trackIds.add(retryTrackId);
+	}
+
+	return trackIds;
 }
 
 function isAbortError(error: unknown) {

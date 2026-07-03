@@ -52,9 +52,11 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				"ready",
 			);
 		});
-		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
-			sources: [expect.objectContaining({ trackId: "audio-1" })],
-		});
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				sources: [expect.objectContaining({ trackId: "audio-1" })],
+			}),
+		);
 		expect(createdPreviewAudioEngines[0]?.setTime).toHaveBeenCalledWith(5.25);
 		expect(createdPreviewAudioEngines[0]?.setPlaybackRate).toHaveBeenCalledWith(
 			1.5,
@@ -161,6 +163,47 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
 			"not-ready",
 		);
+	});
+
+	it("reports degraded status as ready when the Preview audio engine has explicit failed tracks", async () => {
+		createPreviewAudioEngineMock.mockImplementationOnce(async () => {
+			const previewAudioEngine = createPreviewAudioEngineSpy({
+				status: "degraded",
+			});
+			createdPreviewAudioEngines.push(previewAudioEngine);
+
+			return previewAudioEngine;
+		});
+		const failedSourcesState = {
+			failures: [
+				{
+					reason: "Desktop source failed",
+					track: {
+						id: "audio-2",
+						kind: "audio",
+					},
+					trackId: "audio-2",
+					trackIndex: 1,
+				},
+			],
+			sources: [createAudioPreviewSource("audio-1")],
+			status: "ready",
+		} satisfies BrowserAudioPreviewSourcesState;
+
+		render(<PreviewAudioMonitoringProbe state={failedSourcesState} />);
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("audio monitoring status").textContent).toBe(
+				"degraded",
+			);
+		});
+		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
+			"ready",
+		);
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
+			failures: failedSourcesState.failures,
+			sources: [expect.objectContaining({ trackId: "audio-1" })],
+		});
 	});
 
 	it("destroys the engine on cleanup", async () => {
@@ -489,13 +532,19 @@ function lastOutputGain(previewAudioEngine: PreviewAudioEngineSpy | undefined) {
 
 type PreviewAudioEngineSpy = ReturnType<typeof createPreviewAudioEngineSpy>;
 
-function createPreviewAudioEngineSpy() {
+function createPreviewAudioEngineSpy({
+	status = "ready",
+}: {
+	status?: "degraded" | "ready";
+} = {}) {
 	return {
 		destroy: vi.fn(),
 		getCurrentTime: vi.fn(() => 0),
+		getStatus: vi.fn(() => status),
 		pause: vi.fn(),
 		play: vi.fn(),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
+		retryTrackResource: vi.fn(async () => status),
 		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setTime: vi.fn(),

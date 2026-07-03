@@ -32,6 +32,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackIncludedChange,
 	onPreviewMeteringClockChange,
+	onPreviewMeteringRetryChange,
 	onPreviewPlayheadChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
@@ -114,6 +115,34 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		enabled: audioPreviewTransportSupported,
 		source,
 	});
+	const audioPreviewSourcesRef = useRef(audioPreviewSources);
+	audioPreviewSourcesRef.current = audioPreviewSources;
+	const handlePreviewMeteringRetry = useCallback(
+		(trackId: string) => {
+			const audioPreviewSources = audioPreviewSourcesRef.current;
+			const sourceFailures =
+				audioPreviewSources.status === "ready" ||
+				audioPreviewSources.status === "failed"
+					? audioPreviewSources.failures
+					: [];
+
+			if (sourceFailures.some((failure) => failure.trackId === trackId)) {
+				audioPreviewSources.retryTrack(trackId);
+				return;
+			}
+
+			const retry = previewAudioEngineRef.current?.retryTrackResource(trackId);
+
+			if (!retry) {
+				return;
+			}
+
+			void retry.then((nextStatus) => {
+				setAudioMonitoringStatus(nextStatus);
+			});
+		},
+		[],
+	);
 	const audioPreviewPreparingTrackIds =
 		audioPreviewSources.status === "loading"
 			? audioPreviewSources.preparingTrackIds
@@ -129,7 +158,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const previewClockMode = resolvePreviewClockMode({
 		asset,
 		audioMonitoringFailed: audioMonitoringStatus === "failed",
-		audioMonitoringReady: audioMonitoringStatus === "ready",
+		audioMonitoringReady:
+			audioMonitoringStatus === "ready" ||
+			audioMonitoringStatus === "degraded",
 		audioPreviewSources,
 		audioPreviewTransportSupported,
 	});
@@ -176,6 +207,14 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			onPreviewMeteringClockChange?.(null);
 		};
 	}, [onPreviewMeteringClockChange]);
+
+	useEffect(() => {
+		onPreviewMeteringRetryChange?.(handlePreviewMeteringRetry);
+
+		return () => {
+			onPreviewMeteringRetryChange?.(null);
+		};
+	}, [handlePreviewMeteringRetry, onPreviewMeteringRetryChange]);
 
 	useEffect(() => {
 		onPreviewPlayheadChange?.(playheadUs);

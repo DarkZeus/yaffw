@@ -15,6 +15,9 @@ export type NativePreviewPlayerProps = {
 	onPreviewMeteringClockChange?: (
 		clock: LivePreviewMeteringClock | null,
 	) => void;
+	onPreviewMeteringRetryChange?: (
+		retryTrack: ((trackId: string) => void) | null,
+	) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;

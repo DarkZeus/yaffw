@@ -40,7 +40,7 @@ export function usePreviewAudioMonitoringLifecycle({
 	const setMonitoringStatus = useCallback(
 		(nextStatus: PreviewAudioMonitoringStatus) => {
 			setStatus(nextStatus);
-			onReadyChange?.(nextStatus === "ready");
+			onReadyChange?.(previewAudioMonitoringStatusIsReady(nextStatus));
 			onStatusChange?.(nextStatus);
 		},
 		[onReadyChange, onStatusChange],
@@ -69,6 +69,7 @@ export function usePreviewAudioMonitoringLifecycle({
 		lifecycle.registerCleanup(() => setMonitoringStatus("idle"));
 
 		void createPreviewAudioEngine({
+			failures: audioPreviewSources.failures,
 			sources: audioPreviewSources.sources,
 		})
 			.then((previewAudioEngine) => {
@@ -94,7 +95,7 @@ export function usePreviewAudioMonitoringLifecycle({
 					previewAudioEngine,
 					sources: audioPreviewSources.sources,
 				});
-				setMonitoringStatus("ready");
+				setMonitoringStatus(previewAudioEngine.getStatus());
 			})
 			.catch(() => {
 				if (!lifecycle.isDisposed()) {
@@ -120,7 +121,7 @@ export function usePreviewAudioMonitoringLifecycle({
 
 		if (
 			audioPreviewSources.status !== "ready" ||
-			status !== "ready" ||
+			!previewAudioMonitoringStatusIsReady(status) ||
 			!previewAudioEngine
 		) {
 			return;
@@ -146,7 +147,13 @@ export function usePreviewAudioMonitoringLifecycle({
 
 	return {
 		previewAudioEngineRef,
-		ready: status === "ready",
+		ready: previewAudioMonitoringStatusIsReady(status),
 		status,
 	};
+}
+
+function previewAudioMonitoringStatusIsReady(
+	status: PreviewAudioMonitoringStatus,
+) {
+	return status === "ready" || status === "degraded";
 }
