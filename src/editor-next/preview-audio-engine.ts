@@ -139,6 +139,7 @@ type PreviewAudioReadyEngineTrack = {
 	channelMode: AudioTrackChannelMode;
 	channelRouting: PreviewAudioTrackChannelRouting;
 	gainNode: PreviewAudioGainNodeLike;
+	meterPlanCache: Map<string, PreviewAudioMeterPlan>;
 	monitorGain: number;
 	resource: DecodedPreviewAudioResource;
 	sourceNode: PreviewAudioBufferSourceNodeLike | null;
@@ -372,6 +373,7 @@ function createPreparedPreviewAudioEngine({
 				resource: track.resource,
 			}),
 			gainNode,
+			meterPlanCache: new Map(),
 			monitorGain: 0,
 			resource: track.resource,
 			sourceNode: null,
@@ -482,11 +484,7 @@ function createPreparedPreviewAudioEngine({
 			return [
 				{
 					...track,
-					meterPlan: createPreviewAudioMeterPlan({
-						audioBuffer: track.resource.buffer,
-						channelMode: track.channelMode,
-						outputChannelCount,
-					}),
+					meterPlan: readPreviewAudioMeterPlan(track, outputChannelCount),
 				},
 			];
 		});
@@ -633,6 +631,7 @@ function createPreparedPreviewAudioEngine({
 						resource,
 					}),
 					gainNode,
+					meterPlanCache: new Map(),
 					monitorGain: track.monitorGain,
 					resource,
 					sourceNode: null,
@@ -705,6 +704,7 @@ function createPreparedPreviewAudioEngine({
 			}
 
 			track.channelMode = channelMode;
+			track.meterPlanCache.clear();
 			track.channelRouting.dispose();
 			track.channelRouting = createPreviewAudioTrackChannelRouting({
 				audioContext,
@@ -884,6 +884,27 @@ function sourceChannelIndexForMode(
 	}
 
 	return 0;
+}
+
+function readPreviewAudioMeterPlan(
+	track: PreviewAudioReadyEngineTrack,
+	outputChannelCount: number,
+): PreviewAudioMeterPlan {
+	const cacheKey = `${track.channelMode}\u0000${outputChannelCount}`;
+	const cachedMeterPlan = track.meterPlanCache.get(cacheKey);
+
+	if (cachedMeterPlan) {
+		return cachedMeterPlan;
+	}
+
+	const meterPlan = createPreviewAudioMeterPlan({
+		audioBuffer: track.resource.buffer,
+		channelMode: track.channelMode,
+		outputChannelCount,
+	});
+	track.meterPlanCache.set(cacheKey, meterPlan);
+
+	return meterPlan;
 }
 
 function createPreviewAudioMeterPlan({

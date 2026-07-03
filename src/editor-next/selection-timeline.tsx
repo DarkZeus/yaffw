@@ -487,10 +487,15 @@ export function SelectionTimeline({
 		},
 		[seekFromLanePointer],
 	);
-
-	function shouldUseMouseFallback() {
-		return typeof window.PointerEvent === "undefined";
-	}
+	const zoomOutTimeline = useCallback(() => {
+		setZoom((currentZoom) => clampTimelineZoom(currentZoom - 0.5));
+	}, []);
+	const zoomInTimeline = useCallback(() => {
+		setZoom((currentZoom) => clampTimelineZoom(currentZoom + 0.5));
+	}, []);
+	const togglePlayheadFollow = useCallback(() => {
+		setPlayheadFollowEnabled((currentFollowEnabled) => !currentFollowEnabled);
+	}, []);
 
 	const selectionStartPercent = mediaTimeToPercent(
 		visibleSelection.startUs,
@@ -592,85 +597,16 @@ export function SelectionTimeline({
 					</span>
 				</div>
 
-				<div className="flex shrink-0 items-center gap-2">
-					<Button
-						aria-label="Reset selection"
-						className="h-7 rounded border-workbench-border bg-workbench-viewer px-2 text-xs text-foreground hover:bg-workbench-hover"
-						disabled={selectionEditingDisabled}
-						onClick={onSelectionResetRequested}
-						size="sm"
-						type="button"
-						variant="outline"
-					>
-						<RotateCcw data-icon="inline-start" />
-						Reset
-					</Button>
-					<Button
-						aria-label="Zoom out timeline"
-						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
-						disabled={zoom <= MINIMUM_TIMELINE_ZOOM}
-						onClick={() =>
-							setZoom((currentZoom) => clampTimelineZoom(currentZoom - 0.5))
-						}
-						size="icon"
-						type="button"
-						variant="outline"
-					>
-						<ZoomOut data-icon="inline-start" />
-					</Button>
-					<label className="hidden min-w-28 items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
-						<span>Zoom</span>
-						<input
-							aria-label="Timeline zoom"
-							className="h-6 min-w-0 accent-primary"
-							max={MAXIMUM_TIMELINE_ZOOM}
-							min={MINIMUM_TIMELINE_ZOOM}
-							onChange={(event) =>
-								setZoom(
-									clampTimelineZoom(
-										Number.parseFloat(event.currentTarget.value),
-									),
-								)
-							}
-							step="0.5"
-							type="range"
-							value={zoom}
-						/>
-					</label>
-					<Button
-						aria-label="Zoom in timeline"
-						className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
-						disabled={zoom >= MAXIMUM_TIMELINE_ZOOM}
-						onClick={() =>
-							setZoom((currentZoom) => clampTimelineZoom(currentZoom + 0.5))
-						}
-						size="icon"
-						type="button"
-						variant="outline"
-					>
-						<ZoomIn data-icon="inline-start" />
-					</Button>
-					<Button
-						aria-label="Keep playhead centered"
-						aria-pressed={playheadFollowEnabled}
-						className={`hidden size-7 rounded sm:inline-flex ${
-							playheadFollowEnabled
-								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
-								: "border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-						}`}
-						onClick={() =>
-							setPlayheadFollowEnabled(
-								(currentFollowEnabled) => !currentFollowEnabled,
-							)
-						}
-						size="icon"
-						title="Keep playhead centered"
-						type="button"
-						variant="outline"
-					>
-						<LocateFixed data-icon="inline-start" />
-					</Button>
-				</div>
+				<SelectionTimelineToolbar
+					onFollowToggle={togglePlayheadFollow}
+					onReset={onSelectionResetRequested}
+					onZoomChange={setZoom}
+					onZoomIn={zoomInTimeline}
+					onZoomOut={zoomOutTimeline}
+					playheadFollowEnabled={playheadFollowEnabled}
+					resetDisabled={selectionEditingDisabled}
+					zoom={zoom}
+				/>
 			</div>
 
 			<div className="min-h-0 overflow-hidden p-4">
@@ -864,6 +800,98 @@ export function SelectionTimeline({
 		</section>
 	);
 }
+
+const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
+	onFollowToggle,
+	onReset,
+	onZoomChange,
+	onZoomIn,
+	onZoomOut,
+	playheadFollowEnabled,
+	resetDisabled,
+	zoom,
+}: {
+	onFollowToggle: () => void;
+	onReset: () => void;
+	onZoomChange: (nextZoom: number | ((currentZoom: number) => number)) => void;
+	onZoomIn: () => void;
+	onZoomOut: () => void;
+	playheadFollowEnabled: boolean;
+	resetDisabled: boolean;
+	zoom: number;
+}) {
+	return (
+		<div className="flex shrink-0 items-center gap-2">
+			<Button
+				aria-label="Reset selection"
+				className="h-7 rounded border-workbench-border bg-workbench-viewer px-2 text-xs text-foreground hover:bg-workbench-hover"
+				disabled={resetDisabled}
+				onClick={onReset}
+				size="sm"
+				type="button"
+				variant="outline"
+			>
+				<RotateCcw data-icon="inline-start" />
+				Reset
+			</Button>
+			<Button
+				aria-label="Zoom out timeline"
+				className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
+				disabled={zoom <= MINIMUM_TIMELINE_ZOOM}
+				onClick={onZoomOut}
+				size="icon"
+				type="button"
+				variant="outline"
+			>
+				<ZoomOut data-icon="inline-start" />
+			</Button>
+			<label className="hidden min-w-28 items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
+				<span>Zoom</span>
+				<input
+					aria-label="Timeline zoom"
+					className="h-6 min-w-0 accent-primary"
+					max={MAXIMUM_TIMELINE_ZOOM}
+					min={MINIMUM_TIMELINE_ZOOM}
+					onChange={(event) =>
+						onZoomChange(
+							clampTimelineZoom(Number.parseFloat(event.currentTarget.value)),
+						)
+					}
+					step="0.5"
+					type="range"
+					value={zoom}
+				/>
+			</label>
+			<Button
+				aria-label="Zoom in timeline"
+				className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
+				disabled={zoom >= MAXIMUM_TIMELINE_ZOOM}
+				onClick={onZoomIn}
+				size="icon"
+				type="button"
+				variant="outline"
+			>
+				<ZoomIn data-icon="inline-start" />
+			</Button>
+			<Button
+				aria-label="Keep playhead centered"
+				aria-pressed={playheadFollowEnabled}
+				className={`hidden size-7 rounded sm:inline-flex ${
+					playheadFollowEnabled
+						? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
+						: "border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+				}`}
+				onClick={onFollowToggle}
+				size="icon"
+				title="Keep playhead centered"
+				type="button"
+				variant="outline"
+			>
+				<LocateFixed data-icon="inline-start" />
+			</Button>
+		</div>
+	);
+});
 
 function useTimelineViewport({
 	laneHeaderWidthPx,
@@ -1243,6 +1271,10 @@ function timeMarkerLabelClassName(placement: SelectionTimelineMarkerPlacement) {
 		case "start":
 			return "left-0 text-left";
 	}
+}
+
+function shouldUseMouseFallback() {
+	return typeof window.PointerEvent === "undefined";
 }
 
 function timelineTrackGeometryFromElement(

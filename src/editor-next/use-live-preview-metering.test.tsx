@@ -9,7 +9,7 @@ import type { LivePreviewMeteringClock } from "./preview-metering-live";
 import { useLivePreviewMetering } from "./use-live-preview-metering";
 
 const frameCallbacks: FrameRequestCallback[] = [];
-const timeoutCallbacks: Array<() => void> = [];
+const timeoutCallbacks: Array<{ callback: () => void; delayMs?: number }> = [];
 
 beforeEach(() => {
 	frameCallbacks.length = 0;
@@ -27,8 +27,8 @@ beforeEach(() => {
 	});
 	Object.defineProperty(window, "setTimeout", {
 		configurable: true,
-		value: vi.fn((callback: () => void) => {
-			timeoutCallbacks.push(callback);
+		value: vi.fn((callback: () => void, delayMs?: number) => {
+			timeoutCallbacks.push({ callback, delayMs });
 			return timeoutCallbacks.length;
 		}),
 	});
@@ -62,7 +62,7 @@ describe("useLivePreviewMetering", () => {
 		snapshot = createReadySnapshot(1);
 		currentNowMs = 80;
 		act(() => {
-			frameCallbacks.shift()?.(80);
+			timeoutCallbacks.shift()?.callback();
 		});
 
 		const attackPeak = Number(screen.getByLabelText("voice peak").textContent);
@@ -86,13 +86,93 @@ describe("useLivePreviewMetering", () => {
 		isPlaying = false;
 		currentNowMs = 250;
 		act(() => {
-			frameCallbacks.shift()?.(250);
+			timeoutCallbacks.shift()?.callback();
 		});
 
 		const decayedPeak = Number(screen.getByLabelText("voice peak").textContent);
 		expect(decayedPeak).toBeLessThan(0);
 		expect(decayedPeak).toBeGreaterThan(-72);
 		expect(timeoutCallbacks).toHaveLength(1);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
+	});
+
+	it("does not commit playing meter values to React state at frame cadence", () => {
+		let currentNowMs = 0;
+		let snapshot = createReadySnapshot(0.25);
+		const clock = createMeteringClock({
+			getIsPlaying: () => true,
+			readMeterSnapshot: () => snapshot,
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
+			-12.04,
+			2,
+		);
+
+		snapshot = createReadySnapshot(1);
+		currentNowMs = 16;
+		act(() => {
+			timeoutCallbacks.shift()?.callback();
+		});
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
+			-12.04,
+			2,
+		);
+
+		currentNowMs = 64;
+		act(() => {
+			timeoutCallbacks.shift()?.callback();
+		});
+
+		const committedPeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+		expect(committedPeak).toBeGreaterThan(-1);
+	});
+
+	it("does not sample expensive playing meter snapshots at frame cadence", () => {
+		let currentNowMs = 0;
+		const readMeterSnapshot = vi.fn(() => createReadySnapshot(0.25));
+		const clock = createMeteringClock({
+			getIsPlaying: () => true,
+			readMeterSnapshot,
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(1);
+
+		for (const frameTimestampMs of [16, 32, 48]) {
+			currentNowMs = frameTimestampMs;
+			act(() => {
+				timeoutCallbacks.shift()?.callback();
+			});
+		}
+
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(1);
+
+		currentNowMs = 64;
+		act(() => {
+			timeoutCallbacks.shift()?.callback();
+		});
+
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
+	});
+
+	it("uses low-frequency playing polling instead of an animation-frame loop", () => {
+		const clock = createMeteringClock({
+			getIsPlaying: () => true,
+			readMeterSnapshot: () => createReadySnapshot(1),
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={fixedNow} />);
+
+		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+		expect(timeoutCallbacks).toHaveLength(1);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(50);
 	});
 
 	it("uses low-frequency paused polling instead of an animation-frame loop", () => {
@@ -106,6 +186,7 @@ describe("useLivePreviewMetering", () => {
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(-72);
 		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
 		expect(timeoutCallbacks).toHaveLength(1);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
 	});
 });
 

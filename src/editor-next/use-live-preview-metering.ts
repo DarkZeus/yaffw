@@ -21,6 +21,7 @@ const EMPTY_LIVE_PREVIEW_METERING_STATE = {
 	trackStates: {},
 } satisfies LivePreviewMeteringState;
 const LIVE_PREVIEW_METERING_ATTACK_MS = 20;
+const LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS = 50;
 const LIVE_PREVIEW_METERING_RELEASE_MS = 220;
 const LIVE_PREVIEW_METERING_SNAP_THRESHOLD_DB = 0.05;
 const PAUSED_PREVIEW_METERING_POLL_INTERVAL_MS = 250;
@@ -61,7 +62,6 @@ export function useLivePreviewMetering({
 		}
 
 		let cancelled = false;
-		let frameId: number | null = null;
 		let timeoutId: number | null = null;
 		let lastDisplayUpdateTimestampMs: number | null = null;
 
@@ -81,12 +81,12 @@ export function useLivePreviewMetering({
 				return;
 			}
 
-			if (isPlaying) {
-				frameId = requestPreviewMeteringFrame(updateLiveMeters);
-				return;
-			}
-
-			timeoutId = requestPausedPreviewMeteringPoll(updateLiveMeters);
+			timeoutId = requestPreviewMeteringPoll(
+				updateLiveMeters,
+				isPlaying
+					? LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS
+					: PAUSED_PREVIEW_METERING_POLL_INTERVAL_MS,
+			);
 		}
 
 		function updateLiveMeters(timestampMs?: number) {
@@ -95,7 +95,21 @@ export function useLivePreviewMetering({
 			}
 
 			const isPlaying = clock?.getIsPlaying() ?? false;
-			const nowMs = now();
+			const displayTimestampMs =
+				typeof timestampMs === "number" ? timestampMs : now();
+			const elapsedDisplayMs =
+				displayTimestampMs !== null && lastDisplayUpdateTimestampMs !== null
+					? displayTimestampMs - lastDisplayUpdateTimestampMs
+					: null;
+			const shouldCommitDisplay =
+				!isPlaying ||
+				elapsedDisplayMs === null ||
+				elapsedDisplayMs >= LIVE_PREVIEW_METERING_COMMIT_INTERVAL_MS;
+
+			if (!shouldCommitDisplay) {
+				scheduleNextUpdate(isPlaying);
+				return;
+			}
 
 			const result = createLivePreviewMeteringTrackStates({
 				excludedTrackIds: createExcludedTrackIds({
@@ -107,7 +121,7 @@ export function useLivePreviewMetering({
 				knownTrackIds: stableKnownTrackIds,
 				meterSnapshot: clock?.readMeterSnapshot() ?? null,
 				meteringStatus: clock?.getMeteringStatus() ?? "idle",
-				nowMs,
+				nowMs: displayTimestampMs,
 				previousClipHoldState: clipHoldStateRef.current,
 			});
 			clipHoldStateRef.current = result.clipHoldState;
@@ -115,12 +129,6 @@ export function useLivePreviewMetering({
 				combinedState: result.combinedState,
 				trackStates: result.trackStates,
 			} satisfies LivePreviewMeteringState;
-			const displayTimestampMs =
-				typeof timestampMs === "number" ? timestampMs : nowMs;
-			const elapsedDisplayMs =
-				displayTimestampMs !== null && lastDisplayUpdateTimestampMs !== null
-					? displayTimestampMs - lastDisplayUpdateTimestampMs
-					: null;
 			const displayMeteringState = smoothLivePreviewMeteringState({
 				elapsedMs: elapsedDisplayMs,
 				previousState: liveMeteringStateRef.current,
@@ -141,12 +149,8 @@ export function useLivePreviewMetering({
 		return () => {
 			cancelled = true;
 
-			if (frameId !== null) {
-				cancelPreviewMeteringFrame(frameId);
-			}
-
 			if (timeoutId !== null) {
-				cancelPausedPreviewMeteringPoll(timeoutId);
+				cancelPreviewMeteringPoll(timeoutId);
 			}
 		};
 	}, [audioMix, clock, enabled, now, soloedAudioTrackId, stableKnownTrackIds]);
@@ -316,33 +320,18 @@ function smoothPeakDb({
 		: smoothedPeakDb;
 }
 
-function requestPreviewMeteringFrame(
-	callback: FrameRequestCallback,
+function requestPreviewMeteringPoll(
+	callback: () => void,
+	delayMs: number,
 ): number | null {
-	if (typeof window.requestAnimationFrame !== "function") {
-		return null;
-	}
-
-	return window.requestAnimationFrame(callback);
-}
-
-function cancelPreviewMeteringFrame(frameId: number) {
-	if (typeof window.cancelAnimationFrame !== "function") {
-		return;
-	}
-
-	window.cancelAnimationFrame(frameId);
-}
-
-function requestPausedPreviewMeteringPoll(callback: () => void): number | null {
 	if (typeof window.setTimeout !== "function") {
 		return null;
 	}
 
-	return window.setTimeout(callback, PAUSED_PREVIEW_METERING_POLL_INTERVAL_MS);
+	return window.setTimeout(callback, delayMs);
 }
 
-function cancelPausedPreviewMeteringPoll(timeoutId: number) {
+function cancelPreviewMeteringPoll(timeoutId: number) {
 	if (typeof window.clearTimeout !== "function") {
 		return;
 	}

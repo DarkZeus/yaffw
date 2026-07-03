@@ -256,91 +256,130 @@ function AudioTrackStrip({
 					</span>
 				) : null}
 			</div>
-			<div
-				aria-label={`${label} audio controls`}
-				className="grid min-w-0 gap-1.5"
-			>
-				<label className="grid min-w-0 gap-1">
-					<span className="sr-only">{label} channel handling</span>
-					<select
-						aria-label={`${label} channel handling`}
-						className="h-7 min-w-0 rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
-						disabled={audioEditingDisabled || !onAudioTrackChannelModeChange}
-						onChange={(event) => {
-							onAudioTrackChannelModeChange?.(
-								track.id,
-								event.currentTarget.value as AudioTrackChannelMode,
-							);
-						}}
-						value={decision.channelMode}
-					>
-						{AUDIO_CHANNEL_MODE_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-				</label>
-				<div className="grid grid-cols-2 gap-1">
-					<Button
-						aria-label={
-							audioIncluded
-								? `Exclude ${label} from output`
-								: `Include ${label} in output`
-						}
-						aria-pressed={audioIncluded}
-						className={`h-7 min-w-0 justify-center rounded border-workbench-border bg-workbench-viewer px-1 text-[10px] hover:bg-workbench-hover ${
-							audioIncluded
-								? "text-workbench-lane-foreground"
-								: "text-muted-foreground"
-						}`}
-						disabled={audioEditingDisabled || !onAudioTrackIncludedChange}
-						onClick={() => {
-							onAudioTrackIncludedChange?.(track.id, !audioIncluded);
-						}}
-						size="sm"
-						title={audioIncluded ? "Output included" : "Output excluded"}
-						type="button"
-						variant="outline"
-					>
-						{audioIncluded ? (
-							<Volume2 aria-hidden="true" className="size-3" />
-						) : (
-							<VolumeX aria-hidden="true" className="size-3" />
-						)}
-						<span className="sr-only">
-							{audioIncluded ? "Output included" : "Output excluded"}
-						</span>
-					</Button>
-					<Button
-						aria-label={
-							soloActive
-								? `Clear ${label} preview solo`
-								: `Solo ${label} for preview`
-						}
-						aria-pressed={soloActive}
-						className={`h-7 min-w-0 justify-center rounded border-workbench-border bg-workbench-viewer px-1 text-[10px] hover:bg-workbench-hover ${
-							soloActive
-								? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
-								: "text-muted-foreground"
-						}`}
-						disabled={!onSoloedAudioTrackChange}
-						onClick={() => {
-							onSoloedAudioTrackChange?.(soloActive ? null : track.id);
-						}}
-						size="sm"
-						title={soloActive ? "Clear preview solo" : "Preview solo"}
-						type="button"
-						variant="outline"
-					>
-						<Headphones aria-hidden="true" className="size-3" />
-						<span className="sr-only">Preview solo</span>
-					</Button>
-				</div>
-			</div>
+			<AudioTrackControls
+				audioEditingDisabled={audioEditingDisabled}
+				audioIncluded={audioIncluded}
+				channelMode={decision.channelMode}
+				label={label}
+				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
+				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+				soloActive={soloActive}
+				trackId={track.id}
+			/>
 		</section>
 	);
 }
+
+const AudioTrackControls = memo(function AudioTrackControls({
+	audioEditingDisabled,
+	audioIncluded,
+	channelMode,
+	label,
+	onAudioTrackChannelModeChange,
+	onAudioTrackIncludedChange,
+	onSoloedAudioTrackChange,
+	soloActive,
+	trackId,
+}: {
+	audioEditingDisabled: boolean;
+	audioIncluded: boolean;
+	channelMode: AudioTrackChannelMode;
+	label: string;
+	onAudioTrackChannelModeChange?: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloActive: boolean;
+	trackId: string;
+}) {
+	return (
+		<div
+			aria-label={`${label} audio controls`}
+			className="grid min-w-0 gap-1.5"
+		>
+			<label className="grid min-w-0 gap-1">
+				<span className="sr-only">{label} channel handling</span>
+				<select
+					aria-label={`${label} channel handling`}
+					className="h-7 min-w-0 rounded border border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-workbench-lane-foreground outline-none hover:bg-workbench-hover focus:border-workbench-progress"
+					disabled={audioEditingDisabled || !onAudioTrackChannelModeChange}
+					onChange={(event) => {
+						onAudioTrackChannelModeChange?.(
+							trackId,
+							event.currentTarget.value as AudioTrackChannelMode,
+						);
+					}}
+					value={channelMode}
+				>
+					{AUDIO_CHANNEL_MODE_OPTIONS.map((option) => (
+						<option key={option.value} value={option.value}>
+							{option.label}
+						</option>
+					))}
+				</select>
+			</label>
+			<div className="grid grid-cols-2 gap-1">
+				<Button
+					aria-label={
+						audioIncluded
+							? `Exclude ${label} from output`
+							: `Include ${label} in output`
+					}
+					aria-pressed={audioIncluded}
+					className={`h-7 min-w-0 justify-center rounded border-workbench-border bg-workbench-viewer px-1 text-[10px] hover:bg-workbench-hover ${
+						audioIncluded
+							? "text-workbench-lane-foreground"
+							: "text-muted-foreground"
+					}`}
+					disabled={audioEditingDisabled || !onAudioTrackIncludedChange}
+					onClick={() => {
+						onAudioTrackIncludedChange?.(trackId, !audioIncluded);
+					}}
+					size="sm"
+					title={audioIncluded ? "Output included" : "Output excluded"}
+					type="button"
+					variant="outline"
+				>
+					{audioIncluded ? (
+						<Volume2 aria-hidden="true" className="size-3" />
+					) : (
+						<VolumeX aria-hidden="true" className="size-3" />
+					)}
+					<span className="sr-only">
+						{audioIncluded ? "Output included" : "Output excluded"}
+					</span>
+				</Button>
+				<Button
+					aria-label={
+						soloActive
+							? `Clear ${label} preview solo`
+							: `Solo ${label} for preview`
+					}
+					aria-pressed={soloActive}
+					className={`h-7 min-w-0 justify-center rounded border-workbench-border bg-workbench-viewer px-1 text-[10px] hover:bg-workbench-hover ${
+						soloActive
+							? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
+							: "text-muted-foreground"
+					}`}
+					disabled={!onSoloedAudioTrackChange}
+					onClick={() => {
+						onSoloedAudioTrackChange?.(soloActive ? null : trackId);
+					}}
+					size="sm"
+					title={soloActive ? "Clear preview solo" : "Preview solo"}
+					type="button"
+					variant="outline"
+				>
+					<Headphones aria-hidden="true" className="size-3" />
+					<span className="sr-only">Preview solo</span>
+				</Button>
+			</div>
+		</div>
+	);
+});
 
 function clampVolumePercent(volumePercent: number) {
 	if (!Number.isFinite(volumePercent)) {

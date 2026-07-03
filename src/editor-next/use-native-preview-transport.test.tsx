@@ -143,7 +143,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:2060000");
 	});
 
-	it("resyncs visible audio-master video lag before it reaches a quarter second", async () => {
+	it("hard-resyncs visible audio-master video lag after it exceeds tolerance", async () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 2,
 		});
@@ -159,7 +159,7 @@ describe("useNativePreviewTransport", () => {
 			expect(readState()).toContain("playing:true");
 		});
 
-		video.currentTime = 1.9;
+		video.currentTime = 1.7;
 		fireEvent.timeUpdate(video);
 
 		expect(video.currentTime).toBe(2);
@@ -209,7 +209,51 @@ describe("useNativePreviewTransport", () => {
 		runNextPreviewFrame(frameCallbacks, 52);
 
 		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_052_000);
-		expect(readState()).toContain("playhead:1052000");
+		expect(readState()).toContain("playhead:1000000");
+
+		video.currentTime = 1.252;
+		runNextPreviewFrame(frameCallbacks, 252);
+
+		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_252_000);
+		expect(readState()).toContain("playhead:1252000");
+	});
+
+	it("does not commit post-seek playback ticks to React state at frame cadence", async () => {
+		vi.spyOn(window.performance, "now").mockReturnValue(0);
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+		expect(readState()).toContain("playhead:10000000");
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		previewAudioEngine.setCurrentTimeSeconds(10.05);
+		runNextPreviewFrame(frameCallbacks, 50);
+		previewAudioEngine.setCurrentTimeSeconds(10.1);
+		runNextPreviewFrame(frameCallbacks, 100);
+		previewAudioEngine.setCurrentTimeSeconds(10.15);
+		runNextPreviewFrame(frameCallbacks, 150);
+		previewAudioEngine.setCurrentTimeSeconds(10.2);
+		runNextPreviewFrame(frameCallbacks, 200);
+
+		expect(readState()).toContain("playhead:10000000");
+
+		previewAudioEngine.setCurrentTimeSeconds(10.25);
+		runNextPreviewFrame(frameCallbacks, 250);
+
+		expect(readState()).toContain("playhead:10250000");
 	});
 
 	it("hard-resyncs large native video drift to the audio-master clock", async () => {
@@ -233,6 +277,111 @@ describe("useNativePreviewTransport", () => {
 
 		expect(video.currentTime).toBe(5);
 		expect(readState()).toContain("playhead:5000000");
+	});
+
+	it("does not repeatedly seek the visual follower for ordinary audio-master lag", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 2,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		currentTimeWrites.clear();
+
+		currentTimeWrites.setNativeCurrentTime(1.9);
+		runNextPreviewFrame(frameCallbacks);
+		previewAudioEngine.setCurrentTimeSeconds(2.016);
+		currentTimeWrites.setNativeCurrentTime(1.916);
+		runNextPreviewFrame(frameCallbacks, 32);
+		previewAudioEngine.setCurrentTimeSeconds(2.032);
+		currentTimeWrites.setNativeCurrentTime(1.932);
+		runNextPreviewFrame(frameCallbacks, 48);
+
+		expect(currentTimeWrites.values()).toEqual([]);
+		expect(readState()).toContain("playhead:2000000");
+	});
+
+	it("does not repeat visual follower seeks while a timeline seek is pending", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video, {
+			applyWrites: false,
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+
+		expect(currentTimeWrites.values()).toEqual([10]);
+		expect(readState()).toContain("playhead:10000000");
+		currentTimeWrites.clear();
+
+		previewAudioEngine.setCurrentTimeSeconds(10.016);
+		runNextPreviewFrame(frameCallbacks, 16);
+		previewAudioEngine.setCurrentTimeSeconds(10.032);
+		runNextPreviewFrame(frameCallbacks, 32);
+		previewAudioEngine.setCurrentTimeSeconds(10.048);
+		runNextPreviewFrame(frameCallbacks, 48);
+
+		expect(currentTimeWrites.values()).toEqual([]);
+	});
+
+	it("does not hard-resync a visual follower while the media element is still seeking", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video, {
+			applyWrites: false,
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+		currentTimeWrites.setSeeking(true);
+		currentTimeWrites.clear();
+
+		previewAudioEngine.setCurrentTimeSeconds(10.3);
+		runNextPreviewFrame(frameCallbacks, 300);
+		previewAudioEngine.setCurrentTimeSeconds(10.6);
+		runNextPreviewFrame(frameCallbacks, 600);
+
+		expect(currentTimeWrites.values()).toEqual([]);
 	});
 
 	it("keeps paused audio-master seeks on the requested visual follower frame", () => {
@@ -819,6 +968,45 @@ function runNextPreviewFrame(
 	act(() => {
 		frameCallbacks.shift()?.(timestampMs);
 	});
+}
+
+function trackVideoCurrentTimeWrites(
+	video: HTMLVideoElement,
+	{ applyWrites = true }: { applyWrites?: boolean } = {},
+) {
+	let currentTime = video.currentTime;
+	let seeking = false;
+	const writes: number[] = [];
+
+	Object.defineProperty(video, "currentTime", {
+		configurable: true,
+		get: () => currentTime,
+		set: (nextCurrentTime: number) => {
+			if (applyWrites) {
+				currentTime = nextCurrentTime;
+			}
+			writes.push(nextCurrentTime);
+		},
+	});
+	Object.defineProperty(video, "seeking", {
+		configurable: true,
+		get: () => seeking,
+	});
+
+	return {
+		clear() {
+			writes.length = 0;
+		},
+		setSeeking(nextSeeking: boolean) {
+			seeking = nextSeeking;
+		},
+		setNativeCurrentTime(nextCurrentTime: number) {
+			currentTime = nextCurrentTime;
+		},
+		values() {
+			return [...writes];
+		},
+	};
 }
 
 function createDeferred<T>() {

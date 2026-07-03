@@ -5,9 +5,9 @@ import type { MediaTimeUs, Selection } from "@/editor-core/model";
 import { setPreviewAudioEnginePlaybackRate } from "./preview-audio-engine";
 import type { UseNativePreviewTransportOptions } from "./use-native-preview-transport.types";
 
-const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.05;
+const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
 const PREVIEW_AV_HARD_RESYNC_FRAME_TOLERANCE = 2;
-const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 50;
+const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 250;
 const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 250_000;
 
 type PlayheadCommitOptions =
@@ -40,6 +40,7 @@ export function useNativePreviewTransport({
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const playheadStateCommitTimestampRef = useRef<number | null>(null);
 	const playheadStateRef = useRef<MediaTimeUs>(0);
+	const pendingVideoFollowerSeekSecondsRef = useRef<number | null>(null);
 	const selectionLoopEnteredRef = useRef(false);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
@@ -61,6 +62,7 @@ export function useNativePreviewTransport({
 		playheadRef.current = 0;
 		playheadStateRef.current = 0;
 		playheadStateCommitTimestampRef.current = null;
+		pendingVideoFollowerSeekSecondsRef.current = null;
 		playbackStartRequestIdRef.current += 1;
 		playbackStartPendingRef.current = false;
 		previewAudioEnginePlaybackStartedRef.current = false;
@@ -121,7 +123,12 @@ export function useNativePreviewTransport({
 			const video = videoRef.current;
 
 			if (video) {
-				video.currentTime = nextTimeSeconds;
+				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
+					video,
+					nextPlayheadUs,
+				)
+					? nextTimeSeconds
+					: null;
 			}
 
 			if (audioMasterClockActive) {
@@ -353,7 +360,12 @@ export function useNativePreviewTransport({
 			const previousPlayheadUs = playheadRef.current;
 
 			if (audioMasterClockActive && !isPlaying) {
-				setVideoFollowerTime(video, previousPlayheadUs);
+				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
+					video,
+					previousPlayheadUs,
+				)
+					? previousPlayheadUs / 1_000_000
+					: null;
 				updateSelectionLoopEntryFromPlayhead(previousPlayheadUs);
 				setPlayheadUs(previousPlayheadUs);
 				return;
@@ -364,14 +376,36 @@ export function useNativePreviewTransport({
 					? previewAudioEngineRef.current.getCurrentTime()
 					: video.currentTime;
 			const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
+			const hardResyncThresholdSeconds =
+				previewAvHardResyncThresholdSeconds(frameDurationUs);
+			const pendingVideoFollowerSeekSeconds =
+				pendingVideoFollowerSeekSecondsRef.current;
+
+			if (
+				pendingVideoFollowerSeekSeconds !== null &&
+				videoFollowerSeekHasSettled({
+					frameDurationUs,
+					pendingSeekSeconds: pendingVideoFollowerSeekSeconds,
+					videoTimeSeconds: video.currentTime,
+				})
+			) {
+				pendingVideoFollowerSeekSecondsRef.current = null;
+			}
 
 			if (
 				audioMasterClockActive &&
 				Number.isFinite(transportTimeSeconds) &&
 				Math.abs(video.currentTime - transportTimeSeconds) >
-					previewAvHardResyncThresholdSeconds(frameDurationUs)
+					hardResyncThresholdSeconds &&
+				!shouldDeferVideoFollowerResyncForPendingSeek({
+					hardResyncThresholdSeconds,
+					pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
+					transportTimeSeconds,
+					videoSeeking: videoFollowerIsSeeking(video),
+				})
 			) {
 				video.currentTime = transportTimeSeconds;
+				pendingVideoFollowerSeekSecondsRef.current = transportTimeSeconds;
 			}
 
 			if (!isPlaying) {
@@ -616,15 +650,68 @@ function previewAvHardResyncThresholdSeconds(frameDurationUs: MediaTimeUs) {
 	);
 }
 
+function previewFollowerSeekSettledThresholdSeconds(
+	frameDurationUs: MediaTimeUs,
+) {
+	return Math.max(0.02, Math.max(0, frameDurationUs) / 1_000_000);
+}
+
+function videoFollowerSeekHasSettled({
+	frameDurationUs,
+	pendingSeekSeconds,
+	videoTimeSeconds,
+}: {
+	frameDurationUs: MediaTimeUs;
+	pendingSeekSeconds: number;
+	videoTimeSeconds: number;
+}) {
+	return (
+		Math.abs(videoTimeSeconds - pendingSeekSeconds) <=
+		previewFollowerSeekSettledThresholdSeconds(frameDurationUs)
+	);
+}
+
+function shouldDeferVideoFollowerResyncForPendingSeek({
+	hardResyncThresholdSeconds,
+	pendingSeekSeconds,
+	transportTimeSeconds,
+	videoSeeking,
+}: {
+	hardResyncThresholdSeconds: number;
+	pendingSeekSeconds: number | null;
+	transportTimeSeconds: number;
+	videoSeeking: boolean;
+}) {
+	if (pendingSeekSeconds !== null && videoSeeking) {
+		return true;
+	}
+
+	return (
+		pendingSeekSeconds !== null &&
+		Math.abs(transportTimeSeconds - pendingSeekSeconds) <=
+			hardResyncThresholdSeconds
+	);
+}
+
+function videoFollowerIsSeeking(video: unknown) {
+	return (
+		typeof video === "object" &&
+		video !== null &&
+		"seeking" in video &&
+		(video as { seeking?: unknown }).seeking === true
+	);
+}
+
 function setVideoFollowerTime(
 	video: { currentTime: number },
 	playheadUs: MediaTimeUs,
-) {
+): boolean {
 	if (secondsToMicroseconds(video.currentTime) === playheadUs) {
-		return;
+		return false;
 	}
 
 	video.currentTime = playheadUs / 1_000_000;
+	return true;
 }
 
 function clampMediaTime(

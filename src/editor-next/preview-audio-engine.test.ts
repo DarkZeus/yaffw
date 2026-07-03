@@ -153,6 +153,36 @@ describe("createPreviewAudioEngine", () => {
 		).toEqual([0.5, 0.375]);
 	});
 
+	it("caches auto channel meter plans across live meter snapshots", async () => {
+		const channelSampleIteration = vi.fn();
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createIterableAudioBufferStub({
+					channels: [
+						[0.25, 0.25, 0.25, 0.25],
+						[0, 0, 0, 0],
+					],
+					onSampleIterated: channelSampleIteration,
+				}),
+			],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			resources: [createPreviewAudioResource("audio-1", 0)],
+		});
+
+		engine.setTrackChannelMode(0, "auto-one-sided-stereo");
+		channelSampleIteration.mockClear();
+
+		engine.readMeterSnapshot({ outputChannels: 2 });
+		expect(channelSampleIteration).toHaveBeenCalled();
+
+		channelSampleIteration.mockClear();
+		engine.readMeterSnapshot({ outputChannels: 2 });
+
+		expect(channelSampleIteration).not.toHaveBeenCalled();
+	});
+
 	it("keeps prepared tracks active in degraded mode when one Preview audio resource fails", async () => {
 		const context = createAudioContextSpy({
 			audioBuffers: [
@@ -521,6 +551,60 @@ function createAudioBufferStub({
 			return data;
 		},
 		length,
+		numberOfChannels: channelData.length,
+		sampleRate: 48_000,
+	} as AudioBuffer;
+}
+
+function createIterableAudioBufferStub({
+	channels,
+	onSampleIterated,
+}: {
+	channels: number[][];
+	onSampleIterated: () => void;
+}): AudioBuffer {
+	const channelData = channels.map((samples) => {
+		const data: {
+			[index: number]: number;
+			length: number;
+			[Symbol.iterator]: () => IterableIterator<number>;
+		} = {
+			length: samples.length,
+			*[Symbol.iterator]() {
+				for (const sample of samples) {
+					onSampleIterated();
+					yield sample;
+				}
+			},
+		};
+
+		for (const [index, sample] of samples.entries()) {
+			data[index] = sample;
+		}
+
+		return data as unknown as Float32Array;
+	});
+
+	return {
+		copyFromChannel(destination, channelNumber, startInChannel = 0) {
+			const source = channelData[channelNumber];
+
+			for (let index = 0; index < destination.length; index += 1) {
+				destination[index] = source?.[startInChannel + index] ?? 0;
+			}
+		},
+		copyToChannel() {},
+		duration: 10,
+		getChannelData(channelNumber) {
+			const data = channelData[channelNumber];
+
+			if (!data) {
+				throw new Error(`Missing channel ${channelNumber}.`);
+			}
+
+			return data;
+		},
+		length: Math.max(1, ...channels.map((channel) => channel.length)),
 		numberOfChannels: channelData.length,
 		sampleRate: 48_000,
 	} as AudioBuffer;
