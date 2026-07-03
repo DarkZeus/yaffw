@@ -13,7 +13,6 @@ export type PreviewViewerRegionProps = {
 	canFullscreen: boolean;
 	isPlaying: boolean;
 	mediaMuted: boolean;
-	multitrackContainerRef: RefObject<HTMLDivElement | null>;
 	onChapterSelectionRequested?: (selection: Selection) => void;
 	onEnded: () => void;
 	onNativePause: () => void;

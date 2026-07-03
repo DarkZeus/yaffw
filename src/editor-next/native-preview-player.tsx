@@ -1,6 +1,5 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type MultiTrack from "wavesurfer-multitrack";
 
 import {
 	ResizableHandle,
@@ -9,8 +8,11 @@ import {
 } from "@/components/ui/resizable";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { MediaTimeUs } from "@/editor-core/model";
-import { canUseBrowserAudioPreviewTransport } from "./native-preview-audio-transport";
 import type { NativePreviewPlayerProps } from "./native-preview-player.types";
+import {
+	canUsePreviewAudioEngine,
+	type PreviewAudioEngine,
+} from "./preview-audio-engine";
 import { usePreviewApertureLayout } from "./preview-aperture-layout";
 import { resolvePreviewClockMode } from "./preview-clock-mode";
 import { usePreviewKeyboardShortcuts } from "./preview-keyboard-shortcuts";
@@ -20,6 +22,7 @@ import { PreviewViewerRegion } from "./preview-viewer-region";
 import { useBrowserAudioPreviewSources } from "./use-browser-audio-preview-sources";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
+import type { PreviewAudioMonitoringStatus } from "./use-preview-audio-monitoring-lifecycle.types";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 
@@ -44,8 +47,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const videoRef = useRef<MediaPlayerInstance | null>(null);
-	const multitrackContainerRef = useRef<HTMLDivElement | null>(null);
-	const multitrackRef = useRef<MultiTrack | null>(null);
+	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
@@ -53,7 +55,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
 		getPlayheadUs: () => getPlayheadUsRef.current(),
 	});
-	const [audioMonitoringReady, setAudioMonitoringReady] = useState(false);
+	const [audioMonitoringStatus, setAudioMonitoringStatus] =
+		useState<PreviewAudioMonitoringStatus>("idle");
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [localSoloedAudioTrackId, setLocalSoloedAudioTrackId] = useState<
 		string | null
@@ -95,8 +98,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		};
 	}, [activeMediaAssetCleanupScope, onSoloedAudioTrackChange, source]);
 
-	const audioPreviewTransportSupported =
-		canUseBrowserAudioPreviewTransport(asset);
+	const audioPreviewTransportSupported = canUsePreviewAudioEngine(asset);
 	const audioPreviewSources = useBrowserAudioPreviewSources({
 		activeMediaAssetCleanupScope,
 		audioMix,
@@ -118,7 +120,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	);
 	const previewClockMode = resolvePreviewClockMode({
 		asset,
-		audioMonitoringReady,
+		audioMonitoringFailed: audioMonitoringStatus === "failed",
+		audioMonitoringReady: audioMonitoringStatus === "ready",
 		audioPreviewSources,
 		audioPreviewTransportSupported,
 	});
@@ -147,7 +150,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	} = useNativePreviewTransport({
 		durationUs: asset.durationUs,
 		frameDurationUs: asset.frameTiming.frameDurationUs,
-		multitrackRef,
+		previewAudioEngineRef,
 		previewClockMode,
 		selection,
 		source,
@@ -170,15 +173,14 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		onPreviewPlayheadChange?.(playheadUs);
 	}, [onPreviewPlayheadChange, playheadUs]);
 
-	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
+	usePreviewAudioMonitoringLifecycle({
 		audioMix,
 		audioPreviewSources,
 		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
 		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
-		multitrackContainerRef,
-		multitrackRef,
 		muted,
-		onReadyChange: setAudioMonitoringReady,
+		onStatusChange: setAudioMonitoringStatus,
+		previewAudioEngineRef,
 		soloedAudioTrackId,
 		volume,
 	});
@@ -244,7 +246,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					canFullscreen={canFullscreen}
 					isPlaying={isPlaying}
 					mediaMuted={previewClockMode !== "native-video" || muted}
-					multitrackContainerRef={audioMonitoring.multitrackContainerRef}
 					onChapterSelectionRequested={
 						selectionEditingDisabled ? undefined : onSelectionReplaceRequested
 					}

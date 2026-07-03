@@ -29,8 +29,8 @@ Audio mix decision.
 YAFFW uses one preview clock authority per playback session.
 
 When preview audio monitoring is active, the audio engine is the preview time
-authority. The multitrack audio transport provides the media time used by the
-Playhead readout, selection-loop checks, waveform/timeline playhead rendering,
+authority. The Preview audio engine provides the media time used by the
+Playhead readout, selection-loop checks, waveform/timeline Playhead rendering,
 and preview video synchronization.
 
 In audio-master mode, native video is a muted visual follower. Native video is
@@ -54,12 +54,12 @@ waveform lanes, mirrored Selection affordances, the time ruler, and the visible
 Playhead, but it is not the preview audio transport and does not own preview
 time.
 
-Preview audio monitoring is a separate adapter concern. It prepares temporary
-browser-playable audio resources, creates the hidden multitrack transport, and
+Preview audio monitoring is a separate adapter concern. It prepares
+source-derived Preview audio resources, creates the Preview audio engine, and
 applies preview volume, preview mute, preview-only solo, Track volume, channel
-handling, and include/exclude decisions to what the user hears. Those temporary
-preview resources are adapter-owned browser resources and must be disposed with
-the active Media asset.
+handling, and include/exclude decisions to what the user hears. Those preview
+resources are adapter-owned browser resources and must be disposed with the
+active Media asset.
 
 ## Export boundary
 

@@ -9,11 +9,13 @@ export type PreviewClockMode =
 
 export function resolvePreviewClockMode({
 	asset,
+	audioMonitoringFailed = false,
 	audioMonitoringReady,
 	audioPreviewSources,
 	audioPreviewTransportSupported,
 }: {
 	asset: ReadyMediaAsset;
+	audioMonitoringFailed?: boolean;
 	audioMonitoringReady: boolean;
 	audioPreviewSources: BrowserAudioPreviewSourcesState;
 	audioPreviewTransportSupported: boolean;
@@ -23,6 +25,10 @@ export function resolvePreviewClockMode({
 	}
 
 	if (audioPreviewSources.status === "failed") {
+		return "native-video";
+	}
+
+	if (audioMonitoringFailed) {
 		return "native-video";
 	}
 

@@ -1,8 +1,8 @@
 import type { RefObject } from "react";
-import type MultiTrack from "wavesurfer-multitrack";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
+import type { PreviewAudioEngine } from "./preview-audio-engine";
 import type { PreviewClockMode } from "./preview-clock-mode";
 
 export type PreviewMediaTransportHandle = {
@@ -17,7 +17,7 @@ export type PreviewMediaTransportHandle = {
 export type UseNativePreviewTransportOptions = {
 	durationUs: MediaTimeUs;
 	frameDurationUs: MediaTimeUs;
-	multitrackRef: RefObject<MultiTrack | null>;
+	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	previewClockMode: PreviewClockMode;
 	selection: Selection;
 	source: Blob;

@@ -38,7 +38,6 @@ export function PreviewViewerRegion({
 	canFullscreen,
 	isPlaying,
 	mediaMuted,
-	multitrackContainerRef,
 	onChapterSelectionRequested,
 	onEnded,
 	onNativePause,
@@ -109,7 +108,6 @@ export function PreviewViewerRegion({
 				<PreviewMediaSurface
 					asset={asset}
 					mediaMuted={mediaMuted}
-					multitrackContainerRef={multitrackContainerRef}
 					onChapterSelectionRequested={onChapterSelectionRequested}
 					onEnded={onEnded}
 					onNativePause={onNativePause}
@@ -129,7 +127,6 @@ export function PreviewViewerRegion({
 const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	asset,
 	mediaMuted,
-	multitrackContainerRef,
 	onChapterSelectionRequested,
 	onEnded,
 	onNativePause,
@@ -143,7 +140,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 }: {
 	asset: ReadyMediaAsset;
 	mediaMuted: boolean;
-	multitrackContainerRef: PreviewViewerRegionProps["multitrackContainerRef"];
 	onChapterSelectionRequested?: (selection: Selection) => void;
 	onEnded: () => void;
 	onNativePause: () => void;
@@ -218,12 +214,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 						}}
 					/>
 				</MediaPlayer>
-				<div
-					aria-hidden="true"
-					className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden opacity-0"
-					data-testid="multitrack-preview-transport"
-					ref={multitrackContainerRef}
-				/>
 			</section>
 		</section>
 	);

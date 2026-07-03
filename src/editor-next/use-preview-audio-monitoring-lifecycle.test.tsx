@@ -11,27 +11,23 @@ import type {
 } from "@/editor-core/model";
 
 import type { BrowserAudioPreviewSource } from "./browser-audio-preview-sources.types";
+import type { PreviewAudioEngineFactory } from "./use-preview-audio-monitoring-lifecycle.types";
 import type { BrowserAudioPreviewSourcesState } from "./use-browser-audio-preview-sources.types";
 import { usePreviewAudioMonitoringLifecycle } from "./use-preview-audio-monitoring-lifecycle";
 
-const createMultitrackMock = vi.fn();
-const createdMultitracks: MultitrackSpy[] = [];
+const createPreviewAudioEngineMock = vi.fn<PreviewAudioEngineFactory>();
+const createdPreviewAudioEngines: PreviewAudioEngineSpy[] = [];
 const DEFAULT_GET_PLAYBACK_RATE = () => 1;
 const DEFAULT_GET_PLAYHEAD_US = () => 0;
 
-vi.mock("wavesurfer-multitrack", () => ({
-	default: {
-		create: createMultitrackMock,
-	},
-}));
-
 beforeEach(() => {
-	createMultitrackMock.mockImplementation(() => {
-		const multitrack = createMultitrackSpy();
-		createdMultitracks.push(multitrack);
-		return multitrack;
+	createdPreviewAudioEngines.length = 0;
+	createPreviewAudioEngineMock.mockImplementation(async () => {
+		const previewAudioEngine = createPreviewAudioEngineSpy();
+		createdPreviewAudioEngines.push(previewAudioEngine);
+
+		return previewAudioEngine;
 	});
-	createdMultitracks.length = 0;
 });
 
 afterEach(() => {
@@ -40,7 +36,7 @@ afterEach(() => {
 });
 
 describe("usePreviewAudioMonitoringLifecycle", () => {
-	it("creates a multitrack adapter, reports readiness, and syncs playhead and playback speed on canplay", async () => {
+	it("creates a Preview audio engine, reports readiness, and syncs playhead and playback speed", async () => {
 		render(
 			<PreviewAudioMonitoringProbe
 				getPlaybackRate={() => 1.5}
@@ -50,25 +46,21 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
-		});
-		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
-			"not-ready",
-		);
-		expect(createdMultitracks[0].setTime).not.toHaveBeenCalled();
-
-		createdMultitracks[0].emitCanPlay();
-
-		await waitFor(() => {
+			expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(1);
 			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
 				"ready",
 			);
 		});
-		expect(createdMultitracks[0].setTime).toHaveBeenCalledWith(5.25);
-		expect(createdMultitracks[0].setAudioRate).toHaveBeenCalledWith(1.5);
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
+			sources: [expect.objectContaining({ trackId: "audio-1" })],
+		});
+		expect(createdPreviewAudioEngines[0]?.setTime).toHaveBeenCalledWith(5.25);
+		expect(createdPreviewAudioEngines[0]?.setPlaybackRate).toHaveBeenCalledWith(
+			1.5,
+		);
 	});
 
-	it("destroys the previous adapter and clears hidden container content when prepared sources change", async () => {
+	it("destroys the previous engine when prepared sources change", async () => {
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
 				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
@@ -76,11 +68,8 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+			expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(1);
 		});
-		screen
-			.getByTestId("audio-monitoring-container")
-			.append(document.createElement("wave"));
 
 		rerender(
 			<PreviewAudioMonitoringProbe
@@ -89,14 +78,11 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(2);
+			expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(2);
 		});
-		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
-		expect(
-			screen.getByTestId("audio-monitoring-container").childElementCount,
-		).toBe(0);
+		expect(createdPreviewAudioEngines[0]?.destroy).toHaveBeenCalledTimes(1);
 		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
-			"not-ready",
+			"ready",
 		);
 	});
 
@@ -108,17 +94,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
-		});
-		createdMultitracks[0].emitCanPlay();
-		await waitFor(() => {
 			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
 				"ready",
 			);
 		});
-		screen
-			.getByTestId("audio-monitoring-container")
-			.append(document.createElement("wave"));
 
 		rerender(
 			<PreviewAudioMonitoringProbe state={loadingAudioSourcesState()} />,
@@ -129,13 +108,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				"not-ready",
 			);
 		});
-		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
-		expect(
-			screen.getByTestId("audio-monitoring-container").childElementCount,
-		).toBe(0);
+		expect(createdPreviewAudioEngines[0]?.destroy).toHaveBeenCalledTimes(1);
 	});
 
-	it("cleans up the adapter and hidden container when audio source preparation fails", async () => {
+	it("cleans up the engine when audio source preparation fails", async () => {
 		const { rerender } = render(
 			<PreviewAudioMonitoringProbe
 				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
@@ -143,17 +119,10 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
-		});
-		createdMultitracks[0].emitCanPlay();
-		await waitFor(() => {
 			expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
 				"ready",
 			);
 		});
-		screen
-			.getByTestId("audio-monitoring-container")
-			.append(document.createElement("wave"));
 
 		rerender(<PreviewAudioMonitoringProbe state={failedAudioSourcesState()} />);
 
@@ -162,14 +131,32 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				"not-ready",
 			);
 		});
-		expect(createMultitrackMock).toHaveBeenCalledTimes(1);
-		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
-		expect(
-			screen.getByTestId("audio-monitoring-container").childElementCount,
-		).toBe(0);
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(1);
+		expect(createdPreviewAudioEngines[0]?.destroy).toHaveBeenCalledTimes(1);
 	});
 
-	it("unsubscribes readiness listeners and destroys the adapter on cleanup", async () => {
+	it("reports failed status when the Preview audio engine cannot be created", async () => {
+		createPreviewAudioEngineMock.mockRejectedValueOnce(
+			new Error("decode failed"),
+		);
+
+		render(
+			<PreviewAudioMonitoringProbe
+				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByLabelText("audio monitoring status").textContent).toBe(
+				"failed",
+			);
+		});
+		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
+			"not-ready",
+		);
+	});
+
+	it("destroys the engine on cleanup", async () => {
 		const { unmount } = render(
 			<PreviewAudioMonitoringProbe
 				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
@@ -177,16 +164,20 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+			expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(1);
 		});
 
 		unmount();
 
-		expect(createdMultitracks[0].unsubscribeCanPlay).toHaveBeenCalledTimes(1);
-		expect(createdMultitracks[0].destroy).toHaveBeenCalledTimes(1);
+		expect(createdPreviewAudioEngines[0]?.destroy).toHaveBeenCalledTimes(1);
 	});
 
-	it("ignores late async multitrack imports after cleanup", async () => {
+	it("destroys late async Preview audio engines after cleanup", async () => {
+		const deferred = createDeferred<PreviewAudioEngineSpy>();
+		createPreviewAudioEngineMock.mockReturnValueOnce(
+			deferred.promise as ReturnType<PreviewAudioEngineFactory>,
+		);
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 		const { unmount } = render(
 			<PreviewAudioMonitoringProbe
 				state={readyAudioSourcesState([createAudioPreviewSource("audio-1")])}
@@ -194,10 +185,12 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		unmount();
-		await Promise.resolve();
+		deferred.resolve(previewAudioEngine);
+		await deferred.promise;
 		await Promise.resolve();
 
-		expect(createMultitrackMock).not.toHaveBeenCalled();
+		expect(previewAudioEngine.destroy).toHaveBeenCalledTimes(1);
+		expect(screen.queryByLabelText("audio monitoring ready")).toBeNull();
 	});
 
 	it("applies preview volume, audio mix volume, include decisions, mute, and preview-only solo inside the lifecycle", async () => {
@@ -226,14 +219,15 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
+			expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
+				0,
+				0.2,
+			);
 		});
-		createdMultitracks[0].emitCanPlay();
-
-		await waitFor(() => {
-			expect(createdMultitracks[0].setTrackVolume).toHaveBeenCalledWith(0, 0.2);
-		});
-		expect(createdMultitracks[0].setTrackVolume).toHaveBeenCalledWith(1, 0);
+		expect(createdPreviewAudioEngines[0]?.setTrackGain).toHaveBeenCalledWith(
+			1,
+			0,
+		);
 
 		rerender(
 			<PreviewAudioMonitoringProbe
@@ -245,8 +239,8 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(0);
-			expect(lastTrackVolume(createdMultitracks[0], 1)).toBe(0);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBe(0);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBe(0);
 		});
 
 		rerender(
@@ -259,20 +253,22 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(0);
-			expect(lastTrackVolume(createdMultitracks[0], 1)).toBeCloseTo(0.05);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBe(0);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBeCloseTo(
+				0.05,
+			);
 		});
 		expect(audioMix.tracks["audio-2"]?.include).toBe(false);
 	});
 
-	it("applies initial track volumes before reporting audio monitoring ready", async () => {
+	it("applies initial track gains before reporting audio monitoring ready", async () => {
 		const onReadyChange = vi.fn((nextReady: boolean) => {
 			if (!nextReady) {
 				return;
 			}
 
-			expect(lastTrackVolume(createdMultitracks[0], 0)).toBe(1);
-			expect(lastTrackVolume(createdMultitracks[0], 1)).toBe(1);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 0)).toBe(1);
+			expect(lastTrackGain(createdPreviewAudioEngines[0], 1)).toBe(1);
 		});
 
 		render(
@@ -284,11 +280,6 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				])}
 			/>,
 		);
-
-		await waitFor(() => {
-			expect(createMultitrackMock).toHaveBeenCalledTimes(1);
-		});
-		createdMultitracks[0].emitCanPlay();
 
 		await waitFor(() => {
 			expect(onReadyChange).toHaveBeenCalledWith(true);
@@ -318,6 +309,7 @@ function PreviewAudioMonitoringProbe({
 	const audioMonitoring = usePreviewAudioMonitoringLifecycle({
 		audioMix,
 		audioPreviewSources: state,
+		createPreviewAudioEngine: createPreviewAudioEngineMock,
 		getPlaybackRate,
 		getPlayheadUs,
 		muted,
@@ -327,15 +319,14 @@ function PreviewAudioMonitoringProbe({
 	});
 
 	return (
-		<div>
-			<div
-				data-testid="audio-monitoring-container"
-				ref={audioMonitoring.multitrackContainerRef}
-			/>
+		<>
 			<output aria-label="audio monitoring ready">
 				{audioMonitoring.ready ? "ready" : "not-ready"}
 			</output>
-		</div>
+			<output aria-label="audio monitoring status">
+				{audioMonitoring.status}
+			</output>
+		</>
 	);
 }
 
@@ -412,6 +403,52 @@ function createAudioPreviewSource(trackId: string): BrowserAudioPreviewSource {
 	};
 }
 
+function lastTrackGain(
+	previewAudioEngine: PreviewAudioEngineSpy | undefined,
+	trackIndex: number,
+) {
+	const calls =
+		previewAudioEngine?.setTrackGain.mock.calls.filter(
+			([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
+		) ?? [];
+	const lastCall = calls.at(-1);
+
+	if (!lastCall) {
+		throw new Error(`No gain call found for track ${trackIndex}.`);
+	}
+
+	return lastCall[1];
+}
+
+type PreviewAudioEngineSpy = ReturnType<typeof createPreviewAudioEngineSpy>;
+
+function createPreviewAudioEngineSpy() {
+	return {
+		destroy: vi.fn(),
+		getCurrentTime: vi.fn(() => 0),
+		pause: vi.fn(),
+		play: vi.fn(),
+		setPlaybackRate: vi.fn(),
+		setTime: vi.fn(),
+		setTrackGain: vi.fn(),
+	};
+}
+
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+
+	return {
+		promise,
+		reject,
+		resolve,
+	};
+}
+
 const readyAsset = {
 	durationUs: 12_000_000,
 	exportCapability: {
@@ -465,41 +502,3 @@ const readyAssetWithAudio = {
 		],
 	},
 } satisfies ReadyMediaAsset;
-
-type MultitrackSpy = ReturnType<typeof createMultitrackSpy>;
-
-function lastTrackVolume(multitrack: MultitrackSpy, trackIndex: number) {
-	const calls = multitrack.setTrackVolume.mock.calls.filter(
-		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
-	);
-	const lastCall = calls.at(-1);
-
-	if (!lastCall) {
-		throw new Error(`No volume call found for track ${trackIndex}.`);
-	}
-
-	return lastCall[1];
-}
-
-function createMultitrackSpy() {
-	let canPlayHandler: (() => void) | undefined;
-	const unsubscribeCanPlay = vi.fn();
-
-	return {
-		destroy: vi.fn(),
-		emitCanPlay: () => {
-			canPlayHandler?.();
-		},
-		on: vi.fn((eventName: string, handler: () => void) => {
-			if (eventName === "canplay") {
-				canPlayHandler = handler;
-			}
-
-			return unsubscribeCanPlay;
-		}),
-		setAudioRate: vi.fn(),
-		setTime: vi.fn(),
-		setTrackVolume: vi.fn(),
-		unsubscribeCanPlay,
-	};
-}

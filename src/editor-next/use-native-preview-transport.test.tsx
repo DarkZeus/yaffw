@@ -10,11 +10,11 @@ import {
 } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type MultiTrack from "wavesurfer-multitrack";
 
 import type { Selection } from "@/editor-core/model";
 
 import { EXPORT_CORRECTNESS_FIXTURES } from "./export-correctness-fixtures";
+import type { PreviewAudioEngine } from "./preview-audio-engine";
 import { useNativePreviewTransport } from "./use-native-preview-transport";
 
 const play = vi.fn().mockResolvedValue(undefined);
@@ -39,10 +39,10 @@ afterEach(() => {
 });
 
 describe("useNativePreviewTransport", () => {
-	it("drives native preview commands through the video and multitrack refs", async () => {
-		const multitrack = createMultitrackSpy();
+	it("drives native preview commands through the video and previewAudioEngine refs", async () => {
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -58,10 +58,10 @@ describe("useNativePreviewTransport", () => {
 		expect(pause).toHaveBeenCalledTimes(1);
 		expect(readState()).toContain("playing:false");
 
-		multitrack.setTime.mockClear();
+		previewAudioEngine.setTime.mockClear();
 		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
 		expect(video.currentTime).toBe(10);
-		expect(multitrack.setTime).toHaveBeenCalledWith(10);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(10);
 		expect(readState()).toContain("playhead:10000000");
 
 		fireEvent.click(screen.getByRole("button", { name: "Step forward" }));
@@ -69,7 +69,7 @@ describe("useNativePreviewTransport", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Set speed" }));
 		expect(video.playbackRate).toBe(1.5);
-		expect(multitrack.setAudioRate).toHaveBeenCalledWith(1.5);
+		expect(previewAudioEngine.setPlaybackRate).toHaveBeenCalledWith(1.5);
 		expect(readState()).toContain("rate:1.5");
 
 		fireEvent.click(screen.getByRole("button", { name: "Set volume" }));
@@ -87,10 +87,10 @@ describe("useNativePreviewTransport", () => {
 
 	it("starts audio-master playback without waiting for native video playback", async () => {
 		const playStarted = createDeferred<void>();
-		const multitrack = createMultitrackSpy();
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 		play.mockReturnValueOnce(playStarted.promise);
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
 
@@ -101,8 +101,8 @@ describe("useNativePreviewTransport", () => {
 			"muted",
 			true,
 		);
-		expect(multitrack.setTime).toHaveBeenCalledWith(0);
-		expect(multitrack.play).toHaveBeenCalledTimes(1);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(0);
+		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 		expect(readState()).toContain("playing:true");
 
 		await act(async () => {
@@ -114,11 +114,11 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("does not chase small custom-audio clock drift with native video seeks during playback", async () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 2.06,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -135,11 +135,11 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("resyncs visible audio-master video lag before it reaches a quarter second", async () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 2,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -202,11 +202,11 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("hard-resyncs large native video drift to the audio-master clock", async () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 5,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -223,17 +223,17 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("keeps paused audio-master seeks on the requested visual follower frame", () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 0,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
 		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
 		expect(video.currentTime).toBe(10);
-		expect(multitrack.setTime).toHaveBeenCalledWith(10);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(10);
 		expect(readState()).toContain("playhead:10000000");
 
 		fireEvent.seeked(video);
@@ -245,12 +245,12 @@ describe("useNativePreviewTransport", () => {
 	it("starts audio-master playback from a paused timeline seek without snapping back", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 0,
 			setTimeUpdatesCurrentTime: true,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -265,24 +265,24 @@ describe("useNativePreviewTransport", () => {
 		});
 		runNextPreviewFrame(frameCallbacks);
 
-		expect(multitrack.setTime).toHaveBeenLastCalledWith(10);
-		expect(multitrack.getCurrentTime()).toBe(10);
+		expect(previewAudioEngine.setTime).toHaveBeenLastCalledWith(10);
+		expect(previewAudioEngine.getCurrentTime()).toBe(10);
 		expect(video.currentTime).toBe(10);
 		expect(readState()).toContain("playhead:10000000");
 	});
 
 	it("keeps paused audio-master frame steps on the requested visual follower frame", () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 0,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
 		fireEvent.click(screen.getByRole("button", { name: "Step forward" }));
 		expect(video.currentTime).toBeCloseTo(0.033333, 5);
-		expect(multitrack.setTime).toHaveBeenCalledWith(0.033333);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(0.033333);
 		expect(readState()).toContain("playhead:33333");
 
 		fireEvent.seeked(video);
@@ -292,11 +292,11 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("ignores native video playback events while audio-master owns preview state", async () => {
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 3,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -307,7 +307,7 @@ describe("useNativePreviewTransport", () => {
 		await waitFor(() => {
 			expect(readState()).toContain("playing:true");
 		});
-		multitrack.pause.mockClear();
+		previewAudioEngine.pause.mockClear();
 
 		video.currentTime = 9;
 		fireEvent.seeked(video);
@@ -315,7 +315,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:3000000");
 
 		fireEvent.pause(video);
-		expect(multitrack.pause).not.toHaveBeenCalled();
+		expect(previewAudioEngine.pause).not.toHaveBeenCalled();
 		expect(readState()).toContain("playing:true");
 
 		fireEvent.ended(video);
@@ -325,12 +325,12 @@ describe("useNativePreviewTransport", () => {
 
 	it("keeps native-clock fallback tied to native video playback events", async () => {
 		const playStarted = createDeferred<void>();
-		const multitrack = createMultitrackSpy();
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 		play.mockReturnValueOnce(playStarted.promise);
 
 		render(
 			<NativePreviewTransportProbe
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				previewClockMode="native-video"
 			/>,
 		);
@@ -342,7 +342,7 @@ describe("useNativePreviewTransport", () => {
 		await waitFor(() => {
 			expect(play).toHaveBeenCalledTimes(1);
 		});
-		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
 		expect(readState()).toContain("playing:false");
 
 		await act(async () => {
@@ -366,10 +366,10 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("does not start native-video free-run while audio-master preview is pending", async () => {
-		const multitrack = createMultitrackSpy();
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 		const view = render(
 			<NativePreviewTransportProbe
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				previewClockMode="audio-master-pending"
 			/>,
 		);
@@ -377,13 +377,13 @@ describe("useNativePreviewTransport", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
 
 		expect(play).not.toHaveBeenCalled();
-		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
 		expect(readState()).toContain("mode:audio-master-pending");
 		expect(readState()).toContain("playing:false");
 
 		view.rerender(
 			<NativePreviewTransportProbe
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				previewClockMode="audio-master"
 			/>,
 		);
@@ -392,7 +392,7 @@ describe("useNativePreviewTransport", () => {
 			expect(readState()).toContain("mode:audio-master");
 		});
 		expect(play).not.toHaveBeenCalled();
-		expect(multitrack.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
 		expect(readState()).toContain("playing:false");
 	});
 
@@ -401,7 +401,7 @@ describe("useNativePreviewTransport", () => {
 		const [firstEvent, secondEvent] = syncFixture.expected.syncEventsUs ?? [];
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
-		const multitrack = createMultitrackSpy();
+		const previewAudioEngine = createPreviewAudioEngineSpy();
 
 		if (!firstEvent || !secondEvent) {
 			throw new Error(
@@ -412,7 +412,7 @@ describe("useNativePreviewTransport", () => {
 		render(
 			<NativePreviewTransportProbe
 				durationUs={syncFixture.expected.durationUs}
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				seekTargetUs={secondEvent.audioClickUs}
 				selection={syncFixture.selections.full}
 			/>,
@@ -426,7 +426,7 @@ describe("useNativePreviewTransport", () => {
 		});
 
 		video.currentTime = 0;
-		multitrack.setCurrentTimeSeconds(firstEvent.audioClickUs / 1_000_000);
+		previewAudioEngine.setCurrentTimeSeconds(firstEvent.audioClickUs / 1_000_000);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(firstEvent.visualFlashUs / 1_000_000);
@@ -441,11 +441,11 @@ describe("useNativePreviewTransport", () => {
 		expect(video.currentTime).toBe(firstEvent.visualFlashUs / 1_000_000);
 		expect(readState()).toContain(`playhead:${firstEvent.audioClickUs}`);
 
-		multitrack.setTime.mockClear();
+		previewAudioEngine.setTime.mockClear();
 		fireEvent.click(screen.getByRole("button", { name: "Seek to sync event" }));
 
 		expect(video.currentTime).toBe(secondEvent.visualFlashUs / 1_000_000);
-		expect(multitrack.setTime).toHaveBeenCalledWith(
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(
 			secondEvent.audioClickUs / 1_000_000,
 		);
 		expect(readState()).toContain(`playhead:${secondEvent.audioClickUs}`);
@@ -456,7 +456,7 @@ describe("useNativePreviewTransport", () => {
 			(secondEvent.visualFlashUs + 33_333) / 1_000_000,
 			5,
 		);
-		expect(multitrack.setTime).toHaveBeenLastCalledWith(
+		expect(previewAudioEngine.setTime).toHaveBeenLastCalledWith(
 			(secondEvent.audioClickUs + 33_333) / 1_000_000,
 		);
 		expect(readState()).toContain(
@@ -501,13 +501,13 @@ describe("useNativePreviewTransport", () => {
 	it("loops audio-master playback from the selection end using the audio clock", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 2,
 		});
 
 		render(
 			<NativePreviewTransportProbe
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				selection={{ endUs: 8_000_000, startUs: 4_000_000 }}
 			/>,
 		);
@@ -521,21 +521,21 @@ describe("useNativePreviewTransport", () => {
 		await waitFor(() => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		});
-		multitrack.setTime.mockClear();
+		previewAudioEngine.setTime.mockClear();
 
 		runNextPreviewFrame(frameCallbacks);
 		expect(video.currentTime).toBe(2);
 		expect(readState()).toContain("playhead:2000000");
 
-		multitrack.setCurrentTimeSeconds(4.5);
+		previewAudioEngine.setCurrentTimeSeconds(4.5);
 		runNextPreviewFrame(frameCallbacks);
 		expect(video.currentTime).toBe(4.5);
 		expect(readState()).toContain("playhead:4500000");
 
-		multitrack.setCurrentTimeSeconds(8.2);
+		previewAudioEngine.setCurrentTimeSeconds(8.2);
 		runNextPreviewFrame(frameCallbacks);
 
-		expect(multitrack.setTime).toHaveBeenCalledWith(4);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(4);
 		expect(video.currentTime).toBe(4);
 		expect(readState()).toContain("playhead:4000000");
 		expect(readState()).toContain("playing:true");
@@ -545,7 +545,7 @@ describe("useNativePreviewTransport", () => {
 		const syncFixture = syncFlashClickFixture();
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds:
 				syncFixture.selections.selectedRange.startUs / 1_000_000,
 		});
@@ -553,7 +553,7 @@ describe("useNativePreviewTransport", () => {
 		render(
 			<NativePreviewTransportProbe
 				durationUs={syncFixture.expected.durationUs}
-				multitrack={multitrack}
+				previewAudioEngine={previewAudioEngine}
 				selection={syncFixture.selections.selectedRange}
 			/>,
 		);
@@ -566,19 +566,19 @@ describe("useNativePreviewTransport", () => {
 		await waitFor(() => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		});
-		multitrack.setTime.mockClear();
+		previewAudioEngine.setTime.mockClear();
 
 		video.currentTime = 0;
-		multitrack.setCurrentTimeSeconds(7);
+		previewAudioEngine.setCurrentTimeSeconds(7);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(7);
 		expect(readState()).toContain("playhead:7000000");
 
-		multitrack.setCurrentTimeSeconds(8.2);
+		previewAudioEngine.setCurrentTimeSeconds(8.2);
 		runNextPreviewFrame(frameCallbacks);
 
-		expect(multitrack.setTime).toHaveBeenCalledWith(
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(
 			syncFixture.selections.selectedRange.startUs / 1_000_000,
 		);
 		expect(video.currentTime).toBe(
@@ -592,11 +592,11 @@ describe("useNativePreviewTransport", () => {
 	it("stops audio-master playback when the audio clock reaches media end", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
-		const multitrack = createMultitrackSpy({
+		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 3,
 		});
 
-		render(<NativePreviewTransportProbe multitrack={multitrack} />);
+		render(<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />);
 
 		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
 
@@ -605,13 +605,13 @@ describe("useNativePreviewTransport", () => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		});
 		pause.mockClear();
-		multitrack.pause.mockClear();
+		previewAudioEngine.pause.mockClear();
 
 		video.currentTime = 10;
-		multitrack.setCurrentTimeSeconds(12.4);
+		previewAudioEngine.setCurrentTimeSeconds(12.4);
 		runNextPreviewFrame(frameCallbacks);
 
-		expect(multitrack.pause).toHaveBeenCalledTimes(1);
+		expect(previewAudioEngine.pause).toHaveBeenCalledTimes(1);
 		expect(pause).toHaveBeenCalledTimes(1);
 		expect(video.currentTime).toBe(12);
 		expect(readState()).toContain("playhead:12000000");
@@ -639,7 +639,7 @@ describe("useNativePreviewTransport", () => {
 function NativePreviewTransportProbe({
 	durationUs = 12_000_000,
 	frameDurationUs = 33_333,
-	multitrack = createMultitrackSpy(),
+	previewAudioEngine = createPreviewAudioEngineSpy(),
 	onTransport,
 	previewClockMode = "audio-master",
 	seekTargetUs = 2_000_000,
@@ -648,7 +648,7 @@ function NativePreviewTransportProbe({
 }: {
 	durationUs?: number;
 	frameDurationUs?: number;
-	multitrack?: ReturnType<typeof createMultitrackSpy>;
+	previewAudioEngine?: ReturnType<typeof createPreviewAudioEngineSpy>;
 	onTransport?: (
 		transport: ReturnType<typeof useNativePreviewTransport>,
 	) => void;
@@ -658,13 +658,13 @@ function NativePreviewTransportProbe({
 	source?: Blob;
 }) {
 	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const multitrackRef = useRef<MultiTrack | null>(
-		multitrack as unknown as MultiTrack,
+	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(
+		previewAudioEngine as unknown as PreviewAudioEngine,
 	);
 	const transport = useNativePreviewTransport({
 		durationUs,
 		frameDurationUs,
-		multitrackRef,
+		previewAudioEngineRef,
 		previewClockMode,
 		selection,
 		source,
@@ -727,7 +727,7 @@ function NativePreviewTransportProbe({
 	);
 }
 
-function createMultitrackSpy({
+function createPreviewAudioEngineSpy({
 	currentTimeSeconds = 0,
 	setTimeUpdatesCurrentTime = false,
 }: {
@@ -740,7 +740,7 @@ function createMultitrackSpy({
 		getCurrentTime: vi.fn(() => currentTime),
 		pause: vi.fn(),
 		play: vi.fn(),
-		setAudioRate: vi.fn(),
+		setPlaybackRate: vi.fn(),
 		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 			currentTime = nextCurrentTimeSeconds;
 		},

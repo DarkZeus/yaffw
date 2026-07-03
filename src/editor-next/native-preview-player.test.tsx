@@ -29,18 +29,16 @@ type MockMediaPlayerProps = Record<string, unknown> & {
 
 const adapterMockState = vi.hoisted(() => ({
 	mediaPlayerRenderCount: 0,
-	multitrackCreate: vi.fn(),
-	multitracks: [] as Array<{
+	previewAudioEngineCreate: vi.fn(),
+	previewAudioEngines: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
-		emitCanPlay: () => void;
 		getCurrentTime: ReturnType<typeof vi.fn>;
-		on: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
-		setAudioRate: ReturnType<typeof vi.fn>;
+		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
 		setTime: ReturnType<typeof vi.fn>;
-		setTrackVolume: ReturnType<typeof vi.fn>;
+		setTrackGain: ReturnType<typeof vi.fn>;
 	}>,
 }));
 
@@ -174,11 +172,15 @@ vi.mock("@vidstack/react/player/layouts/default", async () => {
 	};
 });
 
-vi.mock("wavesurfer-multitrack", () => ({
-	default: {
-		create: adapterMockState.multitrackCreate,
-	},
-}));
+vi.mock("./preview-audio-engine", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./preview-audio-engine")>();
+
+	return {
+		...actual,
+		canUsePreviewAudioEngine: () => true,
+		createPreviewAudioEngine: adapterMockState.previewAudioEngineCreate,
+	};
+});
 
 vi.mock("./browser-audio-preview-sources", async (importOriginal) => {
 	const actual =
@@ -233,37 +235,26 @@ beforeEach(() => {
 		createObjectURL,
 		revokeObjectURL,
 	});
-	adapterMockState.multitracks.length = 0;
+	adapterMockState.previewAudioEngines.length = 0;
 	adapterMockState.mediaPlayerRenderCount = 0;
-	adapterMockState.multitrackCreate.mockReset();
-	adapterMockState.multitrackCreate.mockImplementation(() => {
-		let canPlayHandler: (() => void) | undefined;
+	adapterMockState.previewAudioEngineCreate.mockReset();
+	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
 		let currentTimeSeconds = 0;
-		const multitrack = {
+		const previewAudioEngine = {
 			destroy: vi.fn(),
-			emitCanPlay: () => {
-				canPlayHandler?.();
-			},
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
-			on: vi.fn((eventName: string, handler: () => void) => {
-				if (eventName === "canplay") {
-					canPlayHandler = handler;
-				}
-
-				return vi.fn();
-			}),
 			pause: vi.fn(),
 			play: vi.fn(),
-			setAudioRate: vi.fn(),
+			setPlaybackRate: vi.fn(),
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
 			},
 			setTime: vi.fn(),
-			setTrackVolume: vi.fn(),
+			setTrackGain: vi.fn(),
 		};
-		adapterMockState.multitracks.push(multitrack);
+		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 
-		return multitrack;
+		return previewAudioEngine;
 	});
 	Object.defineProperty(HTMLMediaElement.prototype, "play", {
 		configurable: true,
@@ -562,7 +553,7 @@ describe("NativePreviewPlayer", () => {
 		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
 	});
 
-	it("applies preview and audio mix controls through the monitored multitrack adapter", async () => {
+	it("applies preview and audio mix controls through the Preview audio engine", async () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
 		prepareBrowserAudioPreviewSourcesMock.mockImplementation(async (request) =>
 			createPreparedAudioPreviewSourcesForRequest(request),
@@ -575,14 +566,13 @@ describe("NativePreviewPlayer", () => {
 		) as HTMLVideoElement;
 
 		await waitFor(() => {
-			expect(adapterMockState.multitracks).toHaveLength(1);
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 		});
-		const multitrack = adapterMockState.multitracks[0];
-		multitrack.emitCanPlay();
+		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBe(1);
-			expect(lastTrackVolume(multitrack, 1)).toBe(1);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
 		});
 		expect(video.muted).toBe(true);
 		expect(readAudioMixSnapshot()).toBe(
@@ -594,8 +584,8 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.5);
-			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
 		});
 
 		fireEvent.change(screen.getByLabelText("Playback speed"), {
@@ -603,13 +593,13 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		expect(video.playbackRate).toBe(1.5);
-		expect(multitrack.setAudioRate).toHaveBeenCalledWith(1.5);
+		expect(previewAudioEngine.setPlaybackRate).toHaveBeenCalledWith(1.5);
 
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBe(0);
-			expect(lastTrackVolume(multitrack, 1)).toBe(0);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(0);
 		});
 		expect(video.muted).toBe(true);
 		expect(readAudioMixSnapshot()).toBe(
@@ -626,8 +616,8 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
-			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.125);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
 		});
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:true:preserve:50|audio-2:true:preserve:100",
@@ -639,8 +629,8 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBe(0);
-			expect(lastTrackVolume(multitrack, 1)).toBeCloseTo(0.5);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBeCloseTo(0.5);
 		});
 
 		fireEvent.click(
@@ -648,8 +638,8 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(lastTrackVolume(multitrack, 0)).toBeCloseTo(0.125);
-			expect(lastTrackVolume(multitrack, 1)).toBe(0);
+			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.125);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(0);
 		});
 		expect(readAudioMixSnapshot()).toBe(
 			"audio-1:false:preserve:50|audio-2:true:preserve:100",
@@ -699,10 +689,7 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(adapterMockState.multitracks).toHaveLength(1);
-		});
-		await act(async () => {
-			adapterMockState.multitracks[0].emitCanPlay();
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 		});
 
 		fireEvent.click(
@@ -726,13 +713,10 @@ describe("NativePreviewPlayer", () => {
 			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(2);
 		});
 		await waitFor(() => {
-			expect(adapterMockState.multitracks).toHaveLength(2);
+			expect(adapterMockState.previewAudioEngines).toHaveLength(2);
 		});
 
-		const remadeMultitrack = adapterMockState.multitracks[1];
-		await act(async () => {
-			remadeMultitrack.emitCanPlay();
-		});
+		const remadePreviewAudioEngine = adapterMockState.previewAudioEngines[1];
 
 		const video = screen.getByLabelText(
 			"Preview for sync-flash-click.mp4",
@@ -744,7 +728,9 @@ describe("NativePreviewPlayer", () => {
 		});
 
 		video.currentTime = 0;
-		remadeMultitrack.setCurrentTimeSeconds(syncEvent.audioClickUs / 1_000_000);
+		remadePreviewAudioEngine.setCurrentTimeSeconds(
+			syncEvent.audioClickUs / 1_000_000,
+		);
 		runNextPreviewFrame(frameCallbacks);
 
 		expect(video.currentTime).toBe(syncEvent.visualFlashUs / 1_000_000);
@@ -1222,17 +1208,17 @@ function readAudioMixSnapshot() {
 	return screen.getByLabelText("audio mix snapshot").textContent ?? "";
 }
 
-function lastTrackVolume(
-	multitrack: (typeof adapterMockState.multitracks)[number],
+function lastTrackGain(
+	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
 	trackIndex: number,
 ) {
-	const calls = multitrack.setTrackVolume.mock.calls.filter(
+	const calls = previewAudioEngine.setTrackGain.mock.calls.filter(
 		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
 	);
 	const lastCall = calls.at(-1);
 
 	if (!lastCall) {
-		throw new Error(`No volume call found for track ${trackIndex}.`);
+		throw new Error(`No gain call found for track ${trackIndex}.`);
 	}
 
 	return lastCall[1];

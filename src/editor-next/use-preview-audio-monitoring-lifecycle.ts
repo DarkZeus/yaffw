@@ -1,47 +1,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type MultiTrack from "wavesurfer-multitrack";
 
 import {
-	applyMultitrackPreviewVolumes,
-	createMultitrackPreviewTracks,
-	setMultitrackPreviewPlaybackRate,
-} from "./native-preview-audio-transport";
+	applyPreviewAudioEngineGains,
+	createPreviewAudioEngine as createDefaultPreviewAudioEngine,
+	setPreviewAudioEnginePlaybackRate,
+	type PreviewAudioEngine,
+} from "./preview-audio-engine";
 import { createPreviewAdapterLifecycle } from "./preview-adapter-lifecycle";
 import type {
 	PreviewAudioMonitoringLifecycle,
+	PreviewAudioMonitoringStatus,
 	UsePreviewAudioMonitoringLifecycleOptions,
 } from "./use-preview-audio-monitoring-lifecycle.types";
 
 export function usePreviewAudioMonitoringLifecycle({
 	audioMix,
 	audioPreviewSources,
+	createPreviewAudioEngine = createDefaultPreviewAudioEngine,
 	getPlaybackRate,
 	getPlayheadUs,
-	multitrackContainerRef: providedMultitrackContainerRef,
-	multitrackRef: providedMultitrackRef,
 	muted,
 	onReadyChange,
+	onStatusChange,
+	previewAudioEngineRef: providedPreviewAudioEngineRef,
 	soloedAudioTrackId = null,
 	volume,
 }: UsePreviewAudioMonitoringLifecycleOptions): PreviewAudioMonitoringLifecycle {
-	const ownedMultitrackContainerRef = useRef<HTMLDivElement | null>(null);
-	const ownedMultitrackRef = useRef<MultiTrack | null>(null);
-	const multitrackContainerRef =
-		providedMultitrackContainerRef ?? ownedMultitrackContainerRef;
-	const multitrackRef = providedMultitrackRef ?? ownedMultitrackRef;
-	const [ready, setReady] = useState(false);
+	const ownedPreviewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
+	const previewAudioEngineRef =
+		providedPreviewAudioEngineRef ?? ownedPreviewAudioEngineRef;
+	const [status, setStatus] =
+		useState<PreviewAudioMonitoringStatus>("idle");
 	const audioControlsRef = useRef({
 		audioMix,
 		muted,
 		soloedAudioTrackId,
 		volume,
 	});
-	const setMonitoringReady = useCallback(
-		(nextReady: boolean) => {
-			setReady(nextReady);
-			onReadyChange?.(nextReady);
+	const setMonitoringStatus = useCallback(
+		(nextStatus: PreviewAudioMonitoringStatus) => {
+			setStatus(nextStatus);
+			onReadyChange?.(nextStatus === "ready");
+			onStatusChange?.(nextStatus);
 		},
-		[onReadyChange],
+		[onReadyChange, onStatusChange],
 	);
 	audioControlsRef.current = {
 		audioMix,
@@ -51,71 +53,53 @@ export function usePreviewAudioMonitoringLifecycle({
 	};
 
 	useEffect(() => {
-		const container = multitrackContainerRef.current;
 		const lifecycle = createPreviewAdapterLifecycle();
 
 		if (
 			audioPreviewSources.status !== "ready" ||
-			audioPreviewSources.sources.length === 0 ||
-			!container
+			audioPreviewSources.sources.length === 0
 		) {
-			multitrackRef.current?.destroy();
-			multitrackRef.current = null;
-			setMonitoringReady(false);
-			container?.replaceChildren();
+			previewAudioEngineRef.current?.destroy();
+			previewAudioEngineRef.current = null;
+			setMonitoringStatus("idle");
 			return;
 		}
 
-		setMonitoringReady(false);
-		lifecycle.registerContainerClear(container);
-		lifecycle.registerCleanup(() => setMonitoringReady(false));
+		setMonitoringStatus("preparing");
+		lifecycle.registerCleanup(() => setMonitoringStatus("idle"));
 
-		void import("wavesurfer-multitrack")
-			.then(({ default: Multitrack }) => {
+		void createPreviewAudioEngine({
+			sources: audioPreviewSources.sources,
+		})
+			.then((previewAudioEngine) => {
 				if (lifecycle.isDisposed()) {
+					previewAudioEngine.destroy();
 					return;
 				}
 
-				const multitrack = lifecycle.registerDestroyable(
-					Multitrack.create(
-						createMultitrackPreviewTracks(audioPreviewSources.sources),
-						{
-							container,
-							cursorColor: "transparent",
-							cursorWidth: 0,
-							minPxPerSec: 1,
-							trackBackground: "transparent",
-							trackBorderColor: "transparent",
-						},
-					),
-				);
-				multitrackRef.current = multitrack;
+				lifecycle.registerDestroyable(previewAudioEngine);
+				previewAudioEngineRef.current = previewAudioEngine;
 				lifecycle.registerCleanup(() => {
-					if (multitrackRef.current === multitrack) {
-						multitrackRef.current = null;
+					if (previewAudioEngineRef.current === previewAudioEngine) {
+						previewAudioEngineRef.current = null;
 					}
 				});
-				lifecycle.registerUnsubscribe(
-					multitrack.on("canplay", () => {
-						if (lifecycle.isDisposed()) {
-							return;
-						}
-
-						multitrack.setTime(getPlayheadUs() / 1_000_000);
-						setMultitrackPreviewPlaybackRate(multitrack, getPlaybackRate());
-						applyMultitrackPreviewVolumes({
-							...audioControlsRef.current,
-							multitrack,
-							sources: audioPreviewSources.sources,
-						});
-						setMonitoringReady(true);
-					}),
+				previewAudioEngine.setTime(getPlayheadUs() / 1_000_000);
+				setPreviewAudioEnginePlaybackRate(
+					previewAudioEngine,
+					getPlaybackRate(),
 				);
+				applyPreviewAudioEngineGains({
+					...audioControlsRef.current,
+					previewAudioEngine,
+					sources: audioPreviewSources.sources,
+				});
+				setMonitoringStatus("ready");
 			})
 			.catch(() => {
 				if (!lifecycle.isDisposed()) {
-					multitrackRef.current = null;
-					setMonitoringReady(false);
+					previewAudioEngineRef.current = null;
+					setMonitoringStatus("failed");
 				}
 			});
 
@@ -124,24 +108,28 @@ export function usePreviewAudioMonitoringLifecycle({
 		};
 	}, [
 		audioPreviewSources,
+		createPreviewAudioEngine,
 		getPlaybackRate,
 		getPlayheadUs,
-		multitrackContainerRef,
-		multitrackRef,
-		setMonitoringReady,
+		previewAudioEngineRef,
+		setMonitoringStatus,
 	]);
 
 	useEffect(() => {
-		const multitrack = multitrackRef.current;
+		const previewAudioEngine = previewAudioEngineRef.current;
 
-		if (audioPreviewSources.status !== "ready" || !ready || !multitrack) {
+		if (
+			audioPreviewSources.status !== "ready" ||
+			status !== "ready" ||
+			!previewAudioEngine
+		) {
 			return;
 		}
 
-		applyMultitrackPreviewVolumes({
+		applyPreviewAudioEngineGains({
 			audioMix,
-			multitrack,
 			muted,
+			previewAudioEngine,
 			soloedAudioTrackId,
 			sources: audioPreviewSources.sources,
 			volume,
@@ -149,16 +137,16 @@ export function usePreviewAudioMonitoringLifecycle({
 	}, [
 		audioMix,
 		audioPreviewSources,
-		multitrackRef,
 		muted,
-		ready,
+		previewAudioEngineRef,
 		soloedAudioTrackId,
+		status,
 		volume,
 	]);
 
 	return {
-		multitrackContainerRef,
-		multitrackRef,
-		ready,
+		previewAudioEngineRef,
+		ready: status === "ready",
+		status,
 	};
 }

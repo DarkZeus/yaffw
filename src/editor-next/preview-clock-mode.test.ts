@@ -69,6 +69,18 @@ describe("resolvePreviewClockMode", () => {
 		).toBe("native-video");
 	});
 
+	it("uses explicit native-video fallback when the Preview audio engine fails", () => {
+		expect(
+			resolvePreviewClockMode({
+				asset: readyAssetWithAudio,
+				audioMonitoringFailed: true,
+				audioMonitoringReady: false,
+				audioPreviewSources: readyAudioSourcesState(),
+				audioPreviewTransportSupported: true,
+			}),
+		).toBe("native-video");
+	});
+
 	it("uses explicit native-video fallback for unsupported audio preview transport", () => {
 		expect(
 			resolvePreviewClockMode({

@@ -22,13 +22,15 @@ import type {
 import { loadBrowserWaveformLane } from "./selection-waveform-lanes";
 
 const adapterMockState = vi.hoisted(() => ({
-	multitrackCreate: vi.fn(),
-	multitracks: [] as Array<{
+	previewAudioEngineCreate: vi.fn(),
+	previewAudioEngines: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
-		on: ReturnType<typeof vi.fn>;
-		setAudioRate: ReturnType<typeof vi.fn>;
+		getCurrentTime: ReturnType<typeof vi.fn>;
+		pause: ReturnType<typeof vi.fn>;
+		play: ReturnType<typeof vi.fn>;
+		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setTime: ReturnType<typeof vi.fn>;
-		setTrackVolume: ReturnType<typeof vi.fn>;
+		setTrackGain: ReturnType<typeof vi.fn>;
 	}>,
 	wavesurferCreate: vi.fn(),
 	wavesurfers: [] as Array<{
@@ -57,11 +59,15 @@ vi.mock("./selection-waveform-lanes", async (importOriginal) => {
 	};
 });
 
-vi.mock("wavesurfer-multitrack", () => ({
-	default: {
-		create: adapterMockState.multitrackCreate,
-	},
-}));
+vi.mock("./preview-audio-engine", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("./preview-audio-engine")>();
+
+	return {
+		...actual,
+		canUsePreviewAudioEngine: () => true,
+		createPreviewAudioEngine: adapterMockState.previewAudioEngineCreate,
+	};
+});
 
 vi.mock("wavesurfer.js", () => ({
 	default: {
@@ -106,19 +112,21 @@ beforeEach(() => {
 		value: vi.fn(),
 	});
 	vi.stubGlobal("AudioContext", vi.fn());
-	adapterMockState.multitracks.length = 0;
+	adapterMockState.previewAudioEngines.length = 0;
 	adapterMockState.wavesurfers.length = 0;
-	adapterMockState.multitrackCreate.mockImplementation(() => {
-		const multitrack = {
+	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
+		const previewAudioEngine = {
 			destroy: vi.fn(),
-			on: vi.fn(() => vi.fn()),
-			setAudioRate: vi.fn(),
+			getCurrentTime: vi.fn(() => 0),
+			pause: vi.fn(),
+			play: vi.fn(),
+			setPlaybackRate: vi.fn(),
 			setTime: vi.fn(),
-			setTrackVolume: vi.fn(),
+			setTrackGain: vi.fn(),
 		};
-		adapterMockState.multitracks.push(multitrack);
+		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 
-		return multitrack;
+		return previewAudioEngine;
 	});
 	adapterMockState.wavesurferCreate.mockImplementation(() => {
 		const wavesurfer = {
@@ -188,7 +196,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		await waitFor(() => {
 			expect(prepareBrowserAudioPreviewSourcesMock).toHaveBeenCalledTimes(1);
 			expect(loadBrowserWaveformLaneMock).toHaveBeenCalledTimes(1);
-			expect(adapterMockState.multitracks).toHaveLength(1);
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 			expect(adapterMockState.wavesurfers).toHaveLength(1);
 		});
 
@@ -228,7 +236,9 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
 			"blob:audio:asset-close-contract:audio-1",
 		);
-		expect(adapterMockState.multitracks[0]?.destroy).toHaveBeenCalledTimes(1);
+		expect(
+			adapterMockState.previewAudioEngines[0]?.destroy,
+		).toHaveBeenCalledTimes(1);
 		expect(adapterMockState.wavesurfers[0]?.destroy).toHaveBeenCalledTimes(1);
 		expect(
 			screen.queryByLabelText("Preview for close-contract.mp4"),
@@ -338,7 +348,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		await waitFor(() => {
-			expect(adapterMockState.multitracks).toHaveLength(1);
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 			expect(adapterMockState.wavesurfers).toHaveLength(1);
 		});
 
@@ -369,7 +379,9 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(
 			"blob:audio:asset-replace-second:audio-1",
 		);
-		expect(adapterMockState.multitracks[0]?.destroy).not.toHaveBeenCalled();
+		expect(
+			adapterMockState.previewAudioEngines[0]?.destroy,
+		).not.toHaveBeenCalled();
 		expect(adapterMockState.wavesurfers[0]?.destroy).not.toHaveBeenCalled();
 		expect(adapterMockState.wavesurfers).toHaveLength(1);
 
@@ -381,7 +393,9 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
 			"blob:audio:asset-replace-second:audio-1",
 		);
-		expect(adapterMockState.multitracks[0]?.destroy).toHaveBeenCalledTimes(1);
+		expect(
+			adapterMockState.previewAudioEngines[0]?.destroy,
+		).toHaveBeenCalledTimes(1);
 		expect(adapterMockState.wavesurfers[0]?.destroy).toHaveBeenCalledTimes(1);
 	});
 
