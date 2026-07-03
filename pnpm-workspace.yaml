@@ -6,4 +6,3 @@ onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - canvas
   - esbuild
-  - node-ffmpeg

@@ -57,16 +57,16 @@ Install dependencies:
 pnpm install
 ```
 
-Run the full legacy-plus-frontend development stack:
+Run the Vite frontend on port 3000:
 
 ```bash
 pnpm dev
 ```
 
-Run only the Vite frontend on port 3000:
+Run the legacy Hono server explicitly when working on legacy upload, URL acquisition, or bulk-download routes:
 
 ```bash
-pnpm frontend
+pnpm server:watch
 ```
 
 Verify the editor-next TypeScript boundary:
