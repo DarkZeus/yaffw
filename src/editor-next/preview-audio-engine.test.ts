@@ -251,6 +251,45 @@ describe("createPreviewAudioEngine", () => {
 		expect(snapshot.combinedState.partial).toBe(false);
 	});
 
+	it("ignores a retried Preview audio resource that resolves after engine cleanup", async () => {
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createAudioBufferStub({
+					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
+				}),
+				createAudioBufferStub({
+					channels: [[[4_800, 0.75]], [[4_800, 0.5]]],
+				}),
+			],
+			decodeFailures: [null, new Error("Desktop decode failed")],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			sources: [
+				createAudioPreviewSource("audio-1", 0),
+				createAudioPreviewSource("audio-2", 0),
+			],
+		});
+		const retryDecode = createDeferred<AudioBuffer>();
+
+		context.decodeAudioData.mockImplementationOnce(() => retryDecode.promise);
+
+		const retry = engine.retryTrackResource("audio-2");
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(context.decodeAudioData).toHaveBeenCalledTimes(3);
+
+		const gainCountBeforeCleanup = context.createdGains.length;
+		engine.destroy();
+		retryDecode.resolve(createAudioBufferStub());
+		await retry;
+
+		expect(context.createdGains).toHaveLength(gainCountBeforeCleanup);
+		expect(context.createdSources).toHaveLength(0);
+		expect(context.close).toHaveBeenCalledTimes(1);
+	});
+
 	it("rejects total Preview audio engine resource failure so native video can own preview", async () => {
 		const context = createAudioContextSpy({
 			decodeFailures: [
@@ -485,6 +524,21 @@ function createAudioBufferStub({
 		numberOfChannels: channelData.length,
 		sampleRate: 48_000,
 	} as AudioBuffer;
+}
+
+function createDeferred<T>() {
+	let resolve!: (value: T | PromiseLike<T>) => void;
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+		resolve = resolvePromise;
+		reject = rejectPromise;
+	});
+
+	return {
+		promise,
+		reject,
+		resolve,
+	};
 }
 
 const readyAsset = {

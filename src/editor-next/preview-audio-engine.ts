@@ -565,6 +565,10 @@ function createPreparedPreviewAudioEngine({
 		},
 		readMeterSnapshot,
 		async retryTrackResource(trackId: string) {
+			if (destroyed) {
+				return getPreviewAudioEngineStatus(tracks);
+			}
+
 			const trackIndex = tracks.findIndex(
 				(track) => track.status === "unavailable" && track.trackId === trackId,
 			);
@@ -584,6 +588,11 @@ function createPreparedPreviewAudioEngine({
 
 			try {
 				const buffer = await decodePreviewAudioResource(audioContext, track.source);
+
+				if (destroyed) {
+					return getPreviewAudioEngineStatus(tracks);
+				}
+
 				const resource = {
 					buffer,
 					source: track.source,
@@ -612,6 +621,10 @@ function createPreparedPreviewAudioEngine({
 				updatePreviewAudioTrackGainNode(readyTrack);
 				tracks[trackIndex] = readyTrack;
 			} catch (error) {
+				if (destroyed) {
+					return getPreviewAudioEngineStatus(tracks);
+				}
+
 				tracks[trackIndex] = {
 					...track,
 					reason: errorToMessage(error),
