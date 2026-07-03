@@ -180,6 +180,109 @@ describe("useNativePreviewTransport", () => {
 		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 	});
 
+	it("resumes audio-master playback from the visible video frame without a follower seek when no explicit seek is pending", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		previewAudioEngine.setCurrentTimeSeconds(5);
+		currentTimeWrites.setNativeCurrentTime(5);
+		runNextPreviewFrame(frameCallbacks, 250);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		expect(readState()).toContain("playing:false");
+		previewAudioEngine.setTime.mockClear();
+		currentTimeWrites.clear();
+
+		currentTimeWrites.setNativeCurrentTime(5.08);
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(readState()).toContain("playing:true");
+		});
+		expect(currentTimeWrites.values()).toEqual([]);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(5.08);
+	});
+
+	it("keeps paused audio-master state tied to the visible video frame when no explicit seek is pending", async () => {
+		const { frameCallbacks, requestAnimationFrame } =
+			stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+
+		previewAudioEngine.setCurrentTimeSeconds(5);
+		currentTimeWrites.setNativeCurrentTime(5);
+		runNextPreviewFrame(frameCallbacks, 250);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		currentTimeWrites.clear();
+		currentTimeWrites.setNativeCurrentTime(5.08);
+		fireEvent.timeUpdate(video);
+
+		expect(currentTimeWrites.values()).toEqual([]);
+		expect(readState()).toContain("playhead:5080000");
+	});
+
+	it("does not let a stale visible frame override an explicit paused timeline seek", async () => {
+		const { requestAnimationFrame } = stubPreviewAnimationFrames();
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		const currentTimeWrites = trackVideoCurrentTimeWrites(video, {
+			applyWrites: false,
+		});
+
+		currentTimeWrites.setNativeCurrentTime(2);
+		fireEvent.click(screen.getByRole("button", { name: "Seek forward" }));
+		expect(currentTimeWrites.values()).toEqual([10]);
+		expect(readState()).toContain("playhead:10000000");
+		previewAudioEngine.setTime.mockClear();
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+
+		await waitFor(() => {
+			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+		});
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(10);
+		expect(previewAudioEngine.getCurrentTime()).toBe(10);
+	});
+
 	it("does not chase small custom-audio clock drift with native video seeks during playback", async () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 2.06,

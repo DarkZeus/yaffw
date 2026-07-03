@@ -222,22 +222,31 @@ export function useNativePreviewTransport({
 
 		try {
 			if (audioMasterClockActive) {
-				const playheadSeconds = playheadRef.current / 1_000_000;
+				const playbackStartSeconds = resolveAudioMasterPlaybackStartSeconds({
+					durationUs,
+					pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
+					playheadUs: playheadRef.current,
+					video,
+				});
+				const pendingSeekSeconds = pendingVideoFollowerSeekSecondsRef.current;
 
 				video.muted = true;
-				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
-					video,
-					playheadRef.current,
-				)
-					? playheadSeconds
-					: null;
+				if (pendingSeekSeconds !== null) {
+					const playbackStartUs = secondsToMicroseconds(playbackStartSeconds);
+					pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
+						video,
+						playbackStartUs,
+					)
+						? playbackStartSeconds
+						: pendingSeekSeconds;
+				}
 				await video.play();
 
 				if (!playbackStartIsCurrent()) {
 					return;
 				}
 
-				previewAudioEngineRef.current?.setTime(playheadSeconds);
+				previewAudioEngineRef.current?.setTime(playbackStartSeconds);
 				await previewAudioEngineRef.current?.play();
 
 				if (!playbackStartIsCurrent()) {
@@ -380,14 +389,28 @@ export function useNativePreviewTransport({
 			const previousPlayheadUs = playheadRef.current;
 
 			if (audioMasterClockActive && !isPlaying) {
-				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
-					video,
-					previousPlayheadUs,
-				)
-					? previousPlayheadUs / 1_000_000
-					: null;
-				updateSelectionLoopEntryFromPlayhead(previousPlayheadUs);
-				setPlayheadUs(previousPlayheadUs);
+				const pendingVideoFollowerSeekSeconds =
+					pendingVideoFollowerSeekSecondsRef.current;
+				const nextPlayheadUs =
+					pendingVideoFollowerSeekSeconds === null
+						? finiteVideoPlayheadUs(video, previousPlayheadUs)
+						: secondsToMicroseconds(pendingVideoFollowerSeekSeconds);
+
+				if (
+					pendingVideoFollowerSeekSeconds !== null &&
+					videoFollowerSeekHasSettled({
+						frameDurationUs,
+						pendingSeekSeconds: pendingVideoFollowerSeekSeconds,
+						videoTimeSeconds: video.currentTime,
+					})
+				) {
+					pendingVideoFollowerSeekSecondsRef.current = null;
+				} else if (pendingVideoFollowerSeekSeconds !== null) {
+					setVideoFollowerTime(video, nextPlayheadUs);
+				}
+
+				updateSelectionLoopEntryFromPlayhead(nextPlayheadUs);
+				setPlayheadUs(nextPlayheadUs);
 				return;
 			}
 
@@ -720,6 +743,42 @@ function videoFollowerIsSeeking(video: unknown) {
 		"seeking" in video &&
 		(video as { seeking?: unknown }).seeking === true
 	);
+}
+
+function resolveAudioMasterPlaybackStartSeconds({
+	durationUs,
+	pendingSeekSeconds,
+	playheadUs,
+	video,
+}: {
+	durationUs: MediaTimeUs;
+	pendingSeekSeconds: number | null;
+	playheadUs: MediaTimeUs;
+	video: { currentTime: number };
+}) {
+	if (pendingSeekSeconds !== null && Number.isFinite(pendingSeekSeconds)) {
+		return clampMediaTime(
+			secondsToMicroseconds(pendingSeekSeconds),
+			0,
+			durationUs,
+		) / 1_000_000;
+	}
+
+	if (Number.isFinite(video.currentTime)) {
+		return clampMediaTime(secondsToMicroseconds(video.currentTime), 0, durationUs) /
+			1_000_000;
+	}
+
+	return clampMediaTime(playheadUs, 0, durationUs) / 1_000_000;
+}
+
+function finiteVideoPlayheadUs(
+	video: { currentTime: number },
+	fallbackPlayheadUs: MediaTimeUs,
+) {
+	return Number.isFinite(video.currentTime)
+		? secondsToMicroseconds(video.currentTime)
+		: fallbackPlayheadUs;
 }
 
 function setVideoFollowerTime(
