@@ -28,7 +28,7 @@ const prototypeRouteFile = join(
 );
 const prototypeComponentFile = join(
 	sourceDir,
-	"editor-next/editor-workbench-prototype.tsx",
+	"editor-next/prototypes/workbench/editor-workbench-prototype.tsx",
 );
 const routeTreeFile = join(sourceDir, "routeTree.gen.ts");
 const appSidebarFile = join(sourceDir, "components/app-sidebar.tsx");

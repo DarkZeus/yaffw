@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
 
-import { EditorNextRoute } from '@/editor-next/EditorNextRoute'
+import { EditorNextRoute } from "@/editor-next/route/entry/EditorNextRoute";
 
-export const Route = createFileRoute('/')({
-  component: EditorNextRoute,
-})
+export const Route = createFileRoute("/")({
+	component: EditorNextRoute,
+});
