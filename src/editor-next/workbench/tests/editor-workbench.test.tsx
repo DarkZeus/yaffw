@@ -13,6 +13,7 @@ import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import {
 	DEFAULT_OUTPUT_PROFILE,
 	type ReadyMediaAsset,
+	createDefaultOutputSettings,
 } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
@@ -318,6 +319,7 @@ const readySession = {
 		status: "reviewing",
 	},
 	importEnabled: false,
+	outputSettings: createDefaultOutputSettings(),
 	runtime: supportedRuntime,
 	selection: {
 		endUs: 12_000_000,

@@ -123,10 +123,13 @@ describe("editor-next final first-slice smoke coverage", () => {
 		).toBeTruthy();
 
 		openExportTab();
-		expect(screen.getByLabelText("Export review")).toBeTruthy();
+		const exportReview = screen.getByLabelText("Export review");
+		expect(exportReview).toBeTruthy();
 
-		expect(screen.getByText("Format")).toBeTruthy();
-		expect(screen.getByText("MP4 / H.264 video / AAC audio")).toBeTruthy();
+		expect(within(exportReview).getByText("Format")).toBeTruthy();
+		expect(
+			within(exportReview).getByText("MP4 / H.264 video / AAC audio"),
+		).toBeTruthy();
 		expect(screen.getAllByText("Export").length).toBeGreaterThan(0);
 		expect(screen.getByText("Whole file export")).toBeTruthy();
 		expect(screen.getByText("Range")).toBeTruthy();

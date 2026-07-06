@@ -230,9 +230,11 @@ export function EditorNextRoute({
 				exportState={displayedSession.export}
 				onCancelExport={stableCommands.cancelDefaultExport}
 				onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}
+				onApplyOutputSettings={stableCommands.applyOutputSettings}
 				onStartExport={() => {
 					void stableCommands.startDefaultExport();
 				}}
+				outputSettings={displayedSession.outputSettings}
 				runtime={displayedSession.runtime}
 				selection={displayedSession.selection}
 			/>
@@ -295,6 +297,8 @@ function useStableEditorCommands(
 
 	return useMemo(
 		() => ({
+			applyOutputSettings: (outputSettings) =>
+				commandsRef.current.applyOutputSettings(outputSettings),
 			cancelDefaultExport: () => commandsRef.current.cancelDefaultExport(),
 			downloadGeneratedMedia: (generatedMedia) =>
 				commandsRef.current.downloadGeneratedMedia(generatedMedia),

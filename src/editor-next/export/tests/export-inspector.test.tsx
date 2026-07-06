@@ -14,8 +14,10 @@ import {
 	DEFAULT_OUTPUT_PROFILE,
 	type ExportProgress,
 	type GeneratedMedia,
+	type OutputSettings,
 	type ReadyMediaAsset,
 	type Selection,
+	createDefaultOutputSettings,
 } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportSessionState } from "@/editor-core/session";
@@ -36,7 +38,9 @@ describe("ExportInspectorPanel", () => {
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={onStartExport}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -52,16 +56,18 @@ describe("ExportInspectorPanel", () => {
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
 		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
 		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();
-		expect(within(exportInspector).getByText("Quality settings")).toBeTruthy();
+		expect(screen.getByLabelText("Output settings panel")).toBeTruthy();
 		expect(
 			within(exportInspector).getByRole("button", {
-				name: "Quality choices",
+				name: "Output settings",
 			}),
 		).toBeTruthy();
+		expect(within(exportInspector).queryByText("GPU Acceleration")).toBeNull();
 		expect(within(exportInspector).queryByText("Selected range")).toBeNull();
-		expect(within(exportInspector).getByText("Format")).toBeTruthy();
+		const exportReview = screen.getByLabelText("Export review");
+		expect(within(exportReview).getByText("Format")).toBeTruthy();
 		expect(
-			within(exportInspector).getByText("MP4 / H.264 video / AAC audio"),
+			within(exportReview).getByText("MP4 / H.264 video / AAC audio"),
 		).toBeTruthy();
 		expect(
 			within(exportInspector).getAllByText("Export").length,
@@ -77,43 +83,118 @@ describe("ExportInspectorPanel", () => {
 		expect(onStartExport).toHaveBeenCalledTimes(1);
 	});
 
-	it("opens the restored quality choices mock from the export tab", () => {
+	it("opens the Output settings modal shell without applying cancelled draft state", () => {
+		const onApplyOutputSettings = vi.fn();
+		const onStartExport = vi.fn();
+
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
-				onStartExport={() => undefined}
+				onApplyOutputSettings={onApplyOutputSettings}
+				onStartExport={onStartExport}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: "Quality choices" }));
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
 
-		const qualityDialog = screen.getByRole("dialog", {
-			name: "Export Quality Settings",
+		const outputSettingsDialog = screen.getByRole("dialog", {
+			name: "Output settings",
 		});
-		expect(within(qualityDialog).getByText("Resolution")).toBeTruthy();
-		expect(within(qualityDialog).getByText("Bitrate")).toBeTruthy();
-		expect(within(qualityDialog).getByText("Codec & Container")).toBeTruthy();
-		expect(within(qualityDialog).getByText("GPU Acceleration")).toBeTruthy();
-		expect(within(qualityDialog).getByText("Frame Interpolation")).toBeTruthy();
+		expect(
+			within(outputSettingsDialog).getByRole("tab", { name: "General" }),
+		).toBeTruthy();
+		expect(
+			within(outputSettingsDialog).getByRole("tab", { name: "Video" }),
+		).toBeTruthy();
+		expect(
+			within(outputSettingsDialog).getByRole("tab", { name: "Audio" }),
+		).toBeTruthy();
+		expect(
+			(
+				within(outputSettingsDialog).getByRole("tab", {
+					name: "AI",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(
+			(
+				within(outputSettingsDialog).getByRole("tab", {
+					name: "Subtitles",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(
+			within(outputSettingsDialog).getByText(
+				"Changing output settings may re-encode video and can change output size, quality, and processing time.",
+			),
+		).toBeTruthy();
+		expect(
+			within(outputSettingsDialog).queryByText("GPU Acceleration"),
+		).toBeNull();
 
 		fireEvent.click(
-			within(qualityDialog).getByRole("button", {
-				name: /720p/,
+			within(outputSettingsDialog).getByRole("button", {
+				name: "Cancel",
+			}),
+		);
+		expect(onApplyOutputSettings).not.toHaveBeenCalled();
+		expect(
+			screen.queryByRole("dialog", { name: "Output settings" }),
+		).toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const reopenedDialog = screen.getByRole("dialog", {
+			name: "Output settings",
+		});
+		fireEvent.click(
+			within(reopenedDialog).getByRole("button", {
+				name: "Reset",
 			}),
 		);
 		fireEvent.click(
-			within(qualityDialog).getByRole("button", {
-				name: "Apply choices",
+			within(reopenedDialog).getByRole("button", {
+				name: "Apply",
 			}),
 		);
 
-		const qualityMock = screen.getByLabelText("Quality settings panel");
-		expect(within(qualityMock).getByText("720p")).toBeTruthy();
+		expect(onApplyOutputSettings).toHaveBeenCalledWith(defaultOutputSettings);
+		expect(onStartExport).not.toHaveBeenCalled();
+	});
+
+	it("blocks Output settings while an export job is running", () => {
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={runningExport({
+					cancelSupported: true,
+					progress: {
+						phase: "encoding",
+					},
+				})}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Output settings",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(screen.getByText("Locked")).toBeTruthy();
 	});
 
 	it("renders blocked export review with a disabled start action", () => {
@@ -123,7 +204,9 @@ describe("ExportInspectorPanel", () => {
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={invalidSelection}
 			/>,
@@ -161,7 +244,9 @@ describe("ExportInspectorPanel", () => {
 				})}
 				onCancelExport={onCancelExport}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -187,7 +272,9 @@ describe("ExportInspectorPanel", () => {
 				})}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -212,7 +299,9 @@ describe("ExportInspectorPanel", () => {
 				}}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={onDownloadGeneratedMedia}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -258,7 +347,9 @@ describe("ExportInspectorPanel", () => {
 				}}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -277,7 +368,9 @@ describe("ExportInspectorPanel", () => {
 				}}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -295,7 +388,9 @@ describe("ExportInspectorPanel", () => {
 				}}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
 				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
 				runtime={supportedRuntime}
 				selection={fullSelection}
 			/>,
@@ -312,6 +407,9 @@ const supportedRuntime = evaluateRuntimeSupport({
 	videoDecoder: true,
 	videoEncoder: true,
 });
+
+const defaultOutputSettings =
+	createDefaultOutputSettings() satisfies OutputSettings;
 
 const readyAsset = {
 	durationUs: 12_000_000,
@@ -406,6 +504,7 @@ function exportJob({
 		snapshot: {
 			asset: readyAsset,
 			audioMix: createDefaultAudioMix(readyAsset),
+			outputSettings: createDefaultOutputSettings(),
 			review: {
 				method: {
 					key: "fast",

@@ -1,5 +1,8 @@
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type { ReadyMediaAsset } from "@/editor-core/model";
+import {
+	type ReadyMediaAsset,
+	createDefaultOutputSettings,
+} from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorWorkbenchVisualFixture } from "../types/editor-workbench-visual-fixture.types";
 
@@ -73,6 +76,7 @@ export function createEditorWorkbenchVisualFixture(
 				status: "reviewing",
 			},
 			importEnabled: false,
+			outputSettings: createDefaultOutputSettings(),
 			runtime,
 			selection: {
 				endUs: 9_860_000,

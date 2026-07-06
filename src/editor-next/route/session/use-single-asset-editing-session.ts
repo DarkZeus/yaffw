@@ -6,9 +6,11 @@ import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
 	AudioTrackChannelMode,
 	GeneratedMedia,
+	OutputSettings,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import { areOutputSettingsEqual } from "@/editor-core/model";
 import {
 	canCloseEditorSession,
 	createInitialEditorSession,
@@ -385,6 +387,21 @@ export function useSingleAssetEditingSession({
 		});
 	}
 
+	function applyOutputSettings(outputSettings: OutputSettings) {
+		if (
+			session.status !== "ready" ||
+			areOutputSettingsEqual(session.outputSettings, outputSettings)
+		) {
+			return;
+		}
+
+		invalidateCurrentGeneratedMediaArtifact();
+		dispatch({
+			outputSettings,
+			type: "output-settings.applied",
+		});
+	}
+
 	function getGeneratedMediaArtifactStore() {
 		if (!generatedMediaArtifactStoreRef.current) {
 			generatedMediaArtifactStoreRef.current =
@@ -417,6 +434,7 @@ export function useSingleAssetEditingSession({
 	return {
 		activeMediaAssetCleanupScope,
 		commands: {
+			applyOutputSettings,
 			cancelDefaultExport,
 			downloadGeneratedMedia,
 			importLocalFile,

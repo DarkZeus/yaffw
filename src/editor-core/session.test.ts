@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import type {
 	GeneratedMedia,
 	MediaAssetDraft,
+	OutputSettings,
 	ReadyMediaAsset,
 	Selection,
 } from "./model";
-import { DEFAULT_OUTPUT_PROFILE } from "./model";
+import { DEFAULT_OUTPUT_PROFILE, createDefaultOutputSettings } from "./model";
 import {
 	evaluateRuntimeSupport,
 	readRuntimeCapabilities,
@@ -306,6 +307,9 @@ describe("editor-next session runtime gate", () => {
 		expect(exporting.export.job.cancelSupported).toBe(true);
 		expect(exporting.export.job.snapshot.asset).toBe(readyAsset);
 		expect(exporting.export.job.snapshot.audioMix).toBe(ready.audioMix);
+		expect(exporting.export.job.snapshot.outputSettings).toBe(
+			ready.outputSettings,
+		);
 		expect(exporting.export.job.snapshot.selection).toEqual({
 			endUs: 800_000,
 			startUs: 200_000,
@@ -320,6 +324,39 @@ describe("editor-next session runtime gate", () => {
 		});
 
 		expect(ignoredSelectionEdit).toBe(exporting);
+	});
+
+	it("owns Output settings as editing decisions and blocks changes while export is running", () => {
+		const ready = createReadySession();
+
+		expect(ready.outputSettings).toEqual(createDefaultOutputSettings());
+
+		const changedOutputSettings = downscaledOutputSettings();
+		const changed = editorSessionReducer(ready, {
+			outputSettings: changedOutputSettings,
+			type: "output-settings.applied",
+		});
+
+		expect(changed.status).toBe("ready");
+		if (changed.status !== "ready") {
+			throw new Error(`Expected ready, got ${changed.status}`);
+		}
+		expect(changed.outputSettings).toEqual(changedOutputSettings);
+		expect(changed.export).toEqual({ status: "reviewing" });
+
+		const unchanged = editorSessionReducer(changed, {
+			outputSettings: downscaledOutputSettings(),
+			type: "output-settings.applied",
+		});
+		expect(unchanged).toBe(changed);
+
+		const exporting = startExport(changed);
+		expect(
+			editorSessionReducer(exporting, {
+				outputSettings: createDefaultOutputSettings(),
+				type: "output-settings.applied",
+			}),
+		).toBe(exporting);
 	});
 
 	it("creates default audio mix decisions when a media asset becomes ready", () => {
@@ -732,6 +769,17 @@ const generatedMedia = {
 	},
 	sizeBytes: 2_048,
 } satisfies GeneratedMedia;
+
+function downscaledOutputSettings(): OutputSettings {
+	return {
+		...createDefaultOutputSettings(),
+		resolution: {
+			height: 720,
+			kind: "target-dimensions",
+			width: 1280,
+		},
+	};
+}
 
 function createReadySession(selection: Selection = defaultSelection) {
 	return createReadySessionWithAsset(readyAsset, selection);

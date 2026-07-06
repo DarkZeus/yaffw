@@ -2,6 +2,7 @@ import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis
 import type {
 	AudioTrackChannelMode,
 	GeneratedMedia,
+	OutputSettings,
 	Selection,
 } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
@@ -11,6 +12,7 @@ import type { GeneratedMediaDeliveryRequest } from "../../export/types/generated
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 
 export type SingleAssetEditingSessionCommands = {
+	applyOutputSettings: (outputSettings: OutputSettings) => void;
 	cancelDefaultExport: () => void;
 	downloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 	importLocalFile: (file: File) => Promise<void>;

@@ -1,5 +1,6 @@
 import type {
 	GeneratedMedia,
+	OutputSettings,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
@@ -11,7 +12,9 @@ export type ExportInspectorPanelProps = {
 	exportState: ExportSessionState;
 	onCancelExport: () => void;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onApplyOutputSettings: (outputSettings: OutputSettings) => void;
 	onStartExport: () => void;
+	outputSettings: OutputSettings;
 	runtime: RuntimeSupport;
 	selection: Selection;
 };

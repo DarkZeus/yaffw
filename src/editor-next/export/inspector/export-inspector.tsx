@@ -14,14 +14,16 @@ import type {
 } from "../types/export-inspector-presenter.types";
 import type { ExportInspectorPanelProps } from "../types/export-inspector.types";
 import { createExportInspectorViewModel } from "./export-inspector-presenter";
-import { ExportQualitySettingsMock } from "./export-quality-settings-mock";
+import { OutputSettingsPanel } from "./output-settings-panel";
 
 export function ExportInspectorPanel({
 	asset,
 	exportState,
 	onCancelExport,
 	onDownloadGeneratedMedia,
+	onApplyOutputSettings,
 	onStartExport,
+	outputSettings,
 	runtime,
 	selection,
 }: ExportInspectorPanelProps) {
@@ -90,7 +92,12 @@ export function ExportInspectorPanel({
 					capability={viewModel.capability}
 					checks={viewModel.runtimeChecks}
 				/>
-				<ExportQualitySettingsMock asset={asset} />
+				<OutputSettingsPanel
+					asset={asset}
+					exportRunning={exportState.status === "running"}
+					onApplyOutputSettings={onApplyOutputSettings}
+					outputSettings={outputSettings}
+				/>
 				<ExportJobStatus
 					deliveryAction={deliveryAction}
 					onDownloadGeneratedMedia={onDownloadGeneratedMedia}

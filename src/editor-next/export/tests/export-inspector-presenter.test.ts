@@ -6,6 +6,7 @@ import {
 	type ExportProgress,
 	type ReadyMediaAsset,
 	type Selection,
+	createDefaultOutputSettings,
 } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportSessionState } from "@/editor-core/session";
@@ -346,6 +347,7 @@ function exportJob({
 		snapshot: {
 			asset: readyAsset,
 			audioMix: createDefaultAudioMix(readyAsset),
+			outputSettings: createDefaultOutputSettings(),
 			review: {
 				method: {
 					key: "fast",

@@ -93,6 +93,166 @@ export const DEFAULT_OUTPUT_PROFILE: DefaultOutputProfile = {
 	videoCodec: "h264",
 };
 
+export type OutputContainerSetting =
+	| {
+			kind: "default-output-profile";
+	  }
+	| {
+			container: string;
+			kind: "documented-container";
+	  };
+
+export type OutputCodecSetting =
+	| {
+			kind: "default-output-profile";
+	  }
+	| {
+			kind: "preserve-source";
+	  }
+	| {
+			codec: string;
+			kind: "documented-codec";
+	  };
+
+export type OutputResolutionSetting =
+	| {
+			kind: "preserve-source";
+	  }
+	| {
+			height: number;
+			kind: "target-dimensions";
+			width: number;
+	  };
+
+export type OutputQualitySetting =
+	| {
+			kind: "preserve-source";
+	  }
+	| {
+			kind: "subjective-quality";
+			quality: string;
+	  }
+	| {
+			bitrateBps: number;
+			kind: "custom-bitrate";
+	  };
+
+export type OutputSettings = {
+	audioCodec: OutputCodecSetting;
+	audioQuality: OutputQualitySetting;
+	container: OutputContainerSetting;
+	resolution: OutputResolutionSetting;
+	videoCodec: OutputCodecSetting;
+	videoQuality: OutputQualitySetting;
+};
+
+export function createDefaultOutputSettings(): OutputSettings {
+	return {
+		audioCodec: {
+			kind: "default-output-profile",
+		},
+		audioQuality: {
+			kind: "preserve-source",
+		},
+		container: {
+			kind: "default-output-profile",
+		},
+		resolution: {
+			kind: "preserve-source",
+		},
+		videoCodec: {
+			kind: "default-output-profile",
+		},
+		videoQuality: {
+			kind: "preserve-source",
+		},
+	};
+}
+
+export function areOutputSettingsEqual(
+	left: OutputSettings,
+	right: OutputSettings,
+): boolean {
+	return (
+		areOutputContainerSettingsEqual(left.container, right.container) &&
+		areOutputCodecSettingsEqual(left.videoCodec, right.videoCodec) &&
+		areOutputCodecSettingsEqual(left.audioCodec, right.audioCodec) &&
+		areOutputResolutionSettingsEqual(left.resolution, right.resolution) &&
+		areOutputQualitySettingsEqual(left.videoQuality, right.videoQuality) &&
+		areOutputQualitySettingsEqual(left.audioQuality, right.audioQuality)
+	);
+}
+
+function areOutputContainerSettingsEqual(
+	left: OutputSettings["container"],
+	right: OutputSettings["container"],
+): boolean {
+	if (left.kind !== right.kind) {
+		return false;
+	}
+
+	if (
+		left.kind === "documented-container" &&
+		right.kind === "documented-container"
+	) {
+		return left.container === right.container;
+	}
+
+	return true;
+}
+
+function areOutputCodecSettingsEqual(
+	left: OutputSettings["videoCodec"],
+	right: OutputSettings["videoCodec"],
+): boolean {
+	if (left.kind !== right.kind) {
+		return false;
+	}
+
+	if (left.kind === "documented-codec" && right.kind === "documented-codec") {
+		return left.codec === right.codec;
+	}
+
+	return true;
+}
+
+function areOutputResolutionSettingsEqual(
+	left: OutputSettings["resolution"],
+	right: OutputSettings["resolution"],
+): boolean {
+	if (left.kind !== right.kind) {
+		return false;
+	}
+
+	if (left.kind === "target-dimensions" && right.kind === "target-dimensions") {
+		return left.width === right.width && left.height === right.height;
+	}
+
+	return true;
+}
+
+function areOutputQualitySettingsEqual(
+	left: OutputSettings["videoQuality"],
+	right: OutputSettings["videoQuality"],
+): boolean {
+	if (left.kind !== right.kind) {
+		return false;
+	}
+
+	if (left.kind === "custom-bitrate" && right.kind === "custom-bitrate") {
+		return left.bitrateBps === right.bitrateBps;
+	}
+
+	if (
+		left.kind === "subjective-quality" &&
+		right.kind === "subjective-quality"
+	) {
+		return left.quality === right.quality;
+	}
+
+	return true;
+}
+
 export type ExportCapability =
 	| {
 			profile: DefaultOutputProfile;

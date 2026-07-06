@@ -3,15 +3,18 @@ import {
 	type ExportCapabilityReview,
 	planDefaultExportCapability,
 } from "./export-capability";
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ExportProgress,
-	GeneratedMedia,
-	MediaAssetDraft,
-	MediaTimeUs,
-	ReadyMediaAsset,
-	Selection,
+import {
+	areOutputSettingsEqual,
+	createDefaultOutputSettings,
+	type AudioMix,
+	type AudioTrackChannelMode,
+	type ExportProgress,
+	type GeneratedMedia,
+	type MediaAssetDraft,
+	type MediaTimeUs,
+	type OutputSettings,
+	type ReadyMediaAsset,
+	type Selection,
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
 import {
@@ -46,6 +49,7 @@ export type LoadingSession = {
 export type ExportJobSnapshot = {
 	asset: ReadyMediaAsset;
 	audioMix: AudioMix;
+	outputSettings: OutputSettings;
 	review: Extract<ExportCapabilityReview, { supported: true }>;
 	selection: Selection;
 };
@@ -87,6 +91,7 @@ export type ReadySession = {
 	asset: ReadyMediaAsset;
 	export: ExportSessionState;
 	importEnabled: false;
+	outputSettings: OutputSettings;
 	selection: Selection;
 	status: "ready";
 } & BaseSessionState;
@@ -163,6 +168,10 @@ export type EditorSessionAction =
 			trackId: string;
 			type: "audio.track.volume.set";
 			volumePercent: number;
+	  }
+	| {
+			outputSettings: OutputSettings;
+			type: "output-settings.applied";
 	  }
 	| {
 			cancelSupported: boolean;
@@ -246,6 +255,7 @@ export function editorSessionReducer(
 					status: "reviewing",
 				},
 				importEnabled: false,
+				outputSettings: createDefaultOutputSettings(),
 				selection: action.selection,
 				runtime: state.runtime,
 				status: "ready",
@@ -404,6 +414,20 @@ export function editorSessionReducer(
 				},
 				export: resetExportReviewAfterEditingDecision(state.export),
 			};
+		case "output-settings.applied":
+			if (!canChangeEditingDecisions(state)) {
+				return state;
+			}
+
+			if (areOutputSettingsEqual(state.outputSettings, action.outputSettings)) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: resetExportReviewAfterEditingDecision(state.export),
+				outputSettings: action.outputSettings,
+			};
 		case "export.started": {
 			if (state.status !== "ready" || state.export.status === "running") {
 				return state;
@@ -431,6 +455,7 @@ export function editorSessionReducer(
 						snapshot: {
 							asset: state.asset,
 							audioMix: state.audioMix,
+							outputSettings: state.outputSettings,
 							review,
 							selection: { ...state.selection },
 						},

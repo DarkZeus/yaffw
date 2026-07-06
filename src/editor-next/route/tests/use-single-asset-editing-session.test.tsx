@@ -4,7 +4,8 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
-import type { GeneratedMedia } from "@/editor-core/model";
+import type { GeneratedMedia, OutputSettings } from "@/editor-core/model";
+import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { useSingleAssetEditingSession } from "../session/use-single-asset-editing-session";
@@ -154,6 +155,71 @@ describe("useSingleAssetEditingSession", () => {
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
 	});
+
+	it("invalidates retained Generated media blobs when changed Output settings are applied", async () => {
+		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
+		const deliverGeneratedMedia = vi.fn();
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+
+		render(
+			<SingleAssetEditingSessionProbe
+				deliverGeneratedMedia={deliverGeneratedMedia}
+				generatedBlob={generatedBlob}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		await act(async () => {
+			await sessionRef.current?.commands.importLocalFile(
+				new File(["video"], "clip.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(sessionRef.current?.session.status).toBe("ready");
+		});
+
+		await act(async () => {
+			await sessionRef.current?.commands.startDefaultExport();
+		});
+		await waitFor(() => {
+			const session = sessionRef.current?.session;
+			expect(session?.status).toBe("ready");
+			if (session?.status !== "ready") {
+				return;
+			}
+			expect(session.export.status).toBe("succeeded");
+		});
+
+		const generatedMedia = readGeneratedMedia(sessionRef.current);
+
+		act(() => {
+			sessionRef.current?.commands.downloadGeneratedMedia(generatedMedia);
+		});
+		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
+
+		act(() => {
+			sessionRef.current?.commands.applyOutputSettings(
+				downscaledOutputSettings(),
+			);
+		});
+		await waitFor(() => {
+			const session = sessionRef.current?.session;
+			expect(session?.status).toBe("ready");
+			if (session?.status !== "ready") {
+				return;
+			}
+			expect(session.outputSettings).toEqual(downscaledOutputSettings());
+			expect(session.export.status).toBe("reviewing");
+		});
+
+		act(() => {
+			sessionRef.current?.commands.downloadGeneratedMedia(generatedMedia);
+		});
+
+		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
+	});
 });
 
 function SingleAssetEditingSessionProbe({
@@ -263,3 +329,14 @@ const supportedInspection = {
 		},
 	],
 } satisfies LocalMediaAssetInspection;
+
+function downscaledOutputSettings(): OutputSettings {
+	return {
+		...createDefaultOutputSettings(),
+		resolution: {
+			height: 720,
+			kind: "target-dimensions",
+			width: 1280,
+		},
+	};
+}
