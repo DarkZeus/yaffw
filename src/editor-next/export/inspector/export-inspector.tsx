@@ -30,6 +30,7 @@ export function ExportInspectorPanel({
 	const viewModel = createExportInspectorViewModel({
 		asset,
 		exportState,
+		outputSettings,
 		runtime,
 		selection,
 	});
@@ -136,7 +137,7 @@ function RuntimeChecksSection({
 			</div>
 			<ul className="flex flex-col gap-2 text-[11px] text-muted-foreground">
 				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">MP4 export</span>
+					<span className="min-w-0 truncate">Documented output profile</span>
 					<CompactStatusBadge tone={capability.tone}>
 						{capability.value === "Ready" ? "Supported" : "Blocked"}
 					</CompactStatusBadge>

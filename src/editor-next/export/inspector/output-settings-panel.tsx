@@ -29,6 +29,11 @@ import {
 	type OutputSettings,
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
+import {
+	type ResolvedOutputVideoProfile,
+	resolveOutputVideoProfile,
+} from "@/editor-core/output-settings";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 
 type OutputSettingsPanelProps = {
 	asset: ReadyMediaAsset;
@@ -67,7 +72,81 @@ export function OutputSettingsPanel({
 		setOpen(false);
 	}
 
+	function changeContainer(containerId: string) {
+		const nextDraft = cloneOutputSettings(activeDraft);
+		nextDraft.container =
+			containerId === "default-output-profile"
+				? { kind: "default-output-profile" }
+				: { container: containerId, kind: "documented-container" };
+
+		if (nextDraft.videoCodec.kind === "default-output-profile") {
+			nextDraft.videoCodec = { kind: "preserve-source" };
+		}
+
+		setReconciledDraft(nextDraft);
+	}
+
+	function changeVideoCodec(codec: string) {
+		const nextDraft = cloneOutputSettings(activeDraft);
+		nextDraft.videoCodec =
+			codec === "default-output-profile"
+				? { kind: "default-output-profile" }
+				: codec === "preserve-source"
+					? { kind: "preserve-source" }
+					: { codec, kind: "documented-codec" };
+
+		setReconciledDraft(nextDraft);
+	}
+
+	function setReconciledDraft(nextDraft: OutputSettings) {
+		const resolution = resolveOutputVideoProfile({
+			asset,
+			outputSettings: nextDraft,
+			support: MEDIABUNNY_OUTPUT_SUPPORT,
+		});
+
+		if (resolution.kind === "resolved" && resolution.automaticReplacement) {
+			nextDraft.videoCodec = {
+				codec: resolution.videoCodec,
+				kind: "documented-codec",
+			};
+			setAutomaticReplacementMessage(
+				`${formatCodecName(resolution.automaticReplacement.requestedCodec)} cannot be preserved in ${resolution.container.label}. ${formatCodecName(resolution.videoCodec)} was selected automatically.`,
+			);
+		} else {
+			setAutomaticReplacementMessage(null);
+		}
+
+		setDraft(nextDraft);
+	}
+
 	const sourceDimensions = formatSourceDimensions(asset);
+	const [automaticReplacementMessage, setAutomaticReplacementMessage] =
+		useState<string | null>(null);
+	const activeDraft = draft ?? outputSettings;
+	const resolvedDraft = resolveOutputVideoProfile({
+		asset,
+		outputSettings: activeDraft,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
+	});
+	const selectedContainer =
+		resolvedDraft.kind === "resolved"
+			? resolvedDraft.container
+			: containerForSetting(activeDraft.container);
+	const compatibleVideoCodecs = selectedContainer?.videoCodecs ?? [];
+
+	function openResolvedOutputSettings() {
+		setAutomaticReplacementMessage(null);
+		openModal();
+	}
+
+	function applyResolvedDraft() {
+		if (resolvedDraft.kind === "invalid") {
+			return;
+		}
+
+		applyDraft();
+	}
 
 	return (
 		<section
@@ -112,7 +191,7 @@ export function OutputSettingsPanel({
 			<Button
 				className="mt-2 h-8 w-full"
 				disabled={exportRunning}
-				onClick={openModal}
+				onClick={openResolvedOutputSettings}
 				size="sm"
 				type="button"
 				variant="outline"
@@ -168,14 +247,24 @@ export function OutputSettingsPanel({
 										icon={<Film aria-hidden="true" className="size-4" />}
 										title="General"
 									>
+										<OutputSettingsChoice
+											label="Container"
+											onChange={changeContainer}
+											value={containerSettingValue(activeDraft.container)}
+										>
+											<option value="default-output-profile">
+												Default output profile (MP4)
+											</option>
+											{MEDIABUNNY_OUTPUT_SUPPORT.containers.map((container) => (
+												<option key={container.id} value={container.id}>
+													{container.label}
+												</option>
+											))}
+										</OutputSettingsChoice>
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
-												label="Container"
-												value={formatContainerSetting(draft.container)}
-											/>
-											<OutputSettingsFact
 												label="Profile"
-												value={formatOutputProfileSummary(draft)}
+												value={formatOutputProfileSummary(activeDraft)}
 											/>
 											<OutputSettingsFact
 												label="Source"
@@ -186,6 +275,10 @@ export function OutputSettingsPanel({
 												value={`${asset.tracks.video.length} video / ${asset.tracks.audio.length} audio`}
 											/>
 										</OutputSettingsFactGrid>
+										<OutputSettingsValidationMessage
+											automaticReplacementMessage={automaticReplacementMessage}
+											resolvedDraft={resolvedDraft}
+										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="video">
@@ -194,24 +287,42 @@ export function OutputSettingsPanel({
 										icon={<Monitor aria-hidden="true" className="size-4" />}
 										title="Video"
 									>
+										<OutputSettingsChoice
+											label="Video codec"
+											onChange={changeVideoCodec}
+											value={codecSettingValue(activeDraft.videoCodec)}
+										>
+											<option value="preserve-source">Preserve source</option>
+											{activeDraft.container.kind ===
+											"default-output-profile" ? (
+												<option value="default-output-profile">
+													Default output profile (H.264)
+												</option>
+											) : null}
+											{compatibleVideoCodecs.map((codec) => (
+												<option key={codec} value={codec}>
+													{formatCodecName(codec)}
+												</option>
+											))}
+										</OutputSettingsChoice>
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
 												label="Resolution"
-												value={formatResolutionSetting(draft.resolution)}
-											/>
-											<OutputSettingsFact
-												label="Video codec"
-												value={formatCodecSetting(draft.videoCodec, "video")}
+												value={formatResolutionSetting(activeDraft.resolution)}
 											/>
 											<OutputSettingsFact
 												label="Video quality"
-												value={formatQualitySetting(draft.videoQuality)}
+												value={formatQualitySetting(activeDraft.videoQuality)}
 											/>
 											<OutputSettingsFact
 												label="Source"
 												value={sourceDimensions}
 											/>
 										</OutputSettingsFactGrid>
+										<OutputSettingsValidationMessage
+											automaticReplacementMessage={automaticReplacementMessage}
+											resolvedDraft={resolvedDraft}
+										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="audio">
@@ -261,7 +372,10 @@ export function OutputSettingsPanel({
 					</Tabs>
 					<DialogFooter className="border-t border-workbench-border px-4 py-3">
 						<Button
-							onClick={() => setDraft(cloneOutputSettings(openingSnapshot))}
+							onClick={() => {
+								setAutomaticReplacementMessage(null);
+								setDraft(cloneOutputSettings(openingSnapshot));
+							}}
 							type="button"
 							variant="outline"
 						>
@@ -273,8 +387,8 @@ export function OutputSettingsPanel({
 						</Button>
 						<Button
 							className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
-							disabled={exportRunning}
-							onClick={applyDraft}
+							disabled={exportRunning || resolvedDraft.kind === "invalid"}
+							onClick={applyResolvedDraft}
 							type="button"
 						>
 							<Check data-icon="inline-start" />
@@ -299,6 +413,65 @@ function OutputSettingsFact({
 			<div className="truncate text-muted-foreground">{label}</div>
 			<div className="truncate font-medium text-foreground">{value}</div>
 		</div>
+	);
+}
+
+function OutputSettingsChoice({
+	children,
+	label,
+	onChange,
+	value,
+}: {
+	children: ReactNode;
+	label: string;
+	onChange: (value: string) => void;
+	value: string;
+}) {
+	return (
+		<label className="grid gap-1.5 text-xs font-medium text-foreground">
+			<span>{label}</span>
+			<select
+				aria-label={label}
+				className="h-9 w-full rounded border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+				onChange={(event) => onChange(event.currentTarget.value)}
+				value={value}
+			>
+				{children}
+			</select>
+		</label>
+	);
+}
+
+function OutputSettingsValidationMessage({
+	automaticReplacementMessage,
+	resolvedDraft,
+}: {
+	automaticReplacementMessage: string | null;
+	resolvedDraft: ResolvedOutputVideoProfile;
+}) {
+	if (resolvedDraft.kind === "invalid") {
+		return (
+			<p
+				aria-live="polite"
+				className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs leading-5 text-destructive"
+				role="alert"
+			>
+				{resolvedDraft.error}
+			</p>
+		);
+	}
+
+	if (!automaticReplacementMessage) {
+		return null;
+	}
+
+	return (
+		<p
+			aria-live="polite"
+			className="rounded border border-workbench-progress/40 bg-workbench-hover/35 px-3 py-2 text-xs leading-5 text-muted-foreground"
+		>
+			{automaticReplacementMessage}
+		</p>
 	);
 }
 
@@ -365,6 +538,46 @@ function formatOutputProfileSummary(outputSettings: OutputSettings): string {
 	}
 
 	return `${formatContainerSetting(outputSettings.container)} / ${formatCodecSetting(outputSettings.videoCodec, "video")} / ${formatCodecSetting(outputSettings.audioCodec, "audio")}`;
+}
+
+function containerForSetting(setting: OutputSettings["container"]) {
+	const id =
+		setting.kind === "default-output-profile"
+			? DEFAULT_OUTPUT_PROFILE.container
+			: setting.container;
+	return MEDIABUNNY_OUTPUT_SUPPORT.containers.find(
+		(container) => container.id === id,
+	);
+}
+
+function containerSettingValue(setting: OutputSettings["container"]): string {
+	return setting.kind === "default-output-profile"
+		? "default-output-profile"
+		: setting.container;
+}
+
+function codecSettingValue(setting: OutputSettings["videoCodec"]): string {
+	if (setting.kind === "documented-codec") {
+		return setting.codec;
+	}
+
+	return setting.kind;
+}
+
+function formatCodecName(codec: string | undefined): string {
+	if (!codec) {
+		return "Unknown source codec";
+	}
+
+	const normalized = codec.toLowerCase();
+	if (normalized === "avc" || normalized === "h264") {
+		return "AVC";
+	}
+	if (normalized === "hevc" || normalized === "h265") {
+		return "HEVC";
+	}
+
+	return normalized.toUpperCase();
 }
 
 function formatContainerSetting(setting: OutputSettings["container"]): string {

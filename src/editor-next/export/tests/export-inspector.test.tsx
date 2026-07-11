@@ -54,7 +54,9 @@ describe("ExportInspectorPanel", () => {
 		expect(within(exportInspector).getByText("Output")).toBeTruthy();
 		expect(within(exportInspector).queryByText("Current settings")).toBeNull();
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
-		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
+		expect(
+			within(exportInspector).getByText("Documented output profile"),
+		).toBeTruthy();
 		expect(within(exportInspector).getByText("Browser APIs")).toBeTruthy();
 		expect(screen.getByLabelText("Output settings panel")).toBeTruthy();
 		expect(
@@ -115,13 +117,21 @@ describe("ExportInspectorPanel", () => {
 		expect(
 			within(outputSettingsDialog).getByRole("tab", { name: "Audio" }),
 		).toBeTruthy();
+		const aiTab = within(outputSettingsDialog).getByRole("tab", {
+			name: "AI",
+		}) as HTMLButtonElement;
+		expect(aiTab.disabled).toBe(true);
+		expect(aiTab.getAttribute("data-state")).toBe("inactive");
+		expect(within(outputSettingsDialog).queryByText("AI Upscaling")).toBeNull();
+
+		fireEvent.mouseDown(aiTab, { button: 0, ctrlKey: false });
+		fireEvent.click(aiTab);
+
+		expect(aiTab.getAttribute("data-state")).toBe("inactive");
+		expect(within(outputSettingsDialog).queryByText("AI Upscaling")).toBeNull();
 		expect(
-			(
-				within(outputSettingsDialog).getByRole("tab", {
-					name: "AI",
-				}) as HTMLButtonElement
-			).disabled,
-		).toBe(true);
+			within(outputSettingsDialog).queryByText("Frame Interpolation"),
+		).toBeNull();
 		expect(
 			(
 				within(outputSettingsDialog).getByRole("tab", {
@@ -165,6 +175,153 @@ describe("ExportInspectorPanel", () => {
 
 		expect(onApplyOutputSettings).toHaveBeenCalledWith(defaultOutputSettings);
 		expect(onStartExport).not.toHaveBeenCalled();
+	});
+
+	it("filters video codecs and visibly replaces an incompatible preserved source codec", () => {
+		const onApplyOutputSettings = vi.fn();
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={onApplyOutputSettings}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		const containerSelect = within(dialog).getByRole("combobox", {
+			name: "Container",
+		});
+
+		expect(
+			within(containerSelect)
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toEqual([
+			"Default output profile (MP4)",
+			"MP4",
+			"MOV",
+			"Matroska (MKV)",
+			"WebM",
+			"MPEG transport stream",
+		]);
+
+		fireEvent.change(containerSelect, { target: { value: "webm" } });
+		const videoTab = within(dialog).getByRole("tab", { name: "Video" });
+		fireEvent.mouseDown(videoTab, { button: 0, ctrlKey: false });
+		fireEvent.click(videoTab);
+
+		const videoCodecSelect = within(dialog).getByRole("combobox", {
+			name: "Video codec",
+		}) as HTMLSelectElement;
+		expect(videoCodecSelect.value).toBe("vp9");
+		expect(
+			within(videoCodecSelect)
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toEqual(["Preserve source", "VP9", "AV1", "VP8"]);
+		expect(
+			within(dialog).getByText(
+				"AVC cannot be preserved in WebM. VP9 was selected automatically.",
+			),
+		).toBeTruthy();
+
+		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+		expect(onApplyOutputSettings).toHaveBeenCalledWith({
+			...defaultOutputSettings,
+			container: { container: "webm", kind: "documented-container" },
+			videoCodec: { codec: "vp9", kind: "documented-codec" },
+		});
+	});
+
+	it("shows an applied documented output profile in Export review", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp9",
+			kind: "documented-codec",
+		};
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
+				onStartExport={() => undefined}
+				outputSettings={outputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		const exportInspector = screen.getByLabelText("Export inspector");
+		expect(
+			within(exportInspector).getByText("WebM / VP9 video / AAC audio"),
+		).toBeTruthy();
+		expect(
+			within(exportInspector).getByText("Documented output profile"),
+		).toBeTruthy();
+		expect(within(exportInspector).queryByText("MP4 export")).toBeNull();
+	});
+
+	it("blocks Apply and Export when no documented container state can be resolved", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "missing-container",
+			kind: "documented-container",
+		};
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
+				onStartExport={() => undefined}
+				outputSettings={outputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		expect(
+			(
+				screen.getByRole("button", {
+					name: "Start export",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(
+			screen.getByText(
+				"The selected missing-container container is not documented by the browser-local media writer.",
+			),
+		).toBeTruthy();
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		expect(within(dialog).getByRole("alert").textContent).toContain(
+			"The selected missing-container container is not documented",
+		);
+		expect(
+			(
+				within(dialog).getByRole("button", {
+					name: "Apply",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
 	});
 
 	it("blocks Output settings while an export job is running", () => {
@@ -214,7 +371,9 @@ describe("ExportInspectorPanel", () => {
 
 		const exportInspector = screen.getByLabelText("Export inspector");
 		expect(within(exportInspector).getAllByText("Blocked").length).toBe(2);
-		expect(within(exportInspector).getByText("MP4 export")).toBeTruthy();
+		expect(
+			within(exportInspector).getByText("Documented output profile"),
+		).toBeTruthy();
 		expect(
 			within(exportInspector).getByText(
 				`Expected selection inside [0, ${readyAsset.durationUs}], got [${invalidSelection.startUs}, ${invalidSelection.endUs}].`,

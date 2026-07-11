@@ -1,5 +1,6 @@
 import type {
 	GeneratedMedia,
+	OutputSettings,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
@@ -101,6 +102,7 @@ export type ExportInspectorViewModel = {
 export type CreateExportInspectorViewModelOptions = {
 	asset: ReadyMediaAsset;
 	exportState: ExportSessionState;
+	outputSettings: OutputSettings;
 	runtime: RuntimeSupport;
 	selection: Selection;
 };

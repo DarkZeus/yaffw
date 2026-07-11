@@ -20,6 +20,7 @@ describe("export inspector presenter", () => {
 			exportState: {
 				status: "reviewing",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -60,12 +61,38 @@ describe("export inspector presenter", () => {
 		});
 	});
 
+	it("reflects the resolved container and video codec in Export review", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp9",
+			kind: "documented-codec",
+		};
+
+		const viewModel = createExportInspectorViewModel({
+			asset: readyAsset,
+			exportState: { status: "reviewing" },
+			outputSettings,
+			runtime: supportedRuntime,
+			selection: fullSelection,
+		});
+
+		expect(viewModel.review.plannedOutput).toEqual({
+			label: "Format",
+			value: "WebM / VP9 video / AAC audio",
+		});
+	});
+
 	it("derives a blocked review for impossible selections", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
 			exportState: {
 				status: "reviewing",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: invalidSelection,
 		});
@@ -105,6 +132,7 @@ describe("export inspector presenter", () => {
 					phase: "encoding",
 				},
 			}),
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -130,6 +158,7 @@ describe("export inspector presenter", () => {
 					phase: "preparing",
 				},
 			}),
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -155,6 +184,7 @@ describe("export inspector presenter", () => {
 				status: "failed",
 				technicalDetails: "Encoder rejected the source video.",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -180,6 +210,7 @@ describe("export inspector presenter", () => {
 				job: exportJob({ cancelSupported: true }),
 				status: "succeeded",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -205,6 +236,7 @@ describe("export inspector presenter", () => {
 				job: exportJob({ cancelSupported: true }),
 				status: "succeeded",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});
@@ -230,6 +262,7 @@ describe("export inspector presenter", () => {
 				job: exportJob({ cancelSupported: true }),
 				status: "cancelled",
 			},
+			outputSettings: createDefaultOutputSettings(),
 			runtime: supportedRuntime,
 			selection: fullSelection,
 		});

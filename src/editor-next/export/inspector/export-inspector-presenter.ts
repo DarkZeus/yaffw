@@ -3,8 +3,10 @@ import {
 	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import type { ExportProgress } from "@/editor-core/model";
+import { resolveOutputVideoProfile } from "@/editor-core/output-settings";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportSessionState } from "@/editor-core/session";
+import { getMediabunnyOutputSupport } from "../adapters/mediabunny-output-support";
 import type {
 	CreateExportInspectorViewModelOptions,
 	ExportInspectorActionViewModel,
@@ -15,9 +17,12 @@ import type {
 	ExportInspectorViewModel,
 } from "../types/export-inspector-presenter.types";
 
+const OUTPUT_SUPPORT = getMediabunnyOutputSupport();
+
 export function createExportInspectorViewModel({
 	asset,
 	exportState,
+	outputSettings,
 	runtime,
 	selection,
 }: CreateExportInspectorViewModelOptions): ExportInspectorViewModel {
@@ -26,15 +31,21 @@ export function createExportInspectorViewModel({
 		runtime,
 		selection,
 	});
+	const outputProfile = resolveOutputVideoProfile({
+		asset,
+		outputSettings,
+		support: OUTPUT_SUPPORT,
+	});
+	const supported = review.supported && outputProfile.kind === "resolved";
 
 	return {
-		action: actionForExportState(exportState, review.supported),
+		action: actionForExportState(exportState, supported),
 		badge: {
-			label: review.supported ? "Ready" : "Blocked",
-			tone: review.supported ? "ready" : "blocked",
+			label: supported ? "Ready" : "Blocked",
+			tone: supported ? "ready" : "blocked",
 		},
-		capability: capabilityViewModel(review.supported),
-		review: reviewViewModel(review),
+		capability: capabilityViewModel(supported),
+		review: reviewViewModel(review, outputProfile),
 		runtimeChecks: runtimeCheckViewModels(runtime),
 		status: statusForExportState(exportState),
 	};
@@ -78,13 +89,28 @@ function runtimeCheckViewModels(
 
 function reviewViewModel(
 	review: ExportCapabilityReview,
+	outputProfile: ReturnType<typeof resolveOutputVideoProfile>,
 ): ExportInspectorReviewViewModel {
-	if (!review.supported) {
+	if (outputProfile.kind === "invalid") {
 		return {
 			plannedOutput: {
 				label: "Format",
-				value: review.plannedOutput.label,
+				value: "Invalid Output settings",
 			},
+			reason: "The current Output settings cannot be applied.",
+			supported: false,
+			technicalDetails: outputProfile.error,
+		};
+	}
+
+	const plannedOutput = {
+		label: "Format" as const,
+		value: formatResolvedOutputProfile(outputProfile),
+	};
+
+	if (!review.supported) {
+		return {
+			plannedOutput,
 			reason: review.reason,
 			supported: false,
 			technicalDetails: review.technicalDetails,
@@ -96,10 +122,7 @@ function reviewViewModel(
 			label: "Export",
 			value: review.method.label,
 		},
-		plannedOutput: {
-			label: "Format",
-			value: review.plannedOutput.label,
-		},
+		plannedOutput,
 		precision: {
 			label: "Range",
 			value: review.precision.label,
@@ -107,6 +130,26 @@ function reviewViewModel(
 		reason: review.reason,
 		supported: true,
 	};
+}
+
+function formatResolvedOutputProfile(
+	profile: Extract<
+		ReturnType<typeof resolveOutputVideoProfile>,
+		{ kind: "resolved" }
+	>,
+): string {
+	return `${profile.container.label} / ${formatVideoCodec(profile.videoCodec)} video / AAC audio`;
+}
+
+function formatVideoCodec(codec: string): string {
+	if (codec === "avc") {
+		return "H.264";
+	}
+	if (codec === "hevc") {
+		return "H.265";
+	}
+
+	return codec.toUpperCase();
 }
 
 function statusForExportState(
