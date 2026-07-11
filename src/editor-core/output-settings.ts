@@ -10,6 +10,7 @@ import {
 	type OutputSettings,
 	type OutputSubjectiveQuality,
 	type ReadyMediaAsset,
+	type ResolvedOutputPlan,
 } from "./model";
 
 const DOWNSCALE_HEIGHTS = [1440, 1080, 720, 480, 360] as const;
@@ -324,6 +325,87 @@ export function resolveOutputAudioProfile({
 export type BrowserLocalOutputSupport = {
 	containers: DocumentedOutputContainer[];
 };
+
+export type ResolvedOutputPlanResult =
+	| {
+			kind: "resolved";
+			plan: ResolvedOutputPlan;
+	  }
+	| {
+			error: string;
+			kind: "invalid";
+	  };
+
+export function resolveOutputPlan({
+	asset,
+	audioMix,
+	outputSettings,
+	support,
+}: {
+	asset: Pick<ReadyMediaAsset, "tracks">;
+	audioMix: AudioMix;
+	outputSettings: OutputSettings;
+	support: BrowserLocalOutputSupport;
+}): ResolvedOutputPlanResult {
+	const video = resolveOutputVideoProfile({ asset, outputSettings, support });
+	if (video.kind === "invalid") {
+		return video;
+	}
+
+	const audio = resolveOutputAudioProfile({
+		asset,
+		audioMix,
+		outputSettings,
+		support,
+	});
+	if (audio.kind === "invalid") {
+		return audio;
+	}
+
+	const resolution = resolveOutputResolution({
+		asset,
+		setting: outputSettings.resolution,
+	});
+	if (resolution.kind === "invalid") {
+		return resolution;
+	}
+
+	const videoQuality = resolveOutputQuality({
+		mediaKind: "video",
+		setting: outputSettings.videoQuality,
+	});
+	if (videoQuality.kind === "invalid") {
+		return videoQuality;
+	}
+
+	const audioQuality = resolveOutputQuality({
+		mediaKind: "audio",
+		setting: outputSettings.audioQuality,
+	});
+	if (audioQuality.kind === "invalid") {
+		return audioQuality;
+	}
+
+	return {
+		kind: "resolved",
+		plan: {
+			audioCodec: audio.audioCodec,
+			audioQuality: { ...outputSettings.audioQuality },
+			container: {
+				fileExtension: video.container.fileExtension,
+				id: video.container.id,
+				label: video.container.label,
+				mimeType: video.container.mimeType,
+			},
+			includedAudioTrackCount: audio.includedTrackCount,
+			resolution: resolution.dimensions
+				? { ...resolution.dimensions }
+				: undefined,
+			videoCodec: video.videoCodec,
+			videoQuality: { ...outputSettings.videoQuality },
+		},
+	};
+}
 
 export type ResolveOutputVideoProfileOptions = {
 	asset: Pick<ReadyMediaAsset, "tracks">;

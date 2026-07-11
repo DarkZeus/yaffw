@@ -36,8 +36,11 @@ export function createExportInspectorViewModel({
 }: CreateExportInspectorViewModelOptions): ExportInspectorViewModel {
 	const review = planDefaultExportCapability({
 		asset,
+		audioMix,
+		outputSettings,
 		runtime,
 		selection,
+		support: OUTPUT_SUPPORT,
 	});
 	const outputProfile = resolveOutputVideoProfile({
 		asset,
@@ -332,6 +335,11 @@ function statusForExportState(
 					: "Ready to download",
 				fileName: exportState.generatedMedia.fileName,
 				kind: "succeeded",
+				outputSummary: exportState.generatedMedia.resolvedOutput
+					? formatGeneratedMediaOutput(
+							exportState.generatedMedia.resolvedOutput,
+						)
+					: undefined,
 				title: "Export complete",
 			};
 		case "cancelled":
@@ -340,6 +348,20 @@ function statusForExportState(
 				message: "Export cancelled.",
 			};
 	}
+}
+
+function formatGeneratedMediaOutput(
+	output: NonNullable<
+		Extract<
+			ExportSessionState,
+			{ status: "succeeded" }
+		>["generatedMedia"]["resolvedOutput"]
+	>,
+): string {
+	const resolution = output.resolution
+		? ` · ${output.resolution.width}x${output.resolution.height}`
+		: "";
+	return `${output.container.label} · ${formatVideoCodec(output.videoCodec)}${output.audioCodec ? ` · ${output.audioCodec.toUpperCase()}` : " · No audio"}${resolution}`;
 }
 
 function actionForExportState(

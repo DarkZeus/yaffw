@@ -512,6 +512,9 @@ describe("EditorNextRoute", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Export complete")).toBeTruthy();
 		});
+		expect(
+			screen.getByLabelText("Generated media output").textContent,
+		).toContain("MP4 · H.264 · AAC · 1920x1080");
 
 		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
 		expect(screen.getByText("picked-export.mp4")).toBeTruthy();
@@ -533,7 +536,7 @@ describe("EditorNextRoute", () => {
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
 			blob: generatedBlob,
-			generatedMedia: {
+			generatedMedia: expect.objectContaining({
 				assetId: "asset-exported",
 				createdAtMs: 1_717_171_717,
 				fileName: "picked-export.mp4",
@@ -549,7 +552,7 @@ describe("EditorNextRoute", () => {
 					startUs: 0,
 				},
 				sizeBytes: generatedBlob.size,
-			},
+			}),
 		});
 		await waitFor(() => {
 			expect(screen.getByText("Delivered")).toBeTruthy();

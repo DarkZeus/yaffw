@@ -3,18 +3,27 @@ import {
 	classifyExportRangeAccuracy,
 } from "./export-correctness";
 import {
+	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
 	type DefaultOutputProfile,
+	type OutputSettings,
 	type ReadyMediaAsset,
+	type ResolvedOutputPlan,
 	type Selection,
+	areOutputSettingsEqual,
+	createDefaultOutputSettings,
 } from "./model";
+import {
+	type BrowserLocalOutputSupport,
+	resolveOutputPlan,
+} from "./output-settings";
 import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type PlannedOutput = {
-	audioCodec: DefaultOutputProfile["audioCodec"];
-	container: DefaultOutputProfile["container"];
+	audioCodec?: string;
+	container: string;
 	label: string;
-	videoCodec: DefaultOutputProfile["videoCodec"];
+	videoCodec: string;
 };
 
 export type ExportMethodKey = "best-effort" | "fast" | "precision";
@@ -41,12 +50,14 @@ export type ExportCapabilityReview =
 			precision: ExportPrecision;
 			profile: DefaultOutputProfile;
 			reason: string;
+			resolvedOutput?: ResolvedOutputPlan;
 			supported: true;
 	  }
 	| {
 			plannedOutput: PlannedOutput;
 			profile: DefaultOutputProfile;
 			reason: string;
+			resolvedOutput?: ResolvedOutputPlan;
 			supported: false;
 			technicalDetails: string;
 	  };
@@ -58,27 +69,56 @@ type ExportCapabilityPlanningAsset = Pick<
 
 type PlanDefaultExportCapabilityOptions = {
 	asset: ExportCapabilityPlanningAsset;
+	audioMix?: AudioMix;
+	outputSettings?: OutputSettings;
 	profile?: DefaultOutputProfile;
 	rangeAccuracy?: ExportRangeAccuracyReport;
 	runtime: RuntimeSupport;
 	selection: Selection;
+	support?: BrowserLocalOutputSupport;
 };
 
 export function planDefaultExportCapability({
 	asset,
+	audioMix,
+	outputSettings,
 	profile = DEFAULT_OUTPUT_PROFILE,
 	rangeAccuracy,
 	runtime,
 	selection,
+	support,
 }: PlanDefaultExportCapabilityOptions): ExportCapabilityReview {
-	const plannedOutput = plannedOutputForProfile(profile);
+	const resolved =
+		audioMix && outputSettings && support
+			? resolveOutputPlan({ asset, audioMix, outputSettings, support })
+			: undefined;
+	const resolvedOutput =
+		resolved?.kind === "resolved" ? resolved.plan : undefined;
+	const usingDefaultOutputSettings =
+		!outputSettings ||
+		areOutputSettingsEqual(outputSettings, createDefaultOutputSettings());
+	const plannedOutput = resolvedOutput
+		? plannedOutputForResolvedPlan(resolvedOutput)
+		: plannedOutputForProfile(profile);
+
+	if (resolved?.kind === "invalid") {
+		return unsupportedReview({
+			plannedOutput: {
+				...plannedOutput,
+				label: "Invalid Output settings",
+			},
+			profile,
+			reason: "The current Output settings cannot be applied.",
+			technicalDetails: resolved.error,
+		});
+	}
 
 	if (!runtime.supported) {
 		return unsupportedReview({
 			plannedOutput,
 			profile,
 			reason:
-				"This runtime cannot export with the default MP4/H.264/AAC profile.",
+				"This runtime cannot export with the selected documented output profile.",
 			technicalDetails: runtime.reason,
 		});
 	}
@@ -104,8 +144,10 @@ export function planDefaultExportCapability({
 				label: "Whole file",
 			},
 			profile,
-			reason:
-				"The current selection covers the full asset, so export can use the default output profile without boundary trimming.",
+			reason: usingDefaultOutputSettings
+				? "The current selection covers the full asset, so export can use the default output profile without boundary trimming."
+				: "The current selection covers the full asset, so export can use the selected output plan without boundary trimming.",
+			resolvedOutput,
 			supported: true,
 		};
 	}
@@ -131,6 +173,7 @@ export function planDefaultExportCapability({
 			},
 			profile,
 			reason: selectedRangeAccuracy.reason,
+			resolvedOutput,
 			supported: true,
 		};
 	}
@@ -147,7 +190,19 @@ export function planDefaultExportCapability({
 		},
 		profile,
 		reason: selectedRangeAccuracy.reason,
+		resolvedOutput,
 		supported: true,
+	};
+}
+
+export function plannedOutputForResolvedPlan(
+	plan: ResolvedOutputPlan,
+): PlannedOutput {
+	return {
+		audioCodec: plan.audioCodec,
+		container: plan.container.id,
+		label: `${plan.container.label} / ${formatVideoCodec(plan.videoCodec)} video / ${plan.audioCodec ? `${plan.audioCodec.toUpperCase()} audio` : "No audio"}`,
+		videoCodec: plan.videoCodec,
 	};
 }
 
@@ -160,6 +215,17 @@ export function plannedOutputForProfile(
 		label: "MP4 / H.264 video / AAC audio",
 		videoCodec: profile.videoCodec,
 	};
+}
+
+function formatVideoCodec(codec: string): string {
+	if (codec === "avc") {
+		return "H.264";
+	}
+	if (codec === "hevc") {
+		return "H.265";
+	}
+
+	return codec.toUpperCase();
 }
 
 function unsupportedReview({

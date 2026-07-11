@@ -3,6 +3,7 @@ import type {
 	ExportProgress,
 	OutputSettings,
 	ReadyMediaAsset,
+	ResolvedOutputPlan,
 	Selection,
 } from "@/editor-core/model";
 
@@ -11,6 +12,7 @@ export type DefaultExportRunnerRequest = {
 	audioMix: AudioMix;
 	onProgress: (progress: ExportProgress) => void;
 	outputSettings: OutputSettings;
+	resolvedOutput?: ResolvedOutputPlan;
 	selection: Selection;
 	signal: AbortSignal;
 	source: Blob;

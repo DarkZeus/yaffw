@@ -153,6 +153,24 @@ export type OutputSettings = {
 	videoQuality: OutputQualitySetting;
 };
 
+export type ResolvedOutputPlan = {
+	audioCodec?: string;
+	audioQuality: OutputQualitySetting;
+	container: {
+		fileExtension: string;
+		id: string;
+		label: string;
+		mimeType: string;
+	};
+	includedAudioTrackCount: number;
+	resolution?: {
+		height: number;
+		width: number;
+	};
+	videoCodec: string;
+	videoQuality: OutputQualitySetting;
+};
+
 export function createDefaultOutputSettings(): OutputSettings {
 	return {
 		audioCodec: {
@@ -290,7 +308,9 @@ export type GeneratedMedia = {
 	fileName: string;
 	id: string;
 	mimeType: string;
+	outputSettings?: OutputSettings;
 	profile: DefaultOutputProfile;
+	resolvedOutput?: ResolvedOutputPlan;
 	selection: Selection;
 	sizeBytes: number;
 };

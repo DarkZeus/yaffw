@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { planDefaultExportCapability } from "./export-capability";
 import { classifyExportRangeAccuracy } from "./export-correctness";
 import type { ReadyMediaAsset, Selection } from "./model";
-import { DEFAULT_OUTPUT_PROFILE } from "./model";
+import { DEFAULT_OUTPUT_PROFILE, createDefaultOutputSettings } from "./model";
 import { evaluateRuntimeSupport } from "./runtime-capabilities";
 
 describe("default export capability planning", () => {
@@ -45,6 +45,65 @@ describe("default export capability planning", () => {
 		expect(review.precision.label).toBe("Whole file");
 		expect(review.reason).toContain("full asset");
 		expect(review.profile).toEqual(DEFAULT_OUTPUT_PROFILE);
+	});
+
+	it("plans capability from the applied Output settings and resolved Generated audio mix", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp9",
+			kind: "documented-codec",
+		};
+
+		const review = planDefaultExportCapability({
+			asset: readyAsset,
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-1": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-1",
+						volumePercent: 100,
+					},
+				},
+			},
+			outputSettings,
+			runtime: supportedRuntime,
+			selection: fullSelection,
+			support: {
+				containers: [
+					{
+						audioCodecs: ["opus"],
+						fileExtension: ".webm",
+						id: "webm",
+						label: "WebM",
+						mimeType: "video/webm",
+						videoCodecs: ["vp9"],
+					},
+				],
+			},
+		});
+
+		expect(review.supported).toBe(true);
+		if (!review.supported) {
+			throw new Error(`Expected supported review: ${review.reason}`);
+		}
+		expect(review.plannedOutput).toEqual({
+			audioCodec: "opus",
+			container: "webm",
+			label: "WebM / VP9 video / OPUS audio",
+			videoCodec: "vp9",
+		});
+		expect(review.resolvedOutput).toMatchObject({
+			audioCodec: "opus",
+			container: { fileExtension: ".webm", mimeType: "video/webm" },
+			videoCodec: "vp9",
+		});
 	});
 
 	it("keeps frame-aligned selections unverified until generated-media evidence proves precision", () => {

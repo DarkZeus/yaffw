@@ -34,6 +34,30 @@ const DOCUMENTED_VIDEO_FORMATS: DocumentedVideoFormat[] = [
 
 export const MEDIABUNNY_OUTPUT_SUPPORT = getMediabunnyOutputSupport();
 
+export function createMediabunnyOutputFormat(
+	containerId: string,
+	options: { fastStart?: boolean } = {},
+): OutputFormat {
+	switch (containerId) {
+		case "mp4":
+			return new Mp4OutputFormat(
+				options.fastStart ? { fastStart: "in-memory" } : undefined,
+			);
+		case "mov":
+			return new MovOutputFormat();
+		case "mkv":
+			return new MkvOutputFormat();
+		case "webm":
+			return new WebMOutputFormat();
+		case "mpeg-ts":
+			return new MpegTsOutputFormat();
+		default:
+			throw new Error(
+				`The selected ${containerId} container has no browser-local output adapter.`,
+			);
+	}
+}
+
 export function getMediabunnyOutputSupport(): BrowserLocalOutputSupport {
 	return {
 		containers: DOCUMENTED_VIDEO_FORMATS.map(toDocumentedOutputContainer),

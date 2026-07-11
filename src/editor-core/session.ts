@@ -4,8 +4,6 @@ import {
 	planDefaultExportCapability,
 } from "./export-capability";
 import {
-	areOutputSettingsEqual,
-	createDefaultOutputSettings,
 	type AudioMix,
 	type AudioTrackChannelMode,
 	type ExportProgress,
@@ -14,7 +12,10 @@ import {
 	type MediaTimeUs,
 	type OutputSettings,
 	type ReadyMediaAsset,
+	type ResolvedOutputPlan,
 	type Selection,
+	areOutputSettingsEqual,
+	createDefaultOutputSettings,
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
 import {
@@ -51,6 +52,7 @@ export type ExportJobSnapshot = {
 	audioMix: AudioMix;
 	outputSettings: OutputSettings;
 	review: Extract<ExportCapabilityReview, { supported: true }>;
+	resolvedOutput?: ResolvedOutputPlan;
 	selection: Selection;
 };
 
@@ -176,6 +178,7 @@ export type EditorSessionAction =
 	| {
 			cancelSupported: boolean;
 			jobId: string;
+			review?: Extract<ExportCapabilityReview, { supported: true }>;
 			type: "export.started";
 	  }
 	| {
@@ -433,11 +436,13 @@ export function editorSessionReducer(
 				return state;
 			}
 
-			const review = planDefaultExportCapability({
-				asset: state.asset,
-				runtime: state.runtime,
-				selection: state.selection,
-			});
+			const review =
+				action.review ??
+				planDefaultExportCapability({
+					asset: state.asset,
+					runtime: state.runtime,
+					selection: state.selection,
+				});
 
 			if (!review.supported) {
 				return state;
@@ -457,6 +462,7 @@ export function editorSessionReducer(
 							audioMix: state.audioMix,
 							outputSettings: state.outputSettings,
 							review,
+							resolvedOutput: review.resolvedOutput,
 							selection: { ...state.selection },
 						},
 					},

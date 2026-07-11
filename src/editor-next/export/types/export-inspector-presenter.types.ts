@@ -56,6 +56,7 @@ export type ExportInspectorStatusViewModel =
 			deliveryState: "Delivered" | "Ready to download";
 			fileName: string;
 			kind: "succeeded";
+			outputSummary?: string;
 			title: "Export complete";
 	  }
 	| {

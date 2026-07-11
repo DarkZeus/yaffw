@@ -92,25 +92,31 @@ vi.mock("mediabunny", () => {
 
 	const Output = vi
 		.fn()
-		.mockImplementation(({ target }: { target: BufferTarget }) => {
-			const output: MockOutput = {
-				addAudioTrack: vi.fn(),
-				addVideoTrack: vi.fn(),
-				cancel: vi.fn(async () => {}),
-				finalize: vi.fn(async () => {
-					if (mediabunnyMock.outputFinalizeFailure) {
-						throw mediabunnyMock.outputFinalizeFailure;
-					}
-
-					target.buffer = new Uint8Array([9, 8, 7]).buffer;
-				}),
-				start: vi.fn(async () => {}),
+		.mockImplementation(
+			({
+				format,
 				target,
-			};
-			mediabunnyMock.outputs.push(output);
+			}: { format: MockOutputFormat; target: BufferTarget }) => {
+				const output: MockOutput = {
+					addAudioTrack: vi.fn(),
+					addVideoTrack: vi.fn(),
+					cancel: vi.fn(async () => {}),
+					finalize: vi.fn(async () => {
+						if (mediabunnyMock.outputFinalizeFailure) {
+							throw mediabunnyMock.outputFinalizeFailure;
+						}
 
-			return output;
-		});
+						target.buffer = new Uint8Array([9, 8, 7]).buffer;
+					}),
+					format,
+					start: vi.fn(async () => {}),
+					target,
+				};
+				mediabunnyMock.outputs.push(output);
+
+				return output;
+			},
+		);
 
 	const Conversion = {
 		init: vi.fn(async (config: MockConversionConfig) => {
@@ -168,7 +174,16 @@ vi.mock("mediabunny", () => {
 		readonly close = vi.fn();
 		readonly options: unknown;
 
-		constructor(options: unknown) {
+		constructor(options: { bitrate?: unknown; codec: string }) {
+			if (
+				options.bitrate === undefined &&
+				options.codec !== "flac" &&
+				!options.codec.startsWith("pcm-")
+			) {
+				throw new TypeError(
+					"config.bitrate must be provided for compressed audio codecs.",
+				);
+			}
 			this.options = options;
 			mediabunnyMock.audioBufferSources.push(this);
 		}
@@ -252,6 +267,33 @@ describe("browserDefaultExportRunner cleanup", () => {
 		await browserDefaultExportRunner.run(createExportRequest());
 
 		expect(conversionConfig?.video).toEqual({ codec: "avc" });
+	});
+
+	it("uses the resolved non-default container, codec, and MIME type", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+			return Promise.resolve();
+		};
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp9",
+			kind: "documented-codec",
+		};
+
+		const result = await browserDefaultExportRunner.run(
+			createExportRequest({ outputSettings }),
+		);
+
+		expect(conversionConfig?.video).toEqual({ codec: "vp9" });
+		expect(conversionConfig?.output.format.mimeType).toBe("video/webm");
+		expect(result.mimeType).toBe("video/webm");
+		expect(result.blob.type).toBe("video/webm");
 	});
 
 	it("disposes video-only export resources after successful export", async () => {
@@ -352,6 +394,10 @@ describe("browserDefaultExportRunner cleanup", () => {
 		).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].add).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
+			bitrate: { name: "QUALITY_MEDIUM" },
+			codec: "aac",
+		});
 	});
 
 	it("encodes the Generated audio mix with the resolved explicit codec", async () => {
@@ -378,6 +424,9 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
 			codec: "flac",
 		});
+		expect(mediabunnyMock.audioBufferSources[0].options).not.toHaveProperty(
+			"bitrate",
+		);
 	});
 
 	it("passes independent subjective video and custom audio bitrate choices", async () => {
@@ -503,10 +552,16 @@ type MockOutput = {
 	addVideoTrack: MockFn;
 	cancel: MockFn;
 	finalize: MockFn;
+	format: MockOutputFormat;
 	start: MockFn;
 	target: {
 		buffer: ArrayBuffer | null;
 	};
+};
+
+type MockOutputFormat = {
+	fileExtension: string;
+	mimeType: string;
 };
 
 type MockConversion = {

@@ -1,4 +1,5 @@
 import {
+	type AudioCodec,
 	QUALITY_HIGH,
 	QUALITY_LOW,
 	QUALITY_MEDIUM,
@@ -29,4 +30,23 @@ export function toMediabunnyBitrate(
 	}
 
 	return MEDIABUNNY_SUBJECTIVE_QUALITIES[quality.quality];
+}
+
+export function toMediabunnyAudioBitrate({
+	codec,
+	quality,
+}: {
+	codec: AudioCodec;
+	quality: Exclude<ResolvedOutputQuality, { kind: "invalid" }>;
+}): number | Quality | undefined {
+	const requestedBitrate = toMediabunnyBitrate(quality);
+	if (
+		requestedBitrate !== undefined ||
+		codec === "flac" ||
+		codec.startsWith("pcm-")
+	) {
+		return requestedBitrate;
+	}
+
+	return QUALITY_MEDIUM;
 }

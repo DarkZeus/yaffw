@@ -8,7 +8,6 @@ import {
 	EncodedPacketSink,
 	EncodedVideoPacketSource,
 	Input,
-	Mp4OutputFormat,
 	Output,
 	type VideoCodec,
 } from "mediabunny";
@@ -18,7 +17,7 @@ import {
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
 import {
-	resolveOutputAudioProfile,
+	resolveOutputPlan,
 	resolveOutputQuality,
 	resolveOutputResolution,
 } from "@/editor-core/output-settings";
@@ -29,8 +28,14 @@ import {
 	createDisposableMediaCleanup,
 	withDisposableMediaWorkScope,
 } from "../../media-work/scopes/disposable-media-work-scope";
-import { toMediabunnyBitrate } from "../adapters/mediabunny-output-quality";
-import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
+import {
+	toMediabunnyAudioBitrate,
+	toMediabunnyBitrate,
+} from "../adapters/mediabunny-output-quality";
+import {
+	MEDIABUNNY_OUTPUT_SUPPORT,
+	createMediabunnyOutputFormat,
+} from "../adapters/mediabunny-output-support";
 import type {
 	DefaultExportRunner,
 	DefaultExportRunnerRequest,
@@ -61,6 +66,7 @@ async function runBrowserDefaultExport({
 	audioMix,
 	onProgress,
 	outputSettings,
+	resolvedOutput: suppliedResolvedOutput,
 	selection,
 	signal,
 	source,
@@ -73,10 +79,24 @@ async function runBrowserDefaultExport({
 		phase: "preparing",
 	});
 
+	const resolved = suppliedResolvedOutput
+		? { kind: "resolved" as const, plan: suppliedResolvedOutput }
+		: resolveOutputPlan({
+				asset,
+				audioMix,
+				outputSettings,
+				support: MEDIABUNNY_OUTPUT_SUPPORT,
+			});
+	if (resolved.kind === "invalid") {
+		throw new Error(resolved.error);
+	}
+	const resolvedOutput = resolved.plan;
+
 	const videoOnlyResult = await runBrowserVideoOnlyExport({
 		asset,
 		onProgress,
 		outputSettings,
+		resolvedOutput,
 		selection,
 		signal,
 		source,
@@ -91,21 +111,12 @@ async function runBrowserDefaultExport({
 		return videoOnlyResult;
 	}
 
-	const audioProfile = resolveOutputAudioProfile({
-		asset,
-		audioMix,
-		outputSettings,
-		support: MEDIABUNNY_OUTPUT_SUPPORT,
-	});
-	if (audioProfile.kind === "invalid") {
-		throw new Error(audioProfile.error);
-	}
-	if (!audioProfile.audioCodec) {
+	if (!resolvedOutput.audioCodec) {
 		return videoOnlyResult;
 	}
 	const audioQuality = resolveOutputQuality({
 		mediaKind: "audio",
-		setting: outputSettings.audioQuality,
+		setting: resolvedOutput.audioQuality,
 	});
 	if (audioQuality.kind === "invalid") {
 		throw new Error(audioQuality.error);
@@ -134,15 +145,19 @@ async function runBrowserDefaultExport({
 
 	const blob = await muxVideoOnlyExportWithMixedAudio({
 		audioBuffer: mixedAudio.audioBuffer,
-		audioBitrate: toMediabunnyBitrate(audioQuality),
-		audioCodec: audioProfile.audioCodec as AudioCodec,
+		audioBitrate: toMediabunnyAudioBitrate({
+			codec: resolvedOutput.audioCodec as AudioCodec,
+			quality: audioQuality,
+		}),
+		audioCodec: resolvedOutput.audioCodec as AudioCodec,
+		containerId: resolvedOutput.container.id,
 		signal,
 		videoOnlyBlob: videoOnlyResult.blob,
 	});
 
 	return {
 		blob,
-		mimeType: "video/mp4",
+		mimeType: resolvedOutput.container.mimeType,
 	};
 }
 
@@ -150,12 +165,19 @@ async function runBrowserVideoOnlyExport({
 	asset,
 	onProgress,
 	outputSettings,
+	resolvedOutput,
 	selection,
 	signal,
 	source,
 }: Pick<
 	DefaultExportRunnerRequest,
-	"asset" | "onProgress" | "outputSettings" | "selection" | "signal" | "source"
+	| "asset"
+	| "onProgress"
+	| "outputSettings"
+	| "resolvedOutput"
+	| "selection"
+	| "signal"
+	| "source"
 >): Promise<DefaultExportRunnerResult> {
 	return withDisposableMediaWorkScope(async (scope) => {
 		const resolution = resolveOutputResolution({
@@ -167,7 +189,7 @@ async function runBrowserVideoOnlyExport({
 		}
 		const videoQuality = resolveOutputQuality({
 			mediaKind: "video",
-			setting: outputSettings.videoQuality,
+			setting: resolvedOutput?.videoQuality ?? outputSettings.videoQuality,
 		});
 		if (videoQuality.kind === "invalid") {
 			throw new Error(videoQuality.error);
@@ -182,7 +204,9 @@ async function runBrowserVideoOnlyExport({
 		);
 		const target = new BufferTarget();
 		const output = new Output({
-			format: new Mp4OutputFormat(),
+			format: createMediabunnyOutputFormat(
+				resolvedOutput?.container.id ?? "mp4",
+			),
 			target,
 		});
 		const outputCleanup = registerCancellableUntilSettled(scope, output);
@@ -198,7 +222,7 @@ async function runBrowserVideoOnlyExport({
 				start: selection.startUs / 1_000_000,
 			},
 			video: {
-				codec: "avc",
+				codec: (resolvedOutput?.videoCodec ?? "avc") as VideoCodec,
 				...(videoBitrate === undefined ? {} : { bitrate: videoBitrate }),
 				...(resolution.conversionDimensions
 					? {
@@ -243,8 +267,10 @@ async function runBrowserVideoOnlyExport({
 		}
 
 		return {
-			blob: new Blob([target.buffer], { type: "video/mp4" }),
-			mimeType: "video/mp4",
+			blob: new Blob([target.buffer], {
+				type: resolvedOutput?.container.mimeType ?? "video/mp4",
+			}),
+			mimeType: resolvedOutput?.container.mimeType ?? "video/mp4",
 		};
 	});
 }
@@ -253,12 +279,14 @@ async function muxVideoOnlyExportWithMixedAudio({
 	audioBuffer,
 	audioBitrate,
 	audioCodec,
+	containerId,
 	signal,
 	videoOnlyBlob,
 }: {
 	audioBuffer: AudioBuffer;
 	audioBitrate: ConstructorParameters<typeof AudioBufferSource>[0]["bitrate"];
 	audioCodec: AudioCodec;
+	containerId: string;
 	signal: AbortSignal;
 	videoOnlyBlob: Blob;
 }): Promise<Blob> {
@@ -275,7 +303,7 @@ async function muxVideoOnlyExportWithMixedAudio({
 		);
 		const target = new BufferTarget();
 		const output = new Output({
-			format: new Mp4OutputFormat({ fastStart: "in-memory" }),
+			format: createMediabunnyOutputFormat(containerId, { fastStart: true }),
 			target,
 		});
 		const outputCleanup = registerCancellableUntilSettled(scope, output);
@@ -336,7 +364,12 @@ async function muxVideoOnlyExportWithMixedAudio({
 			throw new Error("Default export mux failed before producing media.");
 		}
 
-		return new Blob([target.buffer], { type: "video/mp4" });
+		return new Blob([target.buffer], {
+			type:
+				MEDIABUNNY_OUTPUT_SUPPORT.containers.find(
+					({ id }) => id === containerId,
+				)?.mimeType ?? "application/octet-stream",
+		});
 	});
 }
 

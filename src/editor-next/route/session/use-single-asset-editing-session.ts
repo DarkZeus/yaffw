@@ -8,6 +8,7 @@ import type {
 	GeneratedMedia,
 	OutputSettings,
 	ReadyMediaAsset,
+	ResolvedOutputPlan,
 	Selection,
 } from "@/editor-core/model";
 import { areOutputSettingsEqual } from "@/editor-core/model";
@@ -17,6 +18,7 @@ import {
 	editorSessionReducer,
 	shouldProtectEditorBeforeUnload,
 } from "@/editor-core/session";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../../export/adapters/mediabunny-output-support";
 import {
 	type GeneratedMediaArtifactStore,
 	createGeneratedMediaArtifactStore,
@@ -168,11 +170,18 @@ export function useSingleAssetEditingSession({
 
 		const review = planDefaultExportCapability({
 			asset: session.asset,
+			audioMix: session.audioMix,
+			outputSettings: session.outputSettings,
 			runtime: session.runtime,
 			selection: session.selection,
+			support: MEDIABUNNY_OUTPUT_SUPPORT,
 		});
 
-		if (!review.supported || session.export.status === "running") {
+		if (
+			!review.supported ||
+			!review.resolvedOutput ||
+			session.export.status === "running"
+		) {
 			return;
 		}
 
@@ -183,6 +192,7 @@ export function useSingleAssetEditingSession({
 		dispatch({
 			cancelSupported: defaultExportRunner.cancelSupported,
 			jobId,
+			review,
 			type: "export.started",
 		});
 
@@ -198,6 +208,7 @@ export function useSingleAssetEditingSession({
 					});
 				},
 				outputSettings: session.outputSettings,
+				resolvedOutput: review.resolvedOutput,
 				selection: session.selection,
 				signal: abortController.signal,
 				source: previewSource,
@@ -216,8 +227,9 @@ export function useSingleAssetEditingSession({
 				blob: result.blob,
 				fileName: result.fileName,
 				generatedMediaId: createGeneratedMediaId(),
-				mimeType: result.mimeType,
 				now,
+				outputSettings: session.outputSettings,
+				resolvedOutput: review.resolvedOutput,
 				selection: session.selection,
 			});
 
@@ -461,39 +473,88 @@ function createGeneratedMedia({
 	blob,
 	fileName,
 	generatedMediaId,
-	mimeType,
 	now,
+	outputSettings,
+	resolvedOutput,
 	selection,
 }: {
 	asset: ReadyMediaAsset;
 	blob: Blob;
 	fileName?: string;
 	generatedMediaId: string;
-	mimeType?: string;
 	now: () => number;
+	outputSettings: OutputSettings;
+	resolvedOutput: ResolvedOutputPlan;
 	selection: Selection;
 }): GeneratedMedia {
 	return {
 		assetId: asset.id,
 		createdAtMs: now(),
 		fileName:
-			fileName ?? createGeneratedMediaFileName(asset.provenance.fileName),
+			fileName !== undefined
+				? replaceFileExtension(fileName, resolvedOutput.container.fileExtension)
+				: createGeneratedMediaFileName(
+						asset.provenance.fileName,
+						resolvedOutput.container.fileExtension,
+					),
 		id: generatedMediaId,
-		mimeType: mimeType ?? (blob.type || "video/mp4"),
+		mimeType: resolvedOutput.container.mimeType,
+		outputSettings: cloneOutputSettings(outputSettings),
 		profile: asset.exportCapability.profile,
+		resolvedOutput: cloneResolvedOutputPlan(resolvedOutput),
 		selection: { ...selection },
 		sizeBytes: blob.size,
 	};
 }
 
-function createGeneratedMediaFileName(fileName: string): string {
+function replaceFileExtension(fileName: string, fileExtension: string): string {
 	const extensionStart = fileName.lastIndexOf(".");
+	const normalizedExtension = fileExtension.startsWith(".")
+		? fileExtension
+		: `.${fileExtension}`;
+
+	return `${extensionStart <= 0 ? fileName : fileName.slice(0, extensionStart)}${normalizedExtension}`;
+}
+
+function createGeneratedMediaFileName(
+	fileName: string,
+	fileExtension: string,
+): string {
+	const extensionStart = fileName.lastIndexOf(".");
+	const normalizedExtension = fileExtension.startsWith(".")
+		? fileExtension
+		: `.${fileExtension}`;
 
 	if (extensionStart <= 0) {
-		return `${fileName}-export.mp4`;
+		return `${fileName}-export${normalizedExtension}`;
 	}
 
-	return `${fileName.slice(0, extensionStart)}-export.mp4`;
+	return `${fileName.slice(0, extensionStart)}-export${normalizedExtension}`;
+}
+
+function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {
+	return {
+		audioCodec: { ...outputSettings.audioCodec },
+		audioQuality: { ...outputSettings.audioQuality },
+		container: { ...outputSettings.container },
+		resolution: { ...outputSettings.resolution },
+		videoCodec: { ...outputSettings.videoCodec },
+		videoQuality: { ...outputSettings.videoQuality },
+	};
+}
+
+function cloneResolvedOutputPlan(
+	resolvedOutput: ResolvedOutputPlan,
+): ResolvedOutputPlan {
+	return {
+		...resolvedOutput,
+		audioQuality: { ...resolvedOutput.audioQuality },
+		container: { ...resolvedOutput.container },
+		resolution: resolvedOutput.resolution
+			? { ...resolvedOutput.resolution }
+			: undefined,
+		videoQuality: { ...resolvedOutput.videoQuality },
+	};
 }
 
 function errorToMessage(error: unknown): string {

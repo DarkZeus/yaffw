@@ -238,6 +238,14 @@ function ExportJobStatus({
 				>
 					{status.fileName}
 				</p>
+				{status.outputSummary ? (
+					<p
+						aria-label="Generated media output"
+						className="text-xs text-muted-foreground"
+					>
+						{status.outputSummary}
+					</p>
+				) : null}
 			</div>
 		);
 	}
