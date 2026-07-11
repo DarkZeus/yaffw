@@ -6,7 +6,10 @@ import {
 } from "@/editor-core/export-correctness";
 import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
-import type { ExportProgress } from "@/editor-core/model";
+import {
+	type ExportProgress,
+	createDefaultOutputSettings,
+} from "@/editor-core/model";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
@@ -184,6 +187,7 @@ async function runExportArtifactHarness({
 			onProgress: (event) => {
 				progress.push(event);
 			},
+			outputSettings: createDefaultOutputSettings(),
 			selection,
 			signal: exportSignal,
 			source,

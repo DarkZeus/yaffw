@@ -16,6 +16,53 @@ afterEach(() => {
 });
 
 describe("useSingleAssetEditingSession", () => {
+	it("starts Export with the applied resolution snapshot", async () => {
+		const run = vi.fn(async () => ({
+			blob: new Blob(["generated media"], { type: "video/mp4" }),
+		}));
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+
+		render(
+			<SingleAssetEditingSessionProbe
+				defaultExportRunner={{ cancelSupported: true, run }}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		await act(async () => {
+			await sessionRef.current?.commands.importLocalFile(
+				new File(["video"], "clip.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(sessionRef.current?.session.status).toBe("ready");
+		});
+
+		const outputSettings = smallDownscaledOutputSettings();
+		act(() => {
+			sessionRef.current?.commands.applyOutputSettings(outputSettings);
+		});
+		await act(async () => {
+			await sessionRef.current?.commands.startDefaultExport();
+		});
+
+		expect(run).toHaveBeenCalledWith(
+			expect.objectContaining({ outputSettings }),
+		);
+		const session = sessionRef.current?.session;
+		expect(session?.status).toBe("ready");
+		if (session?.status !== "ready" || session.export.status !== "succeeded") {
+			throw new Error("Expected a succeeded export.");
+		}
+		expect(session.export.job.snapshot.outputSettings.resolution).toEqual({
+			height: 90,
+			kind: "target-dimensions",
+			width: 160,
+		});
+	});
+
 	it("ignores stale failed asset analysis after a newer Media asset is ready", async () => {
 		const inspections: Array<{
 			deferred: Deferred<LocalMediaAssetInspection>;
@@ -225,6 +272,7 @@ describe("useSingleAssetEditingSession", () => {
 function SingleAssetEditingSessionProbe({
 	createAssetId = () => "asset-1",
 	createDraftId = () => "draft-1",
+	defaultExportRunner,
 	deliverGeneratedMedia = () => {},
 	generatedBlob,
 	inspectLocalAsset = async () => supportedInspection,
@@ -232,6 +280,7 @@ function SingleAssetEditingSessionProbe({
 }: {
 	createAssetId?: SingleAssetEditingSessionOptions["createAssetId"];
 	createDraftId?: SingleAssetEditingSessionOptions["createDraftId"];
+	defaultExportRunner?: SingleAssetEditingSessionOptions["defaultExportRunner"];
 	deliverGeneratedMedia?: SingleAssetEditingSessionOptions["deliverGeneratedMedia"];
 	generatedBlob?: Blob;
 	inspectLocalAsset?: SingleAssetEditingSessionOptions["inspectLocalAsset"];
@@ -243,7 +292,7 @@ function SingleAssetEditingSessionProbe({
 		createDraftId,
 		createExportJobId: () => "export-1",
 		createGeneratedMediaId: () => "generated-1",
-		defaultExportRunner: {
+		defaultExportRunner: defaultExportRunner ?? {
 			cancelSupported: true,
 			run: async () => ({
 				blob:
@@ -337,6 +386,17 @@ function downscaledOutputSettings(): OutputSettings {
 			height: 720,
 			kind: "target-dimensions",
 			width: 1280,
+		},
+	};
+}
+
+function smallDownscaledOutputSettings(): OutputSettings {
+	return {
+		...createDefaultOutputSettings(),
+		resolution: {
+			height: 90,
+			kind: "target-dimensions",
+			width: 160,
 		},
 	};
 }

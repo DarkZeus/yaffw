@@ -2,7 +2,9 @@ import {
 	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
 	type ExportProgress,
+	type OutputSettings,
 	type ReadyMediaAsset,
+	createDefaultOutputSettings,
 } from "@/editor-core/model";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -181,6 +183,41 @@ beforeEach(() => {
 });
 
 describe("browserDefaultExportRunner cleanup", () => {
+	it("passes resolved downscale dimensions to Mediabunny conversion", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+			return Promise.resolve();
+		};
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({
+				outputSettings: downscaledOutputSettings,
+			}),
+		);
+
+		expect(conversionConfig?.video).toEqual({
+			codec: "avc",
+			fit: "fill",
+			height: 720,
+			width: 1280,
+		});
+	});
+
+	it("does not set custom dimensions when resolution preserves the source", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+			return Promise.resolve();
+		};
+
+		await browserDefaultExportRunner.run(createExportRequest());
+
+		expect(conversionConfig?.video).toEqual({ codec: "avc" });
+	});
+
 	it("disposes video-only export resources after successful export", async () => {
 		const onProgress = vi.fn();
 
@@ -350,6 +387,12 @@ type MockConversion = {
 
 type MockConversionConfig = {
 	output: MockOutput;
+	video: {
+		codec: string;
+		fit?: string;
+		height?: number;
+		width?: number;
+	};
 };
 
 type MockVideoTrack = {
@@ -376,16 +419,19 @@ type MockAudioBufferSource = {
 function createExportRequest({
 	audioMix = videoOnlyAudioMix,
 	onProgress = vi.fn(),
+	outputSettings = createDefaultOutputSettings(),
 	signal = new AbortController().signal,
 }: {
 	audioMix?: AudioMix;
 	onProgress?: (progress: ExportProgress) => void;
+	outputSettings?: OutputSettings;
 	signal?: AbortSignal;
 } = {}): DefaultExportRunnerRequest {
 	return {
 		asset: readyAsset,
 		audioMix,
 		onProgress,
+		outputSettings,
 		selection: {
 			endUs: 1_000_000,
 			startUs: 0,
@@ -394,6 +440,15 @@ function createExportRequest({
 		source: new Blob(["video"], { type: "video/mp4" }),
 	};
 }
+
+const downscaledOutputSettings = {
+	...createDefaultOutputSettings(),
+	resolution: {
+		height: 720,
+		kind: "target-dimensions",
+		width: 1280,
+	},
+} satisfies OutputSettings;
 
 async function waitForConversion() {
 	for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -453,8 +508,10 @@ const readyAsset = {
 		video: [
 			{
 				codec: "avc",
+				height: 1080,
 				id: "video-1",
 				kind: "video",
+				width: 1920,
 			},
 		],
 	},

@@ -3,7 +3,11 @@ import {
 	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import type { ExportProgress } from "@/editor-core/model";
-import { resolveOutputVideoProfile } from "@/editor-core/output-settings";
+import {
+	type ResolvedOutputResolution,
+	resolveOutputResolution,
+	resolveOutputVideoProfile,
+} from "@/editor-core/output-settings";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportSessionState } from "@/editor-core/session";
 import { getMediabunnyOutputSupport } from "../adapters/mediabunny-output-support";
@@ -36,7 +40,14 @@ export function createExportInspectorViewModel({
 		outputSettings,
 		support: OUTPUT_SUPPORT,
 	});
-	const supported = review.supported && outputProfile.kind === "resolved";
+	const outputResolution = resolveOutputResolution({
+		asset,
+		setting: outputSettings.resolution,
+	});
+	const supported =
+		review.supported &&
+		outputProfile.kind === "resolved" &&
+		outputResolution.kind === "resolved";
 
 	return {
 		action: actionForExportState(exportState, supported),
@@ -45,7 +56,7 @@ export function createExportInspectorViewModel({
 			tone: supported ? "ready" : "blocked",
 		},
 		capability: capabilityViewModel(supported),
-		review: reviewViewModel(review, outputProfile),
+		review: reviewViewModel(review, outputProfile, outputResolution),
 		runtimeChecks: runtimeCheckViewModels(runtime),
 		status: statusForExportState(exportState),
 	};
@@ -90,6 +101,7 @@ function runtimeCheckViewModels(
 function reviewViewModel(
 	review: ExportCapabilityReview,
 	outputProfile: ReturnType<typeof resolveOutputVideoProfile>,
+	outputResolution: ResolvedOutputResolution,
 ): ExportInspectorReviewViewModel {
 	if (outputProfile.kind === "invalid") {
 		return {
@@ -98,8 +110,22 @@ function reviewViewModel(
 				value: "Invalid Output settings",
 			},
 			reason: "The current Output settings cannot be applied.",
+			resolution: resolutionViewModel(outputResolution),
 			supported: false,
 			technicalDetails: outputProfile.error,
+		};
+	}
+
+	if (outputResolution.kind === "invalid") {
+		return {
+			plannedOutput: {
+				label: "Format",
+				value: "Invalid Output settings",
+			},
+			reason: "The current Output settings cannot be applied.",
+			resolution: resolutionViewModel(outputResolution),
+			supported: false,
+			technicalDetails: outputResolution.error,
 		};
 	}
 
@@ -112,6 +138,7 @@ function reviewViewModel(
 		return {
 			plannedOutput,
 			reason: review.reason,
+			resolution: resolutionViewModel(outputResolution),
 			supported: false,
 			technicalDetails: review.technicalDetails,
 		};
@@ -128,7 +155,24 @@ function reviewViewModel(
 			value: review.precision.label,
 		},
 		reason: review.reason,
+		resolution: resolutionViewModel(outputResolution),
 		supported: true,
+	};
+}
+
+function resolutionViewModel(resolution: ResolvedOutputResolution): {
+	label: "Resolution";
+	value: string;
+} {
+	if (resolution.kind === "invalid") {
+		return { label: "Resolution", value: "Invalid Output settings" };
+	}
+
+	return {
+		label: "Resolution",
+		value: resolution.dimensions
+			? `${resolution.dimensions.width}x${resolution.dimensions.height}`
+			: "Preserve source",
 	};
 }
 

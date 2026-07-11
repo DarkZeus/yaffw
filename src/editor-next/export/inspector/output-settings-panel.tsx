@@ -30,7 +30,10 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import {
+	type ResolvedOutputResolution,
 	type ResolvedOutputVideoProfile,
+	getOutputResolutionChoices,
+	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
@@ -98,6 +101,19 @@ export function OutputSettingsPanel({
 		setReconciledDraft(nextDraft);
 	}
 
+	function changeResolution(value: string) {
+		const choice = resolutionChoices.find(
+			({ setting }) => resolutionSettingValue(setting) === value,
+		);
+		if (!choice) {
+			return;
+		}
+
+		const nextDraft = cloneOutputSettings(activeDraft);
+		nextDraft.resolution = { ...choice.setting };
+		setDraft(nextDraft);
+	}
+
 	function setReconciledDraft(nextDraft: OutputSettings) {
 		const resolution = resolveOutputVideoProfile({
 			asset,
@@ -119,11 +135,15 @@ export function OutputSettingsPanel({
 
 		setDraft(nextDraft);
 	}
-
 	const sourceDimensions = formatSourceDimensions(asset);
 	const [automaticReplacementMessage, setAutomaticReplacementMessage] =
 		useState<string | null>(null);
 	const activeDraft = draft ?? outputSettings;
+	const resolutionChoices = getOutputResolutionChoices(asset);
+	const resolvedResolution = resolveOutputResolution({
+		asset,
+		setting: activeDraft.resolution,
+	});
 	const resolvedDraft = resolveOutputVideoProfile({
 		asset,
 		outputSettings: activeDraft,
@@ -141,7 +161,10 @@ export function OutputSettingsPanel({
 	}
 
 	function applyResolvedDraft() {
-		if (resolvedDraft.kind === "invalid") {
+		if (
+			resolvedDraft.kind === "invalid" ||
+			resolvedResolution.kind === "invalid"
+		) {
 			return;
 		}
 
@@ -278,6 +301,7 @@ export function OutputSettingsPanel({
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
+											resolvedResolution={resolvedResolution}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -305,6 +329,20 @@ export function OutputSettingsPanel({
 												</option>
 											))}
 										</OutputSettingsChoice>
+										<OutputSettingsChoice
+											label="Resolution"
+											onChange={changeResolution}
+											value={resolutionSettingValue(activeDraft.resolution)}
+										>
+											{resolutionChoices.map((choice) => (
+												<option
+													key={resolutionSettingValue(choice.setting)}
+													value={resolutionSettingValue(choice.setting)}
+												>
+													{choice.label}
+												</option>
+											))}
+										</OutputSettingsChoice>
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
 												label="Resolution"
@@ -322,6 +360,7 @@ export function OutputSettingsPanel({
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
+											resolvedResolution={resolvedResolution}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -387,7 +426,11 @@ export function OutputSettingsPanel({
 						</Button>
 						<Button
 							className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
-							disabled={exportRunning || resolvedDraft.kind === "invalid"}
+							disabled={
+								exportRunning ||
+								resolvedDraft.kind === "invalid" ||
+								resolvedResolution.kind === "invalid"
+							}
 							onClick={applyResolvedDraft}
 							type="button"
 						>
@@ -445,18 +488,27 @@ function OutputSettingsChoice({
 function OutputSettingsValidationMessage({
 	automaticReplacementMessage,
 	resolvedDraft,
+	resolvedResolution,
 }: {
 	automaticReplacementMessage: string | null;
 	resolvedDraft: ResolvedOutputVideoProfile;
+	resolvedResolution: ResolvedOutputResolution;
 }) {
-	if (resolvedDraft.kind === "invalid") {
+	const error =
+		resolvedDraft.kind === "invalid"
+			? resolvedDraft.error
+			: resolvedResolution.kind === "invalid"
+				? resolvedResolution.error
+				: undefined;
+
+	if (error) {
 		return (
 			<p
 				aria-live="polite"
 				className="rounded border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs leading-5 text-destructive"
 				role="alert"
 			>
-				{resolvedDraft.error}
+				{error}
 			</p>
 		);
 	}
@@ -613,6 +665,12 @@ function formatResolutionSetting(
 	}
 
 	return "Preserve source";
+}
+
+function resolutionSettingValue(setting: OutputSettings["resolution"]): string {
+	return setting.kind === "target-dimensions"
+		? `${setting.width}x${setting.height}`
+		: setting.kind;
 }
 
 function formatQualitySetting(setting: OutputSettings["videoQuality"]): string {

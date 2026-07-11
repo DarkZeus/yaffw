@@ -241,6 +241,56 @@ describe("ExportInspectorPanel", () => {
 		});
 	});
 
+	it("offers only source-relative downscales and applies the selected resolution", () => {
+		const onApplyOutputSettings = vi.fn();
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={onApplyOutputSettings}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		const videoTab = within(dialog).getByRole("tab", { name: "Video" });
+		fireEvent.mouseDown(videoTab, { button: 0, ctrlKey: false });
+		fireEvent.click(videoTab);
+
+		const resolutionSelect = within(dialog).getByRole("combobox", {
+			name: "Resolution",
+		});
+		expect(
+			within(resolutionSelect)
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toEqual([
+			"Preserve source (1920x1080)",
+			"1280x720",
+			"854x480",
+			"640x360",
+		]);
+
+		fireEvent.change(resolutionSelect, { target: { value: "1280x720" } });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+
+		expect(onApplyOutputSettings).toHaveBeenCalledWith({
+			...defaultOutputSettings,
+			resolution: {
+				height: 720,
+				kind: "target-dimensions",
+				width: 1280,
+			},
+		});
+	});
+
 	it("shows an applied documented output profile in Export review", () => {
 		const outputSettings = createDefaultOutputSettings();
 		outputSettings.container = {
@@ -250,6 +300,11 @@ describe("ExportInspectorPanel", () => {
 		outputSettings.videoCodec = {
 			codec: "vp9",
 			kind: "documented-codec",
+		};
+		outputSettings.resolution = {
+			height: 720,
+			kind: "target-dimensions",
+			width: 1280,
 		};
 
 		render(
@@ -272,6 +327,9 @@ describe("ExportInspectorPanel", () => {
 		).toBeTruthy();
 		expect(
 			within(exportInspector).getByText("Documented output profile"),
+		).toBeTruthy();
+		expect(
+			within(screen.getByLabelText("Export review")).getByText("1280x720"),
 		).toBeTruthy();
 		expect(within(exportInspector).queryByText("MP4 export")).toBeNull();
 	});

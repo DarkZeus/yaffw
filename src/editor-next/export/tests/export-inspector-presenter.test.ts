@@ -49,6 +49,7 @@ describe("export inspector presenter", () => {
 			precision: { label: "Range", value: "Whole file" },
 			reason:
 				"The current selection covers the full asset, so export can use the default output profile without boundary trimming.",
+			resolution: { label: "Resolution", value: "1920x1080" },
 			supported: true,
 		});
 		expect(viewModel.status).toEqual({
@@ -86,6 +87,28 @@ describe("export inspector presenter", () => {
 		});
 	});
 
+	it("reflects the resolved downscale in Export review", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.resolution = {
+			height: 720,
+			kind: "target-dimensions",
+			width: 1280,
+		};
+
+		const viewModel = createExportInspectorViewModel({
+			asset: readyAsset,
+			exportState: { status: "reviewing" },
+			outputSettings,
+			runtime: supportedRuntime,
+			selection: fullSelection,
+		});
+
+		expect(viewModel.review.resolution).toEqual({
+			label: "Resolution",
+			value: "1280x720",
+		});
+	});
+
 	it("derives a blocked review for impossible selections", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
@@ -112,6 +135,7 @@ describe("export inspector presenter", () => {
 				value: "MP4 / H.264 video / AAC audio",
 			},
 			reason: "The current selection is outside the active media asset.",
+			resolution: { label: "Resolution", value: "1920x1080" },
 			supported: false,
 			technicalDetails: `Expected selection inside [0, ${readyAsset.durationUs}], got [${invalidSelection.startUs}, ${invalidSelection.endUs}].`,
 		});

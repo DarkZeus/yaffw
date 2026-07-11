@@ -197,6 +197,7 @@ export function useSingleAssetEditingSession({
 						type: "export.progressed",
 					});
 				},
+				outputSettings: session.outputSettings,
 				selection: session.selection,
 				signal: abortController.signal,
 				source: previewSource,

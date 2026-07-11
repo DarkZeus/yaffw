@@ -16,6 +16,7 @@ import {
 	audioMixPlanHasIncludedTracks,
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
+import { resolveOutputResolution } from "@/editor-core/output-settings";
 import { renderBrowserAudioMix } from "../../audio/engine/browser-audio-mix";
 import {
 	type DisposableMediaCleanup,
@@ -49,8 +50,10 @@ export function isDefaultExportCancelledError(error: unknown): boolean {
 }
 
 async function runBrowserDefaultExport({
+	asset,
 	audioMix,
 	onProgress,
+	outputSettings,
 	selection,
 	signal,
 	source,
@@ -64,7 +67,9 @@ async function runBrowserDefaultExport({
 	});
 
 	const videoOnlyResult = await runBrowserVideoOnlyExport({
+		asset,
 		onProgress,
+		outputSettings,
 		selection,
 		signal,
 		source,
@@ -113,15 +118,25 @@ async function runBrowserDefaultExport({
 }
 
 async function runBrowserVideoOnlyExport({
+	asset,
 	onProgress,
+	outputSettings,
 	selection,
 	signal,
 	source,
 }: Pick<
 	DefaultExportRunnerRequest,
-	"onProgress" | "selection" | "signal" | "source"
+	"asset" | "onProgress" | "outputSettings" | "selection" | "signal" | "source"
 >): Promise<DefaultExportRunnerResult> {
 	return withDisposableMediaWorkScope(async (scope) => {
+		const resolution = resolveOutputResolution({
+			asset,
+			setting: outputSettings.resolution,
+		});
+		if (resolution.kind === "invalid") {
+			throw new Error(resolution.error);
+		}
+
 		const input = scope.registerDisposable(
 			new Input({
 				formats: ALL_FORMATS,
@@ -147,6 +162,12 @@ async function runBrowserVideoOnlyExport({
 			},
 			video: {
 				codec: "avc",
+				...(resolution.conversionDimensions
+					? {
+							...resolution.conversionDimensions,
+							fit: "fill" as const,
+						}
+					: {}),
 			},
 		});
 		const conversionCleanup = registerCancellableUntilSettled(

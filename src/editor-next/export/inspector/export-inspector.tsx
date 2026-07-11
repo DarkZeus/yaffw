@@ -65,6 +65,10 @@ export function ExportInspectorPanel({
 							label={viewModel.review.plannedOutput.label}
 							value={viewModel.review.plannedOutput.value}
 						/>
+						<InspectorLine
+							label={viewModel.review.resolution.label}
+							value={viewModel.review.resolution.value}
+						/>
 						{viewModel.review.supported ? (
 							<>
 								<InspectorLine

@@ -1,8 +1,118 @@
 import {
 	DEFAULT_OUTPUT_PROFILE,
+	type OutputResolutionSetting,
 	type OutputSettings,
 	type ReadyMediaAsset,
 } from "./model";
+
+const DOWNSCALE_HEIGHTS = [1440, 1080, 720, 480, 360] as const;
+
+export type OutputResolutionChoice = {
+	label: string;
+	setting: OutputResolutionSetting;
+};
+
+export type ResolvedOutputResolution =
+	| {
+			conversionDimensions?: {
+				height: number;
+				width: number;
+			};
+			dimensions?: {
+				height: number;
+				width: number;
+			};
+			kind: "resolved";
+	  }
+	| {
+			error: string;
+			kind: "invalid";
+	  };
+
+export function resolveOutputResolution({
+	asset,
+	setting,
+}: {
+	asset: Pick<ReadyMediaAsset, "tracks">;
+	setting: OutputResolutionSetting;
+}): ResolvedOutputResolution {
+	const source = sourceVideoDimensions(asset);
+
+	if (setting.kind === "preserve-source") {
+		return {
+			dimensions: source,
+			kind: "resolved",
+		};
+	}
+
+	if (
+		source &&
+		Number.isInteger(setting.width) &&
+		Number.isInteger(setting.height) &&
+		setting.width > 0 &&
+		setting.height > 0 &&
+		setting.width <= source.width &&
+		setting.height <= source.height
+	) {
+		const dimensions = {
+			height: setting.height,
+			width: setting.width,
+		};
+
+		return {
+			conversionDimensions: dimensions,
+			dimensions,
+			kind: "resolved",
+		};
+	}
+
+	return {
+		error:
+			"Target output dimensions must be positive whole pixels no larger than the active source resolution.",
+		kind: "invalid",
+	};
+}
+
+export function getOutputResolutionChoices(
+	asset: Pick<ReadyMediaAsset, "tracks">,
+): OutputResolutionChoice[] {
+	const source = sourceVideoDimensions(asset);
+	const preserveSource: OutputResolutionChoice = {
+		label: source
+			? `Preserve source (${source.width}x${source.height})`
+			: "Preserve source",
+		setting: { kind: "preserve-source" },
+	};
+
+	if (!source) {
+		return [preserveSource];
+	}
+
+	return [
+		preserveSource,
+		...DOWNSCALE_HEIGHTS.flatMap((height) => {
+			if (height >= source.height) {
+				return [];
+			}
+
+			const width = roundToEven((height * source.width) / source.height);
+			if (width <= 0 || width >= source.width) {
+				return [];
+			}
+
+			return [
+				{
+					label: `${width}x${height}`,
+					setting: {
+						height,
+						kind: "target-dimensions" as const,
+						width,
+					},
+				},
+			];
+		}),
+	];
+}
 
 export type DocumentedOutputContainer = {
 	fileExtension: string;
@@ -120,4 +230,29 @@ function normalizeVideoCodec(codec: string | undefined): string | undefined {
 	}
 
 	return normalized;
+}
+
+function sourceVideoDimensions(
+	asset: Pick<ReadyMediaAsset, "tracks">,
+): { height: number; width: number } | undefined {
+	const videoTrack = asset.tracks.video[0];
+
+	if (
+		!videoTrack ||
+		!Number.isFinite(videoTrack.width) ||
+		!Number.isFinite(videoTrack.height) ||
+		(videoTrack.width ?? 0) <= 0 ||
+		(videoTrack.height ?? 0) <= 0
+	) {
+		return undefined;
+	}
+
+	return {
+		height: videoTrack.height as number,
+		width: videoTrack.width as number,
+	};
+}
+
+function roundToEven(value: number): number {
+	return Math.max(2, Math.round(value / 2) * 2);
 }

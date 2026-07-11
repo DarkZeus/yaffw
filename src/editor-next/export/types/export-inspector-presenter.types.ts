@@ -18,11 +18,13 @@ export type ExportInspectorReviewViewModel =
 			plannedOutput: ExportInspectorFact;
 			precision: ExportInspectorFact;
 			reason: string;
+			resolution: ExportInspectorFact;
 			supported: true;
 	  }
 	| {
 			plannedOutput: ExportInspectorFact;
 			reason: string;
+			resolution: ExportInspectorFact;
 			supported: false;
 			technicalDetails: string;
 	  };
