@@ -4,6 +4,7 @@ import { createDefaultOutputSettings } from "./model";
 import {
 	type BrowserLocalOutputSupport,
 	getOutputResolutionChoices,
+	resolveOutputAudioProfile,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "./output-settings";
@@ -240,6 +241,7 @@ describe("Output settings video profile resolution", () => {
 				support: {
 					containers: [
 						{
+							audioCodecs: [],
 							fileExtension: ".empty",
 							id: "empty",
 							label: "Empty",
@@ -257,9 +259,152 @@ describe("Output settings video profile resolution", () => {
 	});
 });
 
+describe("Output settings generated audio mix resolution", () => {
+	it("preserves the first included source audio track codec", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.audioCodec = { kind: "preserve-source" };
+
+		expect(
+			resolveOutputAudioProfile({
+				asset: {
+					tracks: {
+						audio: [
+							{ codec: "aac", id: "audio-1", kind: "audio" },
+							{ codec: "opus", id: "audio-2", kind: "audio" },
+						],
+						video: [],
+					},
+				},
+				audioMix: {
+					finalPeakGuardDb: -1,
+					outputChannels: 2,
+					tracks: {
+						"audio-1": {
+							channelMode: "preserve",
+							include: false,
+							trackId: "audio-1",
+							volumePercent: 100,
+						},
+						"audio-2": {
+							channelMode: "preserve",
+							include: true,
+							trackId: "audio-2",
+							volumePercent: 100,
+						},
+					},
+				},
+				outputSettings,
+				support,
+			}),
+		).toMatchObject({
+			audioCodec: "opus",
+			includedTrackCount: 1,
+			kind: "resolved",
+		});
+	});
+
+	it("uses an explicitly selected codec for the Generated audio mix", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "mp4",
+			kind: "documented-container",
+		};
+		outputSettings.audioCodec = {
+			codec: "flac",
+			kind: "documented-codec",
+		};
+
+		expect(
+			resolveOutputAudioProfile({
+				asset: singleAacAudioAsset,
+				audioMix: includedSingleAudioMix,
+				outputSettings,
+				support,
+			}),
+		).toMatchObject({
+			audioCodec: "flac",
+			includedTrackCount: 1,
+			kind: "resolved",
+		});
+	});
+
+	it("replaces an incompatible preserved codec in documented order", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.audioCodec = { kind: "preserve-source" };
+
+		expect(
+			resolveOutputAudioProfile({
+				asset: singleAacAudioAsset,
+				audioMix: includedSingleAudioMix,
+				outputSettings,
+				support,
+			}),
+		).toMatchObject({
+			audioCodec: "opus",
+			automaticReplacement: {
+				audioCodec: "opus",
+				requestedCodec: "aac",
+			},
+			kind: "resolved",
+		});
+	});
+
+	it("plans no output audio track when every source audio track is excluded", () => {
+		expect(
+			resolveOutputAudioProfile({
+				asset: singleAacAudioAsset,
+				audioMix: {
+					...includedSingleAudioMix,
+					tracks: {
+						"audio-1": {
+							...includedSingleAudioMix.tracks["audio-1"],
+							include: false,
+						},
+					},
+				},
+				outputSettings: createDefaultOutputSettings(),
+				support,
+			}),
+		).toMatchObject({
+			audioCodec: undefined,
+			includedTrackCount: 0,
+			kind: "resolved",
+		});
+	});
+});
+
+const singleAacAudioAsset = {
+	tracks: {
+		audio: [{ codec: "aac", id: "audio-1", kind: "audio" as const }],
+		video: [],
+	},
+};
+
+const includedSingleAudioMix = {
+	finalPeakGuardDb: -1,
+	outputChannels: 2 as const,
+	tracks: {
+		"audio-1": {
+			channelMode: "preserve" as const,
+			include: true,
+			trackId: "audio-1",
+			volumePercent: 100,
+		},
+	},
+};
+
 const support = {
 	containers: [
 		{
+			audioCodecs: ["aac", "opus", "mp3", "flac"],
 			fileExtension: ".mp4",
 			id: "mp4",
 			label: "MP4",
@@ -267,6 +412,7 @@ const support = {
 			videoCodecs: ["avc", "hevc", "vp9"],
 		},
 		{
+			audioCodecs: ["opus", "vorbis"],
 			fileExtension: ".webm",
 			id: "webm",
 			label: "WebM",

@@ -1,4 +1,9 @@
 import {
+	createAudioMixPlan,
+	includedAudioMixPlanTracks,
+} from "./audio-mix-plan";
+import {
+	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
 	type OutputResolutionSetting,
 	type OutputSettings,
@@ -115,12 +120,112 @@ export function getOutputResolutionChoices(
 }
 
 export type DocumentedOutputContainer = {
+	audioCodecs: string[];
 	fileExtension: string;
 	id: string;
 	label: string;
 	mimeType: string;
 	videoCodecs: string[];
 };
+
+export type ResolvedOutputAudioProfile =
+	| {
+			audioCodec?: string;
+			automaticReplacement?: {
+				audioCodec: string;
+				requestedCodec?: string;
+			};
+			container: DocumentedOutputContainer;
+			includedTrackCount: number;
+			kind: "resolved";
+	  }
+	| {
+			error: string;
+			kind: "invalid";
+	  };
+
+export function resolveOutputAudioProfile({
+	asset,
+	audioMix,
+	outputSettings,
+	support,
+}: {
+	asset: Pick<ReadyMediaAsset, "tracks">;
+	audioMix: AudioMix;
+	outputSettings: OutputSettings;
+	support: BrowserLocalOutputSupport;
+}): ResolvedOutputAudioProfile {
+	const containerId =
+		outputSettings.container.kind === "default-output-profile"
+			? DEFAULT_OUTPUT_PROFILE.container
+			: outputSettings.container.container;
+	const container = support.containers.find(({ id }) => id === containerId);
+
+	if (!container) {
+		return {
+			error: `The selected ${containerId} container is not documented by the browser-local media writer.`,
+			kind: "invalid",
+		};
+	}
+
+	const includedTrackIds = new Set(
+		includedAudioMixPlanTracks(
+			createAudioMixPlan({
+				audioMix,
+				trackIds: asset.tracks.audio.map(({ id }) => id),
+			}),
+		).map(({ trackId }) => trackId),
+	);
+	const includedTracks = asset.tracks.audio.filter(({ id }) =>
+		includedTrackIds.has(id),
+	);
+	const sourceCodec = normalizeAudioCodec(includedTracks[0]?.codec);
+	if (includedTracks.length === 0) {
+		return {
+			audioCodec: undefined,
+			container,
+			includedTrackCount: 0,
+			kind: "resolved",
+		};
+	}
+
+	const requestedCodec =
+		outputSettings.audioCodec.kind === "default-output-profile"
+			? DEFAULT_OUTPUT_PROFILE.audioCodec
+			: outputSettings.audioCodec.kind === "documented-codec"
+				? normalizeAudioCodec(outputSettings.audioCodec.codec)
+				: sourceCodec;
+
+	if (requestedCodec && container.audioCodecs.includes(requestedCodec)) {
+		return {
+			audioCodec: requestedCodec,
+			container,
+			includedTrackCount: includedTracks.length,
+			kind: "resolved",
+		};
+	}
+
+	if (outputSettings.audioCodec.kind === "preserve-source") {
+		const replacementCodec = container.audioCodecs[0];
+		if (replacementCodec) {
+			return {
+				audioCodec: replacementCodec,
+				automaticReplacement: {
+					audioCodec: replacementCodec,
+					requestedCodec,
+				},
+				container,
+				includedTrackCount: includedTracks.length,
+				kind: "resolved",
+			};
+		}
+	}
+
+	return {
+		error: `No documented audio codec can satisfy the selected ${container.label} container.`,
+		kind: "invalid",
+	};
+}
 
 export type BrowserLocalOutputSupport = {
 	containers: DocumentedOutputContainer[];
@@ -227,6 +332,19 @@ function normalizeVideoCodec(codec: string | undefined): string | undefined {
 	}
 	if (normalized.startsWith("av01")) {
 		return "av1";
+	}
+
+	return normalized;
+}
+
+function normalizeAudioCodec(codec: string | undefined): string | undefined {
+	if (!codec) {
+		return undefined;
+	}
+
+	const normalized = codec.trim().toLowerCase();
+	if (normalized === "aac" || normalized.startsWith("mp4a")) {
+		return "aac";
 	}
 
 	return normalized;

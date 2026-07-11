@@ -17,6 +17,7 @@ describe("export inspector presenter", () => {
 	it("derives a supported export review with a start action", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				status: "reviewing",
 			},
@@ -41,6 +42,10 @@ describe("export inspector presenter", () => {
 			{ available: true, label: "Local file APIs", status: "Ready" },
 		]);
 		expect(viewModel.review).toEqual({
+			audioMix: {
+				label: "Generated audio mix",
+				value: "1 included source track to one AAC audio track",
+			},
 			method: { label: "Export", value: "Whole file export" },
 			plannedOutput: {
 				label: "Format",
@@ -62,6 +67,28 @@ describe("export inspector presenter", () => {
 		});
 	});
 
+	it("shows no output audio track when every source audio track is excluded", () => {
+		const audioMix = createDefaultAudioMix(readyAsset);
+		audioMix.tracks["audio-1"].include = false;
+
+		const viewModel = createExportInspectorViewModel({
+			asset: readyAsset,
+			audioMix,
+			exportState: { status: "reviewing" },
+			outputSettings: createDefaultOutputSettings(),
+			runtime: supportedRuntime,
+			selection: fullSelection,
+		});
+
+		expect(viewModel.review.plannedOutput.value).toBe(
+			"MP4 / H.264 video / No audio",
+		);
+		expect(viewModel.review.audioMix).toEqual({
+			label: "Generated audio mix",
+			value: "No audio track",
+		});
+	});
+
 	it("reflects the resolved container and video codec in Export review", () => {
 		const outputSettings = createDefaultOutputSettings();
 		outputSettings.container = {
@@ -72,9 +99,11 @@ describe("export inspector presenter", () => {
 			codec: "vp9",
 			kind: "documented-codec",
 		};
+		outputSettings.audioCodec = { kind: "preserve-source" };
 
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: createDefaultAudioMix(readyAsset),
 			exportState: { status: "reviewing" },
 			outputSettings,
 			runtime: supportedRuntime,
@@ -83,7 +112,11 @@ describe("export inspector presenter", () => {
 
 		expect(viewModel.review.plannedOutput).toEqual({
 			label: "Format",
-			value: "WebM / VP9 video / AAC audio",
+			value: "WebM / VP9 video / OPUS audio",
+		});
+		expect(viewModel.review.audioMix).toEqual({
+			label: "Generated audio mix",
+			value: "1 included source track to one OPUS audio track",
 		});
 	});
 
@@ -97,6 +130,7 @@ describe("export inspector presenter", () => {
 
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: { status: "reviewing" },
 			outputSettings,
 			runtime: supportedRuntime,
@@ -112,6 +146,7 @@ describe("export inspector presenter", () => {
 	it("derives a blocked review for impossible selections", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				status: "reviewing",
 			},
@@ -130,6 +165,10 @@ describe("export inspector presenter", () => {
 			value: "Blocked",
 		});
 		expect(viewModel.review).toEqual({
+			audioMix: {
+				label: "Generated audio mix",
+				value: "1 included source track to one AAC audio track",
+			},
 			plannedOutput: {
 				label: "Format",
 				value: "MP4 / H.264 video / AAC audio",
@@ -149,6 +188,7 @@ describe("export inspector presenter", () => {
 	it("derives running progress and cancellation availability", () => {
 		const cancellable = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: runningExport({
 				cancelSupported: true,
 				progress: {
@@ -176,6 +216,7 @@ describe("export inspector presenter", () => {
 
 		const uncancellable = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: runningExport({
 				cancelSupported: false,
 				progress: {
@@ -202,6 +243,7 @@ describe("export inspector presenter", () => {
 	it("derives failed export state with retry available", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				job: exportJob({ cancelSupported: true }),
 				message: "Default export failed.",
@@ -228,6 +270,7 @@ describe("export inspector presenter", () => {
 	it("derives succeeded, delivered, and explicit delivery action states", () => {
 		const succeeded = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				delivered: false,
 				generatedMedia,
@@ -254,6 +297,7 @@ describe("export inspector presenter", () => {
 
 		const delivered = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				delivered: true,
 				generatedMedia,
@@ -282,6 +326,7 @@ describe("export inspector presenter", () => {
 	it("derives cancelled export state with retry available", () => {
 		const viewModel = createExportInspectorViewModel({
 			asset: readyAsset,
+			audioMix: defaultAudioMix,
 			exportState: {
 				job: exportJob({ cancelSupported: true }),
 				status: "cancelled",
@@ -353,6 +398,8 @@ const readyAsset = {
 		],
 	},
 } satisfies ReadyMediaAsset;
+
+const defaultAudioMix = createDefaultAudioMix(readyAsset);
 
 const fullSelection = {
 	endUs: 12_000_000,

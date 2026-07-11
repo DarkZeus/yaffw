@@ -18,6 +18,7 @@ import { OutputSettingsPanel } from "./output-settings-panel";
 
 export function ExportInspectorPanel({
 	asset,
+	audioMix,
 	exportState,
 	onCancelExport,
 	onDownloadGeneratedMedia,
@@ -29,6 +30,7 @@ export function ExportInspectorPanel({
 }: ExportInspectorPanelProps) {
 	const viewModel = createExportInspectorViewModel({
 		asset,
+		audioMix,
 		exportState,
 		outputSettings,
 		runtime,
@@ -69,6 +71,10 @@ export function ExportInspectorPanel({
 							label={viewModel.review.resolution.label}
 							value={viewModel.review.resolution.value}
 						/>
+						<InspectorLine
+							label={viewModel.review.audioMix.label}
+							value={viewModel.review.audioMix.value}
+						/>
 						{viewModel.review.supported ? (
 							<>
 								<InspectorLine
@@ -99,6 +105,7 @@ export function ExportInspectorPanel({
 				/>
 				<OutputSettingsPanel
 					asset={asset}
+					audioMix={audioMix}
 					exportRunning={exportState.status === "running"}
 					onApplyOutputSettings={onApplyOutputSettings}
 					outputSettings={outputSettings}

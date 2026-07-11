@@ -16,5 +16,8 @@ describe("Mediabunny output support", () => {
 		expect(
 			support.containers.find(({ id }) => id === "webm")?.videoCodecs,
 		).toEqual(["vp9", "av1", "vp8"]);
+		expect(
+			support.containers.find(({ id }) => id === "webm")?.audioCodecs,
+		).toEqual(["opus", "vorbis"]);
 	});
 });

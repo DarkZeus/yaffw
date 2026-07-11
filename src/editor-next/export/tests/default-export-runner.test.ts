@@ -47,9 +47,35 @@ vi.mock("mediabunny", () => {
 
 	class Mp4OutputFormat {
 		readonly options: unknown;
+		readonly fileExtension: string = ".mp4";
+		readonly mimeType: string = "video/mp4";
 
 		constructor(options?: unknown) {
 			this.options = options;
+		}
+
+		getSupportedAudioCodecs() {
+			return ["aac", "opus", "mp3", "flac"];
+		}
+
+		getSupportedVideoCodecs() {
+			return ["avc", "hevc", "vp9"];
+		}
+	}
+
+	class MovOutputFormat extends Mp4OutputFormat {}
+	class MkvOutputFormat extends Mp4OutputFormat {}
+	class MpegTsOutputFormat extends Mp4OutputFormat {}
+	class WebMOutputFormat extends Mp4OutputFormat {
+		override readonly fileExtension = ".webm";
+		override readonly mimeType = "video/webm";
+
+		override getSupportedAudioCodecs() {
+			return ["opus", "vorbis"];
+		}
+
+		override getSupportedVideoCodecs() {
+			return ["vp9", "av1", "vp8"];
 		}
 	}
 
@@ -156,8 +182,12 @@ vi.mock("mediabunny", () => {
 		EncodedPacketSink,
 		EncodedVideoPacketSource,
 		Input,
+		MkvOutputFormat,
+		MovOutputFormat,
 		Mp4OutputFormat,
+		MpegTsOutputFormat,
 		Output,
+		WebMOutputFormat,
 	};
 });
 
@@ -318,6 +348,32 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 	});
 
+	it("encodes the Generated audio mix with the resolved explicit codec", async () => {
+		const videoTrack = createVideoTrack();
+		mediabunnyMock.videoTracks = [videoTrack];
+		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.audioCodec = {
+			codec: "flac",
+			kind: "documented-codec",
+		};
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({
+				audioMix: includedAudioMix,
+				outputSettings,
+			}),
+		);
+
+		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
+			codec: "flac",
+		});
+	});
+
 	it("keeps an all-excluded Audio mix as a valid video-only export", async () => {
 		const result = await browserDefaultExportRunner.run(
 			createExportRequest({
@@ -414,6 +470,7 @@ type MockEncodedVideoPacketSource = {
 type MockAudioBufferSource = {
 	add: MockFn;
 	close: MockFn;
+	options: unknown;
 };
 
 function createExportRequest({

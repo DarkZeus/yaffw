@@ -1,6 +1,7 @@
 import {
 	ALL_FORMATS,
 	AudioBufferSource,
+	type AudioCodec,
 	BlobSource,
 	BufferTarget,
 	Conversion,
@@ -16,7 +17,10 @@ import {
 	audioMixPlanHasIncludedTracks,
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
-import { resolveOutputResolution } from "@/editor-core/output-settings";
+import {
+	resolveOutputAudioProfile,
+	resolveOutputResolution,
+} from "@/editor-core/output-settings";
 import { renderBrowserAudioMix } from "../../audio/engine/browser-audio-mix";
 import {
 	type DisposableMediaCleanup,
@@ -24,6 +28,7 @@ import {
 	createDisposableMediaCleanup,
 	withDisposableMediaWorkScope,
 } from "../../media-work/scopes/disposable-media-work-scope";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import type {
 	DefaultExportRunner,
 	DefaultExportRunnerRequest,
@@ -84,6 +89,19 @@ async function runBrowserDefaultExport({
 		return videoOnlyResult;
 	}
 
+	const audioProfile = resolveOutputAudioProfile({
+		asset,
+		audioMix,
+		outputSettings,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
+	});
+	if (audioProfile.kind === "invalid") {
+		throw new Error(audioProfile.error);
+	}
+	if (!audioProfile.audioCodec) {
+		return videoOnlyResult;
+	}
+
 	onProgress({
 		phase: "preparing",
 		message: "Preparing audio mix.",
@@ -107,6 +125,7 @@ async function runBrowserDefaultExport({
 
 	const blob = await muxVideoOnlyExportWithMixedAudio({
 		audioBuffer: mixedAudio.audioBuffer,
+		audioCodec: audioProfile.audioCodec as AudioCodec,
 		signal,
 		videoOnlyBlob: videoOnlyResult.blob,
 	});
@@ -213,10 +232,12 @@ async function runBrowserVideoOnlyExport({
 
 async function muxVideoOnlyExportWithMixedAudio({
 	audioBuffer,
+	audioCodec,
 	signal,
 	videoOnlyBlob,
 }: {
 	audioBuffer: AudioBuffer;
+	audioCodec: AudioCodec;
 	signal: AbortSignal;
 	videoOnlyBlob: Blob;
 }): Promise<Blob> {
@@ -251,7 +272,7 @@ async function muxVideoOnlyExportWithMixedAudio({
 		});
 		const audioSource = new AudioBufferSource({
 			bitrate: 192_000,
-			codec: "aac",
+			codec: audioCodec,
 		});
 		const closeAudioSource = registerClosableCleanup(scope, audioSource);
 

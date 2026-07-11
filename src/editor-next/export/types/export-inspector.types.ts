@@ -1,4 +1,5 @@
 import type {
+	AudioMix,
 	GeneratedMedia,
 	OutputSettings,
 	ReadyMediaAsset,
@@ -9,6 +10,7 @@ import type { ExportSessionState } from "@/editor-core/session";
 
 export type ExportInspectorPanelProps = {
 	asset: ReadyMediaAsset;
+	audioMix: AudioMix;
 	exportState: ExportSessionState;
 	onCancelExport: () => void;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;

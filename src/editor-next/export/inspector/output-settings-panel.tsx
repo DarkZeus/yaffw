@@ -25,14 +25,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
 	type OutputSettings,
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import {
+	type ResolvedOutputAudioProfile,
 	type ResolvedOutputResolution,
 	type ResolvedOutputVideoProfile,
 	getOutputResolutionChoices,
+	resolveOutputAudioProfile,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
@@ -40,6 +43,7 @@ import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support
 
 type OutputSettingsPanelProps = {
 	asset: ReadyMediaAsset;
+	audioMix: AudioMix;
 	exportRunning: boolean;
 	onApplyOutputSettings: (outputSettings: OutputSettings) => void;
 	outputSettings: OutputSettings;
@@ -47,6 +51,7 @@ type OutputSettingsPanelProps = {
 
 export function OutputSettingsPanel({
 	asset,
+	audioMix,
 	exportRunning,
 	onApplyOutputSettings,
 	outputSettings,
@@ -85,6 +90,9 @@ export function OutputSettingsPanel({
 		if (nextDraft.videoCodec.kind === "default-output-profile") {
 			nextDraft.videoCodec = { kind: "preserve-source" };
 		}
+		if (nextDraft.audioCodec.kind === "default-output-profile") {
+			nextDraft.audioCodec = { kind: "preserve-source" };
+		}
 
 		setReconciledDraft(nextDraft);
 	}
@@ -92,6 +100,18 @@ export function OutputSettingsPanel({
 	function changeVideoCodec(codec: string) {
 		const nextDraft = cloneOutputSettings(activeDraft);
 		nextDraft.videoCodec =
+			codec === "default-output-profile"
+				? { kind: "default-output-profile" }
+				: codec === "preserve-source"
+					? { kind: "preserve-source" }
+					: { codec, kind: "documented-codec" };
+
+		setReconciledDraft(nextDraft);
+	}
+
+	function changeAudioCodec(codec: string) {
+		const nextDraft = cloneOutputSettings(activeDraft);
+		nextDraft.audioCodec =
 			codec === "default-output-profile"
 				? { kind: "default-output-profile" }
 				: codec === "preserve-source"
@@ -115,23 +135,39 @@ export function OutputSettingsPanel({
 	}
 
 	function setReconciledDraft(nextDraft: OutputSettings) {
-		const resolution = resolveOutputVideoProfile({
+		const videoProfile = resolveOutputVideoProfile({
 			asset,
 			outputSettings: nextDraft,
 			support: MEDIABUNNY_OUTPUT_SUPPORT,
 		});
 
-		if (resolution.kind === "resolved" && resolution.automaticReplacement) {
+		const audioProfile = resolveOutputAudioProfile({
+			asset,
+			audioMix,
+			outputSettings: nextDraft,
+			support: MEDIABUNNY_OUTPUT_SUPPORT,
+		});
+		const replacementMessages: string[] = [];
+
+		if (videoProfile.kind === "resolved" && videoProfile.automaticReplacement) {
 			nextDraft.videoCodec = {
-				codec: resolution.videoCodec,
+				codec: videoProfile.videoCodec,
 				kind: "documented-codec",
 			};
-			setAutomaticReplacementMessage(
-				`${formatCodecName(resolution.automaticReplacement.requestedCodec)} cannot be preserved in ${resolution.container.label}. ${formatCodecName(resolution.videoCodec)} was selected automatically.`,
+			replacementMessages.push(
+				`${formatCodecName(videoProfile.automaticReplacement.requestedCodec)} cannot be preserved in ${videoProfile.container.label}. ${formatCodecName(videoProfile.videoCodec)} was selected automatically.`,
 			);
-		} else {
-			setAutomaticReplacementMessage(null);
 		}
+		if (audioProfile.kind === "resolved" && audioProfile.automaticReplacement) {
+			nextDraft.audioCodec = {
+				codec: audioProfile.automaticReplacement.audioCodec,
+				kind: "documented-codec",
+			};
+			replacementMessages.push(
+				`${formatCodecName(audioProfile.automaticReplacement.requestedCodec)} cannot be preserved in ${audioProfile.container.label}. ${formatCodecName(audioProfile.audioCodec)} was selected automatically.`,
+			);
+		}
+		setAutomaticReplacementMessage(replacementMessages.join(" ") || null);
 
 		setDraft(nextDraft);
 	}
@@ -149,11 +185,18 @@ export function OutputSettingsPanel({
 		outputSettings: activeDraft,
 		support: MEDIABUNNY_OUTPUT_SUPPORT,
 	});
+	const resolvedAudio = resolveOutputAudioProfile({
+		asset,
+		audioMix,
+		outputSettings: activeDraft,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
+	});
 	const selectedContainer =
 		resolvedDraft.kind === "resolved"
 			? resolvedDraft.container
 			: containerForSetting(activeDraft.container);
 	const compatibleVideoCodecs = selectedContainer?.videoCodecs ?? [];
+	const compatibleAudioCodecs = selectedContainer?.audioCodecs ?? [];
 
 	function openResolvedOutputSettings() {
 		setAutomaticReplacementMessage(null);
@@ -163,6 +206,7 @@ export function OutputSettingsPanel({
 	function applyResolvedDraft() {
 		if (
 			resolvedDraft.kind === "invalid" ||
+			resolvedAudio.kind === "invalid" ||
 			resolvedResolution.kind === "invalid"
 		) {
 			return;
@@ -301,6 +345,7 @@ export function OutputSettingsPanel({
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
+											resolvedAudio={resolvedAudio}
 											resolvedResolution={resolvedResolution}
 										/>
 									</OutputSettingsTabSection>
@@ -360,6 +405,7 @@ export function OutputSettingsPanel({
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
+											resolvedAudio={resolvedAudio}
 											resolvedResolution={resolvedResolution}
 										/>
 									</OutputSettingsTabSection>
@@ -370,6 +416,24 @@ export function OutputSettingsPanel({
 										icon={<Music2 aria-hidden="true" className="size-4" />}
 										title="Audio"
 									>
+										<OutputSettingsChoice
+											label="Audio codec"
+											onChange={changeAudioCodec}
+											value={codecSettingValue(activeDraft.audioCodec)}
+										>
+											<option value="preserve-source">Preserve source</option>
+											{activeDraft.container.kind ===
+											"default-output-profile" ? (
+												<option value="default-output-profile">
+													Default output profile (AAC)
+												</option>
+											) : null}
+											{compatibleAudioCodecs.map((codec) => (
+												<option key={codec} value={codec}>
+													{formatCodecName(codec)}
+												</option>
+											))}
+										</OutputSettingsChoice>
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
 												label="Audio codec"
@@ -381,17 +445,24 @@ export function OutputSettingsPanel({
 											/>
 											<OutputSettingsFact
 												label="Included source tracks"
-												value={`${asset.tracks.audio.length}`}
+												value={`${resolvedAudio.kind === "resolved" ? resolvedAudio.includedTrackCount : 0}`}
 											/>
 											<OutputSettingsFact
 												label="Generated mix"
 												value={
-													asset.tracks.audio.length === 0
+													resolvedAudio.kind === "resolved" &&
+													resolvedAudio.includedTrackCount === 0
 														? "No audio track"
 														: "One audio track"
 												}
 											/>
 										</OutputSettingsFactGrid>
+										<OutputSettingsValidationMessage
+											automaticReplacementMessage={automaticReplacementMessage}
+											resolvedAudio={resolvedAudio}
+											resolvedDraft={resolvedDraft}
+											resolvedResolution={resolvedResolution}
+										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="ai">
@@ -429,6 +500,7 @@ export function OutputSettingsPanel({
 							disabled={
 								exportRunning ||
 								resolvedDraft.kind === "invalid" ||
+								resolvedAudio.kind === "invalid" ||
 								resolvedResolution.kind === "invalid"
 							}
 							onClick={applyResolvedDraft}
@@ -487,19 +559,23 @@ function OutputSettingsChoice({
 
 function OutputSettingsValidationMessage({
 	automaticReplacementMessage,
+	resolvedAudio,
 	resolvedDraft,
 	resolvedResolution,
 }: {
 	automaticReplacementMessage: string | null;
+	resolvedAudio: ResolvedOutputAudioProfile;
 	resolvedDraft: ResolvedOutputVideoProfile;
 	resolvedResolution: ResolvedOutputResolution;
 }) {
 	const error =
 		resolvedDraft.kind === "invalid"
 			? resolvedDraft.error
-			: resolvedResolution.kind === "invalid"
-				? resolvedResolution.error
-				: undefined;
+			: resolvedAudio.kind === "invalid"
+				? resolvedAudio.error
+				: resolvedResolution.kind === "invalid"
+					? resolvedResolution.error
+					: undefined;
 
 	if (error) {
 		return (

@@ -1,4 +1,5 @@
 import type {
+	AudioMix,
 	GeneratedMedia,
 	OutputSettings,
 	ReadyMediaAsset,
@@ -14,6 +15,7 @@ export type ExportInspectorFact = {
 
 export type ExportInspectorReviewViewModel =
 	| {
+			audioMix: ExportInspectorFact;
 			method: ExportInspectorFact;
 			plannedOutput: ExportInspectorFact;
 			precision: ExportInspectorFact;
@@ -22,6 +24,7 @@ export type ExportInspectorReviewViewModel =
 			supported: true;
 	  }
 	| {
+			audioMix: ExportInspectorFact;
 			plannedOutput: ExportInspectorFact;
 			reason: string;
 			resolution: ExportInspectorFact;
@@ -103,6 +106,7 @@ export type ExportInspectorViewModel = {
 
 export type CreateExportInspectorViewModelOptions = {
 	asset: ReadyMediaAsset;
+	audioMix: AudioMix;
 	exportState: ExportSessionState;
 	outputSettings: OutputSettings;
 	runtime: RuntimeSupport;

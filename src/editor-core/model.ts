@@ -149,7 +149,7 @@ export type OutputSettings = {
 export function createDefaultOutputSettings(): OutputSettings {
 	return {
 		audioCodec: {
-			kind: "default-output-profile",
+			kind: "preserve-source",
 		},
 		audioQuality: {
 			kind: "preserve-source",

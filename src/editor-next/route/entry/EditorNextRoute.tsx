@@ -227,6 +227,7 @@ export function EditorNextRoute({
 		displayedSession.status === "ready" ? (
 			<ExportInspectorPanel
 				asset={displayedSession.asset}
+				audioMix={displayedSession.audioMix}
 				exportState={displayedSession.export}
 				onCancelExport={stableCommands.cancelDefaultExport}
 				onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}

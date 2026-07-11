@@ -35,6 +35,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -92,6 +93,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -183,6 +185,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -229,13 +232,27 @@ describe("ExportInspectorPanel", () => {
 		).toEqual(["Preserve source", "VP9", "AV1", "VP8"]);
 		expect(
 			within(dialog).getByText(
-				"AVC cannot be preserved in WebM. VP9 was selected automatically.",
+				"AVC cannot be preserved in WebM. VP9 was selected automatically. AAC cannot be preserved in WebM. OPUS was selected automatically.",
 			),
 		).toBeTruthy();
+
+		const audioTab = within(dialog).getByRole("tab", { name: "Audio" });
+		fireEvent.mouseDown(audioTab, { button: 0, ctrlKey: false });
+		fireEvent.click(audioTab);
+		const audioCodecSelect = within(dialog).getByRole("combobox", {
+			name: "Audio codec",
+		}) as HTMLSelectElement;
+		expect(audioCodecSelect.value).toBe("opus");
+		expect(
+			within(audioCodecSelect)
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toEqual(["Preserve source", "OPUS", "VORBIS"]);
 
 		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
 		expect(onApplyOutputSettings).toHaveBeenCalledWith({
 			...defaultOutputSettings,
+			audioCodec: { codec: "opus", kind: "documented-codec" },
 			container: { container: "webm", kind: "documented-container" },
 			videoCodec: { codec: "vp9", kind: "documented-codec" },
 		});
@@ -247,6 +264,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -301,6 +319,7 @@ describe("ExportInspectorPanel", () => {
 			codec: "vp9",
 			kind: "documented-codec",
 		};
+		outputSettings.audioCodec = { kind: "preserve-source" };
 		outputSettings.resolution = {
 			height: 720,
 			kind: "target-dimensions",
@@ -310,6 +329,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -323,7 +343,7 @@ describe("ExportInspectorPanel", () => {
 
 		const exportInspector = screen.getByLabelText("Export inspector");
 		expect(
-			within(exportInspector).getByText("WebM / VP9 video / AAC audio"),
+			within(exportInspector).getByText("WebM / VP9 video / OPUS audio"),
 		).toBeTruthy();
 		expect(
 			within(exportInspector).getByText("Documented output profile"),
@@ -344,6 +364,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -386,6 +407,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={runningExport({
 					cancelSupported: true,
 					progress: {
@@ -416,6 +438,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{ status: "reviewing" }}
 				onCancelExport={() => undefined}
 				onDownloadGeneratedMedia={() => undefined}
@@ -452,6 +475,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={runningExport({
 					cancelSupported: true,
 					progress: {
@@ -481,6 +505,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={runningExport({
 					cancelSupported: false,
 					progress: {
@@ -508,6 +533,7 @@ describe("ExportInspectorPanel", () => {
 		render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{
 					delivered: false,
 					generatedMedia,
@@ -556,6 +582,7 @@ describe("ExportInspectorPanel", () => {
 		const { rerender } = render(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{
 					delivered: true,
 					generatedMedia,
@@ -577,6 +604,7 @@ describe("ExportInspectorPanel", () => {
 		rerender(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{
 					job: exportJob({ cancelSupported: true }),
 					message: "Default export failed.",
@@ -599,6 +627,7 @@ describe("ExportInspectorPanel", () => {
 		rerender(
 			<ExportInspectorPanel
 				asset={readyAsset}
+				audioMix={defaultAudioMix}
 				exportState={{
 					job: exportJob({ cancelSupported: true }),
 					status: "cancelled",
@@ -670,6 +699,8 @@ const readyAsset = {
 		],
 	},
 } satisfies ReadyMediaAsset;
+
+const defaultAudioMix = createDefaultAudioMix(readyAsset);
 
 const fullSelection = {
 	endUs: 12_000_000,

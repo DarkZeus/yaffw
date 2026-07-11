@@ -5,6 +5,7 @@ import {
 import type { ExportProgress } from "@/editor-core/model";
 import {
 	type ResolvedOutputResolution,
+	resolveOutputAudioProfile,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
@@ -25,6 +26,7 @@ const OUTPUT_SUPPORT = getMediabunnyOutputSupport();
 
 export function createExportInspectorViewModel({
 	asset,
+	audioMix,
 	exportState,
 	outputSettings,
 	runtime,
@@ -40,6 +42,12 @@ export function createExportInspectorViewModel({
 		outputSettings,
 		support: OUTPUT_SUPPORT,
 	});
+	const outputAudio = resolveOutputAudioProfile({
+		asset,
+		audioMix,
+		outputSettings,
+		support: OUTPUT_SUPPORT,
+	});
 	const outputResolution = resolveOutputResolution({
 		asset,
 		setting: outputSettings.resolution,
@@ -47,6 +55,7 @@ export function createExportInspectorViewModel({
 	const supported =
 		review.supported &&
 		outputProfile.kind === "resolved" &&
+		outputAudio.kind === "resolved" &&
 		outputResolution.kind === "resolved";
 
 	return {
@@ -56,7 +65,12 @@ export function createExportInspectorViewModel({
 			tone: supported ? "ready" : "blocked",
 		},
 		capability: capabilityViewModel(supported),
-		review: reviewViewModel(review, outputProfile, outputResolution),
+		review: reviewViewModel(
+			review,
+			outputProfile,
+			outputAudio,
+			outputResolution,
+		),
 		runtimeChecks: runtimeCheckViewModels(runtime),
 		status: statusForExportState(exportState),
 	};
@@ -101,10 +115,12 @@ function runtimeCheckViewModels(
 function reviewViewModel(
 	review: ExportCapabilityReview,
 	outputProfile: ReturnType<typeof resolveOutputVideoProfile>,
+	outputAudio: ReturnType<typeof resolveOutputAudioProfile>,
 	outputResolution: ResolvedOutputResolution,
 ): ExportInspectorReviewViewModel {
 	if (outputProfile.kind === "invalid") {
 		return {
+			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput: {
 				label: "Format",
 				value: "Invalid Output settings",
@@ -118,6 +134,7 @@ function reviewViewModel(
 
 	if (outputResolution.kind === "invalid") {
 		return {
+			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput: {
 				label: "Format",
 				value: "Invalid Output settings",
@@ -129,13 +146,28 @@ function reviewViewModel(
 		};
 	}
 
+	if (outputAudio.kind === "invalid") {
+		return {
+			audioMix: audioMixViewModel(outputAudio),
+			plannedOutput: {
+				label: "Format",
+				value: "Invalid Output settings",
+			},
+			reason: "The current Output settings cannot be applied.",
+			resolution: resolutionViewModel(outputResolution),
+			supported: false,
+			technicalDetails: outputAudio.error,
+		};
+	}
+
 	const plannedOutput = {
 		label: "Format" as const,
-		value: formatResolvedOutputProfile(outputProfile),
+		value: formatResolvedOutputProfile(outputProfile, outputAudio.audioCodec),
 	};
 
 	if (!review.supported) {
 		return {
+			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput,
 			reason: review.reason,
 			resolution: resolutionViewModel(outputResolution),
@@ -145,6 +177,7 @@ function reviewViewModel(
 	}
 
 	return {
+		audioMix: audioMixViewModel(outputAudio),
 		method: {
 			label: "Export",
 			value: review.method.label,
@@ -157,6 +190,31 @@ function reviewViewModel(
 		reason: review.reason,
 		resolution: resolutionViewModel(outputResolution),
 		supported: true,
+	};
+}
+
+function audioMixViewModel(
+	profile: ReturnType<typeof resolveOutputAudioProfile>,
+): { label: "Generated audio mix"; value: string } {
+	if (profile.kind === "invalid") {
+		return {
+			label: "Generated audio mix",
+			value: "Invalid Output settings",
+		};
+	}
+
+	if (!profile.audioCodec || profile.includedTrackCount === 0) {
+		return {
+			label: "Generated audio mix",
+			value: "No audio track",
+		};
+	}
+
+	const sourceTrackLabel =
+		profile.includedTrackCount === 1 ? "source track" : "source tracks";
+	return {
+		label: "Generated audio mix",
+		value: `${profile.includedTrackCount} included ${sourceTrackLabel} to one ${profile.audioCodec.toUpperCase()} audio track`,
 	};
 }
 
@@ -181,8 +239,9 @@ function formatResolvedOutputProfile(
 		ReturnType<typeof resolveOutputVideoProfile>,
 		{ kind: "resolved" }
 	>,
+	audioCodec: string | undefined,
 ): string {
-	return `${profile.container.label} / ${formatVideoCodec(profile.videoCodec)} video / AAC audio`;
+	return `${profile.container.label} / ${formatVideoCodec(profile.videoCodec)} video / ${audioCodec ? `${audioCodec.toUpperCase()} audio` : "No audio"}`;
 }
 
 function formatVideoCodec(codec: string): string {

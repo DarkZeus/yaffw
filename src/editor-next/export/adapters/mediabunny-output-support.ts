@@ -46,6 +46,7 @@ function toDocumentedOutputContainer({
 	label,
 }: DocumentedVideoFormat): DocumentedOutputContainer {
 	return {
+		audioCodecs: format.getSupportedAudioCodecs(),
 		fileExtension: format.fileExtension,
 		id,
 		label,
