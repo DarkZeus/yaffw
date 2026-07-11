@@ -26,6 +26,7 @@ import { ExportInspectorPanel } from "../inspector/export-inspector";
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+	window.localStorage.clear();
 });
 
 describe("ExportInspectorPanel", () => {
@@ -177,6 +178,127 @@ describe("ExportInspectorPanel", () => {
 
 		expect(onApplyOutputSettings).toHaveBeenCalledWith(defaultOutputSettings);
 		expect(onStartExport).not.toHaveBeenCalled();
+	});
+
+	it("saves and loads Export presets as modal drafts before explicit Apply", () => {
+		const onApplyOutputSettings = vi.fn();
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				audioMix={defaultAudioMix}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={onApplyOutputSettings}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		let dialog = screen.getByRole("dialog", { name: "Output settings" });
+		fireEvent.change(
+			within(dialog).getByRole("combobox", { name: "Container" }),
+			{ target: { value: "webm" } },
+		);
+		fireEvent.change(
+			within(dialog).getByRole("textbox", { name: "Export preset name" }),
+			{ target: { value: "  Web sharing  " } },
+		);
+		fireEvent.click(
+			within(dialog).getByRole("button", { name: "Save preset" }),
+		);
+
+		expect(within(dialog).getByText("Web sharing saved.")).toBeTruthy();
+		expect(onApplyOutputSettings).not.toHaveBeenCalled();
+		fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		dialog = screen.getByRole("dialog", { name: "Output settings" });
+		fireEvent.change(
+			within(dialog).getByRole("combobox", { name: "Saved Export preset" }),
+			{ target: { value: "Web sharing" } },
+		);
+		fireEvent.click(within(dialog).getByRole("button", { name: "Load" }));
+
+		expect(
+			(
+				within(dialog).getByRole("combobox", {
+					name: "Container",
+				}) as HTMLSelectElement
+			).value,
+		).toBe("webm");
+		expect(
+			within(dialog).getByText(
+				"Web sharing loaded into the draft. Apply to update the editing session.",
+			),
+		).toBeTruthy();
+		expect(onApplyOutputSettings).not.toHaveBeenCalled();
+
+		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+		expect(onApplyOutputSettings).toHaveBeenCalledWith({
+			...defaultOutputSettings,
+			audioCodec: { codec: "opus", kind: "documented-codec" },
+			container: { container: "webm", kind: "documented-container" },
+			videoCodec: { codec: "vp9", kind: "documented-codec" },
+		});
+	});
+
+	it("requires confirmation before overwriting or deleting an Export preset", () => {
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				audioMix={defaultAudioMix}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		const presetName = within(dialog).getByRole("textbox", {
+			name: "Export preset name",
+		});
+		fireEvent.change(presetName, { target: { value: "Archive" } });
+		fireEvent.click(
+			within(dialog).getByRole("button", { name: "Save preset" }),
+		);
+		fireEvent.click(
+			within(dialog).getByRole("button", { name: "Save preset" }),
+		);
+
+		const overwrite = within(dialog).getByLabelText("Overwrite Export preset");
+		expect(within(overwrite).getByText(/already exists/)).toBeTruthy();
+		fireEvent.click(
+			within(overwrite).getByRole("button", { name: "Overwrite" }),
+		);
+
+		fireEvent.click(
+			within(dialog).getByRole("button", {
+				name: "Delete selected Export preset",
+			}),
+		);
+		const confirmation = within(dialog).getByLabelText("Delete Export preset");
+		expect(within(confirmation).getByText(/Delete Archive/)).toBeTruthy();
+		fireEvent.click(
+			within(confirmation).getByRole("button", { name: "Delete" }),
+		);
+		expect(
+			(
+				within(dialog).getByRole("combobox", {
+					name: "Saved Export preset",
+				}) as HTMLSelectElement
+			).disabled,
+		).toBe(true);
 	});
 
 	it("filters video codecs and visibly replaces an incompatible preserved source codec", () => {

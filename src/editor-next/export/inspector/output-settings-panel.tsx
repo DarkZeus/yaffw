@@ -45,6 +45,7 @@ import {
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
+import { ExportPresetControls } from "../presets/export-preset-controls";
 
 type OutputSettingsPanelProps = {
 	asset: ReadyMediaAsset;
@@ -264,6 +265,12 @@ export function OutputSettingsPanel({
 			: containerForSetting(activeDraft.container);
 	const compatibleVideoCodecs = selectedContainer?.videoCodecs ?? [];
 	const compatibleAudioCodecs = selectedContainer?.audioCodecs ?? [];
+	const draftIsValid =
+		resolvedDraft.kind !== "invalid" &&
+		resolvedAudio.kind !== "invalid" &&
+		resolvedResolution.kind !== "invalid" &&
+		resolvedVideoQuality.kind !== "invalid" &&
+		resolvedAudioQuality.kind !== "invalid";
 
 	function openResolvedOutputSettings() {
 		setAutomaticReplacementMessage(null);
@@ -271,13 +278,7 @@ export function OutputSettingsPanel({
 	}
 
 	function applyResolvedDraft() {
-		if (
-			resolvedDraft.kind === "invalid" ||
-			resolvedAudio.kind === "invalid" ||
-			resolvedResolution.kind === "invalid" ||
-			resolvedVideoQuality.kind === "invalid" ||
-			resolvedAudioQuality.kind === "invalid"
-		) {
+		if (!draftIsValid) {
 			return;
 		}
 
@@ -383,6 +384,17 @@ export function OutputSettingsPanel({
 										icon={<Film aria-hidden="true" className="size-4" />}
 										title="General"
 									>
+										<ExportPresetControls
+											draft={activeDraft}
+											draftIsValid={draftIsValid}
+											exportRunning={exportRunning}
+											onLoadPreset={(preset) =>
+												setReconciledDraft(
+													cloneOutputSettings(preset.outputSettings),
+												)
+											}
+										/>
+										<Separator />
 										<OutputSettingsChoice
 											label="Container"
 											onChange={changeContainer}
@@ -910,14 +922,6 @@ function formatSourceDimensions(asset: ReadyMediaAsset): string {
 	}
 
 	return `${videoTrack.width}x${videoTrack.height}`;
-}
-
-function formatBitrate(bitrateBps: number): string {
-	if (bitrateBps >= 1_000_000) {
-		return `${(bitrateBps / 1_000_000).toFixed(1)} Mbps`;
-	}
-
-	return `${Math.round(bitrateBps / 1_000)} Kbps`;
 }
 
 function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {
