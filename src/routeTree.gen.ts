@@ -9,19 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VidstackPreviewPrototypeRouteImport } from './routes/vidstack-preview-prototype'
 import { Route as TestRouteImport } from './routes/test'
 import { Route as EditorNextRouteImport } from './routes/editor-next'
-import { Route as EditorLayoutPrototypeRouteImport } from './routes/editor-layout-prototype'
 import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
 import { Route as IndexRouteImport } from './routes/index'
 
-const VidstackPreviewPrototypeRoute =
-  VidstackPreviewPrototypeRouteImport.update({
-    id: '/vidstack-preview-prototype',
-    path: '/vidstack-preview-prototype',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const TestRoute = TestRouteImport.update({
   id: '/test',
   path: '/test',
@@ -30,11 +22,6 @@ const TestRoute = TestRouteImport.update({
 const EditorNextRoute = EditorNextRouteImport.update({
   id: '/editor-next',
   path: '/editor-next',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EditorLayoutPrototypeRoute = EditorLayoutPrototypeRouteImport.update({
-  id: '/editor-layout-prototype',
-  path: '/editor-layout-prototype',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BulkDownloadRoute = BulkDownloadRouteImport.update({
@@ -51,73 +38,39 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
-  '/editor-layout-prototype': typeof EditorLayoutPrototypeRoute
   '/editor-next': typeof EditorNextRoute
   '/test': typeof TestRoute
-  '/vidstack-preview-prototype': typeof VidstackPreviewPrototypeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
-  '/editor-layout-prototype': typeof EditorLayoutPrototypeRoute
   '/editor-next': typeof EditorNextRoute
   '/test': typeof TestRoute
-  '/vidstack-preview-prototype': typeof VidstackPreviewPrototypeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
-  '/editor-layout-prototype': typeof EditorLayoutPrototypeRoute
   '/editor-next': typeof EditorNextRoute
   '/test': typeof TestRoute
-  '/vidstack-preview-prototype': typeof VidstackPreviewPrototypeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/bulk-download'
-    | '/editor-layout-prototype'
-    | '/editor-next'
-    | '/test'
-    | '/vidstack-preview-prototype'
+  fullPaths: '/' | '/bulk-download' | '/editor-next' | '/test'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/bulk-download'
-    | '/editor-layout-prototype'
-    | '/editor-next'
-    | '/test'
-    | '/vidstack-preview-prototype'
-  id:
-    | '__root__'
-    | '/'
-    | '/bulk-download'
-    | '/editor-layout-prototype'
-    | '/editor-next'
-    | '/test'
-    | '/vidstack-preview-prototype'
+  to: '/' | '/bulk-download' | '/editor-next' | '/test'
+  id: '__root__' | '/' | '/bulk-download' | '/editor-next' | '/test'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BulkDownloadRoute: typeof BulkDownloadRoute
-  EditorLayoutPrototypeRoute: typeof EditorLayoutPrototypeRoute
   EditorNextRoute: typeof EditorNextRoute
   TestRoute: typeof TestRoute
-  VidstackPreviewPrototypeRoute: typeof VidstackPreviewPrototypeRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vidstack-preview-prototype': {
-      id: '/vidstack-preview-prototype'
-      path: '/vidstack-preview-prototype'
-      fullPath: '/vidstack-preview-prototype'
-      preLoaderRoute: typeof VidstackPreviewPrototypeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/test': {
       id: '/test'
       path: '/test'
@@ -130,13 +83,6 @@ declare module '@tanstack/react-router' {
       path: '/editor-next'
       fullPath: '/editor-next'
       preLoaderRoute: typeof EditorNextRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/editor-layout-prototype': {
-      id: '/editor-layout-prototype'
-      path: '/editor-layout-prototype'
-      fullPath: '/editor-layout-prototype'
-      preLoaderRoute: typeof EditorLayoutPrototypeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bulk-download': {
@@ -159,10 +105,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BulkDownloadRoute: BulkDownloadRoute,
-  EditorLayoutPrototypeRoute: EditorLayoutPrototypeRoute,
   EditorNextRoute: EditorNextRoute,
   TestRoute: TestRoute,
-  VidstackPreviewPrototypeRoute: VidstackPreviewPrototypeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

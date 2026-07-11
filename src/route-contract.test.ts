@@ -18,20 +18,31 @@ import { getAppSidebarItems } from "./components/app-sidebar-items";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { routeTree } from "./routeTree.gen";
 
-const prototypeRoutePath = "/editor-next-workbench-prototype";
+const referencePrototypeRoutePath = "/editor-next-workbench-prototype";
 const legacyRoutePath = "/legacy-editor";
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const legacyRouteFile = join(sourceDir, "routes/legacy-editor.tsx");
-const prototypeRouteFile = join(
+const referencePrototypeRouteFile = join(
 	sourceDir,
 	"routes/editor-next-workbench-prototype.tsx",
 );
-const prototypeComponentFile = join(
+const referencePrototypeComponentFile = join(
 	sourceDir,
 	"editor-next/prototypes/workbench/editor-workbench-prototype.tsx",
 );
+const removedPrototypeRoutes = [
+	{
+		path: "/editor-layout-prototype",
+		routeFile: join(sourceDir, "routes/editor-layout-prototype.tsx"),
+	},
+	{
+		path: "/vidstack-preview-prototype",
+		routeFile: join(sourceDir, "routes/vidstack-preview-prototype.tsx"),
+	},
+];
 const routeTreeFile = join(sourceDir, "routeTree.gen.ts");
 const appSidebarFile = join(sourceDir, "components/app-sidebar.tsx");
+const rootRouteFile = join(sourceDir, "routes/__root.tsx");
 const routeRenderTimeout = { timeout: 5_000 };
 
 beforeEach(() => {
@@ -162,18 +173,31 @@ describe("app route contract", () => {
 		expect(screen.queryByRole("link", { name: "Bulk download" })).toBeNull();
 	});
 
-	it("does not publish the workbench prototype as a route while preserving its reference component", () => {
+	it("does not publish removed prototype routes or retain shell exceptions for them", () => {
 		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
 		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-		const prototypeComponentSource = readFileSync(
-			prototypeComponentFile,
+		const rootRouteSource = readFileSync(rootRouteFile, "utf8");
+
+		for (const removedPrototype of removedPrototypeRoutes) {
+			expect(routeTreeSource).not.toContain(removedPrototype.path);
+			expect(existsSync(removedPrototype.routeFile)).toBe(false);
+			expect(appSidebarSource).not.toContain(removedPrototype.path);
+			expect(rootRouteSource).not.toContain(removedPrototype.path);
+		}
+	});
+
+	it("keeps the resolved workbench reference artifact unpublished", () => {
+		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
+		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
+		const referencePrototypeComponentSource = readFileSync(
+			referencePrototypeComponentFile,
 			"utf8",
 		);
 
-		expect(routeTreeSource).not.toContain(prototypeRoutePath);
-		expect(existsSync(prototypeRouteFile)).toBe(false);
-		expect(appSidebarSource).not.toContain(prototypeRoutePath);
-		expect(prototypeComponentSource).toContain(
+		expect(routeTreeSource).not.toContain(referencePrototypeRoutePath);
+		expect(existsSync(referencePrototypeRouteFile)).toBe(false);
+		expect(appSidebarSource).not.toContain(referencePrototypeRoutePath);
+		expect(referencePrototypeComponentSource).toContain(
 			"export function EditorWorkbenchPrototype",
 		);
 	});
