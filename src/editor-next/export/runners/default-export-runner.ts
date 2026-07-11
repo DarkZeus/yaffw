@@ -19,6 +19,7 @@ import {
 } from "@/editor-core/audio-mix-plan";
 import {
 	resolveOutputAudioProfile,
+	resolveOutputQuality,
 	resolveOutputResolution,
 } from "@/editor-core/output-settings";
 import { renderBrowserAudioMix } from "../../audio/engine/browser-audio-mix";
@@ -28,6 +29,7 @@ import {
 	createDisposableMediaCleanup,
 	withDisposableMediaWorkScope,
 } from "../../media-work/scopes/disposable-media-work-scope";
+import { toMediabunnyBitrate } from "../adapters/mediabunny-output-quality";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import type {
 	DefaultExportRunner,
@@ -101,6 +103,13 @@ async function runBrowserDefaultExport({
 	if (!audioProfile.audioCodec) {
 		return videoOnlyResult;
 	}
+	const audioQuality = resolveOutputQuality({
+		mediaKind: "audio",
+		setting: outputSettings.audioQuality,
+	});
+	if (audioQuality.kind === "invalid") {
+		throw new Error(audioQuality.error);
+	}
 
 	onProgress({
 		phase: "preparing",
@@ -125,6 +134,7 @@ async function runBrowserDefaultExport({
 
 	const blob = await muxVideoOnlyExportWithMixedAudio({
 		audioBuffer: mixedAudio.audioBuffer,
+		audioBitrate: toMediabunnyBitrate(audioQuality),
 		audioCodec: audioProfile.audioCodec as AudioCodec,
 		signal,
 		videoOnlyBlob: videoOnlyResult.blob,
@@ -155,6 +165,14 @@ async function runBrowserVideoOnlyExport({
 		if (resolution.kind === "invalid") {
 			throw new Error(resolution.error);
 		}
+		const videoQuality = resolveOutputQuality({
+			mediaKind: "video",
+			setting: outputSettings.videoQuality,
+		});
+		if (videoQuality.kind === "invalid") {
+			throw new Error(videoQuality.error);
+		}
+		const videoBitrate = toMediabunnyBitrate(videoQuality);
 
 		const input = scope.registerDisposable(
 			new Input({
@@ -181,6 +199,7 @@ async function runBrowserVideoOnlyExport({
 			},
 			video: {
 				codec: "avc",
+				...(videoBitrate === undefined ? {} : { bitrate: videoBitrate }),
 				...(resolution.conversionDimensions
 					? {
 							...resolution.conversionDimensions,
@@ -232,11 +251,13 @@ async function runBrowserVideoOnlyExport({
 
 async function muxVideoOnlyExportWithMixedAudio({
 	audioBuffer,
+	audioBitrate,
 	audioCodec,
 	signal,
 	videoOnlyBlob,
 }: {
 	audioBuffer: AudioBuffer;
+	audioBitrate: ConstructorParameters<typeof AudioBufferSource>[0]["bitrate"];
 	audioCodec: AudioCodec;
 	signal: AbortSignal;
 	videoOnlyBlob: Blob;
@@ -271,7 +292,7 @@ async function muxVideoOnlyExportWithMixedAudio({
 			};
 		});
 		const audioSource = new AudioBufferSource({
-			bitrate: 192_000,
+			...(audioBitrate === undefined ? {} : { bitrate: audioBitrate }),
 			codec: audioCodec,
 		});
 		const closeAudioSource = registerClosableCleanup(scope, audioSource);

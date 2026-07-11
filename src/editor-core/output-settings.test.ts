@@ -5,9 +5,58 @@ import {
 	type BrowserLocalOutputSupport,
 	getOutputResolutionChoices,
 	resolveOutputAudioProfile,
+	resolveOutputQuality,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "./output-settings";
+
+describe("Output settings quality resolution", () => {
+	it("keeps Preserve source symbolic and accepts every Mediabunny Subjective quality", () => {
+		expect(
+			resolveOutputQuality({
+				mediaKind: "video",
+				setting: { kind: "preserve-source" },
+			}),
+		).toEqual({ kind: "preserve-source" });
+
+		for (const quality of [
+			"very-low",
+			"low",
+			"medium",
+			"high",
+			"very-high",
+		] as const) {
+			expect(
+				resolveOutputQuality({
+					mediaKind: "video",
+					setting: { kind: "subjective-quality", quality },
+				}),
+			).toEqual({ kind: "subjective-quality", quality });
+		}
+	});
+
+	it("accepts an exact positive bitrate and rejects invalid custom values", () => {
+		expect(
+			resolveOutputQuality({
+				mediaKind: "audio",
+				setting: { bitrateBps: 256_000, kind: "custom-bitrate" },
+			}),
+		).toEqual({ bitrateBps: 256_000, kind: "custom-bitrate" });
+
+		for (const bitrateBps of [0, -1, 12.5, Number.NaN]) {
+			expect(
+				resolveOutputQuality({
+					mediaKind: "audio",
+					setting: { bitrateBps, kind: "custom-bitrate" },
+				}),
+			).toEqual({
+				error:
+					"Enter a positive whole-number audio bitrate in bits per second.",
+				kind: "invalid",
+			});
+		}
+	});
+});
 
 describe("Output settings resolution choices", () => {
 	it("offers Preserve source and aspect-correct downscales below the active source dimensions", () => {

@@ -16,20 +16,24 @@ export type ExportInspectorFact = {
 export type ExportInspectorReviewViewModel =
 	| {
 			audioMix: ExportInspectorFact;
+			audioQuality: ExportInspectorFact;
 			method: ExportInspectorFact;
 			plannedOutput: ExportInspectorFact;
 			precision: ExportInspectorFact;
 			reason: string;
 			resolution: ExportInspectorFact;
 			supported: true;
+			videoQuality: ExportInspectorFact;
 	  }
 	| {
 			audioMix: ExportInspectorFact;
+			audioQuality: ExportInspectorFact;
 			plannedOutput: ExportInspectorFact;
 			reason: string;
 			resolution: ExportInspectorFact;
 			supported: false;
 			technicalDetails: string;
+			videoQuality: ExportInspectorFact;
 	  };
 
 export type ExportInspectorStatusViewModel =

@@ -5,7 +5,9 @@ import {
 import type { ExportProgress } from "@/editor-core/model";
 import {
 	type ResolvedOutputResolution,
+	formatOutputQualitySetting,
 	resolveOutputAudioProfile,
+	resolveOutputQuality,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
@@ -52,11 +54,21 @@ export function createExportInspectorViewModel({
 		asset,
 		setting: outputSettings.resolution,
 	});
+	const videoQuality = resolveOutputQuality({
+		mediaKind: "video",
+		setting: outputSettings.videoQuality,
+	});
+	const audioQuality = resolveOutputQuality({
+		mediaKind: "audio",
+		setting: outputSettings.audioQuality,
+	});
 	const supported =
 		review.supported &&
 		outputProfile.kind === "resolved" &&
 		outputAudio.kind === "resolved" &&
-		outputResolution.kind === "resolved";
+		outputResolution.kind === "resolved" &&
+		videoQuality.kind !== "invalid" &&
+		audioQuality.kind !== "invalid";
 
 	return {
 		action: actionForExportState(exportState, supported),
@@ -70,6 +82,9 @@ export function createExportInspectorViewModel({
 			outputProfile,
 			outputAudio,
 			outputResolution,
+			outputSettings,
+			videoQuality.kind === "invalid" ? videoQuality.error : undefined,
+			audioQuality.kind === "invalid" ? audioQuality.error : undefined,
 		),
 		runtimeChecks: runtimeCheckViewModels(runtime),
 		status: statusForExportState(exportState),
@@ -117,9 +132,36 @@ function reviewViewModel(
 	outputProfile: ReturnType<typeof resolveOutputVideoProfile>,
 	outputAudio: ReturnType<typeof resolveOutputAudioProfile>,
 	outputResolution: ResolvedOutputResolution,
+	outputSettings: CreateExportInspectorViewModelOptions["outputSettings"],
+	videoQualityError: string | undefined,
+	audioQualityError: string | undefined,
 ): ExportInspectorReviewViewModel {
+	const qualityFacts = {
+		audioQuality: {
+			label: "Audio quality",
+			value: formatOutputQualitySetting(outputSettings.audioQuality),
+		},
+		videoQuality: {
+			label: "Video quality",
+			value: formatOutputQualitySetting(outputSettings.videoQuality),
+		},
+	};
+	const qualityError = videoQualityError ?? audioQualityError;
+	if (qualityError) {
+		return {
+			...qualityFacts,
+			audioMix: audioMixViewModel(outputAudio),
+			plannedOutput: { label: "Format", value: "Invalid Output settings" },
+			reason: "The current Output settings cannot be applied.",
+			resolution: resolutionViewModel(outputResolution),
+			supported: false,
+			technicalDetails: qualityError,
+		};
+	}
+
 	if (outputProfile.kind === "invalid") {
 		return {
+			...qualityFacts,
 			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput: {
 				label: "Format",
@@ -134,6 +176,7 @@ function reviewViewModel(
 
 	if (outputResolution.kind === "invalid") {
 		return {
+			...qualityFacts,
 			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput: {
 				label: "Format",
@@ -148,6 +191,7 @@ function reviewViewModel(
 
 	if (outputAudio.kind === "invalid") {
 		return {
+			...qualityFacts,
 			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput: {
 				label: "Format",
@@ -167,6 +211,7 @@ function reviewViewModel(
 
 	if (!review.supported) {
 		return {
+			...qualityFacts,
 			audioMix: audioMixViewModel(outputAudio),
 			plannedOutput,
 			reason: review.reason,
@@ -177,6 +222,7 @@ function reviewViewModel(
 	}
 
 	return {
+		...qualityFacts,
 		audioMix: audioMixViewModel(outputAudio),
 		method: {
 			label: "Export",

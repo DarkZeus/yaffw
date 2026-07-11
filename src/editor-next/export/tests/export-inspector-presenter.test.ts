@@ -46,6 +46,10 @@ describe("export inspector presenter", () => {
 				label: "Generated audio mix",
 				value: "1 included source track to one AAC audio track",
 			},
+			audioQuality: {
+				label: "Audio quality",
+				value: "Preserve source",
+			},
 			method: { label: "Export", value: "Whole file export" },
 			plannedOutput: {
 				label: "Format",
@@ -56,6 +60,10 @@ describe("export inspector presenter", () => {
 				"The current selection covers the full asset, so export can use the default output profile without boundary trimming.",
 			resolution: { label: "Resolution", value: "1920x1080" },
 			supported: true,
+			videoQuality: {
+				label: "Video quality",
+				value: "Preserve source",
+			},
 		});
 		expect(viewModel.status).toEqual({
 			kind: "idle",
@@ -169,6 +177,10 @@ describe("export inspector presenter", () => {
 				label: "Generated audio mix",
 				value: "1 included source track to one AAC audio track",
 			},
+			audioQuality: {
+				label: "Audio quality",
+				value: "Preserve source",
+			},
 			plannedOutput: {
 				label: "Format",
 				value: "MP4 / H.264 video / AAC audio",
@@ -177,6 +189,10 @@ describe("export inspector presenter", () => {
 			resolution: { label: "Resolution", value: "1920x1080" },
 			supported: false,
 			technicalDetails: `Expected selection inside [0, ${readyAsset.durationUs}], got [${invalidSelection.startUs}, ${invalidSelection.endUs}].`,
+			videoQuality: {
+				label: "Video quality",
+				value: "Preserve source",
+			},
 		});
 		expect(viewModel.action).toEqual({
 			disabled: true,

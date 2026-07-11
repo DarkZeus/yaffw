@@ -72,6 +72,14 @@ export function ExportInspectorPanel({
 							value={viewModel.review.resolution.value}
 						/>
 						<InspectorLine
+							label={viewModel.review.videoQuality.label}
+							value={viewModel.review.videoQuality.value}
+						/>
+						<InspectorLine
+							label={viewModel.review.audioQuality.label}
+							value={viewModel.review.audioQuality.value}
+						/>
+						<InspectorLine
 							label={viewModel.review.audioMix.label}
 							value={viewModel.review.audioMix.value}
 						/>

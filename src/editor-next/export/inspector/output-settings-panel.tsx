@@ -27,15 +27,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
+	type OutputQualitySetting,
 	type OutputSettings,
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import {
+	OUTPUT_SUBJECTIVE_QUALITY_CHOICES,
 	type ResolvedOutputAudioProfile,
+	type ResolvedOutputQuality,
 	type ResolvedOutputResolution,
 	type ResolvedOutputVideoProfile,
+	formatOutputQualitySetting,
 	getOutputResolutionChoices,
 	resolveOutputAudioProfile,
+	resolveOutputQuality,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
@@ -134,6 +139,60 @@ export function OutputSettingsPanel({
 		setDraft(nextDraft);
 	}
 
+	function changeQuality(mediaKind: "audio" | "video", value: string) {
+		const nextDraft = cloneOutputSettings(activeDraft);
+		const currentSetting =
+			mediaKind === "video"
+				? activeDraft.videoQuality
+				: activeDraft.audioQuality;
+		let nextSetting: OutputQualitySetting;
+		if (value === "preserve-source") {
+			nextSetting = { kind: "preserve-source" };
+		} else if (value === "custom-bitrate") {
+			nextSetting = {
+				bitrateBps:
+					currentSetting.kind === "custom-bitrate"
+						? currentSetting.bitrateBps
+						: mediaKind === "video"
+							? 5_000_000
+							: 192_000,
+				kind: "custom-bitrate",
+			};
+		} else {
+			const quality = OUTPUT_SUBJECTIVE_QUALITY_CHOICES.find(
+				(choice) => choice.value === value,
+			)?.value;
+			if (!quality) {
+				return;
+			}
+			nextSetting = { kind: "subjective-quality", quality };
+		}
+
+		if (mediaKind === "video") {
+			nextDraft.videoQuality = nextSetting;
+		} else {
+			nextDraft.audioQuality = nextSetting;
+		}
+		setDraft(nextDraft);
+	}
+
+	function changeCustomBitrate(
+		mediaKind: "audio" | "video",
+		bitrateBps: number,
+	) {
+		const nextDraft = cloneOutputSettings(activeDraft);
+		const nextSetting: OutputQualitySetting = {
+			bitrateBps,
+			kind: "custom-bitrate",
+		};
+		if (mediaKind === "video") {
+			nextDraft.videoQuality = nextSetting;
+		} else {
+			nextDraft.audioQuality = nextSetting;
+		}
+		setDraft(nextDraft);
+	}
+
 	function setReconciledDraft(nextDraft: OutputSettings) {
 		const videoProfile = resolveOutputVideoProfile({
 			asset,
@@ -180,6 +239,14 @@ export function OutputSettingsPanel({
 		asset,
 		setting: activeDraft.resolution,
 	});
+	const resolvedVideoQuality = resolveOutputQuality({
+		mediaKind: "video",
+		setting: activeDraft.videoQuality,
+	});
+	const resolvedAudioQuality = resolveOutputQuality({
+		mediaKind: "audio",
+		setting: activeDraft.audioQuality,
+	});
 	const resolvedDraft = resolveOutputVideoProfile({
 		asset,
 		outputSettings: activeDraft,
@@ -207,7 +274,9 @@ export function OutputSettingsPanel({
 		if (
 			resolvedDraft.kind === "invalid" ||
 			resolvedAudio.kind === "invalid" ||
-			resolvedResolution.kind === "invalid"
+			resolvedResolution.kind === "invalid" ||
+			resolvedVideoQuality.kind === "invalid" ||
+			resolvedAudioQuality.kind === "invalid"
 		) {
 			return;
 		}
@@ -244,7 +313,7 @@ export function OutputSettingsPanel({
 				/>
 				<OutputSettingsFact
 					label="Video quality"
-					value={formatQualitySetting(outputSettings.videoQuality)}
+					value={formatOutputQualitySetting(outputSettings.videoQuality)}
 				/>
 				<OutputSettingsFact
 					label="Video codec"
@@ -347,6 +416,8 @@ export function OutputSettingsPanel({
 											resolvedDraft={resolvedDraft}
 											resolvedAudio={resolvedAudio}
 											resolvedResolution={resolvedResolution}
+											resolvedVideoQuality={resolvedVideoQuality}
+											resolvedAudioQuality={resolvedAudioQuality}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -374,6 +445,14 @@ export function OutputSettingsPanel({
 												</option>
 											))}
 										</OutputSettingsChoice>
+										<OutputQualityChoice
+											label="Video quality"
+											onBitrateChange={(bitrateBps) =>
+												changeCustomBitrate("video", bitrateBps)
+											}
+											onChange={(value) => changeQuality("video", value)}
+											setting={activeDraft.videoQuality}
+										/>
 										<OutputSettingsChoice
 											label="Resolution"
 											onChange={changeResolution}
@@ -395,7 +474,9 @@ export function OutputSettingsPanel({
 											/>
 											<OutputSettingsFact
 												label="Video quality"
-												value={formatQualitySetting(activeDraft.videoQuality)}
+												value={formatOutputQualitySetting(
+													activeDraft.videoQuality,
+												)}
 											/>
 											<OutputSettingsFact
 												label="Source"
@@ -407,6 +488,8 @@ export function OutputSettingsPanel({
 											resolvedDraft={resolvedDraft}
 											resolvedAudio={resolvedAudio}
 											resolvedResolution={resolvedResolution}
+											resolvedVideoQuality={resolvedVideoQuality}
+											resolvedAudioQuality={resolvedAudioQuality}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -434,6 +517,14 @@ export function OutputSettingsPanel({
 												</option>
 											))}
 										</OutputSettingsChoice>
+										<OutputQualityChoice
+											label="Audio quality"
+											onBitrateChange={(bitrateBps) =>
+												changeCustomBitrate("audio", bitrateBps)
+											}
+											onChange={(value) => changeQuality("audio", value)}
+											setting={activeDraft.audioQuality}
+										/>
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
 												label="Audio codec"
@@ -441,7 +532,7 @@ export function OutputSettingsPanel({
 											/>
 											<OutputSettingsFact
 												label="Audio quality"
-												value={formatQualitySetting(draft.audioQuality)}
+												value={formatOutputQualitySetting(draft.audioQuality)}
 											/>
 											<OutputSettingsFact
 												label="Included source tracks"
@@ -462,6 +553,8 @@ export function OutputSettingsPanel({
 											resolvedAudio={resolvedAudio}
 											resolvedDraft={resolvedDraft}
 											resolvedResolution={resolvedResolution}
+											resolvedVideoQuality={resolvedVideoQuality}
+											resolvedAudioQuality={resolvedAudioQuality}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -501,7 +594,9 @@ export function OutputSettingsPanel({
 								exportRunning ||
 								resolvedDraft.kind === "invalid" ||
 								resolvedAudio.kind === "invalid" ||
-								resolvedResolution.kind === "invalid"
+								resolvedResolution.kind === "invalid" ||
+								resolvedVideoQuality.kind === "invalid" ||
+								resolvedAudioQuality.kind === "invalid"
 							}
 							onClick={applyResolvedDraft}
 							type="button"
@@ -557,16 +652,66 @@ function OutputSettingsChoice({
 	);
 }
 
+function OutputQualityChoice({
+	label,
+	onBitrateChange,
+	onChange,
+	setting,
+}: {
+	label: string;
+	onBitrateChange: (bitrateBps: number) => void;
+	onChange: (value: string) => void;
+	setting: OutputQualitySetting;
+}) {
+	return (
+		<div className="grid gap-1.5 text-xs font-medium text-foreground">
+			<OutputSettingsChoice
+				label={label}
+				onChange={onChange}
+				value={qualitySettingValue(setting)}
+			>
+				<option value="preserve-source">Preserve source</option>
+				{OUTPUT_SUBJECTIVE_QUALITY_CHOICES.map(({ label, value }) => (
+					<option key={value} value={value}>
+						{label}
+					</option>
+				))}
+				<option value="custom-bitrate">Custom bitrate</option>
+			</OutputSettingsChoice>
+			{setting.kind === "custom-bitrate" ? (
+				<label className="grid gap-1.5">
+					<span>Custom {label.toLowerCase()} bitrate (bps)</span>
+					<input
+						aria-label={`Custom ${label.toLowerCase()} bitrate`}
+						className="h-9 w-full rounded border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+						min="1"
+						onChange={(event) =>
+							onBitrateChange(event.currentTarget.valueAsNumber)
+						}
+						step="1"
+						type="number"
+						value={Number.isNaN(setting.bitrateBps) ? "" : setting.bitrateBps}
+					/>
+				</label>
+			) : null}
+		</div>
+	);
+}
+
 function OutputSettingsValidationMessage({
 	automaticReplacementMessage,
 	resolvedAudio,
 	resolvedDraft,
 	resolvedResolution,
+	resolvedVideoQuality,
+	resolvedAudioQuality,
 }: {
 	automaticReplacementMessage: string | null;
 	resolvedAudio: ResolvedOutputAudioProfile;
 	resolvedDraft: ResolvedOutputVideoProfile;
 	resolvedResolution: ResolvedOutputResolution;
+	resolvedVideoQuality: ResolvedOutputQuality;
+	resolvedAudioQuality: ResolvedOutputQuality;
 }) {
 	const error =
 		resolvedDraft.kind === "invalid"
@@ -575,7 +720,11 @@ function OutputSettingsValidationMessage({
 				? resolvedAudio.error
 				: resolvedResolution.kind === "invalid"
 					? resolvedResolution.error
-					: undefined;
+					: resolvedVideoQuality.kind === "invalid"
+						? resolvedVideoQuality.error
+						: resolvedAudioQuality.kind === "invalid"
+							? resolvedAudioQuality.error
+							: undefined;
 
 	if (error) {
 		return (
@@ -749,16 +898,8 @@ function resolutionSettingValue(setting: OutputSettings["resolution"]): string {
 		: setting.kind;
 }
 
-function formatQualitySetting(setting: OutputSettings["videoQuality"]): string {
-	if (setting.kind === "custom-bitrate") {
-		return `${formatBitrate(setting.bitrateBps)}`;
-	}
-
-	if (setting.kind === "subjective-quality") {
-		return setting.quality;
-	}
-
-	return "Preserve source";
+function qualitySettingValue(setting: OutputQualitySetting): string {
+	return setting.kind === "subjective-quality" ? setting.quality : setting.kind;
 }
 
 function formatSourceDimensions(asset: ReadyMediaAsset): string {

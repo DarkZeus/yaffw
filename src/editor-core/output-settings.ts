@@ -5,12 +5,106 @@ import {
 import {
 	type AudioMix,
 	DEFAULT_OUTPUT_PROFILE,
+	type OutputQualitySetting,
 	type OutputResolutionSetting,
 	type OutputSettings,
+	type OutputSubjectiveQuality,
 	type ReadyMediaAsset,
 } from "./model";
 
 const DOWNSCALE_HEIGHTS = [1440, 1080, 720, 480, 360] as const;
+
+export const OUTPUT_SUBJECTIVE_QUALITY_CHOICES: ReadonlyArray<{
+	label: string;
+	value: OutputSubjectiveQuality;
+}> = [
+	{ label: "Very low", value: "very-low" },
+	{ label: "Low", value: "low" },
+	{ label: "Medium", value: "medium" },
+	{ label: "High", value: "high" },
+	{ label: "Very high", value: "very-high" },
+];
+
+const OUTPUT_SUBJECTIVE_QUALITIES = new Set<OutputSubjectiveQuality>(
+	OUTPUT_SUBJECTIVE_QUALITY_CHOICES.map(({ value }) => value),
+);
+
+export type ResolvedOutputQuality =
+	| {
+			kind: "preserve-source";
+	  }
+	| {
+			kind: "subjective-quality";
+			quality: OutputSubjectiveQuality;
+	  }
+	| {
+			bitrateBps: number;
+			kind: "custom-bitrate";
+	  }
+	| {
+			error: string;
+			kind: "invalid";
+	  };
+
+export function resolveOutputQuality({
+	mediaKind,
+	setting,
+}: {
+	mediaKind: "audio" | "video";
+	setting: OutputQualitySetting;
+}): ResolvedOutputQuality {
+	if (setting.kind === "preserve-source") {
+		return setting;
+	}
+
+	if (setting.kind === "subjective-quality") {
+		return OUTPUT_SUBJECTIVE_QUALITIES.has(setting.quality)
+			? setting
+			: {
+					error: `Select a documented Mediabunny Subjective quality for ${mediaKind}.`,
+					kind: "invalid",
+				};
+	}
+
+	if (Number.isInteger(setting.bitrateBps) && setting.bitrateBps > 0) {
+		return setting;
+	}
+
+	return {
+		error: `Enter a positive whole-number ${mediaKind} bitrate in bits per second.`,
+		kind: "invalid",
+	};
+}
+
+export function formatOutputQualitySetting(
+	setting: OutputQualitySetting,
+): string {
+	if (setting.kind === "custom-bitrate") {
+		return formatOutputBitrate(setting.bitrateBps);
+	}
+
+	if (setting.kind === "subjective-quality") {
+		return (
+			OUTPUT_SUBJECTIVE_QUALITY_CHOICES.find(
+				({ value }) => value === setting.quality,
+			)?.label ?? setting.quality
+		);
+	}
+
+	return "Preserve source";
+}
+
+function formatOutputBitrate(bitrateBps: number): string {
+	if (!Number.isFinite(bitrateBps)) {
+		return "Invalid custom bitrate";
+	}
+
+	if (bitrateBps >= 1_000_000) {
+		return `${(bitrateBps / 1_000_000).toFixed(1)} Mbps`;
+	}
+
+	return `${Math.round(bitrateBps / 1_000)} Kbps`;
+}
 
 export type OutputResolutionChoice = {
 	label: string;

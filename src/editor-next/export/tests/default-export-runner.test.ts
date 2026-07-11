@@ -23,6 +23,7 @@ const mediabunnyMock = vi.hoisted(() => ({
 	outputFinalizeFailure: undefined as Error | undefined,
 	outputs: [] as MockOutput[],
 	packetBatches: new Map<MockVideoTrack, MockPacket[]>(),
+	qualityHigh: { name: "QUALITY_HIGH" },
 	videoTracks: [] as MockVideoTrack[],
 }));
 
@@ -187,6 +188,11 @@ vi.mock("mediabunny", () => {
 		Mp4OutputFormat,
 		MpegTsOutputFormat,
 		Output,
+		QUALITY_HIGH: mediabunnyMock.qualityHigh,
+		QUALITY_LOW: { name: "QUALITY_LOW" },
+		QUALITY_MEDIUM: { name: "QUALITY_MEDIUM" },
+		QUALITY_VERY_HIGH: { name: "QUALITY_VERY_HIGH" },
+		QUALITY_VERY_LOW: { name: "QUALITY_VERY_LOW" },
 		WebMOutputFormat,
 	};
 });
@@ -374,6 +380,74 @@ describe("browserDefaultExportRunner cleanup", () => {
 		});
 	});
 
+	it("passes independent subjective video and custom audio bitrate choices", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+			return Promise.resolve();
+		};
+		const videoTrack = createVideoTrack();
+		mediabunnyMock.videoTracks = [videoTrack];
+		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.videoQuality = {
+			kind: "subjective-quality",
+			quality: "high",
+		};
+		outputSettings.audioQuality = {
+			bitrateBps: 256_000,
+			kind: "custom-bitrate",
+		};
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
+		);
+
+		expect(conversionConfig?.video.bitrate).toBe(mediabunnyMock.qualityHigh);
+		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
+			bitrate: 256_000,
+		});
+	});
+
+	it("passes an exact custom video bitrate and subjective audio Quality", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+			return Promise.resolve();
+		};
+		const videoTrack = createVideoTrack();
+		mediabunnyMock.videoTracks = [videoTrack];
+		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.videoQuality = {
+			bitrateBps: 4_000_000,
+			kind: "custom-bitrate",
+		};
+		outputSettings.audioQuality = {
+			kind: "subjective-quality",
+			quality: "high",
+		};
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
+		);
+
+		expect(conversionConfig?.video.bitrate).toBe(4_000_000);
+		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
+			bitrate: mediabunnyMock.qualityHigh,
+		});
+	});
+
 	it("keeps an all-excluded Audio mix as a valid video-only export", async () => {
 		const result = await browserDefaultExportRunner.run(
 			createExportRequest({
@@ -444,6 +518,7 @@ type MockConversion = {
 type MockConversionConfig = {
 	output: MockOutput;
 	video: {
+		bitrate?: unknown;
 		codec: string;
 		fit?: string;
 		height?: number;

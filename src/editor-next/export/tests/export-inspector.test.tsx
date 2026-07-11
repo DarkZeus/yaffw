@@ -309,6 +309,101 @@ describe("ExportInspectorPanel", () => {
 		});
 	});
 
+	it("applies independent Subjective quality and custom bitrate choices", () => {
+		const onApplyOutputSettings = vi.fn();
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				audioMix={defaultAudioMix}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={onApplyOutputSettings}
+				onStartExport={() => undefined}
+				outputSettings={defaultOutputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
+		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		const videoTab = within(dialog).getByRole("tab", { name: "Video" });
+		fireEvent.mouseDown(videoTab, { button: 0, ctrlKey: false });
+		fireEvent.click(videoTab);
+		fireEvent.change(
+			within(dialog).getByRole("combobox", { name: "Video quality" }),
+			{ target: { value: "high" } },
+		);
+
+		const audioTab = within(dialog).getByRole("tab", { name: "Audio" });
+		fireEvent.mouseDown(audioTab, { button: 0, ctrlKey: false });
+		fireEvent.click(audioTab);
+		fireEvent.change(
+			within(dialog).getByRole("combobox", { name: "Audio quality" }),
+			{ target: { value: "custom-bitrate" } },
+		);
+		const customAudioBitrate = within(dialog).getByRole("spinbutton", {
+			name: "Custom audio quality bitrate",
+		});
+		fireEvent.change(customAudioBitrate, { target: { value: "0" } });
+		expect(
+			(
+				within(dialog).getByRole("button", {
+					name: "Apply",
+				}) as HTMLButtonElement
+			).disabled,
+		).toBe(true);
+		expect(
+			within(dialog).getByText(
+				"Enter a positive whole-number audio bitrate in bits per second.",
+			),
+		).toBeTruthy();
+
+		fireEvent.change(customAudioBitrate, { target: { value: "256000" } });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+
+		expect(onApplyOutputSettings).toHaveBeenCalledWith({
+			...defaultOutputSettings,
+			audioQuality: { bitrateBps: 256_000, kind: "custom-bitrate" },
+			videoQuality: { kind: "subjective-quality", quality: "high" },
+		});
+	});
+
+	it("summarizes applied video and audio quality in Export review", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.videoQuality = {
+			kind: "subjective-quality",
+			quality: "high",
+		};
+		outputSettings.audioQuality = {
+			bitrateBps: 256_000,
+			kind: "custom-bitrate",
+		};
+
+		render(
+			<ExportInspectorPanel
+				asset={readyAsset}
+				audioMix={defaultAudioMix}
+				exportState={{ status: "reviewing" }}
+				onCancelExport={() => undefined}
+				onDownloadGeneratedMedia={() => undefined}
+				onApplyOutputSettings={() => undefined}
+				onStartExport={() => undefined}
+				outputSettings={outputSettings}
+				runtime={supportedRuntime}
+				selection={fullSelection}
+			/>,
+		);
+
+		const review = screen.getByLabelText("Export review");
+		expect(within(review).getByText("Video quality")).toBeTruthy();
+		expect(within(review).getByText("High")).toBeTruthy();
+		expect(within(review).getByText("Audio quality")).toBeTruthy();
+		expect(within(review).getByText("256 Kbps")).toBeTruthy();
+	});
+
 	it("shows an applied documented output profile in Export review", () => {
 		const outputSettings = createDefaultOutputSettings();
 		outputSettings.container = {

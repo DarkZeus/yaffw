@@ -124,13 +124,20 @@ export type OutputResolutionSetting =
 			width: number;
 	  };
 
+export type OutputSubjectiveQuality =
+	| "very-low"
+	| "low"
+	| "medium"
+	| "high"
+	| "very-high";
+
 export type OutputQualitySetting =
 	| {
 			kind: "preserve-source";
 	  }
 	| {
 			kind: "subjective-quality";
-			quality: string;
+			quality: OutputSubjectiveQuality;
 	  }
 	| {
 			bitrateBps: number;
