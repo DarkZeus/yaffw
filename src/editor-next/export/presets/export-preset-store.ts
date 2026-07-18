@@ -90,6 +90,16 @@ export function deleteExportPreset(
 	return cloneExportPresetDocument(document);
 }
 
+export function saveLastUsedSettings(
+	storage: ExportPresetStorage,
+	outputSettings: OutputSettings,
+): ExportPresetDocument {
+	const document = readExportPresetDocument(storage);
+	document.lastUsedSettings = cloneOutputSettings(outputSettings);
+	writeExportPresetDocument(storage, document);
+	return cloneExportPresetDocument(document);
+}
+
 export function validateExportPresetName(name: string): string {
 	const normalizedName = name.trim();
 	if (!normalizedName) {

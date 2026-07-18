@@ -46,6 +46,7 @@ import {
 } from "@/editor-core/output-settings";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import { ExportPresetControls } from "../presets/export-preset-controls";
+import { saveLastUsedSettings } from "../presets/export-preset-store";
 
 type OutputSettingsPanelProps = {
 	asset: ReadyMediaAsset;
@@ -78,14 +79,19 @@ export function OutputSettingsPanel({
 	}
 
 	function applyDraft() {
-		if (exportRunning) {
+		if (exportRunning || !draftIsValid) {
 			return;
 		}
 
-		onApplyOutputSettings(cloneOutputSettings(draft));
+		const appliedOutputSettings = cloneOutputSettings(draft ?? outputSettings);
+		onApplyOutputSettings(appliedOutputSettings);
+		try {
+			saveLastUsedSettings(window.localStorage, appliedOutputSettings);
+		} catch {
+			// Applying session-local settings must still succeed when storage is unavailable.
+		}
 		setOpen(false);
 	}
-
 	function changeContainer(containerId: string) {
 		const nextDraft = cloneOutputSettings(activeDraft);
 		nextDraft.container =

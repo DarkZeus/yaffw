@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import type { OutputSettings } from "@/editor-core/model";
 import {
 	type ExportPreset,
+	LAST_USED_SETTINGS_PRESET_NAME,
 	deleteExportPreset,
 	readExportPresetDocument,
 	saveExportPreset,
@@ -22,7 +23,17 @@ export function ExportPresetControls({
 	exportRunning: boolean;
 	onLoadPreset: (preset: ExportPreset) => void;
 }) {
-	const [exportPresets, setExportPresets] = useState<ExportPreset[]>(() => {
+	const [lastUsedSettings, setLastUsedSettings] =
+		useState<OutputSettings | null>(() => {
+			try {
+				return (
+					readExportPresetDocument(window.localStorage).lastUsedSettings ?? null
+				);
+			} catch {
+				return null;
+			}
+		});
+	const [userPresets, setUserPresets] = useState<ExportPreset[]>(() => {
 		try {
 			return readExportPresetDocument(window.localStorage).userPresets;
 		} catch {
@@ -37,9 +48,24 @@ export function ExportPresetControls({
 		null,
 	);
 	const [deletePresetName, setDeletePresetName] = useState<string | null>(null);
+	const exportPresets: ExportPreset[] = [
+		...(lastUsedSettings
+			? [
+					{
+						name: LAST_USED_SETTINGS_PRESET_NAME,
+						outputSettings: lastUsedSettings,
+					},
+				]
+			: []),
+		...userPresets,
+	];
+	const selectedPresetIsSystem =
+		selectedPresetName === LAST_USED_SETTINGS_PRESET_NAME;
 
 	function refreshExportPresets() {
-		setExportPresets(readExportPresetDocument(window.localStorage).userPresets);
+		const document = readExportPresetDocument(window.localStorage);
+		setLastUsedSettings(document.lastUsedSettings ?? null);
+		setUserPresets(document.userPresets);
 	}
 
 	function loadSelectedPreset() {
@@ -51,7 +77,9 @@ export function ExportPresetControls({
 		}
 
 		onLoadPreset(preset);
-		setPresetName(preset.name);
+		setPresetName(
+			preset.name === LAST_USED_SETTINGS_PRESET_NAME ? "" : preset.name,
+		);
 		setPresetError(null);
 		setPresetMessage(
 			`${preset.name} loaded into the draft. Apply to update the editing session.`,
@@ -98,7 +126,12 @@ export function ExportPresetControls({
 	}
 
 	function updateSelectedPreset() {
-		if (!selectedPresetName || !draftIsValid || exportRunning) {
+		if (
+			!selectedPresetName ||
+			selectedPresetIsSystem ||
+			!draftIsValid ||
+			exportRunning
+		) {
 			return;
 		}
 
@@ -132,7 +165,8 @@ export function ExportPresetControls({
 		try {
 			const deletedName = deletePresetName;
 			const document = deleteExportPreset(window.localStorage, deletedName);
-			setExportPresets(document.userPresets);
+			setLastUsedSettings(document.lastUsedSettings ?? null);
+			setUserPresets(document.userPresets);
 			setSelectedPresetName("");
 			setPresetName("");
 			setDeletePresetName(null);
