@@ -17,8 +17,15 @@ The long-term product is no longer an FFmpeg-wrapper UI. Legacy server-backed ed
 - Native video preview with playhead, frame stepping, playback speed, volume, fullscreen, and keyboard controls.
 - Media-time Selection represented as half-open integer microsecond ranges.
 - Selection handles, range dragging, read-only time labels, zoom, and waveform lanes for audio tracks when available.
-- Export review for the default MP4/H.264/AAC output profile.
-- Browser export through Mediabunny/WebCodecs with explicit Generated media delivery.
+- Session-owned Output settings for documented container, video codec, Generated
+  audio mix codec, downscale resolution, and independent video/audio quality or
+  custom bitrate choices.
+- Browser-local Export presets with draft-only loading, explicit Apply, and a
+  system-managed Last used settings entry.
+- Export review for the applied documented output profile, including its
+  resolved resolution and Generated audio mix.
+- Browser export through Mediabunny/WebCodecs with matching Generated media
+  metadata and explicit delivery.
 - Export failure and cancellation recovery that keeps the active media asset and Selection retryable.
 
 ## Export Correctness
@@ -93,4 +100,5 @@ npm run build
 - Keep acquisition and bulk download behavior out of the editor core.
 - Model generated media separately from delivery actions.
 - Preserve the single-asset editing session model until a future feature earns a broader model.
-- Do not add server export fallback, native FFmpeg, smart rendering, custom output settings, or generated-media preview without a concrete decision record.
+- Do not add server export fallback, native FFmpeg, smart rendering, or
+  Generated media preview without a concrete decision record.
