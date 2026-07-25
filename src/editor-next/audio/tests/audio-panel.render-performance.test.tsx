@@ -10,6 +10,11 @@ import {
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
+import {
+	PreviewMeteringProvider,
+	type PreviewMeteringSource,
+	usePreviewMeteringSource,
+} from "../meters/preview-metering-provider";
 import { AudioPanel } from "../panel/audio-panel";
 
 const buttonRenderStats = vi.hoisted(() => ({
@@ -63,14 +68,22 @@ describe("AudioPanel live meter render isolation", () => {
 		);
 
 		render(
-			<AudioPanel
+			<PreviewMeteringProvider
 				asset={readyAsset}
 				audioMix={audioMix}
-				onAudioTrackIncludedChange={() => {}}
-				onAudioTrackVolumePercentChange={() => {}}
-				onSoloedAudioTrackChange={() => {}}
-				previewMetering={{ clock }}
-			/>,
+				soloedAudioTrackId={null}
+			>
+				<PreviewMeteringSourceProbe
+					source={{ ...clock, retryTrack: () => undefined }}
+				/>
+				<AudioPanel
+					asset={readyAsset}
+					audioMix={audioMix}
+					onAudioTrackIncludedChange={() => {}}
+					onAudioTrackVolumePercentChange={() => {}}
+					onSoloedAudioTrackChange={() => {}}
+				/>
+			</PreviewMeteringProvider>,
 		);
 
 		const voiceMeter = screen.getByLabelText("Voice preview meter");
@@ -165,6 +178,15 @@ function createMeteringClock(
 		getMeteringStatus: () => "ready",
 		readMeterSnapshot,
 	};
+}
+
+function PreviewMeteringSourceProbe({
+	source,
+}: {
+	source: PreviewMeteringSource;
+}) {
+	usePreviewMeteringSource(source);
+	return null;
 }
 
 function createMeterSnapshot({

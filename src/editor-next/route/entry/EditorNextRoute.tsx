@@ -11,7 +11,7 @@ import {
 import type { MediaTimeUs } from "@/editor-core/model";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
-import type { LivePreviewMeteringClock } from "../../audio/meters/preview-metering-live";
+import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
 import { deliverBrowserGeneratedMedia } from "../../export/generated-media/generated-media-delivery";
 import { ExportInspectorPanel } from "../../export/inspector/export-inspector";
@@ -65,20 +65,8 @@ export function EditorNextRoute({
 	const stableCommands = useStableEditorCommands(commands);
 	const activeAssetId = session.status === "ready" ? session.asset.id : null;
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
-	const [previewMeteringClock, setPreviewMeteringClock] =
-		useState<LivePreviewMeteringClock | null>(null);
-	const [previewMeteringRetry, setPreviewMeteringRetry] = useState<
-		((trackId: string) => void) | null
-	>(null);
 	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
 		null,
-	);
-	const previewMetering = useMemo(
-		() => ({
-			clock: previewMeteringClock,
-			onTrackRetry: previewMeteringRetry ?? undefined,
-		}),
-		[previewMeteringClock, previewMeteringRetry],
 	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
@@ -90,21 +78,6 @@ export function EditorNextRoute({
 			currentTrackId === trackId ? currentTrackId : trackId,
 		);
 	}, []);
-	const handlePreviewMeteringClockChange = useCallback(
-		(clock: LivePreviewMeteringClock | null) => {
-			setPreviewMeteringClock((currentClock) =>
-				currentClock === clock ? currentClock : clock,
-			);
-		},
-		[],
-	);
-	const handlePreviewMeteringRetryChange = useCallback(
-		(retryTrack: ((trackId: string) => void) | null) => {
-			setPreviewMeteringRetry(() => retryTrack);
-		},
-		[],
-	);
-
 	useEffect(() => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
 			activeAssetId === null || currentPlayheadUs !== 0 ? 0 : currentPlayheadUs,
@@ -112,12 +85,6 @@ export function EditorNextRoute({
 		setSoloedAudioTrackId((currentTrackId) =>
 			activeAssetId === null || currentTrackId !== null ? null : currentTrackId,
 		);
-		setPreviewMeteringClock((currentClock) =>
-			activeAssetId === null ? null : currentClock,
-		);
-		if (activeAssetId === null) {
-			setPreviewMeteringRetry(null);
-		}
 	}, [activeAssetId]);
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
@@ -165,7 +132,6 @@ export function EditorNextRoute({
 				onAudioTrackVolumePercentChange={
 					stableCommands.setAudioTrackVolumePercent
 				}
-				previewMetering={previewMetering}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				soloedAudioTrackId={soloedAudioTrackId}
 			/>
@@ -183,8 +149,6 @@ export function EditorNextRoute({
 				onSelectionReplaceRequested={stableCommands.setSelectionRange}
 				onSelectionResetRequested={stableCommands.resetSelection}
 				onSelectionStartRequested={stableCommands.setSelectionStartFromPlayhead}
-				onPreviewMeteringClockChange={handlePreviewMeteringClockChange}
-				onPreviewMeteringRetryChange={handlePreviewMeteringRetryChange}
 				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				selection={session.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
@@ -211,7 +175,7 @@ export function EditorNextRoute({
 			/>
 		) : null;
 
-	return (
+	const editorWorkbench = (
 		<EditorWorkbenchFrame
 			activeAsset={session.status === "ready" ? session.asset : null}
 			previewStatus={
@@ -241,6 +205,18 @@ export function EditorNextRoute({
 				/>
 			)}
 		</EditorWorkbenchFrame>
+	);
+
+	return session.status === "ready" ? (
+		<PreviewMeteringProvider
+			asset={session.asset}
+			audioMix={session.audioMix}
+			soloedAudioTrackId={soloedAudioTrackId}
+		>
+			{editorWorkbench}
+		</PreviewMeteringProvider>
+	) : (
+		editorWorkbench
 	);
 }
 

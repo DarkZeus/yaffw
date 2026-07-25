@@ -17,7 +17,12 @@ import {
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
-import { AudioPanel } from "../panel/audio-panel";
+import {
+	PreviewMeteringProvider,
+	type PreviewMeteringSource,
+	usePreviewMeteringSource,
+} from "../meters/preview-metering-provider";
+import { AudioPanel, type AudioPanelProps } from "../panel/audio-panel";
 
 afterEach(() => {
 	cleanup();
@@ -195,32 +200,33 @@ describe("AudioPanel", () => {
 	});
 
 	it("renders controlled preview metering ready and preparing states without live peak values yet", () => {
-		const previewMetering = {
-			clock: createMeteringClock({
-				snapshot: {
-					combinedState: {
+		const clock = createMeteringClock({
+			snapshot: {
+				combinedState: {
+					channels: [
+						{ label: "Left", peak: 0 },
+						{ label: "Right", peak: 0 },
+					],
+					partial: false,
+					status: "ready",
+				},
+				trackStates: {
+					"audio-voice": {
 						channels: [
 							{ label: "Left", peak: 0 },
 							{ label: "Right", peak: 0 },
 						],
-						partial: false,
 						status: "ready",
-					},
-					trackStates: {
-						"audio-voice": {
-							channels: [
-								{ label: "Left", peak: 0 },
-								{ label: "Right", peak: 0 },
-							],
-							status: "ready",
-							trackId: "audio-voice",
-						},
+						trackId: "audio-voice",
 					},
 				},
-			}),
-		};
+			},
+		});
 
-		render(<AudioPanel asset={readyAsset} previewMetering={previewMetering} />);
+		renderMeteredAudioPanel({
+			asset: readyAsset,
+			clock,
+		});
 
 		const voiceMeter = screen.getByLabelText("Voice preview meter");
 		const voiceStrip = screen.getByLabelText("Audio track strip Voice");
@@ -241,47 +247,43 @@ describe("AudioPanel", () => {
 
 	it("keeps unavailable meter layout stable and owns retry outside the reusable meter", () => {
 		const onTrackRetry = vi.fn();
-		const previewMetering = {
-			clock: createMeteringClock({
-				snapshot: {
-					combinedState: {
+		const clock = createMeteringClock({
+			snapshot: {
+				combinedState: {
+					channels: [
+						{ label: "Left", peak: 0 },
+						{ label: "Right", peak: 0 },
+					],
+					partial: true,
+					reason:
+						"Some monitored tracks are unavailable: Desktop decode failed",
+					status: "ready",
+				},
+				trackStates: {
+					"audio-desktop": {
+						reason: "Desktop decode failed",
+						status: "unavailable",
+						trackId: "audio-desktop",
+					},
+					"audio-voice": {
 						channels: [
 							{ label: "Left", peak: 0 },
 							{ label: "Right", peak: 0 },
 						],
-						partial: true,
-						reason:
-							"Some monitored tracks are unavailable: Desktop decode failed",
 						status: "ready",
-					},
-					trackStates: {
-						"audio-desktop": {
-							reason: "Desktop decode failed",
-							status: "unavailable",
-							trackId: "audio-desktop",
-						},
-						"audio-voice": {
-							channels: [
-								{ label: "Left", peak: 0 },
-								{ label: "Right", peak: 0 },
-							],
-							status: "ready",
-							trackId: "audio-voice",
-						},
+						trackId: "audio-voice",
 					},
 				},
-			}),
-			onTrackRetry,
-		};
+			},
+		});
 
-		render(
-			<AudioPanel
-				asset={readyAsset}
-				onAudioTrackIncludedChange={() => {}}
-				onAudioTrackVolumePercentChange={() => {}}
-				previewMetering={previewMetering}
-			/>,
-		);
+		renderMeteredAudioPanel({
+			asset: readyAsset,
+			clock,
+			onAudioTrackIncludedChange: () => {},
+			onAudioTrackVolumePercentChange: () => {},
+			onTrackRetry,
+		});
 
 		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
 		const desktopMeter = within(desktopStrip).getByLabelText(
@@ -325,22 +327,18 @@ describe("AudioPanel", () => {
 		voiceDecision.channelMode = "use-left-as-mono";
 		voiceDecision.volumePercent = 50;
 
-		render(
-			<AudioPanel
-				asset={readyAsset}
-				audioMix={audioMix}
-				previewMetering={{
-					clock: createMeteringClock({
-						snapshot: createMeterSnapshot({
-							combinedPeaks: [0.25, 0.25],
-							trackPeaks: {
-								"audio-voice": [0.25, 0.25],
-							},
-						}),
-					}),
-				}}
-			/>,
-		);
+		renderMeteredAudioPanel({
+			asset: readyAsset,
+			audioMix,
+			clock: createMeteringClock({
+				snapshot: createMeterSnapshot({
+					combinedPeaks: [0.25, 0.25],
+					trackPeaks: {
+						"audio-voice": [0.25, 0.25],
+					},
+				}),
+			}),
+		});
 
 		const voiceMeter = screen.getByLabelText("Voice preview meter");
 
@@ -363,22 +361,18 @@ describe("AudioPanel", () => {
 	});
 
 	it("renders live combined Preview output meter values as stereo channels", async () => {
-		render(
-			<AudioPanel
-				asset={readyAsset}
-				previewMetering={{
-					clock: createMeteringClock({
-						snapshot: createMeterSnapshot({
-							combinedPeaks: [1, 0.5],
-							trackPeaks: {
-								"audio-desktop": [0.5, 0.25],
-								"audio-voice": [0.5, 0.25],
-							},
-						}),
-					}),
-				}}
-			/>,
-		);
+		renderMeteredAudioPanel({
+			asset: readyAsset,
+			clock: createMeteringClock({
+				snapshot: createMeterSnapshot({
+					combinedPeaks: [1, 0.5],
+					trackPeaks: {
+						"audio-desktop": [0.5, 0.25],
+						"audio-voice": [0.5, 0.25],
+					},
+				}),
+			}),
+		});
 
 		const combinedStrip = screen.getByLabelText("Combined preview strip");
 		const combinedMeter = within(combinedStrip).getByLabelText(
@@ -412,44 +406,40 @@ describe("AudioPanel", () => {
 		const onAudioTrackIncludedChange = vi.fn();
 		const onAudioTrackVolumePercentChange = vi.fn();
 
-		render(
-			<AudioPanel
-				asset={readyAsset}
-				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
-				previewMetering={{
-					clock: createMeteringClock({
-						snapshot: {
-							combinedState: {
-								channels: [
-									{ label: "Left", peak: 0.5 },
-									{ label: "Right", peak: 0 },
-								],
-								partial: true,
-								reason:
-									"Some monitored tracks are unavailable: Desktop decode failed",
-								status: "ready",
-							},
-							trackStates: {
-								"audio-desktop": {
-									reason: "Desktop decode failed",
-									status: "unavailable",
-									trackId: "audio-desktop",
-								},
-								"audio-voice": {
-									channels: [
-										{ label: "Left", peak: 0.5 },
-										{ label: "Right", peak: 0 },
-									],
-									status: "ready",
-									trackId: "audio-voice",
-								},
-							},
+		renderMeteredAudioPanel({
+			asset: readyAsset,
+			clock: createMeteringClock({
+				snapshot: {
+					combinedState: {
+						channels: [
+							{ label: "Left", peak: 0.5 },
+							{ label: "Right", peak: 0 },
+						],
+						partial: true,
+						reason:
+							"Some monitored tracks are unavailable: Desktop decode failed",
+						status: "ready",
+					},
+					trackStates: {
+						"audio-desktop": {
+							reason: "Desktop decode failed",
+							status: "unavailable",
+							trackId: "audio-desktop",
 						},
-					}),
-				}}
-			/>,
-		);
+						"audio-voice": {
+							channels: [
+								{ label: "Left", peak: 0.5 },
+								{ label: "Right", peak: 0 },
+							],
+							status: "ready",
+							trackId: "audio-voice",
+						},
+					},
+				},
+			}),
+			onAudioTrackIncludedChange,
+			onAudioTrackVolumePercentChange,
+		});
 
 		const combinedStrip = screen.getByLabelText("Combined preview strip");
 		const combinedMeter = within(combinedStrip).getByLabelText(
@@ -560,6 +550,42 @@ function createMeteringClock({
 		getMeteringStatus: () => status,
 		readMeterSnapshot: () => snapshot,
 	};
+}
+
+function renderMeteredAudioPanel({
+	clock,
+	onTrackRetry = () => undefined,
+	...panelProps
+}: AudioPanelProps & {
+	clock: LivePreviewMeteringClock;
+	onTrackRetry?: (trackId: string) => void;
+}) {
+	const audioMix =
+		panelProps.audioMix ?? createDefaultAudioMix(panelProps.asset);
+	const source: PreviewMeteringSource = {
+		...clock,
+		retryTrack: onTrackRetry,
+	};
+
+	return render(
+		<PreviewMeteringProvider
+			asset={panelProps.asset}
+			audioMix={audioMix}
+			soloedAudioTrackId={panelProps.soloedAudioTrackId ?? null}
+		>
+			<PreviewMeteringSourceProbe source={source} />
+			<AudioPanel {...panelProps} />
+		</PreviewMeteringProvider>,
+	);
+}
+
+function PreviewMeteringSourceProbe({
+	source,
+}: {
+	source: PreviewMeteringSource;
+}) {
+	usePreviewMeteringSource(source);
+	return null;
 }
 
 function createMeterSnapshot({

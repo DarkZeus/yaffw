@@ -24,11 +24,10 @@ import {
 	type PreviewLevelMeterState,
 } from "../meters/preview-level-meter";
 import type {
-	LivePreviewMeteringClock,
 	LivePreviewMeteringCombinedState,
 	LivePreviewMeteringTrackState,
 } from "../meters/preview-metering-live";
-import { useLivePreviewMetering } from "../meters/use-live-preview-metering";
+import { usePreviewMeteringDisplay } from "../meters/preview-metering-provider";
 
 export type AudioPanelProps = {
 	asset: ReadyMediaAsset;
@@ -43,10 +42,6 @@ export type AudioPanelProps = {
 		trackId: string,
 		volumePercent: number,
 	) => void;
-	previewMetering?: {
-		clock?: LivePreviewMeteringClock | null;
-		onTrackRetry?: (trackId: string) => void;
-	};
 	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	soloedAudioTrackId?: string | null;
 };
@@ -69,24 +64,13 @@ export const AudioPanel = memo(function AudioPanel({
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
-	previewMetering,
 	onSoloedAudioTrackChange,
 	soloedAudioTrackId = null,
 }: AudioPanelProps) {
 	const defaultAudioMix = useMemo(() => createDefaultAudioMix(asset), [asset]);
 	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
-	const audioTrackIds = useMemo(
-		() => audioTracks.map((track) => track.id),
-		[audioTracks],
-	);
-	const livePreviewMetering = useLivePreviewMetering({
-		audioMix,
-		clock: previewMetering?.clock,
-		enabled: Boolean(previewMetering),
-		knownTrackIds: audioTrackIds,
-		soloedAudioTrackId,
-	});
+	const livePreviewMetering = usePreviewMeteringDisplay();
 
 	return (
 		<section
@@ -115,17 +99,19 @@ export const AudioPanel = memo(function AudioPanel({
 								onAudioTrackVolumePercentChange={
 									onAudioTrackVolumePercentChange
 								}
-								onPreviewMeteringRetry={previewMetering?.onTrackRetry}
+								onPreviewMeteringRetry={livePreviewMetering?.retryTrack}
 								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
-								previewMeteringControlled={Boolean(previewMetering)}
-								previewMeteringState={livePreviewMetering.trackStates[track.id]}
+								previewMeteringControlled={Boolean(livePreviewMetering)}
+								previewMeteringState={
+									livePreviewMetering?.trackStates[track.id]
+								}
 								soloActive={soloedAudioTrackId === track.id}
 								track={track}
 							/>
 						))}
 						<CombinedPreviewStrip
-							previewMeteringControlled={Boolean(previewMetering)}
-							previewMeteringState={livePreviewMetering.combinedState}
+							previewMeteringControlled={Boolean(livePreviewMetering)}
+							previewMeteringState={livePreviewMetering?.combinedState}
 						/>
 					</div>
 				)}

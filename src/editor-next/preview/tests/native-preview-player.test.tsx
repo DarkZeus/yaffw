@@ -20,6 +20,8 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/engine/preview-audio-engine";
+import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
+import { AudioPanel } from "../../audio/panel/audio-panel";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
 	children?: ReactNode;
@@ -685,7 +687,6 @@ describe("NativePreviewPlayer", () => {
 	});
 
 	it("publishes a retry handler that re-prepares only a failed audio track", async () => {
-		const retryHandlers: Array<((trackId: string) => void) | null> = [];
 		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
 
 		if (!desktopTrack) {
@@ -716,22 +717,37 @@ describe("NativePreviewPlayer", () => {
 				createPreparedPreviewAudioResourcesForRequest(request),
 			);
 
-		render(
-			<AudioMasterPlayerProbe
-				onPreviewMeteringRetryChange={(retryTrack) => {
-					retryHandlers.push(retryTrack);
-				}}
-			/>,
-		);
+		render(<AudioMasterPlayerProbe showAudioPanel />);
 
 		await waitFor(() => {
 			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 		});
-		expect(retryHandlers.at(-1)).toEqual(expect.any(Function));
-
-		act(() => {
-			retryHandlers.at(-1)?.("audio-2");
+		adapterMockState.previewAudioEngines[0]?.readMeterSnapshot.mockReturnValue({
+			combinedState: {
+				channels: [],
+				partial: true,
+				reason: "Desktop source failed",
+				status: "ready",
+			},
+			trackStates: {
+				"audio-1": {
+					channels: [],
+					status: "ready",
+					trackId: "audio-1",
+				},
+				"audio-2": {
+					reason: "Desktop source failed",
+					status: "unavailable",
+					trackId: "audio-2",
+				},
+			},
 		});
+
+		fireEvent.click(
+			await screen.findByRole("button", {
+				name: "Retry Desktop preview meter",
+			}),
+		);
 
 		await waitFor(() => {
 			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(2);
@@ -1191,23 +1207,25 @@ function createPlayerElement(
 
 function AudioMasterPlayerProbe({
 	asset = readyAssetWithTwoAudioTracks,
-	onPreviewMeteringRetryChange,
 	onPreviewPlayheadChange,
 	selection: playerSelection = selection,
+	showAudioPanel = false,
 	source = previewSource,
 }: {
 	asset?: ReadyMediaAsset;
-	onPreviewMeteringRetryChange?: (
-		retryTrack: ((trackId: string) => void) | null,
-	) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
 	selection?: Selection;
+	showAudioPanel?: boolean;
 	source?: Blob;
 } = {}) {
 	const [audioMix, setAudioMix] = useState(() => createDefaultAudioMix(asset));
 
 	return (
-		<>
+		<PreviewMeteringProvider
+			asset={asset}
+			audioMix={audioMix}
+			soloedAudioTrackId={null}
+		>
 			<NativePreviewPlayer
 				asset={asset}
 				audioMix={audioMix}
@@ -1216,7 +1234,6 @@ function AudioMasterPlayerProbe({
 						updateAudioMixTrack(currentAudioMix, trackId, { include }),
 					);
 				}}
-				onPreviewMeteringRetryChange={onPreviewMeteringRetryChange}
 				onPreviewPlayheadChange={onPreviewPlayheadChange}
 				onSelectionEndRequested={() => {}}
 				onSelectionRangeMoveRequested={() => {}}
@@ -1252,7 +1269,8 @@ function AudioMasterPlayerProbe({
 			<output aria-label="audio mix snapshot">
 				{formatAudioMixSnapshot(audioMix)}
 			</output>
-		</>
+			{showAudioPanel ? <AudioPanel asset={asset} audioMix={audioMix} /> : null}
+		</PreviewMeteringProvider>
 	);
 }
 

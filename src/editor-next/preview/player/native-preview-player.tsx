@@ -14,6 +14,7 @@ import {
 } from "../../audio/engine/preview-audio-engine";
 import { usePreviewAudioMonitoringLifecycle } from "../../audio/engine/use-preview-audio-monitoring-lifecycle";
 import { usePreviewAudioResources } from "../../audio/engine/use-preview-audio-resources";
+import { usePreviewMeteringSource } from "../../audio/meters/preview-metering-provider";
 import type { PreviewAudioMonitoringStatus } from "../../audio/types/use-preview-audio-monitoring-lifecycle.types";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
@@ -31,8 +32,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	asset,
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackIncludedChange,
-	onPreviewMeteringClockChange,
-	onPreviewMeteringRetryChange,
 	onPreviewPlayheadChange,
 	onSelectionEndRequested,
 	onSelectionRangeMoveRequested,
@@ -53,13 +52,18 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
-	const previewMeteringClockRef = useRef({
+	const retryPreviewMeteringTrackRef = useRef<(trackId: string) => void>(
+		() => undefined,
+	);
+	const previewMeteringSourceRef = useRef({
 		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
 		getMeteringStatus: () => audioMonitoringStatusRef.current,
 		readMeterSnapshot: () =>
 			previewAudioEngineRef.current?.readMeterSnapshot({
 				outputChannels: audioMixRef.current.outputChannels,
 			}) ?? null,
+		retryTrack: (trackId: string) =>
+			retryPreviewMeteringTrackRef.current(trackId),
 	});
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
@@ -138,6 +142,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			setAudioMonitoringStatus(nextStatus);
 		});
 	}, []);
+	retryPreviewMeteringTrackRef.current = handlePreviewMeteringRetry;
 	const audioPreviewPreparingTrackIds =
 		previewAudioResources.status === "loading"
 			? previewAudioResources.preparingTrackIds
@@ -192,23 +197,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
 	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
-
-	useEffect(() => {
-		const clock = previewMeteringClockRef.current;
-		onPreviewMeteringClockChange?.(clock);
-
-		return () => {
-			onPreviewMeteringClockChange?.(null);
-		};
-	}, [onPreviewMeteringClockChange]);
-
-	useEffect(() => {
-		onPreviewMeteringRetryChange?.(handlePreviewMeteringRetry);
-
-		return () => {
-			onPreviewMeteringRetryChange?.(null);
-		};
-	}, [handlePreviewMeteringRetry, onPreviewMeteringRetryChange]);
+	usePreviewMeteringSource(previewMeteringSourceRef.current);
 
 	useEffect(() => {
 		onPreviewPlayheadChange?.(playheadUs);
