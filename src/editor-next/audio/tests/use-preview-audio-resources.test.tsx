@@ -9,12 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import {
 	type ActiveMediaAssetCleanupScope,
@@ -60,7 +55,7 @@ afterEach(() => {
 });
 
 describe("usePreviewAudioResources", () => {
-	it("prepares audio tracks once and reuses them across channel decisions", async () => {
+	it("prepares decision-agnostic audio tracks once and reuses them across owner rerenders", async () => {
 		const prepareRuns: Array<{
 			deferred: Deferred<PreviewAudioResourcesResult>;
 			request: PrepareRequest;
@@ -73,9 +68,7 @@ describe("usePreviewAudioResources", () => {
 			return deferred.promise;
 		});
 
-		const { rerender } = render(
-			<PreviewAudioResourcesProbe audioMix={createAudioMix()} />,
-		);
+		const { rerender } = render(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
 			expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
@@ -85,6 +78,7 @@ describe("usePreviewAudioResources", () => {
 			"audio-1",
 			"audio-2",
 		]);
+		expect(prepareRuns[0].request).not.toHaveProperty("audioMix");
 
 		prepareRuns[0].deferred.resolve(
 			createPreparedResourcesResult(prepareRuns[0].request),
@@ -96,11 +90,7 @@ describe("usePreviewAudioResources", () => {
 			);
 		});
 
-		rerender(
-			<PreviewAudioResourcesProbe
-				audioMix={createAudioMix({ "audio-1": "use-left-as-mono" })}
-			/>,
-		);
+		rerender(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
 			expect(readState()).toBe(
@@ -109,7 +99,7 @@ describe("usePreviewAudioResources", () => {
 		});
 		expect(prepareRuns).toHaveLength(1);
 
-		rerender(<PreviewAudioResourcesProbe audioMix={createAudioMix()} />);
+		rerender(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
 			expect(readState()).toBe(
@@ -118,6 +108,89 @@ describe("usePreviewAudioResources", () => {
 		});
 		expect(prepareRuns).toHaveLength(1);
 		expect(revokePreviewAudioResourcesMock).not.toHaveBeenCalled();
+	});
+
+	it("prepares only a newly discovered track for the same Media asset source", async () => {
+		const prepareRuns: Array<{
+			deferred: Deferred<PreviewAudioResourcesResult>;
+			request: PrepareRequest;
+		}> = [];
+		const expandedAsset = {
+			...readyAsset,
+			tracks: {
+				...readyAsset.tracks,
+				audio: [
+					...readyAsset.tracks.audio,
+					{
+						codec: "aac",
+						id: "audio-3",
+						kind: "audio",
+						label: "Music",
+					},
+				],
+			},
+		} satisfies ReadyMediaAsset;
+
+		preparePreviewAudioResourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<PreviewAudioResourcesResult>();
+			prepareRuns.push({ deferred, request });
+
+			return deferred.promise;
+		});
+
+		const { rerender } = render(<PreviewAudioResourcesProbe />);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(1);
+		});
+		prepareRuns[0].deferred.resolve(
+			createPreparedResourcesResult(prepareRuns[0].request),
+		);
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
+			);
+		});
+
+		rerender(<PreviewAudioResourcesProbe asset={expandedAsset} />);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
+			"audio-3",
+		]);
+		expect(readState()).toBe(
+			"loading|preparing:audio-3|resources:blob:audio-1:resource,blob:audio-2:resource",
+		);
+
+		prepareRuns[1].deferred.resolve(
+			createPreparedResourcesResult(prepareRuns[1].request),
+		);
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|resources:blob:audio-1:resource,blob:audio-2:resource,blob:audio-3:resource",
+			);
+		});
+	});
+
+	it("keeps video-only media on the disabled path without preparing resources", () => {
+		const videoOnlyAsset = {
+			...readyAsset,
+			tracks: {
+				...readyAsset.tracks,
+				audio: [],
+			},
+		} satisfies ReadyMediaAsset;
+
+		render(
+			<PreviewAudioResourcesProbe asset={videoOnlyAsset} enabled={false} />,
+		);
+
+		expect(readState()).toBe("disabled");
+		expect(preparePreviewAudioResourcesMock).not.toHaveBeenCalled();
 	});
 
 	it("revokes cached resources when the active Media asset cleanup scope is disposed", async () => {
@@ -131,7 +204,6 @@ describe("usePreviewAudioResources", () => {
 		render(
 			<PreviewAudioResourcesProbe
 				activeMediaAssetCleanupScope={cleanupScope}
-				audioMix={createAudioMix()}
 			/>,
 		);
 
@@ -142,13 +214,59 @@ describe("usePreviewAudioResources", () => {
 		});
 
 		cleanupScope.dispose();
+		cleanup();
 
-		expect(revokePreviewAudioResourcesMock).toHaveBeenCalledWith({
+		expect(revokedUrls()).toEqual([
+			"blob:audio-1:resource",
+			"blob:audio-2:resource",
+		]);
+	});
+
+	it("aborts active preparation on cleanup and revokes a late result exactly once", async () => {
+		const controller = createActiveMediaAssetCleanupScopeController();
+		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
+		const deferred = createDeferred<PreviewAudioResourcesResult>();
+
+		preparePreviewAudioResourcesMock.mockImplementation(() => deferred.promise);
+
+		render(
+			<PreviewAudioResourcesProbe
+				activeMediaAssetCleanupScope={cleanupScope}
+			/>,
+		);
+
+		await waitFor(() => {
+			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
+		});
+		const request = preparePreviewAudioResourcesMock.mock.calls[0]?.[0];
+
+		if (!request) {
+			throw new Error("Expected an active Preview audio resource request.");
+		}
+
+		cleanupScope.dispose();
+		expect(request.signal.aborted).toBe(true);
+
+		deferred.resolve({
+			failures: [],
 			resources: [
-				expect.objectContaining({ url: "blob:audio-1:resource" }),
-				expect.objectContaining({ url: "blob:audio-2:resource" }),
+				createPreviewResource({ trackId: "audio-1", trackIndex: 0 }),
+				createPreviewResource({ trackId: "audio-2", trackIndex: 1 }),
 			],
 		});
+
+		await waitFor(() => {
+			expect(revokedUrls()).toEqual([
+				"blob:audio-1:resource",
+				"blob:audio-2:resource",
+			]);
+		});
+
+		cleanup();
+		expect(revokedUrls()).toEqual([
+			"blob:audio-1:resource",
+			"blob:audio-2:resource",
+		]);
 	});
 
 	it("revokes stale prepared resources after media asset replacement", async () => {
@@ -177,10 +295,7 @@ describe("usePreviewAudioResources", () => {
 		});
 
 		const { rerender } = render(
-			<PreviewAudioResourcesProbe
-				activeMediaAssetCleanupScope={firstScope}
-				audioMix={createAudioMix()}
-			/>,
+			<PreviewAudioResourcesProbe activeMediaAssetCleanupScope={firstScope} />,
 		);
 
 		await waitFor(() => {
@@ -192,7 +307,6 @@ describe("usePreviewAudioResources", () => {
 			<PreviewAudioResourcesProbe
 				activeMediaAssetCleanupScope={nextScope}
 				asset={nextAsset}
-				audioMix={createAudioMix({}, nextAsset)}
 				source={nextSource}
 			/>,
 		);
@@ -244,7 +358,7 @@ describe("usePreviewAudioResources", () => {
 			return deferred.promise;
 		});
 
-		render(<PreviewAudioResourcesProbe audioMix={createAudioMix()} />);
+		render(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
 			expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
@@ -290,30 +404,161 @@ describe("usePreviewAudioResources", () => {
 		});
 		expect(revokePreviewAudioResourcesMock).not.toHaveBeenCalled();
 	});
+
+	it("replaces only an explicitly retried track resource and revokes each URL once", async () => {
+		const prepareRuns: Array<{
+			deferred: Deferred<PreviewAudioResourcesResult>;
+			request: PrepareRequest;
+		}> = [];
+
+		preparePreviewAudioResourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<PreviewAudioResourcesResult>();
+			prepareRuns.push({ deferred, request });
+
+			return deferred.promise;
+		});
+
+		render(<PreviewAudioResourcesProbe />);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(1);
+		});
+		prepareRuns[0].deferred.resolve(
+			createPreparedResourcesResult(prepareRuns[0].request),
+		);
+
+		await waitFor(() => {
+			expect(readState()).toContain("ready|resources:");
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
+			"audio-2",
+		]);
+		prepareRuns[1].deferred.resolve({
+			failures: [],
+			resources: [
+				{
+					...createPreviewResource({ trackId: "audio-2", trackIndex: 1 }),
+					url: "blob:audio-2:replacement",
+				},
+			],
+		});
+
+		await waitFor(() => {
+			expect(readState()).toBe(
+				"ready|resources:blob:audio-1:resource,blob:audio-2:replacement",
+			);
+		});
+		expect(revokedUrls()).toEqual(["blob:audio-2:resource"]);
+
+		cleanup();
+
+		expect(revokedUrls()).toEqual([
+			"blob:audio-2:resource",
+			"blob:audio-1:resource",
+			"blob:audio-2:replacement",
+		]);
+	});
+
+	it("keeps unrelated track failures visible while retrying one failed track", async () => {
+		const prepareRuns: Array<{
+			deferred: Deferred<PreviewAudioResourcesResult>;
+			request: PrepareRequest;
+		}> = [];
+		const asset = {
+			...readyAsset,
+			tracks: {
+				...readyAsset.tracks,
+				audio: [
+					...readyAsset.tracks.audio,
+					{
+						codec: "aac",
+						id: "audio-3",
+						kind: "audio",
+						label: "Music",
+					},
+				],
+			},
+		} satisfies ReadyMediaAsset;
+
+		preparePreviewAudioResourcesMock.mockImplementation((request) => {
+			const deferred = createDeferred<PreviewAudioResourcesResult>();
+			prepareRuns.push({ deferred, request });
+
+			return deferred.promise;
+		});
+
+		const { rerender } = render(<PreviewAudioResourcesProbe asset={asset} />);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(1);
+		});
+
+		prepareRuns[0].deferred.resolve({
+			failures: [
+				createPreviewFailure(asset, "audio-2"),
+				createPreviewFailure(asset, "audio-3"),
+			],
+			resources: [createPreviewResource({ trackId: "audio-1", trackIndex: 0 })],
+		});
+
+		await waitFor(() => {
+			expect(readFailures()).toBe("audio-2,audio-3");
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+		prepareRuns[1].deferred.resolve({
+			failures: [],
+			resources: [createPreviewResource({ trackId: "audio-2", trackIndex: 1 })],
+		});
+
+		await waitFor(() => {
+			expect(readFailures()).toBe("audio-3");
+		});
+
+		rerender(<PreviewAudioResourcesProbe asset={{ ...asset }} />);
+
+		await waitFor(() => {
+			expect(prepareRuns).toHaveLength(2);
+		});
+	});
 });
 
 function PreviewAudioResourcesProbe({
 	activeMediaAssetCleanupScope,
 	asset = readyAsset,
-	audioMix,
+	enabled = true,
 	source: sourceBlob = source,
 }: {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset?: ReadyMediaAsset;
-	audioMix: AudioMix;
+	enabled?: boolean;
 	source?: Blob;
 }) {
 	const state = usePreviewAudioResources({
 		activeMediaAssetCleanupScope,
 		asset,
-		audioMix,
-		enabled: true,
+		enabled,
 		source: sourceBlob,
 	});
 
 	return (
 		<>
 			<output aria-label="audio preview state">{formatState(state)}</output>
+			<output aria-label="audio preview failures">
+				{state.status === "ready" || state.status === "failed"
+					? state.failures.map((failure) => failure.trackId).join(",")
+					: ""}
+			</output>
 			<button
 				onClick={() => {
 					state.retryTrack("audio-2");
@@ -346,6 +591,16 @@ function formatState(state: PreviewAudioResourcesState) {
 
 function readState() {
 	return screen.getByLabelText("audio preview state").textContent;
+}
+
+function readFailures() {
+	return screen.getByLabelText("audio preview failures").textContent;
+}
+
+function revokedUrls() {
+	return revokePreviewAudioResourcesMock.mock.calls.flatMap(([{ resources }]) =>
+		resources.map((resource) => resource.url),
+	);
 }
 
 function createPreparedResourcesResult(
@@ -392,21 +647,22 @@ function createPreviewResource({
 	};
 }
 
-function createAudioMix(
-	channelModes: Partial<Record<string, AudioTrackChannelMode>> = {},
-	asset: ReadyMediaAsset = readyAsset,
-) {
-	const audioMix = createDefaultAudioMix(asset);
+function createPreviewFailure(asset: ReadyMediaAsset, trackId: string) {
+	const trackIndex = asset.tracks.audio.findIndex(
+		(track) => track.id === trackId,
+	);
+	const track = asset.tracks.audio[trackIndex];
 
-	for (const [trackId, channelMode] of Object.entries(channelModes)) {
-		const decision = audioMix.tracks[trackId];
-
-		if (decision && channelMode) {
-			decision.channelMode = channelMode;
-		}
+	if (!track) {
+		throw new Error(`Expected ${trackId} in the test Media asset.`);
 	}
 
-	return audioMix;
+	return {
+		reason: `${trackId} failed`,
+		track,
+		trackId,
+		trackIndex,
+	};
 }
 
 type Deferred<T> = {

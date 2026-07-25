@@ -110,7 +110,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const audioPreviewTransportSupported = canUsePreviewAudioEngine(asset);
 	const previewAudioResources = usePreviewAudioResources({
 		activeMediaAssetCleanupScope,
-		audioMix,
 		asset,
 		enabled: audioPreviewTransportSupported,
 		source,

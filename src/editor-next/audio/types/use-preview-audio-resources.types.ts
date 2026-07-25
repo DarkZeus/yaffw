@@ -1,4 +1,4 @@
-import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type {
@@ -32,7 +32,6 @@ export type PreviewAudioResourcesLifecycle = PreviewAudioResourcesState & {
 
 export type UsePreviewAudioResourcesOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
-	audioMix: AudioMix;
 	asset: ReadyMediaAsset;
 	enabled: boolean;
 	source: Blob;

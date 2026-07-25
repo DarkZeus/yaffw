@@ -1437,9 +1437,6 @@ function createPreparedPreviewAudioResourcesForRequest(
 			const track = request.asset.tracks.audio.find(
 				(candidateTrack) => candidateTrack.id === trackId,
 			);
-			const channelMode =
-				request.audioMix.tracks[trackId]?.channelMode ?? "preserve";
-
 			if (!track) {
 				throw new Error(`Expected audio track ${trackId}.`);
 			}
@@ -1454,7 +1451,7 @@ function createPreparedPreviewAudioResourcesForRequest(
 				track,
 				trackId,
 				trackIndex: resourceIndex,
-				url: `blob:audio:${request.asset.id}:${trackId}:${channelMode}`,
+				url: `blob:audio:${request.asset.id}:${trackId}`,
 			} satisfies PreviewAudioResource;
 		}),
 	};

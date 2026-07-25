@@ -1,7 +1,6 @@
 import {
 	ALL_FORMATS,
 	AdtsOutputFormat,
-	AudioBufferSource,
 	type AudioCodec,
 	AudioSampleSink,
 	AudioSampleSource,
@@ -19,7 +18,6 @@ import {
 	WebMOutputFormat,
 } from "mediabunny";
 
-import type { AudioTrackChannelMode } from "@/editor-core/model";
 import {
 	type DisposableMediaCleanup,
 	type DisposableMediaWorkScope,
@@ -29,7 +27,6 @@ import {
 import type {
 	AudioPreviewTrackMetadata,
 	CreatePreviewAudioResourceOptions,
-	CreateTransformedPreviewAudioTrackResourceOptions,
 	InputAudioTrack,
 	PreparePreviewAudioTrackResourceOptions,
 	PreparePreviewAudioTrackResourceResult,
@@ -41,17 +38,8 @@ import type {
 	RemuxCandidate,
 	RemuxPreviewAudioTrackResourceOptions,
 } from "../types/preview-audio-resources.types";
-import {
-	createAudioBuffer,
-	createChannelCompensatedAudioBuffer,
-	createPeakSafeAudioBuffer,
-	createTransformedAudioBuffer,
-	outputChannelCountForMode,
-	resolveChannelTransform,
-} from "./browser-audio-mix";
 
 export async function preparePreviewAudioResources({
-	audioMix,
 	asset,
 	createObjectURL = URL.createObjectURL,
 	revokeObjectURL = URL.revokeObjectURL,
@@ -109,8 +97,6 @@ export async function preparePreviewAudioResources({
 				const preparedResource = await preparePreviewAudioTrackResource({
 					assetTrack,
 					createObjectURL,
-					decision: audioMix.tracks[assetTrack.id],
-					finalPeakGuardDb: audioMix.finalPeakGuardDb,
 					metadata,
 					revokeObjectURL,
 					scope,
@@ -239,19 +225,9 @@ export function remuxCandidatesForAudioPreviewCodec(
 	return [mp4Candidate];
 }
 
-export function shouldPrepareTransformedPreviewAudioResource(
-	channelMode: AudioTrackChannelMode,
-): channelMode is Exclude<AudioTrackChannelMode, "preserve"> {
-	void channelMode;
-
-	return false;
-}
-
 async function preparePreviewAudioTrackResource({
 	assetTrack,
 	createObjectURL,
-	decision,
-	finalPeakGuardDb,
 	metadata,
 	revokeObjectURL,
 	scope,
@@ -260,31 +236,6 @@ async function preparePreviewAudioTrackResource({
 	trackIndex,
 }: PreparePreviewAudioTrackResourceOptions): Promise<PreparePreviewAudioTrackResourceResult> {
 	const reasons: string[] = [];
-	const channelMode = decision?.channelMode ?? "preserve";
-
-	if (shouldPrepareTransformedPreviewAudioResource(channelMode)) {
-		try {
-			const resource = await createTransformedPreviewAudioTrackResource({
-				assetTrack,
-				channelMode,
-				createObjectURL,
-				finalPeakGuardDb,
-				metadata,
-				revokeObjectURL,
-				scope,
-				signal,
-				track,
-				trackIndex,
-			});
-
-			return {
-				resource,
-				status: "ready",
-			};
-		} catch (error) {
-			reasons.push(`decoded-channel-transform: ${errorToMessage(error)}`);
-		}
-	}
 
 	for (const candidate of remuxCandidatesForAudioPreviewCodec(metadata.codec)) {
 		throwIfAborted(signal);
@@ -336,234 +287,6 @@ async function preparePreviewAudioTrackResource({
 			reasons.join("; ") || "No Preview audio resource could be prepared.",
 		status: "failed",
 	};
-}
-
-async function createTransformedPreviewAudioTrackResource({
-	assetTrack,
-	channelMode,
-	createObjectURL,
-	finalPeakGuardDb,
-	metadata,
-	revokeObjectURL,
-	scope,
-	signal,
-	track,
-	trackIndex,
-}: CreateTransformedPreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
-	if (!(await track.canDecode())) {
-		throw new Error("Track is not decodable in this browser.");
-	}
-
-	const decoded = await decodePreviewAudioTrackToBuffer({
-		metadata,
-		scope,
-		signal,
-		track,
-	});
-	const channelTransform = resolveChannelTransform(decoded, channelMode);
-	const transformed = createTransformedAudioBuffer(decoded, {
-		channelMode: channelTransform.resolvedMode,
-		outputChannels: outputChannelCountForMode(
-			decoded,
-			channelTransform.resolvedMode,
-		),
-	});
-	const channelCompensated = createChannelCompensatedAudioBuffer({
-		channelTransform,
-		inputBuffer: decoded,
-		outputBuffer: transformed,
-	});
-	const peakSafe = createPeakSafeAudioBuffer(
-		channelCompensated,
-		finalPeakGuardDb,
-	);
-	const encoded = await encodeTransformedPreviewAudioBlob(
-		peakSafe,
-		metadata,
-		scope,
-	);
-
-	return createPreviewAudioResource({
-		assetTrack,
-		blob: encoded.blob,
-		createObjectURL,
-		downloadName: `track-${metadata.number}-${channelMode}${encoded.extension}`,
-		metadata,
-		mimeType: encoded.mimeType,
-		revokeObjectURL,
-		scope,
-		strategy: encoded.strategy,
-		trackIndex,
-	});
-}
-
-async function decodePreviewAudioTrackToBuffer({
-	metadata,
-	scope,
-	signal,
-	track,
-}: {
-	metadata: AudioPreviewTrackMetadata;
-	scope: DisposableMediaWorkScope;
-	signal: AbortSignal;
-	track: InputAudioTrack;
-}): Promise<AudioBuffer> {
-	const sink = new AudioSampleSink(track);
-	const chunks: Array<{ buffer: AudioBuffer; timestamp: number }> = [];
-	let sampleRate = track.sampleRate || 48_000;
-	let numberOfChannels = Math.max(1, track.numberOfChannels || 1);
-	let firstTimestampSeconds = Number.POSITIVE_INFINITY;
-
-	for await (const sample of sink.samples()) {
-		throwIfAborted(signal);
-		const closeSample = registerClosableCleanup(scope, sample);
-
-		try {
-			const buffer = sample.toAudioBuffer();
-
-			if (!sampleRate) {
-				sampleRate = buffer.sampleRate;
-			}
-
-			if (buffer.sampleRate !== sampleRate) {
-				throw new Error(
-					`Decoded sample rate changed from ${sampleRate}Hz to ${buffer.sampleRate}Hz.`,
-				);
-			}
-
-			numberOfChannels = Math.max(numberOfChannels, buffer.numberOfChannels);
-			firstTimestampSeconds = Math.min(firstTimestampSeconds, sample.timestamp);
-			chunks.push({
-				buffer,
-				timestamp: sample.timestamp,
-			});
-		} finally {
-			await closeSample();
-		}
-	}
-
-	if (chunks.length === 0) {
-		throw new Error("Original audio track produced no decoded buffers.");
-	}
-
-	const trackStartSeconds = Number.isFinite(metadata.firstTimestampSeconds)
-		? (metadata.firstTimestampSeconds ?? firstTimestampSeconds)
-		: firstTimestampSeconds;
-	const frameSpans = chunks.map(({ buffer, timestamp }) => {
-		const frameOffset = Math.max(
-			0,
-			Math.round((timestamp - trackStartSeconds) * sampleRate),
-		);
-
-		return {
-			buffer,
-			frameEnd: frameOffset + buffer.length,
-			frameOffset,
-		};
-	});
-	const length = Math.max(...frameSpans.map((span) => span.frameEnd));
-	const audioBuffer = createAudioBuffer({
-		length,
-		numberOfChannels,
-		sampleRate,
-	});
-
-	for (const { buffer, frameOffset } of frameSpans) {
-		for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-			const channelData = new Float32Array(buffer.length);
-			buffer.copyFromChannel(channelData, channel);
-			audioBuffer.copyToChannel(channelData, channel, frameOffset);
-		}
-	}
-
-	return audioBuffer;
-}
-
-async function encodeTransformedPreviewAudioBlob(
-	audioBuffer: AudioBuffer,
-	metadata: AudioPreviewTrackMetadata,
-	scope: DisposableMediaWorkScope,
-): Promise<{
-	blob: Blob;
-	extension: string;
-	mimeType: string;
-	strategy: Extract<
-		PreviewAudioResource["strategy"],
-		"decoded-channel-transform-aac-m4a" | "decoded-channel-transform-wav"
-	>;
-}> {
-	try {
-		return await encodeAudioBufferToM4aBlob(audioBuffer, metadata, scope);
-	} catch {
-		return encodeAudioBufferToWavBlob(audioBuffer, metadata, scope);
-	}
-}
-
-async function encodeAudioBufferToM4aBlob(
-	audioBuffer: AudioBuffer,
-	metadata: AudioPreviewTrackMetadata,
-	scope: DisposableMediaWorkScope,
-) {
-	const target = new BufferTarget();
-	const output = new Output({
-		format: new Mp4OutputFormat({ fastStart: "in-memory" }),
-		target,
-	});
-	const outputCleanup = registerCancellableUntilSettled(scope, output);
-	const source = new AudioBufferSource({
-		bitrate: 192_000,
-		codec: "aac",
-	});
-	const closeSource = registerClosableCleanup(scope, source);
-	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
-	await output.start();
-	await source.add(audioBuffer);
-	await closeSource();
-	await output.finalize();
-	outputCleanup.markSettled();
-
-	if (!target.buffer) {
-		throw new Error("M4A output produced no buffer.");
-	}
-
-	return {
-		blob: new Blob([target.buffer], { type: "audio/mp4" }),
-		extension: ".m4a",
-		mimeType: "audio/mp4",
-		strategy: "decoded-channel-transform-aac-m4a",
-	} satisfies Awaited<ReturnType<typeof encodeTransformedPreviewAudioBlob>>;
-}
-
-async function encodeAudioBufferToWavBlob(
-	audioBuffer: AudioBuffer,
-	metadata: AudioPreviewTrackMetadata,
-	scope: DisposableMediaWorkScope,
-) {
-	const target = new BufferTarget();
-	const output = new Output({
-		format: new WavOutputFormat(),
-		target,
-	});
-	const outputCleanup = registerCancellableUntilSettled(scope, output);
-	const source = new AudioBufferSource({ codec: "pcm-s16" });
-	const closeSource = registerClosableCleanup(scope, source);
-	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
-	await output.start();
-	await source.add(audioBuffer);
-	await closeSource();
-	await output.finalize();
-	outputCleanup.markSettled();
-
-	if (!target.buffer) {
-		throw new Error("WAV output produced no buffer.");
-	}
-
-	return {
-		blob: new Blob([target.buffer], { type: "audio/wav" }),
-		extension: ".wav",
-		mimeType: "audio/wav",
-		strategy: "decoded-channel-transform-wav",
-	} satisfies Awaited<ReturnType<typeof encodeTransformedPreviewAudioBlob>>;
 }
 
 async function remuxPreviewAudioTrackResource({

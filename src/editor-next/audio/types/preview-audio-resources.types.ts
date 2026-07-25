@@ -1,12 +1,6 @@
 import type { AudioCodec, Input, OutputFormat } from "mediabunny";
 
-import type {
-	AudioMediaTrack,
-	AudioMix,
-	AudioMixTrackDecision,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { AudioMediaTrack, ReadyMediaAsset } from "@/editor-core/model";
 import type { DisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 
 export type PreviewAudioResource = {
@@ -15,11 +9,7 @@ export type PreviewAudioResource = {
 	downloadName: string;
 	mimeType: string;
 	startPositionSeconds: number;
-	strategy:
-		| "decoded-channel-transform-aac-m4a"
-		| "decoded-channel-transform-wav"
-		| "decoded-wav-fallback"
-		| "same-codec-remux";
+	strategy: "decoded-wav-fallback" | "same-codec-remux";
 	track: AudioMediaTrack;
 	trackId: string;
 	trackIndex: number;
@@ -39,7 +29,6 @@ export type PreviewAudioResourcesResult = {
 };
 
 export type PreviewAudioResourcesRequest = {
-	audioMix: AudioMix;
 	asset: ReadyMediaAsset;
 	createObjectURL?: (blob: Blob) => string;
 	revokeObjectURL?: (url: string) => void;
@@ -79,10 +68,7 @@ export type PreviewAudioTrackResourceOptions = {
 };
 
 export type PreparePreviewAudioTrackResourceOptions =
-	PreviewAudioTrackResourceOptions & {
-		decision: AudioMixTrackDecision | undefined;
-		finalPeakGuardDb: number;
-	};
+	PreviewAudioTrackResourceOptions;
 
 export type PreparePreviewAudioTrackResourceResult =
 	| {
@@ -93,12 +79,6 @@ export type PreparePreviewAudioTrackResourceResult =
 			reason: string;
 			status: "failed";
 	  };
-
-export type CreateTransformedPreviewAudioTrackResourceOptions =
-	PreviewAudioTrackResourceOptions & {
-		channelMode: Exclude<AudioTrackChannelMode, "preserve">;
-		finalPeakGuardDb: number;
-	};
 
 export type RemuxPreviewAudioTrackResourceOptions =
 	PreviewAudioTrackResourceOptions & {

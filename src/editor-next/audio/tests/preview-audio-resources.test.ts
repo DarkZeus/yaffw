@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	remuxCandidatesForAudioPreviewCodec,
 	revokePreviewAudioResources,
-	shouldPrepareTransformedPreviewAudioResource,
 } from "../engine/preview-audio-resources";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 
@@ -30,20 +29,6 @@ describe("remuxCandidatesForAudioPreviewCodec", () => {
 			),
 		).toEqual(["wav-same-codec"]);
 		expect(remuxCandidatesForAudioPreviewCodec(null)).toEqual([]);
-	});
-});
-
-describe("shouldPrepareTransformedPreviewAudioResource", () => {
-	it("keeps preview resources source-derived for every channel mode", () => {
-		expect(shouldPrepareTransformedPreviewAudioResource("preserve")).toBe(
-			false,
-		);
-		expect(
-			shouldPrepareTransformedPreviewAudioResource("auto-one-sided-stereo"),
-		).toBe(false);
-		expect(
-			shouldPrepareTransformedPreviewAudioResource("use-left-as-mono"),
-		).toBe(false);
 	});
 });
 

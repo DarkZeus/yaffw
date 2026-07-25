@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
 const mockMedia = vi.hoisted(() => ({
@@ -123,7 +122,6 @@ describe("preparePreviewAudioResources cleanup", () => {
 
 		const result = await preparePreviewAudioResources({
 			asset: readyAsset,
-			audioMix: createDefaultAudioMix(readyAsset),
 			createObjectURL: vi.fn(() => "blob:audio-preview"),
 			revokeObjectURL: vi.fn(),
 			signal: new AbortController().signal,
