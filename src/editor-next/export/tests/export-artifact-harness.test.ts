@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
+import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { describe, expect, it, vi } from "vitest";
 
@@ -80,6 +81,10 @@ describe("full-asset export artifact harness", () => {
 		expect(result.report.execution.generatedMedia.sizeBytes).toBe(
 			fixtureBlob.size,
 		);
+		expect(result.report.execution.generatedMedia.fileName).toBe(
+			"tiny-video-only-export.mp4",
+		);
+		expect(result.report.execution.generatedMedia.mimeType).toBe("video/mp4");
 		expect(result.report.inspection.durationUs).toBeCloseTo(
 			fixture.expected.durationUs,
 			-4,
@@ -93,6 +98,194 @@ describe("full-asset export artifact harness", () => {
 				"The harness captures generated media bytes directly; download remains a separate Delivery action.",
 			required: true,
 		});
+	});
+
+	it("carries a non-default documented profile through artifact inspection and Generated media metadata", async () => {
+		const sourceFixture = requiredFixture("mp4-video-only");
+		const generatedFixture = requiredFixture("webm-video-only");
+		const sourceBlob = await readFixtureBlob(
+			sourceFixture.publicPath,
+			sourceFixture.expected.mimeTypePrefix,
+		);
+		const generatedBlob = await readFixtureBlob(
+			generatedFixture.publicPath,
+			generatedFixture.expected.mimeTypePrefix,
+		);
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp8",
+			kind: "documented-codec",
+		};
+		const run = vi.fn(
+			async ({
+				outputSettings: requestedOutputSettings,
+				resolvedOutput,
+				selection,
+			}) => {
+				expect(requestedOutputSettings).toEqual(outputSettings);
+				expect(resolvedOutput).toMatchObject({
+					audioCodec: undefined,
+					container: {
+						fileExtension: ".webm",
+						id: "webm",
+						mimeType: "video/webm",
+					},
+					videoCodec: "vp8",
+				});
+				expect(selection).toEqual(sourceFixture.selections.full);
+
+				return {
+					blob: generatedBlob,
+					fileName: "tiny-video-only-export.mp4",
+					mimeType: "video/webm",
+				};
+			},
+		);
+
+		const result = await runFullAssetExportArtifactHarness({
+			fetchFixtureBlob: async () => sourceBlob,
+			fixture: sourceFixture,
+			inspectGeneratedMedia: inspectGeneratedMediaBlob,
+			inspectLocalAsset: async () => supportedInspection,
+			outputSettings,
+			runtime: supportedRuntime,
+			runner: {
+				cancelSupported: true,
+				run,
+			},
+		});
+
+		expect(run).toHaveBeenCalledTimes(1);
+		expect(result.artifact.mimeType).toBe("video/webm");
+		expect(result.artifact.fileName).toBe("tiny-video-only-export.webm");
+		expect(result.report.inspection).toMatchObject({
+			container: "webm",
+			mimeType: expect.stringMatching(/^video\/webm/),
+			tracks: {
+				audio: [],
+				video: [
+					expect.objectContaining({
+						codec: "vp8",
+						height: 90,
+						width: 160,
+					}),
+				],
+			},
+		});
+		expect(result.report.execution.generatedMedia).toMatchObject({
+			fileName: "tiny-video-only-export.webm",
+			mimeType: "video/webm",
+			outputSettings,
+			resolvedOutput: {
+				audioCodec: undefined,
+				container: {
+					fileExtension: ".webm",
+					id: "webm",
+					mimeType: "video/webm",
+				},
+				videoCodec: "vp8",
+			},
+		});
+		expect(result.report.exportReview).toMatchObject({
+			plannedOutput: {
+				container: "webm",
+				videoCodec: "vp8",
+			},
+			supported: true,
+		});
+		expect(result.report.rangeAccuracy).toMatchObject({
+			kind: "full-asset",
+			precisionProven: false,
+		});
+		expect(result.report.delivery).toMatchObject({
+			performed: false,
+			required: true,
+		});
+	});
+
+	it("reports a documented-profile runner failure instead of hiding the profile", async () => {
+		const fixture = requiredFixture("mp4-video-only");
+		const fixtureBlob = await readFixtureBlob(
+			fixture.publicPath,
+			fixture.expected.mimeTypePrefix,
+		);
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "webm",
+			kind: "documented-container",
+		};
+		outputSettings.videoCodec = {
+			codec: "vp9",
+			kind: "documented-codec",
+		};
+
+		const catalog = await runFixtureCatalogExportArtifactHarness({
+			fetchFixtureBlob: async () => fixtureBlob,
+			fixtures: [fixture],
+			inspectLocalAsset: async () => supportedInspection,
+			outputSettings,
+			runtime: supportedRuntime,
+			runner: {
+				cancelSupported: true,
+				run: async () => {
+					throw new Error(
+						"The runtime could not initialize its documented VP9 encoder.",
+					);
+				},
+			},
+		});
+
+		expect(catalog.summary).toEqual({
+			exported: 0,
+			total: 1,
+			unsupported: 1,
+		});
+		const failure = unsupportedCatalogResult(catalog, fixture.id).failure;
+		expect(failure.stage).toBe("export-runner");
+		expect(failure.reason).toBe(
+			"Fixture export failed before generated media could be inspected.",
+		);
+		expect(failure.technicalDetails).toContain("documented VP9 encoder");
+	});
+
+	it("reports an unavailable output profile before running export", async () => {
+		const fixture = requiredFixture("mp4-video-only");
+		const fixtureBlob = await readFixtureBlob(
+			fixture.publicPath,
+			fixture.expected.mimeTypePrefix,
+		);
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.container = {
+			container: "unavailable-container",
+			kind: "documented-container",
+		};
+		const run = vi.fn();
+
+		const catalog = await runFixtureCatalogExportArtifactHarness({
+			fetchFixtureBlob: async () => fixtureBlob,
+			fixtures: [fixture],
+			inspectLocalAsset: async () => supportedInspection,
+			outputSettings,
+			runtime: supportedRuntime,
+			runner: {
+				cancelSupported: true,
+				run,
+			},
+		});
+
+		expect(run).not.toHaveBeenCalled();
+		const failure = unsupportedCatalogResult(catalog, fixture.id).failure;
+		expect(failure.stage).toBe("profile-capability");
+		expect(failure.reason).toBe(
+			"The selected documented output profile is unavailable.",
+		);
+		expect(failure.technicalDetails).toContain(
+			"unavailable-container container is not documented",
+		);
 	});
 });
 
@@ -328,6 +521,18 @@ function inspectionForFixtureLabel(label: string): LocalMediaAssetInspection {
 			},
 		],
 	};
+}
+
+function requiredFixture(id: string) {
+	const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
+		(candidate) => candidate.id === id,
+	);
+
+	if (!fixture) {
+		throw new Error(`Expected export correctness fixture ${id}.`);
+	}
+
+	return fixture;
 }
 
 function exportedCatalogResult(

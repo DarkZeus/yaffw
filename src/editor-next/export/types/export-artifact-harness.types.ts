@@ -6,10 +6,13 @@ import type {
 import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis";
 import type {
 	ExportProgress,
+	GeneratedMedia,
 	LocalFileSource,
+	OutputSettings,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import type { BrowserLocalOutputSupport } from "@/editor-core/output-settings";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import type { ExportCorrectnessFixture } from "../harness/export-correctness-fixtures";
@@ -20,6 +23,7 @@ export type FixtureSource = Blob & LocalFileSource;
 export type ExportArtifactHarnessOptions = {
 	createAssetId?: () => string;
 	createDraftId?: () => string;
+	createGeneratedMediaId?: () => string;
 	createFixtureSource?: (
 		blob: Blob,
 		fixture: ExportCorrectnessFixture,
@@ -28,6 +32,9 @@ export type ExportArtifactHarnessOptions = {
 	fixture?: ExportCorrectnessFixture;
 	inspectGeneratedMedia?: (blob: Blob) => Promise<GeneratedMediaInspection>;
 	inspectLocalAsset?: LocalMediaAssetInspector;
+	now?: () => number;
+	outputSettings?: OutputSettings;
+	outputSupport?: BrowserLocalOutputSupport;
 	runner?: DefaultExportRunner;
 	runnerLabel?: string;
 	runtime?: RuntimeSupport;
@@ -52,6 +59,7 @@ export type ExportArtifactHarnessFailureStage =
 	| "export-runner"
 	| "fixture-source"
 	| "generated-media-inspection"
+	| "profile-capability"
 	| "runtime-capability";
 
 export type ExportFixtureCatalogSelectionKind =
@@ -99,11 +107,7 @@ export type ExportArtifactHarnessReport = {
 		required: true;
 	};
 	execution: {
-		generatedMedia: {
-			fileName?: string;
-			mimeType: string;
-			sizeBytes: number;
-		};
+		generatedMedia: GeneratedMedia;
 		progress: ExportProgress[];
 		requestedSelection: Selection;
 		runner: string;

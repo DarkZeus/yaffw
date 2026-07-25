@@ -10,10 +10,13 @@ import {
 	type ExportProgress,
 	createDefaultOutputSettings,
 } from "@/editor-core/model";
+import { resolveOutputPlan } from "@/editor-core/output-settings";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import { inspectGeneratedMediaBlob } from "../generated-media/generated-media-inspector";
+import { createGeneratedMediaMetadata } from "../generated-media/generated-media-metadata";
 import { browserDefaultExportRunner } from "../runners/default-export-runner";
 import type { DefaultExportRunner } from "../types/default-export-runner.types";
 import type {
@@ -112,11 +115,15 @@ export async function runSelectedRangeExportArtifactHarness(
 async function runExportArtifactHarness({
 	createAssetId = () => "export-artifact-harness-asset",
 	createDraftId = () => "export-artifact-harness-draft",
+	createGeneratedMediaId = () => "export-artifact-harness-generated-media",
 	createFixtureSource = createBrowserFixtureSource,
 	fetchFixtureBlob = fetchBrowserFixtureBlob,
 	fixture = defaultFullAssetFixture(),
 	inspectGeneratedMedia = inspectGeneratedMediaBlob,
 	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
+	now = () => 0,
+	outputSettings = createDefaultOutputSettings(),
+	outputSupport = MEDIABUNNY_OUTPUT_SUPPORT,
 	runner = browserDefaultExportRunner,
 	runnerLabel = "browserDefaultExportRunner",
 	runtime = detectRuntimeSupport(),
@@ -162,10 +169,29 @@ async function runExportArtifactHarness({
 		);
 	}
 
+	const audioMix = createDefaultAudioMix(analysis.asset);
+	const resolvedOutput = resolveOutputPlan({
+		asset: analysis.asset,
+		audioMix,
+		outputSettings,
+		support: outputSupport,
+	});
+
+	if (resolvedOutput.kind === "invalid") {
+		throw new ExportArtifactHarnessFailure(
+			"profile-capability",
+			"The selected documented output profile is unavailable.",
+			resolvedOutput.error,
+		);
+	}
+
 	const exportReadiness = planDefaultExportCapability({
 		asset: analysis.asset,
+		audioMix,
+		outputSettings,
 		runtime,
 		selection,
+		support: outputSupport,
 	});
 
 	if (!exportReadiness.supported) {
@@ -183,11 +209,12 @@ async function runExportArtifactHarness({
 	try {
 		exportResult = await runner.run({
 			asset: analysis.asset,
-			audioMix: createDefaultAudioMix(analysis.asset),
+			audioMix,
 			onProgress: (event) => {
 				progress.push(event);
 			},
-			outputSettings: createDefaultOutputSettings(),
+			outputSettings,
+			resolvedOutput: resolvedOutput.plan,
 			selection,
 			signal: exportSignal,
 			source,
@@ -240,8 +267,21 @@ async function runExportArtifactHarness({
 	});
 	const exportReview = planDefaultExportCapability({
 		asset: analysis.asset,
+		audioMix,
+		outputSettings,
 		rangeAccuracy,
 		runtime,
+		selection,
+		support: outputSupport,
+	});
+	const generatedMedia = createGeneratedMediaMetadata({
+		asset: analysis.asset,
+		blob: generatedBlob,
+		fileName: exportResult.fileName,
+		generatedMediaId: createGeneratedMediaId(),
+		now,
+		outputSettings,
+		resolvedOutput: resolvedOutput.plan,
 		selection,
 	});
 
@@ -249,7 +289,7 @@ async function runExportArtifactHarness({
 		artifact: {
 			blob: generatedBlob,
 			bytes: generatedBytes,
-			fileName: exportResult.fileName,
+			fileName: generatedMedia.fileName,
 			mimeType: generatedMimeType,
 			sizeBytes: generatedBlob.size,
 		},
@@ -261,11 +301,7 @@ async function runExportArtifactHarness({
 				required: true,
 			},
 			execution: {
-				generatedMedia: {
-					fileName: exportResult.fileName,
-					mimeType: generatedMimeType,
-					sizeBytes: generatedBlob.size,
-				},
+				generatedMedia,
 				progress,
 				requestedSelection: selection,
 				runner: runnerLabel,

@@ -59,6 +59,13 @@ MP4, WebM, video-only, and video-with-audio cases explicit without silently
 falling back to another output profile or treating delivery as part of export
 correctness.
 
+The harness also accepts applied Output settings. It resolves those settings
+through the same Mediabunny output-support data used by the editor, passes the
+resolved output plan to the browser-local runner, and records the resulting
+Generated media metadata. Artifact coverage can therefore compare the inspected
+container and tracks with the selected codecs, MIME type, filename extension,
+Export review, and still-separate Delivery action.
+
 ## Measured behavior
 
 Full-asset fixture export is the strongest current browser/WebCodecs path. The
@@ -78,6 +85,15 @@ each have one generated video track and one generated audio track. The WebM
 video-only fixture is explicit rather than silent fallback: if the runtime
 cannot export it with the default profile, the catalog result is `unsupported`
 at the capability stage with technical details.
+
+Non-default profile coverage selects WebM/VP8 for the MP4 video-only source,
+carries that resolved plan through the artifact harness, and inspects the
+registered WebM/VP8 Generated media fixture. The fast Vitest path injects the
+runner result so it proves Output settings plumbing, Generated media metadata,
+artifact inspection, and failure reporting without claiming that Node provides
+a WebCodecs VP8 encoder. In a supported Chromium runtime the same harness can
+use the real browser runner; an unavailable documented encoder remains an
+explicit export-runner failure with technical details.
 
 Selected-range fixture export is currently a harness shape, not a real-runner
 precision result. The registered selected range is `[500000, 1500000)`, a
@@ -124,6 +140,12 @@ The current committed baseline can guarantee:
   media through the current runtime or records an unsupported capability result
   with technical details. It does not silently change the default output
   profile.
+- A non-default WebM/VP8 output plan is covered through capability resolution,
+  runner input, inspected Generated media container and video track, WebM MIME
+  type and filename extension, Export review, and explicit post-export Delivery
+  action.
+- A documented-profile runtime failure remains visible in the artifact catalog
+  as an export-runner failure rather than causing the profile to disappear.
 
 The current baseline does not yet prove:
 
@@ -134,6 +156,8 @@ The current baseline does not yet prove:
 - Track inventory beyond the registered tiny fixture catalog.
 - Runtime support across broader browsers, containers, codecs, durations, and
   multi-track media.
+- Real Chromium encoder availability for every documented output profile; the
+  fast non-default profile test uses an injected runner artifact.
 
 Track inventory measurement currently proves only whether inspected generated
 tracks are present in the fixture result. It does not prove audio/video sync,
@@ -141,7 +165,8 @@ codec suitability beyond the default profile facts, or behavior for media with
 more than one audio track.
 
 Out of scope for this baseline: server export fallback, native FFmpeg export,
-smart rendering, custom output settings, and generated media preview.
+smart rendering, exhaustive documented-profile coverage, and generated media
+preview.
 
 ## Follow-up direction
 
@@ -161,7 +186,7 @@ facts through the existing conservative classifier. If selected-range conversion
 can still take a packet-copy path in some case, selected-range precision export
 should explicitly set `forceTranscode: true` for video and audio.
 
-Do not add server fallback, native FFmpeg, smart rendering, custom output
-settings, or Generated media preview as the next step. Native FFmpeg should be a
-future runtime capability only if real Mediabunny boundary/alignment evidence
-shows a browser limitation that cannot be fixed in the browser export runner.
+Do not add server fallback, native FFmpeg, smart rendering, or Generated media
+preview as the next step. Native FFmpeg should be a future runtime capability
+only if real Mediabunny boundary/alignment evidence shows a browser limitation
+that cannot be fixed in the browser export runner.
