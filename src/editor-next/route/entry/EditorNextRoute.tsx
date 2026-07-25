@@ -20,11 +20,6 @@ import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/b
 import { MediaAssetContextPanel } from "../../media-asset/panel/media-asset-context";
 import { NativePreviewPlayer } from "../../preview/player/native-preview-player";
 import {
-	EDITOR_WORKBENCH_VISUAL_FIXTURE_PREVIEW_POSTER_SRC,
-	createEditorWorkbenchVisualFixture,
-	shouldUseEditorWorkbenchVisualFixtureFromUrl,
-} from "../../workbench/fixtures/editor-workbench-visual-fixture";
-import {
 	EditorSessionShell,
 	EditorWorkbenchFrame,
 	UnsupportedRuntimeState,
@@ -43,7 +38,6 @@ export function EditorNextRoute({
 	deliverGeneratedMedia = deliverBrowserGeneratedMedia,
 	initialRuntime,
 	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
-	mockUploadedMediaState,
 	now = () => Date.now(),
 }: EditorNextRouteProps) {
 	const runtime = useMemo(
@@ -69,25 +63,7 @@ export function EditorNextRoute({
 		runtime,
 	});
 	const stableCommands = useStableEditorCommands(commands);
-	const visualFixture = useMemo(
-		() => createEditorWorkbenchVisualFixture(runtime),
-		[runtime],
-	);
-	const visualFixtureActive =
-		session.status === "empty" &&
-		runtime.supported &&
-		(mockUploadedMediaState ?? shouldUseEditorWorkbenchVisualFixtureFromUrl());
-	const displayedSession = visualFixtureActive
-		? visualFixture.session
-		: session;
-	const displayedPreviewSource = visualFixtureActive
-		? visualFixture.source
-		: previewSource;
-	const displayedPreviewPosterSrc = visualFixtureActive
-		? EDITOR_WORKBENCH_VISUAL_FIXTURE_PREVIEW_POSTER_SRC
-		: undefined;
-	const activeAssetId =
-		displayedSession.status === "ready" ? displayedSession.asset.id : null;
+	const activeAssetId = session.status === "ready" ? session.asset.id : null;
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
 	const [previewMeteringClock, setPreviewMeteringClock] =
 		useState<LivePreviewMeteringClock | null>(null);
@@ -168,23 +144,22 @@ export function EditorNextRoute({
 	}
 
 	const readyMediaAssetContext =
-		displayedSession.status === "ready" ? (
+		session.status === "ready" ? (
 			<MediaAssetContextPanel
-				asset={displayedSession.asset}
-				closeFileDisabled={!canCloseEditorSession(displayedSession)}
+				asset={session.asset}
+				closeFileDisabled={!canCloseEditorSession(session)}
 				onCloseFileRequested={stableCommands.requestCloseFile}
-				selection={displayedSession.selection}
+				selection={session.selection}
 			/>
 		) : null;
 	const selectionEditingDisabled =
-		displayedSession.status === "ready" &&
-		displayedSession.export.status === "running";
+		session.status === "ready" && session.export.status === "running";
 	const readyAudioPanel =
-		displayedSession.status === "ready" ? (
+		session.status === "ready" ? (
 			<AudioPanel
-				asset={displayedSession.asset}
+				asset={session.asset}
 				audioEditingDisabled={selectionEditingDisabled}
-				audioMix={displayedSession.audioMix}
+				audioMix={session.audioMix}
 				onAudioTrackChannelModeChange={stableCommands.setAudioTrackChannelMode}
 				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
 				onAudioTrackVolumePercentChange={
@@ -196,15 +171,11 @@ export function EditorNextRoute({
 			/>
 		) : null;
 	const readyPreviewPlayer =
-		displayedSession.status === "ready" && displayedPreviewSource ? (
+		session.status === "ready" && previewSource ? (
 			<NativePreviewPlayer
-				activeMediaAssetCleanupScope={
-					visualFixtureActive
-						? undefined
-						: (activeMediaAssetCleanupScope ?? undefined)
-				}
-				asset={displayedSession.asset}
-				audioMix={displayedSession.audioMix}
+				activeMediaAssetCleanupScope={activeMediaAssetCleanupScope ?? undefined}
+				asset={session.asset}
+				audioMix={session.audioMix}
 				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
 				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				onSelectionEndRequested={stableCommands.setSelectionEndFromPlayhead}
@@ -215,52 +186,48 @@ export function EditorNextRoute({
 				onPreviewMeteringClockChange={handlePreviewMeteringClockChange}
 				onPreviewMeteringRetryChange={handlePreviewMeteringRetryChange}
 				onPreviewPlayheadChange={handlePreviewPlayheadChange}
-				previewPosterSrc={displayedPreviewPosterSrc}
-				selection={displayedSession.selection}
+				selection={session.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				shortcutsDisabled={selectionEditingDisabled}
 				soloedAudioTrackId={soloedAudioTrackId}
-				source={displayedPreviewSource}
+				source={previewSource}
 			/>
 		) : null;
 	const readyExportInspector =
-		displayedSession.status === "ready" ? (
+		session.status === "ready" ? (
 			<ExportInspectorPanel
-				asset={displayedSession.asset}
-				audioMix={displayedSession.audioMix}
-				exportState={displayedSession.export}
+				asset={session.asset}
+				audioMix={session.audioMix}
+				exportState={session.export}
 				onCancelExport={stableCommands.cancelDefaultExport}
 				onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}
 				onApplyOutputSettings={stableCommands.applyOutputSettings}
 				onStartExport={() => {
 					void stableCommands.startDefaultExport();
 				}}
-				outputSettings={displayedSession.outputSettings}
-				runtime={displayedSession.runtime}
-				selection={displayedSession.selection}
+				outputSettings={session.outputSettings}
+				runtime={session.runtime}
+				selection={session.selection}
 			/>
 		) : null;
 
 	return (
 		<EditorWorkbenchFrame
-			activeAsset={
-				displayedSession.status === "ready" ? displayedSession.asset : null
-			}
+			activeAsset={session.status === "ready" ? session.asset : null}
 			previewStatus={
-				displayedSession.status === "ready"
+				session.status === "ready"
 					? {
 							playheadUs: previewPlayheadUs,
 							selectionDurationUs:
-								displayedSession.selection.endUs -
-								displayedSession.selection.startUs,
+								session.selection.endUs - session.selection.startUs,
 						}
 					: null
 			}
 			runtime={runtime}
-			status={displayedSession.status}
+			status={session.status}
 		>
-			{displayedSession.status === "unsupported-runtime" ? (
-				<UnsupportedRuntimeState session={displayedSession} />
+			{session.status === "unsupported-runtime" ? (
+				<UnsupportedRuntimeState session={session} />
 			) : (
 				<EditorSessionShell
 					audioPanel={readyAudioPanel}
@@ -270,7 +237,7 @@ export function EditorNextRoute({
 					onLocalFileDropped={handleLocalFileDropped}
 					onLocalFileSelected={handleLocalFileSelected}
 					previewPlayer={readyPreviewPlayer}
-					session={displayedSession}
+					session={session}
 				/>
 			)}
 		</EditorWorkbenchFrame>

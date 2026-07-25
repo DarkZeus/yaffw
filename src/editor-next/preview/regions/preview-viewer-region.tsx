@@ -8,7 +8,6 @@ import {
 	type MediaProviderAdapter,
 	Menu,
 	type PlayerSrc,
-	Poster,
 	isHLSProvider,
 	useChapterOptions,
 	useMediaStore,
@@ -47,7 +46,6 @@ export function PreviewViewerRegion({
 	playbackRate,
 	playheadUs,
 	previewApertureStyle,
-	previewPosterSrc,
 	previewSourceMimeType,
 	previewSurfaceRef,
 	previewUrl,
@@ -115,7 +113,6 @@ export function PreviewViewerRegion({
 					onSyncPlayhead={onSyncPlayhead}
 					playerSrc={playerSrc}
 					previewApertureStyle={previewApertureStyle}
-					previewPosterSrc={previewPosterSrc}
 					previewSurfaceRef={previewSurfaceRef}
 					videoRef={videoRef}
 				/>
@@ -134,7 +131,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead,
 	playerSrc,
 	previewApertureStyle,
-	previewPosterSrc,
 	previewSurfaceRef,
 	videoRef,
 }: {
@@ -147,7 +143,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead: () => void;
 	playerSrc: PlayerSrc | undefined;
 	previewApertureStyle: PreviewViewerRegionProps["previewApertureStyle"];
-	previewPosterSrc?: string;
 	previewSurfaceRef: PreviewViewerRegionProps["previewSurfaceRef"];
 	videoRef: PreviewViewerRegionProps["videoRef"];
 }) {
@@ -184,15 +179,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 						mediaProps={{
 							className: "h-full w-full bg-black object-contain",
 						}}
-					>
-						{previewPosterSrc ? (
-							<Poster
-								alt=""
-								className="vds-poster h-full w-full object-contain"
-								src={previewPosterSrc}
-							/>
-						) : null}
-					</MediaProvider>
+					/>
 					<DefaultVideoLayout
 						icons={defaultLayoutIcons}
 						slots={{

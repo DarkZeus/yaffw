@@ -24,7 +24,6 @@ export type NativePreviewPlayerProps = {
 	onSelectionResetRequested: () => void;
 	onSelectionReplaceRequested?: (selection: Selection) => void;
 	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
-	previewPosterSrc?: string;
 	selection: Selection;
 	selectionEditingDisabled?: boolean;
 	shortcutsDisabled?: boolean;

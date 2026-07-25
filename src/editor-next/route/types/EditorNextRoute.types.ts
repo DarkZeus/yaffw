@@ -14,6 +14,5 @@ export type EditorNextRouteProps = {
 	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
 	initialRuntime?: RuntimeSupport;
 	inspectLocalAsset?: LocalMediaAssetInspector;
-	mockUploadedMediaState?: boolean;
 	now?: () => number;
 };

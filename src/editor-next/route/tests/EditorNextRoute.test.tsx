@@ -20,6 +20,7 @@ const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 
 beforeEach(() => {
+	window.history.replaceState(null, "", "/");
 	Object.defineProperty(URL, "createObjectURL", {
 		configurable: true,
 		value: vi.fn(() => "blob:editor-next-preview"),
@@ -56,31 +57,16 @@ describe("EditorNextRoute", () => {
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
 
-	it("can render the uploaded-media visual fixture without exposing upload controls", async () => {
-		render(
-			<EditorNextRoute
-				initialRuntime={supportedRuntime}
-				mockUploadedMediaState
-			/>,
-		);
+	it("ignores visual fixture query parameters and keeps the empty import state", () => {
+		window.history.replaceState(null, "", "/?mockUploadedMedia=1");
 
-		await waitFor(() => {
-			expect(
-				screen.getByLabelText("Preview for stalker-patch-1.5-teaser.mp4"),
-			).toBeTruthy();
-		});
-		expect(screen.queryByLabelText("Local media file")).toBeNull();
+		render(<EditorNextRoute initialRuntime={supportedRuntime} />);
+
+		expect(screen.getByText("No media asset loaded")).toBeTruthy();
+		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(
-			screen.getAllByText("stalker-patch-1.5-teaser.mp4").length,
-		).toBeGreaterThan(0);
-		expect(
-			within(screen.getByLabelText("Workbench selection region")).getByText(
-				"Selection",
-			),
-		).toBeTruthy();
-		openExportTab();
-		expect(screen.getByText("Output")).toBeTruthy();
-		expect(screen.queryByText("Export file")).toBeNull();
+			screen.queryByLabelText("Preview for stalker-patch-1.5-teaser.mp4"),
+		).toBeNull();
 	});
 
 	it("renders the unsupported runtime state before exposing local import", () => {

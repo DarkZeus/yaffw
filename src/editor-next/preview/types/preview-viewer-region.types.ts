@@ -22,7 +22,6 @@ export type PreviewViewerRegionProps = {
 	playbackRate: number;
 	playheadUs: MediaTimeUs;
 	previewApertureStyle: CSSProperties;
-	previewPosterSrc?: string;
 	previewSourceMimeType: string;
 	previewSurfaceRef: RefObject<HTMLElement | null>;
 	previewUrl: string;

@@ -39,7 +39,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	onSelectionReplaceRequested,
 	onSelectionResetRequested,
 	onSelectionStartRequested,
-	previewPosterSrc,
 	selection,
 	selectionEditingDisabled = false,
 	shortcutsDisabled = false,
@@ -299,7 +298,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					playbackRate={playbackRate}
 					playheadUs={playheadUs}
 					previewApertureStyle={previewApertureStyle}
-					previewPosterSrc={previewPosterSrc}
 					previewSourceMimeType={source.type}
 					previewSurfaceRef={previewSurfaceRef}
 					previewUrl={previewUrl}
