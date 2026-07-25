@@ -2,16 +2,24 @@ import { AudioLines, ChevronRight, Film, X } from "lucide-react";
 import { type ReactElement, type ReactNode, cloneElement } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
+import type {
+	AudioMediaTrack,
+	ReadyMediaAsset,
+	Selection,
+	VideoMediaTrack,
+} from "@/editor-core/model";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
-import { createMediaAssetContextViewModel } from "../presenter/media-asset-context-presenter";
-import type { MediaAssetContextFact } from "../types/media-asset-context-presenter.types";
 import type { MediaAssetContextPanelProps } from "../types/media-asset-context.types";
 
 type PanelIconElement = ReactElement<{
 	"aria-hidden"?: boolean;
 	className?: string;
 }>;
+
+type MediaAssetContextFact = {
+	label: string;
+	value: string;
+};
 
 type AnalysisFactGroup = {
 	facts: MediaAssetContextFact[];
@@ -24,13 +32,14 @@ export function MediaAssetContextPanel({
 	onCloseFileRequested,
 	selection,
 }: MediaAssetContextPanelProps) {
-	const viewModel = createMediaAssetContextViewModel({
-		asset,
-		closeDisabled: closeFileDisabled,
-		selection,
-	});
-	const sourceAnalysisFacts = viewModel.provenanceFacts.filter(
-		(fact) => fact.label !== "Source file",
+	const primaryVideoTrack = asset.tracks.video[0];
+	const primaryAudioTrack = asset.tracks.audio[0];
+	const sourceFileSize = formatFileSize(asset.provenance.sizeBytes);
+	const frameTiming = formatFrameTiming(asset);
+	const selectionDurationUs = Math.max(0, selection.endUs - selection.startUs);
+	const selectionCoverage = formatSelectionCoverage(
+		selectionDurationUs,
+		asset.durationUs,
 	);
 
 	return (
@@ -46,15 +55,15 @@ export function MediaAssetContextPanel({
 				>
 					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
 						<div className="truncate text-sm font-medium text-foreground">
-							{viewModel.identity.name}
+							{asset.label}
 						</div>
 						<Button
-							aria-label={viewModel.closeFile.label}
+							aria-label="Close file"
 							className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-							disabled={viewModel.closeFile.disabled}
+							disabled={closeFileDisabled}
 							onClick={onCloseFileRequested}
 							size="icon"
-							title={viewModel.closeFile.label}
+							title="Close file"
 							type="button"
 							variant="outline"
 						>
@@ -62,10 +71,7 @@ export function MediaAssetContextPanel({
 						</Button>
 					</div>
 					<div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-						<CompactMetric
-							label="Size"
-							value={factValue(viewModel.provenanceFacts, "Size")}
-						/>
+						<CompactMetric label="Size" value={sourceFileSize} />
 						<CompactMetric
 							label="Duration"
 							value={formatMediaTime(asset.durationUs)}
@@ -74,7 +80,7 @@ export function MediaAssetContextPanel({
 							label="Codec"
 							value={formatAssetCodecSummary(asset)}
 						/>
-						<CompactMetric label="Frames" value={formatFrameTiming(asset)} />
+						<CompactMetric label="Frames" value={frameTiming} />
 					</div>
 				</div>
 
@@ -117,30 +123,35 @@ export function MediaAssetContextPanel({
 					/>
 					<CompactTimeBox
 						label="Duration"
-						value={formatMediaTime(selection.endUs - selection.startUs)}
+						value={formatMediaTime(selectionDurationUs)}
 					/>
-					<CompactTimeBox
-						label="Coverage"
-						value={formatSelectionCoverage(selection, asset)}
-					/>
+					<CompactTimeBox label="Coverage" value={selectionCoverage} />
 				</div>
 
 				<MediaAnalysisSection
 					groups={[
 						{
-							facts: sourceAnalysisFacts,
+							facts: sourceAnalysisFactsForAsset(asset, sourceFileSize),
 							title: "Source context",
 						},
 						{
-							facts: viewModel.videoFacts,
+							facts: videoAnalysisFactsForAsset(
+								primaryVideoTrack,
+								asset,
+								frameTiming,
+							),
 							title: "Video facts",
 						},
 						{
-							facts: viewModel.audioFacts,
+							facts: audioAnalysisFactsForAsset(primaryAudioTrack, asset),
 							title: "Audio facts",
 						},
 						{
-							facts: viewModel.selectionFacts,
+							facts: selectionAnalysisFacts(
+								selection,
+								selectionDurationUs,
+								selectionCoverage,
+							),
 							title: "Selection facts",
 						},
 					]}
@@ -148,6 +159,88 @@ export function MediaAssetContextPanel({
 			</div>
 		</section>
 	);
+}
+
+function sourceAnalysisFactsForAsset(
+	asset: ReadyMediaAsset,
+	sourceFileSize: string,
+): MediaAssetContextFact[] {
+	return [
+		{ label: "Asset identity", value: asset.id },
+		{ label: "Duration", value: formatMediaTime(asset.durationUs) },
+		{ label: "Size", value: sourceFileSize },
+		{ label: "Type", value: formatContainerType(asset.provenance) },
+	];
+}
+
+function videoAnalysisFactsForAsset(
+	primaryVideoTrack: VideoMediaTrack | undefined,
+	asset: ReadyMediaAsset,
+	frameTiming: string,
+): MediaAssetContextFact[] {
+	return [
+		{ label: "Video tracks", value: `${asset.tracks.video.length}` },
+		{
+			label: "Primary video",
+			value: formatTrackLabel(primaryVideoTrack?.label, "Unnamed video track"),
+		},
+		{
+			label: "Resolution",
+			value: formatVideoResolution(primaryVideoTrack),
+		},
+		{
+			label: "Aspect",
+			value: formatAspectRatio(
+				primaryVideoTrack?.width,
+				primaryVideoTrack?.height,
+			),
+		},
+		{ label: "Frame timing", value: frameTiming },
+		{ label: "Codec", value: formatCodec(primaryVideoTrack?.codec) },
+	];
+}
+
+function audioAnalysisFactsForAsset(
+	primaryAudioTrack: AudioMediaTrack | undefined,
+	asset: ReadyMediaAsset,
+): MediaAssetContextFact[] {
+	if (!primaryAudioTrack) {
+		return [
+			{ label: "Audio tracks", value: `${asset.tracks.audio.length}` },
+			{ label: "Primary audio", value: "None" },
+		];
+	}
+
+	return [
+		{ label: "Audio tracks", value: `${asset.tracks.audio.length}` },
+		{
+			label: "Primary audio",
+			value: formatTrackLabel(primaryAudioTrack.label, "Unnamed audio track"),
+		},
+		{
+			label: "Channels",
+			value: formatAudioChannels(primaryAudioTrack.channels),
+		},
+		{
+			label: "Sample rate",
+			value: formatSampleRate(primaryAudioTrack.sampleRate),
+		},
+		{ label: "Codec", value: formatCodec(primaryAudioTrack.codec) },
+		{ label: "Language", value: formatLanguage(primaryAudioTrack.language) },
+	];
+}
+
+function selectionAnalysisFacts(
+	selection: Selection,
+	durationUs: number,
+	coverage: string,
+): MediaAssetContextFact[] {
+	return [
+		{ label: "Selection start", value: formatMediaTime(selection.startUs) },
+		{ label: "Selection end", value: formatMediaTime(selection.endUs) },
+		{ label: "Selection duration", value: formatMediaTime(durationUs) },
+		{ label: "Asset coverage", value: coverage },
+	];
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
@@ -261,13 +354,9 @@ function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
 	);
 }
 
-function factValue(facts: MediaAssetContextFact[], label: string): string {
-	return facts.find((fact) => fact.label === label)?.value ?? "Unknown";
-}
-
 function formatAssetCodecSummary(asset: ReadyMediaAsset): string {
-	const videoCodec = asset.tracks.video[0]?.codec?.trim() || "Video";
-	const audioCodec = asset.tracks.audio[0]?.codec?.trim() || "Audio";
+	const videoCodec = formatCodec(asset.tracks.video[0]?.codec);
+	const audioCodec = formatCodec(asset.tracks.audio[0]?.codec);
 
 	return `${videoCodec.toUpperCase()} / ${audioCodec.toUpperCase()}`;
 }
@@ -275,11 +364,7 @@ function formatAssetCodecSummary(asset: ReadyMediaAsset): string {
 function formatVideoTrackMeta(
 	track: ReadyMediaAsset["tracks"]["video"][number],
 ): string {
-	if (track.width && track.height) {
-		return `${track.width} x ${track.height}`;
-	}
-
-	return "Resolution unknown";
+	return formatVideoResolution(track, " x ", "Resolution unknown");
 }
 
 function formatAudioTrackMeta(
@@ -287,15 +372,15 @@ function formatAudioTrackMeta(
 ): string {
 	const facts = [
 		formatAudioChannels(track.channels),
-		track.sampleRate ? `${formatNumber(track.sampleRate / 1000)} kHz` : null,
-	].filter((fact): fact is string => Boolean(fact));
+		formatSampleRate(track.sampleRate),
+	].filter((fact) => fact !== "Unknown");
 
 	return facts.length > 0 ? facts.join(", ") : "Audio track";
 }
 
-function formatAudioChannels(channels?: number): string | null {
+function formatAudioChannels(channels?: number): string {
 	if (!channels || channels <= 0) {
-		return null;
+		return "Unknown";
 	}
 
 	if (channels === 1) {
@@ -310,12 +395,11 @@ function formatAudioChannels(channels?: number): string | null {
 }
 
 function formatSelectionCoverage(
-	selection: Selection,
-	asset: ReadyMediaAsset,
+	selectionDurationUs: number,
+	assetDurationUs: number,
 ): string {
-	const durationUs = Math.max(0, selection.endUs - selection.startUs);
 	const coveragePercent =
-		asset.durationUs > 0 ? (durationUs / asset.durationUs) * 100 : 0;
+		assetDurationUs > 0 ? (selectionDurationUs / assetDurationUs) * 100 : 0;
 
 	return `${formatNumber(coveragePercent)}%`;
 }
@@ -329,11 +413,105 @@ function formatNumber(value: number): string {
 }
 
 function formatFrameTiming(asset: ReadyMediaAsset): string {
-	const fps = Number.isInteger(asset.frameTiming.fps)
-		? String(asset.frameTiming.fps)
-		: asset.frameTiming.fps.toFixed(2);
+	const fps = formatNumber(asset.frameTiming.fps);
 
 	return asset.frameTiming.source === "estimated"
 		? `${fps} fps estimated`
 		: `${fps} fps`;
+}
+
+function formatFileSize(bytes: number): string {
+	if (bytes <= 0) {
+		return "0 B";
+	}
+
+	const units = ["B", "KB", "MB", "GB", "TB"];
+	const unitIndex = Math.min(
+		units.length - 1,
+		Math.floor(Math.log(bytes) / Math.log(1024)),
+	);
+	const value = bytes / 1024 ** unitIndex;
+
+	return `${formatNumber(value)} ${units[unitIndex]}`;
+}
+
+function formatContainerType(
+	provenance: ReadyMediaAsset["provenance"],
+): string {
+	const mimeSubtype = provenance.mimeType?.split("/")[1]?.trim();
+
+	if (mimeSubtype) {
+		return mimeSubtype.toUpperCase();
+	}
+
+	const lastDotIndex = provenance.fileName.lastIndexOf(".");
+	const extension =
+		lastDotIndex > 0 && lastDotIndex < provenance.fileName.length - 1
+			? provenance.fileName.slice(lastDotIndex + 1)
+			: undefined;
+
+	return extension ? extension.toUpperCase() : "Unknown";
+}
+
+function formatVideoResolution(
+	track: VideoMediaTrack | undefined,
+	separator = "x",
+	fallback = "Unknown",
+): string {
+	if (!track?.width || !track.height) {
+		return fallback;
+	}
+
+	return `${track.width}${separator}${track.height}`;
+}
+
+function formatAspectRatio(width?: number, height?: number): string {
+	if (!width || !height) {
+		return "Unknown";
+	}
+
+	const divisor = greatestCommonDivisor(width, height);
+
+	return `${width / divisor}:${height / divisor}`;
+}
+
+function formatSampleRate(sampleRate?: number): string {
+	if (!sampleRate || sampleRate <= 0) {
+		return "Unknown";
+	}
+
+	return sampleRate >= 1_000
+		? `${formatNumber(sampleRate / 1_000)} kHz`
+		: `${sampleRate} Hz`;
+}
+
+function formatCodec(codec?: string, fallback = "Unknown"): string {
+	return codec?.trim() || fallback;
+}
+
+function formatLanguage(language?: string): string {
+	const normalizedLanguage = language?.trim();
+
+	if (!normalizedLanguage || normalizedLanguage.toLowerCase() === "und") {
+		return "Unknown";
+	}
+
+	return normalizedLanguage;
+}
+
+function formatTrackLabel(label: string | undefined, fallback: string): string {
+	return label?.trim() || fallback;
+}
+
+function greatestCommonDivisor(first: number, second: number): number {
+	let a = Math.abs(first);
+	let b = Math.abs(second);
+
+	while (b !== 0) {
+		const next = b;
+		b = a % b;
+		a = next;
+	}
+
+	return a || 1;
 }

@@ -177,6 +177,97 @@ describe("MediaAssetContextPanel", () => {
 		expect(within(mediaAssetContext).getByText("No audio tracks")).toBeTruthy();
 		expect(within(mediaAssetContext).queryByText("none")).toBeNull();
 	});
+
+	it("falls back to the ordinary source-file extension when MIME type is unavailable", () => {
+		render(
+			<MediaAssetContextPanel
+				asset={{
+					...readyAsset,
+					provenance: {
+						...readyAsset.provenance,
+						fileName: "recording.mp4",
+						mimeType: undefined,
+					},
+				}}
+				closeFileDisabled={false}
+				onCloseFileRequested={() => undefined}
+				selection={fullSelection}
+			/>,
+		);
+
+		const mediaAnalysis = screen.getByLabelText("Media analysis");
+		expect(within(mediaAnalysis).getByText("MP4")).toBeTruthy();
+	});
+
+	it("renders explicit neutral values for unknown source and track metadata", () => {
+		render(
+			<MediaAssetContextPanel
+				asset={{
+					...readyAsset,
+					provenance: {
+						...readyAsset.provenance,
+						fileName: "recording",
+						mimeType: undefined,
+					},
+					tracks: {
+						audio: [
+							{
+								id: "audio-unknown",
+								kind: "audio",
+							},
+						],
+						video: [
+							{
+								id: "video-unknown",
+								kind: "video",
+							},
+						],
+					},
+				}}
+				closeFileDisabled={false}
+				onCloseFileRequested={() => undefined}
+				selection={fullSelection}
+			/>,
+		);
+
+		const mediaAssetContext = screen.getByLabelText("Media asset context");
+		expect(
+			within(mediaAssetContext).getByText("UNKNOWN / UNKNOWN"),
+		).toBeTruthy();
+
+		const sourceFacts =
+			within(mediaAssetContext).getByLabelText("Source context");
+		const videoFacts = within(mediaAssetContext).getByLabelText("Video facts");
+		const audioFacts = within(mediaAssetContext).getByLabelText("Audio facts");
+		expect(within(sourceFacts).getByText("Unknown")).toBeTruthy();
+		expect(within(videoFacts).getAllByText("Unknown").length).toBeGreaterThan(
+			1,
+		);
+		expect(within(audioFacts).getAllByText("Unknown").length).toBeGreaterThan(
+			1,
+		);
+	});
+
+	it("visibly distinguishes estimated Frame timing in compact and Analysis facts", () => {
+		render(
+			<MediaAssetContextPanel
+				asset={{
+					...readyAsset,
+					frameTiming: {
+						fps: 30,
+						frameDurationUs: 33_333,
+						reason: "Container metadata did not expose frame timing.",
+						source: "estimated",
+					},
+				}}
+				closeFileDisabled={false}
+				onCloseFileRequested={() => undefined}
+				selection={fullSelection}
+			/>,
+		);
+
+		expect(screen.getAllByText("30 fps estimated")).toHaveLength(2);
+	});
 });
 
 const fullSelection = {
