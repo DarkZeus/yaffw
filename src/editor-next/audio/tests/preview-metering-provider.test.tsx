@@ -15,6 +15,7 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
+import { PreviewAudioMonitoringProvider } from "../engine/preview-audio-monitoring-provider";
 import {
 	PreviewMeteringProvider,
 	type PreviewMeteringSource,
@@ -38,15 +39,16 @@ describe("Preview metering ownership", () => {
 		};
 
 		render(
-			<PreviewMeteringProvider
-				asset={readyAsset}
-				audioMix={createDefaultAudioMix(readyAsset)}
-				soloedAudioTrackId={null}
-			>
-				<PreviewMeteringSourceProbe source={source} />
-				<AudioPanel asset={readyAsset} />
-				<PreviewMeteringRetryProbe trackId="audio-voice" />
-			</PreviewMeteringProvider>,
+			<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+				<PreviewMeteringProvider
+					asset={readyAsset}
+					audioMix={createDefaultAudioMix(readyAsset)}
+				>
+					<PreviewMeteringSourceProbe source={source} />
+					<AudioPanel asset={readyAsset} />
+					<PreviewMeteringRetryProbe trackId="audio-voice" />
+				</PreviewMeteringProvider>
+			</PreviewAudioMonitoringProvider>,
 		);
 
 		const voiceMeter = screen.getByLabelText("Voice preview meter");

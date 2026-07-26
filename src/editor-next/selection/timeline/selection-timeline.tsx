@@ -86,13 +86,11 @@ export type SelectionTimelineProps = {
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;
 	onSelectionStartCommitRequested: (playheadUs: MediaTimeUs) => void;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
 	playheadUs: MediaTimeUs;
 	playheadUpdatesAreLive?: boolean;
 	readLivePlayheadUs?: () => MediaTimeUs;
 	selection: Selection;
 	selectionEditingDisabled?: boolean;
-	soloedAudioTrackId?: string | null;
 	source: Blob;
 	videoStripThumbnailLoader?: VideoStripThumbnailLoader;
 	waveformLaneLoader?: WaveformLaneLoader;
@@ -126,13 +124,11 @@ export function SelectionTimeline({
 	onSelectionRangeMoveRequested,
 	onSelectionResetRequested,
 	onSelectionStartCommitRequested,
-	onSoloedAudioTrackChange,
 	playheadUs,
 	playheadUpdatesAreLive = false,
 	readLivePlayheadUs,
 	selection,
 	selectionEditingDisabled = false,
-	soloedAudioTrackId = null,
 	source,
 	videoStripThumbnailLoader = loadBrowserVideoStripThumbnails,
 	waveformLaneLoader = loadBrowserWaveformLane,
@@ -803,11 +799,9 @@ export function SelectionTimeline({
 											onPointerDown={seekFromLanePointer}
 											onSelectionCommitRequested={commitRegionSelectionChange}
 											onSelectionPreviewRequested={previewRegionSelectionChange}
-											onSoloedAudioTrackChange={onSoloedAudioTrackChange}
 											selection={visibleSelection}
 											selectionEditingDisabled={selectionEditingDisabled}
 											selectionEditInProgress={selectionEditInProgress}
-											soloedAudioTrackId={soloedAudioTrackId}
 											trackIndex={trackIndex}
 										/>
 									))

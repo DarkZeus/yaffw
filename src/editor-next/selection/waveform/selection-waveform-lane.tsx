@@ -17,6 +17,7 @@ import type {
 	MediaTimeUs,
 	Selection,
 } from "@/editor-core/model";
+import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
 import type { WaveformLaneState } from "../types/selection-waveform-lanes.types";
 import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
 import {
@@ -44,8 +45,6 @@ export type WaveformLaneProps = {
 	selection: Selection;
 	selectionEditingDisabled: boolean;
 	selectionEditInProgress: boolean;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
-	soloedAudioTrackId?: string | null;
 	trackIndex: number;
 };
 
@@ -61,13 +60,13 @@ export const WaveformLane = memo(function WaveformLane({
 	onPointerDown,
 	onSelectionCommitRequested,
 	onSelectionPreviewRequested,
-	onSoloedAudioTrackChange,
 	selection,
 	selectionEditingDisabled,
 	selectionEditInProgress,
-	soloedAudioTrackId = null,
 	trackIndex,
 }: WaveformLaneProps) {
+	const { soloedAudioTrackId, toggleSoloedAudioTrack } =
+		usePreviewAudioMonitoring();
 	const identity = createWaveformLaneIdentityViewModel({
 		status: lane.status,
 		track: lane.track,
@@ -141,10 +140,9 @@ export const WaveformLane = memo(function WaveformLane({
 									? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
 									: "text-muted-foreground"
 							}`}
-							disabled={!onSoloedAudioTrackChange}
 							onClick={(event) => {
 								event.stopPropagation();
-								onSoloedAudioTrackChange?.(soloActive ? null : lane.track.id);
+								toggleSoloedAudioTrack(lane.track.id);
 							}}
 							onPointerDown={(event) => event.stopPropagation()}
 							size="icon"

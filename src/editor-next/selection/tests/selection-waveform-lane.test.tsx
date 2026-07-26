@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { WaveformLane } from "../waveform/selection-waveform-lane";
 import { createWaveformLaneIdentityViewModel } from "../waveform/selection-waveform-lane.identity";
 
@@ -78,44 +79,44 @@ describe("createWaveformLaneIdentityViewModel", () => {
 
 	it("keeps only quick output and preview-solo controls in the lane header", () => {
 		const onAudioTrackIncludedChange = vi.fn();
-		const onSoloedAudioTrackChange = vi.fn();
 
 		render(
-			<WaveformLane
-				audioDecision={{
-					channelMode: "preserve",
-					include: true,
-					trackId: "audio-voice",
-					volumePercent: 64,
-				}}
-				audioPreviewPreparing={true}
-				durationUs={12_000_000}
-				lane={{
-					status: "loading",
-					track: {
-						channels: 2,
-						codec: "aac",
-						id: "audio-voice",
-						kind: "audio",
-						label: "Voice",
-					},
-				}}
-				laneHeaderWidthPx={168}
-				minimumSelectionDurationUs={33_333}
-				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onPlayheadSeekRequested={() => {}}
-				onPointerDown={() => {}}
-				onSelectionCommitRequested={() => {}}
-				onSelectionPreviewRequested={() => {}}
-				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
-				selection={{
-					endUs: 12_000_000,
-					startUs: 0,
-				}}
-				selectionEditingDisabled={false}
-				selectionEditInProgress={false}
-				trackIndex={0}
-			/>,
+			<PreviewAudioMonitoringProvider assetId="asset-with-voice">
+				<WaveformLane
+					audioDecision={{
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-voice",
+						volumePercent: 64,
+					}}
+					audioPreviewPreparing={true}
+					durationUs={12_000_000}
+					lane={{
+						status: "loading",
+						track: {
+							channels: 2,
+							codec: "aac",
+							id: "audio-voice",
+							kind: "audio",
+							label: "Voice",
+						},
+					}}
+					laneHeaderWidthPx={168}
+					minimumSelectionDurationUs={33_333}
+					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+					onPlayheadSeekRequested={() => {}}
+					onPointerDown={() => {}}
+					onSelectionCommitRequested={() => {}}
+					onSelectionPreviewRequested={() => {}}
+					selection={{
+						endUs: 12_000_000,
+						startUs: 0,
+					}}
+					selectionEditingDisabled={false}
+					selectionEditInProgress={false}
+					trackIndex={0}
+				/>
+			</PreviewAudioMonitoringProvider>,
 		);
 
 		const laneHeader = screen.getByTestId("waveform-lane-header-audio-voice");
@@ -143,6 +144,8 @@ describe("createWaveformLaneIdentityViewModel", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Solo Voice for preview" }),
 		);
-		expect(onSoloedAudioTrackChange).toHaveBeenCalledWith("audio-voice");
+		expect(
+			screen.getByRole("button", { name: "Clear Voice preview solo" }),
+		).toBeTruthy();
 	});
 });

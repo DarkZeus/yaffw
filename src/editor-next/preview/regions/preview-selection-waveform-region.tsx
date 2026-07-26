@@ -16,13 +16,11 @@ export type PreviewSelectionWaveformRegionProps = {
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
 	onSelectionResetRequested: () => void;
 	onSelectionStartCommitRequested: (playheadUs: MediaTimeUs) => void;
-	onSoloedAudioTrackChange: (trackId: string | null) => void;
 	playheadUs: MediaTimeUs;
 	playheadUpdatesAreLive: boolean;
 	readLivePlayheadUs: () => MediaTimeUs;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
-	soloedAudioTrackId: string | null;
 	source: Blob;
 };
 
@@ -36,13 +34,11 @@ export function PreviewSelectionWaveformRegion({
 	onSelectionRangeMoveRequested,
 	onSelectionResetRequested,
 	onSelectionStartCommitRequested,
-	onSoloedAudioTrackChange,
 	playheadUs,
 	playheadUpdatesAreLive,
 	readLivePlayheadUs,
 	selection,
 	selectionEditingDisabled,
-	soloedAudioTrackId,
 	source,
 }: PreviewSelectionWaveformRegionProps) {
 	return (
@@ -56,7 +52,6 @@ export function PreviewSelectionWaveformRegion({
 				asset={asset}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
 				onPlayheadSeekRequested={onPlayheadSeekRequested}
-				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
 				onSelectionEndCommitRequested={onSelectionEndCommitRequested}
 				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 				onSelectionResetRequested={onSelectionResetRequested}
@@ -66,7 +61,6 @@ export function PreviewSelectionWaveformRegion({
 				readLivePlayheadUs={readLivePlayheadUs}
 				selection={selection}
 				selectionEditingDisabled={selectionEditingDisabled}
-				soloedAudioTrackId={soloedAudioTrackId}
 				source={source}
 			/>
 		</section>

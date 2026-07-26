@@ -20,6 +20,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/engine/preview-audio-engine";
+import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
 
@@ -684,6 +685,18 @@ describe("NativePreviewPlayer", () => {
 			);
 		});
 		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Clear Voice preview solo" }),
+		);
+
+		await waitFor(() => {
+			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
+			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
+		});
+		expect(readAudioMixSnapshot()).toBe(
+			"audio-1:false:use-left-as-mono:50|audio-2:true:preserve:100",
+		);
 	});
 
 	it("publishes a retry handler that re-prepares only a failed audio track", async () => {
@@ -1191,17 +1204,25 @@ function renderPlayer(
 function createPlayerElement(
 	props: Partial<React.ComponentProps<typeof NativePreviewPlayer>> = {},
 ) {
+	const asset = props.asset ?? readyAsset;
+	const audioMix = props.audioMix ?? createDefaultAudioMix(asset);
+
 	return (
-		<NativePreviewPlayer
-			asset={readyAsset}
-			onSelectionEndRequested={() => {}}
-			onSelectionRangeMoveRequested={() => {}}
-			onSelectionResetRequested={() => {}}
-			onSelectionStartRequested={() => {}}
-			selection={selection}
-			source={previewSource}
-			{...props}
-		/>
+		<PreviewAudioMonitoringProvider assetId={asset.id}>
+			<PreviewMeteringProvider asset={asset} audioMix={audioMix}>
+				<NativePreviewPlayer
+					asset={asset}
+					audioMix={audioMix}
+					onSelectionEndRequested={() => {}}
+					onSelectionRangeMoveRequested={() => {}}
+					onSelectionResetRequested={() => {}}
+					onSelectionStartRequested={() => {}}
+					selection={selection}
+					source={previewSource}
+					{...props}
+				/>
+			</PreviewMeteringProvider>
+		</PreviewAudioMonitoringProvider>
 	);
 }
 
@@ -1221,56 +1242,56 @@ function AudioMasterPlayerProbe({
 	const [audioMix, setAudioMix] = useState(() => createDefaultAudioMix(asset));
 
 	return (
-		<PreviewMeteringProvider
-			asset={asset}
-			audioMix={audioMix}
-			soloedAudioTrackId={null}
-		>
-			<NativePreviewPlayer
-				asset={asset}
-				audioMix={audioMix}
-				onAudioTrackIncludedChange={(trackId, include) => {
-					setAudioMix((currentAudioMix) =>
-						updateAudioMixTrack(currentAudioMix, trackId, { include }),
-					);
-				}}
-				onPreviewPlayheadChange={onPreviewPlayheadChange}
-				onSelectionEndRequested={() => {}}
-				onSelectionRangeMoveRequested={() => {}}
-				onSelectionResetRequested={() => {}}
-				onSelectionStartRequested={() => {}}
-				selection={playerSelection}
-				source={source}
-			/>
-			<button
-				onClick={() => {
-					setAudioMix((currentAudioMix) =>
-						updateAudioMixTrack(currentAudioMix, "audio-1", {
-							volumePercent: 50,
-						}),
-					);
-				}}
-				type="button"
-			>
-				Set Voice track volume to 50%
-			</button>
-			<button
-				onClick={() => {
-					setAudioMix((currentAudioMix) =>
-						updateAudioMixTrack(currentAudioMix, "audio-1", {
-							channelMode: "use-left-as-mono",
-						}),
-					);
-				}}
-				type="button"
-			>
-				Set Voice channel handling to left mono
-			</button>
-			<output aria-label="audio mix snapshot">
-				{formatAudioMixSnapshot(audioMix)}
-			</output>
-			{showAudioPanel ? <AudioPanel asset={asset} audioMix={audioMix} /> : null}
-		</PreviewMeteringProvider>
+		<PreviewAudioMonitoringProvider assetId={asset.id}>
+			<PreviewMeteringProvider asset={asset} audioMix={audioMix}>
+				<NativePreviewPlayer
+					asset={asset}
+					audioMix={audioMix}
+					onAudioTrackIncludedChange={(trackId, include) => {
+						setAudioMix((currentAudioMix) =>
+							updateAudioMixTrack(currentAudioMix, trackId, { include }),
+						);
+					}}
+					onPreviewPlayheadChange={onPreviewPlayheadChange}
+					onSelectionEndRequested={() => {}}
+					onSelectionRangeMoveRequested={() => {}}
+					onSelectionResetRequested={() => {}}
+					onSelectionStartRequested={() => {}}
+					selection={playerSelection}
+					source={source}
+				/>
+				<button
+					onClick={() => {
+						setAudioMix((currentAudioMix) =>
+							updateAudioMixTrack(currentAudioMix, "audio-1", {
+								volumePercent: 50,
+							}),
+						);
+					}}
+					type="button"
+				>
+					Set Voice track volume to 50%
+				</button>
+				<button
+					onClick={() => {
+						setAudioMix((currentAudioMix) =>
+							updateAudioMixTrack(currentAudioMix, "audio-1", {
+								channelMode: "use-left-as-mono",
+							}),
+						);
+					}}
+					type="button"
+				>
+					Set Voice channel handling to left mono
+				</button>
+				<output aria-label="audio mix snapshot">
+					{formatAudioMixSnapshot(audioMix)}
+				</output>
+				{showAudioPanel ? (
+					<AudioPanel asset={asset} audioMix={audioMix} />
+				) : null}
+			</PreviewMeteringProvider>
+		</PreviewAudioMonitoringProvider>
 	);
 }
 

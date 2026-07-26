@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
+import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { SelectionTimeline } from "../timeline/selection-timeline";
 
 const buttonRenderStats = vi.hoisted(() => ({
@@ -181,28 +182,30 @@ function createTimelineElement({
 	readLivePlayheadUs?: () => number;
 }) {
 	return (
-		<SelectionTimeline
-			asset={readyAsset}
-			audioMix={audioMix}
-			onPlayheadSeekRequested={timelineCallbacks.onPlayheadSeekRequested}
-			onSelectionEndCommitRequested={
-				timelineCallbacks.onSelectionEndCommitRequested
-			}
-			onSelectionRangeMoveRequested={
-				timelineCallbacks.onSelectionRangeMoveRequested
-			}
-			onSelectionResetRequested={timelineCallbacks.onSelectionResetRequested}
-			onSelectionStartCommitRequested={
-				timelineCallbacks.onSelectionStartCommitRequested
-			}
-			playheadUpdatesAreLive
-			playheadUs={playheadUs}
-			readLivePlayheadUs={readLivePlayheadUs}
-			selection={selection}
-			source={source}
-			videoStripThumbnailLoader={videoStripThumbnailLoader}
-			waveformLaneLoader={waveformLaneLoader}
-		/>
+		<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+			<SelectionTimeline
+				asset={readyAsset}
+				audioMix={audioMix}
+				onPlayheadSeekRequested={timelineCallbacks.onPlayheadSeekRequested}
+				onSelectionEndCommitRequested={
+					timelineCallbacks.onSelectionEndCommitRequested
+				}
+				onSelectionRangeMoveRequested={
+					timelineCallbacks.onSelectionRangeMoveRequested
+				}
+				onSelectionResetRequested={timelineCallbacks.onSelectionResetRequested}
+				onSelectionStartCommitRequested={
+					timelineCallbacks.onSelectionStartCommitRequested
+				}
+				playheadUpdatesAreLive
+				playheadUs={playheadUs}
+				readLivePlayheadUs={readLivePlayheadUs}
+				selection={selection}
+				source={source}
+				videoStripThumbnailLoader={videoStripThumbnailLoader}
+				waveformLaneLoader={waveformLaneLoader}
+			/>
+		</PreviewAudioMonitoringProvider>
 	);
 }
 

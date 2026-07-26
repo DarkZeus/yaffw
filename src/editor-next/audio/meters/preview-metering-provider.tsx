@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
+import { usePreviewAudioMonitoring } from "../engine/preview-audio-monitoring-provider";
 import type {
 	LivePreviewMeteringClock,
 	LivePreviewMeteringState,
@@ -38,13 +39,12 @@ export function PreviewMeteringProvider({
 	asset,
 	audioMix,
 	children,
-	soloedAudioTrackId,
 }: {
 	asset: ReadyMediaAsset;
 	audioMix: AudioMix;
 	children: ReactNode;
-	soloedAudioTrackId: string | null;
 }) {
+	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const [source, setSource] = useState<PreviewMeteringSource | null>(null);
 	const knownTrackIds = useMemo(
 		() => asset.tracks.audio.map((track) => track.id),

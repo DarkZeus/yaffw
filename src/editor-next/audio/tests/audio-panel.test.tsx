@@ -16,6 +16,7 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
+import { PreviewAudioMonitoringProvider } from "../engine/preview-audio-monitoring-provider";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
 import {
 	PreviewMeteringProvider,
@@ -30,7 +31,7 @@ afterEach(() => {
 
 describe("AudioPanel", () => {
 	it("remains available with a clear empty state for video-only media assets", () => {
-		render(<AudioPanel asset={videoOnlyAsset} />);
+		renderAudioPanel({ asset: videoOnlyAsset });
 
 		const audioPanel = screen.getByLabelText("Audio panel");
 		expect(audioPanel.className).toContain("bg-workbench-inspector");
@@ -46,7 +47,7 @@ describe("AudioPanel", () => {
 	});
 
 	it("renders one per-track strip and one combined preview strip without mixer controls", () => {
-		render(<AudioPanel asset={readyAsset} />);
+		renderAudioPanel({ asset: readyAsset });
 
 		const audioPanel = screen.getByLabelText("Audio panel");
 		const voiceStrip = within(audioPanel).getByLabelText(
@@ -123,19 +124,14 @@ describe("AudioPanel", () => {
 		const onAudioTrackChannelModeChange = vi.fn();
 		const onAudioTrackIncludedChange = vi.fn();
 		const onAudioTrackVolumePercentChange = vi.fn();
-		const onSoloedAudioTrackChange = vi.fn();
 
-		render(
-			<AudioPanel
-				asset={readyAsset}
-				audioMix={audioMix}
-				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
-				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onAudioTrackVolumePercentChange={onAudioTrackVolumePercentChange}
-				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
-				soloedAudioTrackId="audio-desktop"
-			/>,
-		);
+		renderAudioPanel({
+			asset: readyAsset,
+			audioMix,
+			onAudioTrackChannelModeChange,
+			onAudioTrackIncludedChange,
+			onAudioTrackVolumePercentChange,
+		});
 
 		const voiceStrip = screen.getByLabelText("Audio track strip Voice");
 		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
@@ -185,18 +181,42 @@ describe("AudioPanel", () => {
 		);
 
 		fireEvent.click(
+			within(desktopStrip).getByRole("button", {
+				name: "Solo Desktop for preview",
+			}),
+		);
+		expect(
+			within(desktopStrip).getByRole("button", {
+				name: "Clear Desktop preview solo",
+			}),
+		).toBeTruthy();
+
+		fireEvent.click(
 			within(voiceStrip).getByRole("button", {
 				name: "Solo Voice for preview",
 			}),
 		);
-		expect(onSoloedAudioTrackChange).toHaveBeenCalledWith("audio-voice");
+		expect(
+			within(voiceStrip).getByRole("button", {
+				name: "Clear Voice preview solo",
+			}),
+		).toBeTruthy();
+		expect(
+			within(desktopStrip).getByRole("button", {
+				name: "Solo Desktop for preview",
+			}),
+		).toBeTruthy();
 
 		fireEvent.click(
-			within(desktopStrip).getByRole("button", {
-				name: "Clear Desktop preview solo",
+			within(voiceStrip).getByRole("button", {
+				name: "Clear Voice preview solo",
 			}),
 		);
-		expect(onSoloedAudioTrackChange).toHaveBeenLastCalledWith(null);
+		expect(
+			within(voiceStrip).getByRole("button", {
+				name: "Solo Voice for preview",
+			}),
+		).toBeTruthy();
 	});
 
 	it("renders controlled preview metering ready and preparing states without live peak values yet", () => {
@@ -568,14 +588,20 @@ function renderMeteredAudioPanel({
 	};
 
 	return render(
-		<PreviewMeteringProvider
-			asset={panelProps.asset}
-			audioMix={audioMix}
-			soloedAudioTrackId={panelProps.soloedAudioTrackId ?? null}
-		>
-			<PreviewMeteringSourceProbe source={source} />
+		<PreviewAudioMonitoringProvider assetId={panelProps.asset.id}>
+			<PreviewMeteringProvider asset={panelProps.asset} audioMix={audioMix}>
+				<PreviewMeteringSourceProbe source={source} />
+				<AudioPanel {...panelProps} />
+			</PreviewMeteringProvider>
+		</PreviewAudioMonitoringProvider>,
+	);
+}
+
+function renderAudioPanel(panelProps: AudioPanelProps) {
+	return render(
+		<PreviewAudioMonitoringProvider assetId={panelProps.asset.id}>
 			<AudioPanel {...panelProps} />
-		</PreviewMeteringProvider>,
+		</PreviewAudioMonitoringProvider>,
 	);
 }
 

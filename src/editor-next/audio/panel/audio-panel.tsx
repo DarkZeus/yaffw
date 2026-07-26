@@ -18,6 +18,7 @@ import type {
 	AudioTrackChannelMode,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
+import { usePreviewAudioMonitoring } from "../engine/preview-audio-monitoring-provider";
 import {
 	PreviewLevelMeter,
 	type PreviewLevelMeterChannel,
@@ -42,8 +43,6 @@ export type AudioPanelProps = {
 		trackId: string,
 		volumePercent: number,
 	) => void;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
-	soloedAudioTrackId?: string | null;
 };
 
 const AUDIO_CHANNEL_MODE_OPTIONS: Array<{
@@ -64,9 +63,9 @@ export const AudioPanel = memo(function AudioPanel({
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
-	onSoloedAudioTrackChange,
-	soloedAudioTrackId = null,
 }: AudioPanelProps) {
+	const { soloedAudioTrackId, toggleSoloedAudioTrack } =
+		usePreviewAudioMonitoring();
 	const defaultAudioMix = useMemo(() => createDefaultAudioMix(asset), [asset]);
 	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
@@ -100,7 +99,7 @@ export const AudioPanel = memo(function AudioPanel({
 									onAudioTrackVolumePercentChange
 								}
 								onPreviewMeteringRetry={livePreviewMetering?.retryTrack}
-								onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+								onPreviewSoloToggle={toggleSoloedAudioTrack}
 								previewMeteringControlled={Boolean(livePreviewMetering)}
 								previewMeteringState={
 									livePreviewMetering?.trackStates[track.id]
@@ -128,7 +127,7 @@ function AudioTrackStrip({
 	onAudioTrackIncludedChange,
 	onAudioTrackVolumePercentChange,
 	onPreviewMeteringRetry,
-	onSoloedAudioTrackChange,
+	onPreviewSoloToggle,
 	previewMeteringControlled,
 	previewMeteringState,
 	soloActive,
@@ -147,7 +146,7 @@ function AudioTrackStrip({
 		volumePercent: number,
 	) => void;
 	onPreviewMeteringRetry?: (trackId: string) => void;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	onPreviewSoloToggle: (trackId: string) => void;
 	previewMeteringControlled: boolean;
 	previewMeteringState?: LivePreviewMeteringTrackState;
 	soloActive: boolean;
@@ -249,7 +248,7 @@ function AudioTrackStrip({
 				label={label}
 				onAudioTrackChannelModeChange={onAudioTrackChannelModeChange}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-				onSoloedAudioTrackChange={onSoloedAudioTrackChange}
+				onPreviewSoloToggle={onPreviewSoloToggle}
 				soloActive={soloActive}
 				trackId={track.id}
 			/>
@@ -264,7 +263,7 @@ const AudioTrackControls = memo(function AudioTrackControls({
 	label,
 	onAudioTrackChannelModeChange,
 	onAudioTrackIncludedChange,
-	onSoloedAudioTrackChange,
+	onPreviewSoloToggle,
 	soloActive,
 	trackId,
 }: {
@@ -277,7 +276,7 @@ const AudioTrackControls = memo(function AudioTrackControls({
 		channelMode: AudioTrackChannelMode,
 	) => void;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	onPreviewSoloToggle: (trackId: string) => void;
 	soloActive: boolean;
 	trackId: string;
 }) {
@@ -350,9 +349,8 @@ const AudioTrackControls = memo(function AudioTrackControls({
 							? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress"
 							: "text-muted-foreground"
 					}`}
-					disabled={!onSoloedAudioTrackChange}
 					onClick={() => {
-						onSoloedAudioTrackChange?.(soloActive ? null : trackId);
+						onPreviewSoloToggle(trackId);
 					}}
 					size="sm"
 					title={soloActive ? "Clear preview solo" : "Preview solo"}

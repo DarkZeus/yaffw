@@ -9,6 +9,7 @@ import {
 	type ReadyMediaAsset,
 } from "@/editor-core/model";
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
+import { PreviewAudioMonitoringProvider } from "../engine/preview-audio-monitoring-provider";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
 import {
 	PreviewMeteringProvider,
@@ -68,22 +69,19 @@ describe("AudioPanel live meter render isolation", () => {
 		);
 
 		render(
-			<PreviewMeteringProvider
-				asset={readyAsset}
-				audioMix={audioMix}
-				soloedAudioTrackId={null}
-			>
-				<PreviewMeteringSourceProbe
-					source={{ ...clock, retryTrack: () => undefined }}
-				/>
-				<AudioPanel
-					asset={readyAsset}
-					audioMix={audioMix}
-					onAudioTrackIncludedChange={() => {}}
-					onAudioTrackVolumePercentChange={() => {}}
-					onSoloedAudioTrackChange={() => {}}
-				/>
-			</PreviewMeteringProvider>,
+			<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+				<PreviewMeteringProvider asset={readyAsset} audioMix={audioMix}>
+					<PreviewMeteringSourceProbe
+						source={{ ...clock, retryTrack: () => undefined }}
+					/>
+					<AudioPanel
+						asset={readyAsset}
+						audioMix={audioMix}
+						onAudioTrackIncludedChange={() => {}}
+						onAudioTrackVolumePercentChange={() => {}}
+					/>
+				</PreviewMeteringProvider>
+			</PreviewAudioMonitoringProvider>,
 		);
 
 		const voiceMeter = screen.getByLabelText("Voice preview meter");

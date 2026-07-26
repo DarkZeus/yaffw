@@ -15,6 +15,7 @@ import {
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
+import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
 import { deliverBrowserGeneratedMedia } from "../../export/generated-media/generated-media-delivery";
@@ -85,25 +86,14 @@ export function EditorNextRoute({
 	const stableCommands = useStableEditorCommands(commands);
 	const activeAssetId = session.status === "ready" ? session.asset.id : null;
 	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
-	const [soloedAudioTrackId, setSoloedAudioTrackId] = useState<string | null>(
-		null,
-	);
 	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
 			currentPlayheadUs === playheadUs ? currentPlayheadUs : playheadUs,
 		);
 	}, []);
-	const handleSoloedAudioTrackChange = useCallback((trackId: string | null) => {
-		setSoloedAudioTrackId((currentTrackId) =>
-			currentTrackId === trackId ? currentTrackId : trackId,
-		);
-	}, []);
 	useEffect(() => {
 		setPreviewPlayheadUs((currentPlayheadUs) =>
 			activeAssetId === null || currentPlayheadUs !== 0 ? 0 : currentPlayheadUs,
-		);
-		setSoloedAudioTrackId((currentTrackId) =>
-			activeAssetId === null || currentTrackId !== null ? null : currentTrackId,
 		);
 	}, [activeAssetId]);
 
@@ -152,8 +142,6 @@ export function EditorNextRoute({
 				onAudioTrackVolumePercentChange={
 					stableCommands.setAudioTrackVolumePercent
 				}
-				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
-				soloedAudioTrackId={soloedAudioTrackId}
 			/>
 		) : null;
 	const readyPreviewPlayer =
@@ -163,7 +151,6 @@ export function EditorNextRoute({
 				asset={session.asset}
 				audioMix={session.audioMix}
 				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
-				onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 				onSelectionEndRequested={stableCommands.setSelectionEndFromPlayhead}
 				onSelectionRangeMoveRequested={stableCommands.moveSelectionRange}
 				onSelectionReplaceRequested={stableCommands.setSelectionRange}
@@ -173,7 +160,6 @@ export function EditorNextRoute({
 				selection={session.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				shortcutsDisabled={selectionEditingDisabled}
-				soloedAudioTrackId={soloedAudioTrackId}
 				source={previewSource}
 			/>
 		) : null;
@@ -228,13 +214,14 @@ export function EditorNextRoute({
 	);
 
 	return session.status === "ready" ? (
-		<PreviewMeteringProvider
-			asset={session.asset}
-			audioMix={session.audioMix}
-			soloedAudioTrackId={soloedAudioTrackId}
-		>
-			{editorWorkbench}
-		</PreviewMeteringProvider>
+		<PreviewAudioMonitoringProvider assetId={session.asset.id}>
+			<PreviewMeteringProvider
+				asset={session.asset}
+				audioMix={session.audioMix}
+			>
+				{editorWorkbench}
+			</PreviewMeteringProvider>
+		</PreviewAudioMonitoringProvider>
 	) : (
 		editorWorkbench
 	);

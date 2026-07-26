@@ -17,6 +17,7 @@ import {
 	type PreviewAudioEngine,
 	canUsePreviewAudioEngine,
 } from "../../audio/engine/preview-audio-engine";
+import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
 import {
 	type PreviewAudioMonitoringStatus,
 	usePreviewAudioMonitoringLifecycle,
@@ -48,8 +49,6 @@ export type NativePreviewPlayerProps = {
 	selection: Selection;
 	selectionEditingDisabled?: boolean;
 	shortcutsDisabled?: boolean;
-	onSoloedAudioTrackChange?: (trackId: string | null) => void;
-	soloedAudioTrackId?: string | null;
 	source: Blob;
 };
 
@@ -67,10 +66,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	selection,
 	selectionEditingDisabled = false,
 	shortcutsDisabled = false,
-	onSoloedAudioTrackChange,
-	soloedAudioTrackId: controlledSoloedAudioTrackId,
 	source,
 }: NativePreviewPlayerProps) {
+	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const videoRef = useRef<MediaPlayerInstance | null>(null);
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const audioMixRef = useRef(audioMix);
@@ -94,26 +92,10 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
 	const [previewUrl, setPreviewUrl] = useState("");
-	const [localSoloedAudioTrackId, setLocalSoloedAudioTrackId] = useState<
-		string | null
-	>(null);
 	const { previewApertureStyle, previewSurfaceRef } =
 		usePreviewApertureLayout(asset);
-	const soloedAudioTrackId =
-		controlledSoloedAudioTrackId === undefined
-			? localSoloedAudioTrackId
-			: controlledSoloedAudioTrackId;
 	audioMixRef.current = audioMix;
 	audioMonitoringStatusRef.current = audioMonitoringStatus;
-	const handleSoloedAudioTrackChange = useCallback(
-		(trackId: string | null) => {
-			setLocalSoloedAudioTrackId((currentTrackId) =>
-				currentTrackId === trackId ? currentTrackId : trackId,
-			);
-			onSoloedAudioTrackChange?.(trackId);
-		},
-		[onSoloedAudioTrackChange],
-	);
 
 	useEffect(() => {
 		const objectUrl = URL.createObjectURL(source);
@@ -123,8 +105,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			},
 		);
 		setPreviewUrl(objectUrl);
-		setLocalSoloedAudioTrackId(null);
-		onSoloedAudioTrackChange?.(null);
 
 		return () => {
 			if (cleanupRegistration) {
@@ -134,7 +114,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 
 			URL.revokeObjectURL(objectUrl);
 		};
-	}, [activeMediaAssetCleanupScope, onSoloedAudioTrackChange, source]);
+	}, [activeMediaAssetCleanupScope, source]);
 
 	const audioPreviewTransportSupported = canUsePreviewAudioEngine(asset);
 	const previewAudioResources = usePreviewAudioResources({
@@ -353,7 +333,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					asset={asset}
 					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
 					onPlayheadSeekRequested={seekToUs}
-					onSoloedAudioTrackChange={handleSoloedAudioTrackChange}
 					onSelectionEndCommitRequested={onSelectionEndRequested}
 					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 					onSelectionResetRequested={onSelectionResetRequested}
@@ -363,7 +342,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					readLivePlayheadUs={getPlayheadUs}
 					selection={selection}
 					selectionEditingDisabled={selectionEditingDisabled}
-					soloedAudioTrackId={soloedAudioTrackId}
 					source={source}
 				/>
 			</ResizablePanel>

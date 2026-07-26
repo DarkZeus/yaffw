@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
+import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 
 import { SelectionTimeline } from "../timeline/selection-timeline";
 import type { VideoStripThumbnailRequest } from "../types/selection-video-strip.types";
@@ -225,32 +226,34 @@ describe("SelectionTimeline", () => {
 		});
 
 		view.rerender(
-			<SelectionTimeline
-				asset={readyAsset}
-				audioMix={{
-					...initialAudioMix,
-					tracks: {
-						...initialAudioMix.tracks,
-						"audio-1": {
-							...initialAudioMix.tracks["audio-1"],
-							channelMode: "use-left-as-mono",
+			<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+				<SelectionTimeline
+					asset={readyAsset}
+					audioMix={{
+						...initialAudioMix,
+						tracks: {
+							...initialAudioMix.tracks,
+							"audio-1": {
+								...initialAudioMix.tracks["audio-1"],
+								channelMode: "use-left-as-mono",
+							},
 						},
-					},
-				}}
-				onPlayheadSeekRequested={() => {}}
-				onSelectionEndCommitRequested={() => {}}
-				onSelectionRangeMoveRequested={() => {}}
-				onSelectionResetRequested={() => {}}
-				onSelectionStartCommitRequested={() => {}}
-				playheadUs={0}
-				selection={selection}
-				source={source}
-				videoStripThumbnailLoader={videoStripThumbnailLoader}
-				waveformLaneLoader={async () => ({
-					samples: [0.4, 0.7, 0.2],
-					status: "ready",
-				})}
-			/>,
+					}}
+					onPlayheadSeekRequested={() => {}}
+					onSelectionEndCommitRequested={() => {}}
+					onSelectionRangeMoveRequested={() => {}}
+					onSelectionResetRequested={() => {}}
+					onSelectionStartCommitRequested={() => {}}
+					playheadUs={0}
+					selection={selection}
+					source={source}
+					videoStripThumbnailLoader={videoStripThumbnailLoader}
+					waveformLaneLoader={async () => ({
+						samples: [0.4, 0.7, 0.2],
+						status: "ready",
+					})}
+				/>
+			</PreviewAudioMonitoringProvider>,
 		);
 
 		await new Promise((resolve) => setTimeout(resolve, 30));
@@ -358,32 +361,36 @@ function renderTimeline(
 	props: Partial<React.ComponentProps<typeof SelectionTimeline>> = {},
 ) {
 	return render(
-		<SelectionTimeline
-			asset={readyAsset}
-			onPlayheadSeekRequested={() => {}}
-			onSelectionEndCommitRequested={() => {}}
-			onSelectionRangeMoveRequested={() => {}}
-			onSelectionResetRequested={() => {}}
-			onSelectionStartCommitRequested={() => {}}
-			playheadUs={0}
-			selection={selection}
-			source={source}
-			videoStripThumbnailLoader={async ({ timestampsUs }) => ({
-				frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
-					imageBlob: new Blob([`thumbnail-${index}`], { type: "image/jpeg" }),
-					index,
-					timestampUs,
-				})),
-				status: "ready",
-				thumbnailHeightPx: 54,
-				thumbnailWidthPx: 96,
-			})}
-			waveformLaneLoader={async () => ({
-				samples: [0.4, 0.7, 0.2],
-				status: "ready",
-			})}
-			{...props}
-		/>,
+		<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+			<SelectionTimeline
+				asset={readyAsset}
+				onPlayheadSeekRequested={() => {}}
+				onSelectionEndCommitRequested={() => {}}
+				onSelectionRangeMoveRequested={() => {}}
+				onSelectionResetRequested={() => {}}
+				onSelectionStartCommitRequested={() => {}}
+				playheadUs={0}
+				selection={selection}
+				source={source}
+				videoStripThumbnailLoader={async ({ timestampsUs }) => ({
+					frames: timestampsUs.slice(0, 3).map((timestampUs, index) => ({
+						imageBlob: new Blob([`thumbnail-${index}`], {
+							type: "image/jpeg",
+						}),
+						index,
+						timestampUs,
+					})),
+					status: "ready",
+					thumbnailHeightPx: 54,
+					thumbnailWidthPx: 96,
+				})}
+				waveformLaneLoader={async () => ({
+					samples: [0.4, 0.7, 0.2],
+					status: "ready",
+				})}
+				{...props}
+			/>
+		</PreviewAudioMonitoringProvider>,
 	);
 }
 
