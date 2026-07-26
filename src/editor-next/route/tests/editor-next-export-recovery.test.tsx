@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
-import { EditorNextRoute } from "../entry/EditorNextRoute";
+import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -43,7 +43,7 @@ describe("editor-next export recovery", () => {
 		);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-export-failure"}
 				createDraftId={() => "draft-export-failure"}
 				createExportJobId={() => "export-failure"}
@@ -119,7 +119,7 @@ describe("editor-next export recovery", () => {
 		);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-export-cancelled"}
 				createDraftId={() => "draft-export-cancelled"}
 				createExportJobId={() => "export-cancelled"}

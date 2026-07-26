@@ -14,7 +14,7 @@ import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysi
 import type { ExportProgress } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
-import { EditorNextRoute } from "../entry/EditorNextRoute";
+import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -40,7 +40,7 @@ afterEach(() => {
 describe("editor-next final first-slice smoke coverage", () => {
 	it("blocks unsupported runtimes before exposing local import", () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				initialRuntime={evaluateRuntimeSupport({
 					fileApi: true,
 					mediaSource: true,
@@ -78,7 +78,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		vi.spyOn(window, "confirm").mockReturnValue(true);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-final-smoke"}
 				createDraftId={() => "draft-final-smoke"}
 				createExportJobId={() => "export-final-smoke"}
@@ -202,7 +202,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 
 	it("smokes drag-and-drop video-only readiness and on-demand unsupported-media details", async () => {
 		const { unmount } = render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-video-only"}
 				createDraftId={() => "draft-video-only"}
 				initialRuntime={supportedRuntime}
@@ -231,7 +231,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		unmount();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-audio-only"}
 				createDraftId={() => "draft-audio-only"}
 				initialRuntime={supportedRuntime}

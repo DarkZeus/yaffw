@@ -141,6 +141,45 @@ describe("useSingleAssetEditingSession", () => {
 		});
 	});
 
+	it("closes the active Media asset only after confirmation and resets session resources", async () => {
+		const confirmCloseFile = vi.fn(() => true);
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+
+		render(
+			<SingleAssetEditingSessionProbe
+				confirmCloseFile={confirmCloseFile}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		await act(async () => {
+			await sessionRef.current?.commands.importLocalFile(
+				new File(["video"], "close-me.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(sessionRef.current?.session.status).toBe("ready");
+			expect(sessionRef.current?.previewSource).toBeInstanceOf(Blob);
+			expect(sessionRef.current?.activeMediaAssetCleanupScope).not.toBeNull();
+		});
+
+		act(() => {
+			sessionRef.current?.commands.requestCloseFile();
+		});
+
+		expect(confirmCloseFile).toHaveBeenCalledWith(
+			expect.stringContaining("Close this media asset?"),
+		);
+		await waitFor(() => {
+			expect(sessionRef.current?.session.status).toBe("empty");
+			expect(sessionRef.current?.previewSource).toBeNull();
+			expect(sessionRef.current?.activeMediaAssetCleanupScope).toBeNull();
+			expect(sessionRef.current?.localFileInputKey).toBe(1);
+		});
+	});
+
 	it("invalidates retained Generated media blobs when editing decisions reset the export result", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
 		const deliverGeneratedMedia = vi.fn();
@@ -270,6 +309,7 @@ describe("useSingleAssetEditingSession", () => {
 });
 
 function SingleAssetEditingSessionProbe({
+	confirmCloseFile = () => true,
 	createAssetId = () => "asset-1",
 	createDraftId = () => "draft-1",
 	defaultExportRunner,
@@ -278,6 +318,7 @@ function SingleAssetEditingSessionProbe({
 	inspectLocalAsset = async () => supportedInspection,
 	sessionRef,
 }: {
+	confirmCloseFile?: SingleAssetEditingSessionOptions["confirmCloseFile"];
 	createAssetId?: SingleAssetEditingSessionOptions["createAssetId"];
 	createDraftId?: SingleAssetEditingSessionOptions["createDraftId"];
 	defaultExportRunner?: SingleAssetEditingSessionOptions["defaultExportRunner"];
@@ -287,7 +328,7 @@ function SingleAssetEditingSessionProbe({
 	sessionRef: { current: SingleAssetEditingSession | null };
 }) {
 	sessionRef.current = useSingleAssetEditingSession({
-		confirmCloseFile: () => true,
+		confirmCloseFile,
 		createAssetId,
 		createDraftId,
 		createExportJobId: () => "export-1",

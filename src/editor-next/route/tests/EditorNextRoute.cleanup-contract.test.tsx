@@ -20,7 +20,7 @@ import {
 } from "../../audio/engine/preview-audio-resources";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { loadBrowserWaveformLane } from "../../selection/waveform/selection-waveform-lanes";
-import { EditorNextRoute } from "../entry/EditorNextRoute";
+import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const adapterMockState = vi.hoisted(() => ({
 	previewAudioEngineCreate: vi.fn(),
@@ -194,7 +194,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		vi.spyOn(window, "confirm").mockReturnValue(true);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-close-contract"}
 				createDraftId={() => "draft-close-contract"}
 				createExportJobId={() => "export-close-contract"}
@@ -317,7 +317,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		const view = render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => assetIds[nextAssetId++] ?? "asset-replace-extra"}
 				createDraftId={() => draftIds[nextDraftId++] ?? "draft-replace-extra"}
 				initialRuntime={supportedRuntime}
@@ -435,7 +435,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		const deliverGeneratedMedia = vi.fn();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-generated-invalidation"}
 				createDraftId={() => "draft-generated-invalidation"}
 				createExportJobId={() => "export-generated-invalidation"}

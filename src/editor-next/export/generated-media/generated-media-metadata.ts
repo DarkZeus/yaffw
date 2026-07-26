@@ -10,8 +10,8 @@ export function createGeneratedMediaMetadata({
 	asset,
 	blob,
 	fileName,
-	generatedMediaId,
-	now,
+	generatedMediaId = createGeneratedMediaId(),
+	now = Date.now,
 	outputSettings,
 	resolvedOutput,
 	selection,
@@ -19,8 +19,8 @@ export function createGeneratedMediaMetadata({
 	asset: ReadyMediaAsset;
 	blob: Blob;
 	fileName?: string;
-	generatedMediaId: string;
-	now: () => number;
+	generatedMediaId?: string;
+	now?: () => number;
 	outputSettings: OutputSettings;
 	resolvedOutput: ResolvedOutputPlan;
 	selection: Selection;
@@ -43,6 +43,23 @@ export function createGeneratedMediaMetadata({
 		selection: { ...selection },
 		sizeBytes: blob.size,
 	};
+}
+
+function createGeneratedMediaId(): string {
+	return createOwnedId("generated");
+}
+
+function createOwnedId(prefix: string): string {
+	if (
+		"crypto" in globalThis &&
+		typeof globalThis.crypto.randomUUID === "function"
+	) {
+		return `${prefix}-${globalThis.crypto.randomUUID()}`;
+	}
+
+	return `${prefix}-${Date.now().toString(36)}-${Math.random()
+		.toString(36)
+		.slice(2)}`;
 }
 
 function replaceFileExtension(fileName: string, fileExtension: string): string {

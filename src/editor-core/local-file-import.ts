@@ -6,7 +6,9 @@ type LocalMediaAssetDraftOptions = {
 
 export function createLocalMediaAssetDraft(
 	source: LocalFileSource,
-	options: LocalMediaAssetDraftOptions,
+	options: LocalMediaAssetDraftOptions = {
+		createDraftId: createMediaAssetDraftId,
+	},
 ): MediaAssetDraft {
 	const mimeType = source.type.trim();
 
@@ -22,4 +24,21 @@ export function createLocalMediaAssetDraft(
 		},
 		source,
 	};
+}
+
+function createMediaAssetDraftId(): string {
+	return createOwnedId("draft");
+}
+
+function createOwnedId(prefix: string): string {
+	if (
+		"crypto" in globalThis &&
+		typeof globalThis.crypto.randomUUID === "function"
+	) {
+		return `${prefix}-${globalThis.crypto.randomUUID()}`;
+	}
+
+	return `${prefix}-${Date.now().toString(36)}-${Math.random()
+		.toString(36)
+		.slice(2)}`;
 }

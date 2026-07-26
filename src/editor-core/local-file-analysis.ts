@@ -1,13 +1,13 @@
 import { planDefaultExportCapability } from "./export-capability";
-import {
-	type AudioMediaTrack,
-	type ExportCapability,
-	type FrameTiming,
-	type MediaAssetDraft,
-	type ReadyMediaAsset,
-	type Selection,
-	type UnsupportedMediaFailure,
-	type VideoMediaTrack,
+import type {
+	AudioMediaTrack,
+	ExportCapability,
+	FrameTiming,
+	MediaAssetDraft,
+	ReadyMediaAsset,
+	Selection,
+	UnsupportedMediaFailure,
+	VideoMediaTrack,
 } from "./model";
 import type { RuntimeSupport } from "./runtime-capabilities";
 
@@ -51,7 +51,7 @@ export type LocalMediaAssetInspector = (
 ) => LocalMediaAssetInspection | Promise<LocalMediaAssetInspection>;
 
 type LocalMediaAssetAnalysisOptions = {
-	createAssetId: () => string;
+	createAssetId?: () => string;
 	inspect: LocalMediaAssetInspector;
 	runtime: RuntimeSupport;
 };
@@ -101,7 +101,7 @@ export async function analyzeLocalMediaAssetDraft(
 		durationUs: inspection.durationUs,
 		exportCapability,
 		frameTiming,
-		id: options.createAssetId(),
+		id: (options.createAssetId ?? createMediaAssetId)(),
 		label: draft.label,
 		provenance: draft.provenance,
 		tracks,
@@ -112,6 +112,23 @@ export async function analyzeLocalMediaAssetDraft(
 		selection,
 		status: "ready",
 	};
+}
+
+function createMediaAssetId(): string {
+	return createOwnedId("asset");
+}
+
+function createOwnedId(prefix: string): string {
+	if (
+		"crypto" in globalThis &&
+		typeof globalThis.crypto.randomUUID === "function"
+	) {
+		return `${prefix}-${globalThis.crypto.randomUUID()}`;
+	}
+
+	return `${prefix}-${Date.now().toString(36)}-${Math.random()
+		.toString(36)
+		.slice(2)}`;
 }
 
 function exportCapabilityFromReview(

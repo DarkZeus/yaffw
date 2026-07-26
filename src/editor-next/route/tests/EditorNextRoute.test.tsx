@@ -15,12 +15,16 @@ import type { ExportProgress } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { EditorNextRoute } from "../entry/EditorNextRoute";
+import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 
 beforeEach(() => {
 	window.history.replaceState(null, "", "/");
+	vi.stubGlobal("MediaSource", class MediaSource {});
+	vi.stubGlobal("VideoDecoder", class VideoDecoder {});
+	vi.stubGlobal("VideoEncoder", class VideoEncoder {});
 	Object.defineProperty(URL, "createObjectURL", {
 		configurable: true,
 		value: vi.fn(() => "blob:editor-next-preview"),
@@ -34,23 +38,14 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup();
 	vi.restoreAllMocks();
+	vi.unstubAllGlobals();
 	restoreObjectUrl("createObjectURL", originalCreateObjectURL);
 	restoreObjectUrl("revokeObjectURL", originalRevokeObjectURL);
 });
 
 describe("EditorNextRoute", () => {
 	it("renders the empty local import shell when the runtime is supported", () => {
-		render(
-			<EditorNextRoute
-				initialRuntime={evaluateRuntimeSupport({
-					fileApi: true,
-					mediaSource: true,
-					objectUrl: true,
-					videoDecoder: true,
-					videoEncoder: true,
-				})}
-			/>,
-		);
+		render(<EditorNextRoute />);
 
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
@@ -60,7 +55,7 @@ describe("EditorNextRoute", () => {
 	it("ignores visual fixture query parameters and keeps the empty import state", () => {
 		window.history.replaceState(null, "", "/?mockUploadedMedia=1");
 
-		render(<EditorNextRoute initialRuntime={supportedRuntime} />);
+		render(<EditorNextRoute />);
 
 		expect(screen.getByText("No media asset loaded")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
@@ -71,7 +66,7 @@ describe("EditorNextRoute", () => {
 
 	it("renders the unsupported runtime state before exposing local import", () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				initialRuntime={evaluateRuntimeSupport({
 					fileApi: true,
 					mediaSource: true,
@@ -92,7 +87,7 @@ describe("EditorNextRoute", () => {
 		const inspection = createDeferred<LocalMediaAssetInspection>();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-loading"}
 				createDraftId={() => "draft-loading"}
 				initialRuntime={supportedRuntime}
@@ -124,7 +119,7 @@ describe("EditorNextRoute", () => {
 
 	it("imports a local file from the file picker into the ready editor state", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-picked"}
 				createDraftId={() => "draft-picked"}
 				initialRuntime={supportedRuntime}
@@ -164,7 +159,7 @@ describe("EditorNextRoute", () => {
 
 	it("renders the Audio panel shell for the ready media asset", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-audio-panel"}
 				createDraftId={() => "draft-audio-panel"}
 				initialRuntime={supportedRuntime}
@@ -197,7 +192,7 @@ describe("EditorNextRoute", () => {
 	it("keeps Audio panel controls synced with Waveform lane quick controls", async () => {
 		mockTimelineGeometry();
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-audio-controls"}
 				createDraftId={() => "draft-audio-controls"}
 				initialRuntime={supportedRuntime}
@@ -285,7 +280,7 @@ describe("EditorNextRoute", () => {
 
 	it("places preview, transport, and selection in the resolved ready workbench layout", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-center-preview"}
 				createDraftId={() => "draft-center-preview"}
 				initialRuntime={supportedRuntime}
@@ -399,7 +394,7 @@ describe("EditorNextRoute", () => {
 
 	it("keeps ready-state overflow inside the workbench regions", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-overflow"}
 				createDraftId={() => "draft-overflow"}
 				initialRuntime={supportedRuntime}
@@ -456,7 +451,7 @@ describe("EditorNextRoute", () => {
 		const deliverGeneratedMedia = vi.fn();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-exported"}
 				createDraftId={() => "draft-exported"}
 				createExportJobId={() => "export-route"}
@@ -549,7 +544,7 @@ describe("EditorNextRoute", () => {
 		const confirmClose = vi.spyOn(window, "confirm").mockReturnValue(false);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-close-cancelled"}
 				createDraftId={() => "draft-close-cancelled"}
 				initialRuntime={supportedRuntime}
@@ -587,7 +582,7 @@ describe("EditorNextRoute", () => {
 		vi.spyOn(window, "confirm").mockReturnValue(true);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-close-confirmed"}
 				createDraftId={() => "draft-close-confirmed"}
 				createExportJobId={() => "export-close-confirmed"}
@@ -657,7 +652,7 @@ describe("EditorNextRoute", () => {
 		let nextDraftId = 0;
 
 		const view = render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => assetIds[nextAssetId++] ?? "asset-reimport-extra"}
 				createDraftId={() => draftIds[nextDraftId++] ?? "draft-reimport-extra"}
 				initialRuntime={supportedRuntime}
@@ -727,7 +722,7 @@ describe("EditorNextRoute", () => {
 		const exportStarted = createDeferred<{ blob: Blob }>();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-close-disabled"}
 				createDraftId={() => "draft-close-disabled"}
 				createExportJobId={() => "export-close-disabled"}
@@ -780,7 +775,7 @@ describe("EditorNextRoute", () => {
 		vi.spyOn(window, "confirm").mockReturnValue(true);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-beforeunload"}
 				createDraftId={() => "draft-beforeunload"}
 				initialRuntime={supportedRuntime}
@@ -817,7 +812,7 @@ describe("EditorNextRoute", () => {
 
 	it("does not persist active session state across a route remount", async () => {
 		const { unmount } = render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-remount"}
 				createDraftId={() => "draft-remount"}
 				initialRuntime={supportedRuntime}
@@ -838,7 +833,7 @@ describe("EditorNextRoute", () => {
 		unmount();
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				initialRuntime={supportedRuntime}
 				inspectLocalAsset={async () => supportedInspection}
 			/>,
@@ -854,7 +849,7 @@ describe("EditorNextRoute", () => {
 		const exportRun = vi.fn(() => exportStarted.promise);
 
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-uncancellable"}
 				createDraftId={() => "draft-uncancellable"}
 				createExportJobId={() => "export-uncancellable"}
@@ -904,7 +899,7 @@ describe("EditorNextRoute", () => {
 	it("renders a shared selection timeline with progressive waveform lanes and commits handle drags through the session", async () => {
 		mockTimelineGeometry();
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-timeline"}
 				createDraftId={() => "draft-timeline"}
 				initialRuntime={supportedRuntime}
@@ -959,7 +954,7 @@ describe("EditorNextRoute", () => {
 
 	it("imports a local file from drag and drop into the ready editor state", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-dropped"}
 				createDraftId={() => "draft-dropped"}
 				initialRuntime={supportedRuntime}
@@ -987,7 +982,7 @@ describe("EditorNextRoute", () => {
 
 	it("shows unsupported-media failures with technical details on demand", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-audio-only"}
 				createDraftId={() => "draft-audio-only"}
 				initialRuntime={supportedRuntime}

@@ -26,10 +26,15 @@ import {
 	type GeneratedMediaArtifactStore,
 	createGeneratedMediaArtifactStore,
 } from "../../export/generated-media/generated-media-artifact-store";
+import { deliverBrowserGeneratedMedia } from "../../export/generated-media/generated-media-delivery";
 import { createGeneratedMediaMetadata } from "../../export/generated-media/generated-media-metadata";
-import { isDefaultExportCancelledError } from "../../export/runners/default-export-runner";
+import {
+	browserDefaultExportRunner,
+	isDefaultExportCancelledError,
+} from "../../export/runners/default-export-runner";
 import type { DefaultExportRunner } from "../../export/types/default-export-runner.types";
 import type { GeneratedMediaDeliveryRequest } from "../../export/types/generated-media-delivery.types";
+import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import {
 	type ActiveMediaAssetCleanupScope,
 	type ActiveMediaAssetCleanupScopeController,
@@ -72,14 +77,14 @@ export type SingleAssetEditingSession = {
 
 export type UseSingleAssetEditingSessionOptions = {
 	confirmCloseFile?: (message: string) => boolean;
-	createAssetId: () => string;
-	createDraftId: () => string;
-	createExportJobId: () => string;
-	createGeneratedMediaId: () => string;
-	defaultExportRunner: DefaultExportRunner;
-	deliverGeneratedMedia: (request: GeneratedMediaDeliveryRequest) => void;
-	inspectLocalAsset: LocalMediaAssetInspector;
-	now: () => number;
+	createAssetId?: () => string;
+	createDraftId?: () => string;
+	createExportJobId?: () => string;
+	createGeneratedMediaId?: () => string;
+	defaultExportRunner?: DefaultExportRunner;
+	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
+	inspectLocalAsset?: LocalMediaAssetInspector;
+	now?: () => number;
 	runtime: RuntimeSupport;
 };
 
@@ -87,11 +92,11 @@ export function useSingleAssetEditingSession({
 	confirmCloseFile = defaultConfirmCloseFile,
 	createAssetId,
 	createDraftId,
-	createExportJobId,
+	createExportJobId = createSessionExportJobId,
 	createGeneratedMediaId,
-	defaultExportRunner,
-	deliverGeneratedMedia,
-	inspectLocalAsset,
+	defaultExportRunner = browserDefaultExportRunner,
+	deliverGeneratedMedia = deliverBrowserGeneratedMedia,
+	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
 	now,
 	runtime,
 }: UseSingleAssetEditingSessionOptions): SingleAssetEditingSession {
@@ -157,9 +162,10 @@ export function useSingleAssetEditingSession({
 
 		clearSessionLocalResources();
 
-		const draft = createLocalMediaAssetDraft(file, {
-			createDraftId,
-		});
+		const draft = createLocalMediaAssetDraft(
+			file,
+			createDraftId ? { createDraftId } : undefined,
+		);
 
 		dispatch({
 			draft,
@@ -268,7 +274,7 @@ export function useSingleAssetEditingSession({
 				asset: session.asset,
 				blob: result.blob,
 				fileName: result.fileName,
-				generatedMediaId: createGeneratedMediaId(),
+				generatedMediaId: createGeneratedMediaId?.(),
 				now,
 				outputSettings: session.outputSettings,
 				resolvedOutput: review.resolvedOutput,
@@ -520,4 +526,17 @@ function errorToMessage(error: unknown): string {
 
 function defaultConfirmCloseFile(message: string): boolean {
 	return window.confirm(message);
+}
+
+function createSessionExportJobId(): string {
+	if (
+		"crypto" in globalThis &&
+		typeof globalThis.crypto.randomUUID === "function"
+	) {
+		return `export-${globalThis.crypto.randomUUID()}`;
+	}
+
+	return `export-${Date.now().toString(36)}-${Math.random()
+		.toString(36)
+		.slice(2)}`;
 }

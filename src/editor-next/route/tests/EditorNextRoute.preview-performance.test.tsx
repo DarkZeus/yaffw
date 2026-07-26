@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
-import { EditorNextRoute } from "../entry/EditorNextRoute";
+import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -85,7 +85,7 @@ afterEach(() => {
 describe("EditorNextRoute preview render isolation", () => {
 	it("does not re-render preview or Audio panel children for top-bar playhead updates", async () => {
 		render(
-			<EditorNextRoute
+			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-preview-render-isolation"}
 				createDraftId={() => "draft-preview-render-isolation"}
 				initialRuntime={supportedRuntime}
