@@ -1,9 +1,10 @@
 import { CircleDot, Maximize2 } from "lucide-react";
-import { memo, useMemo } from "react";
+import { type CSSProperties, type RefObject, memo, useMemo } from "react";
 
 import {
 	type ChapterOption,
 	MediaPlayer,
+	type MediaPlayerInstance,
 	MediaProvider,
 	type MediaProviderAdapter,
 	Menu,
@@ -30,7 +31,26 @@ import type {
 } from "@/editor-core/model";
 
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
-import type { PreviewViewerRegionProps } from "../types/preview-viewer-region.types";
+
+export type PreviewViewerRegionProps = {
+	asset: ReadyMediaAsset;
+	canFullscreen: boolean;
+	isPlaying: boolean;
+	mediaMuted: boolean;
+	onChapterSelectionRequested?: (selection: Selection) => void;
+	onEnded: () => void;
+	onNativePause: () => void;
+	onNativePlay: () => void;
+	onRequestFullscreen: () => void;
+	onSyncPlayhead: () => void;
+	playbackRate: number;
+	playheadUs: MediaTimeUs;
+	previewApertureStyle: CSSProperties;
+	previewSourceMimeType: string;
+	previewSurfaceRef: RefObject<HTMLElement | null>;
+	previewUrl: string;
+	videoRef: RefObject<MediaPlayerInstance | null>;
+};
 
 export function PreviewViewerRegion({
 	asset,

@@ -1,4 +1,4 @@
-import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import type { MediaTimeUs } from "@/editor-core/model";
 
 export type VideoStripThumbnailLoader = (
 	request: VideoStripThumbnailRequest,
@@ -68,26 +68,8 @@ export type VideoStripThumbnailViewFrame = {
 	url: string;
 };
 
-export type UseVideoStripThumbnailsOptions = {
-	asset: ReadyMediaAsset;
-	source: Blob;
-	thumbnailWindow: VideoStripThumbnailWindow | null;
-	videoStripThumbnailLoader: VideoStripThumbnailLoader;
-};
-
 export type VideoStripThumbnailViewport = {
 	scrollLeftPx: number;
 	trackWidthPx: number;
 	viewportWidthPx: number;
-};
-
-export type VideoStripThumbnailWindow = {
-	assetDurationUs: MediaTimeUs;
-	frameStepUs: MediaTimeUs;
-	key: string;
-	timestampsUs: MediaTimeUs[];
-	visibleEndUs: MediaTimeUs;
-	visibleStartUs: MediaTimeUs;
-	windowEndUs: MediaTimeUs;
-	windowStartUs: MediaTimeUs;
 };

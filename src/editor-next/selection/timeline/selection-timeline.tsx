@@ -21,7 +21,12 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type { MediaTimeUs, Selection } from "@/editor-core/model";
+import type {
+	AudioMix,
+	MediaTimeUs,
+	ReadyMediaAsset,
+	Selection,
+} from "@/editor-core/model";
 import {
 	moveSelectionRangeByDelta,
 	setSelectionEndFromPlayhead,
@@ -30,18 +35,12 @@ import {
 
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
 import type {
-	SelectionTimelineMarkerPlacement,
-	TimelineTrackGeometry,
-} from "../types/selection-timeline-geometry.types";
-import type {
-	DragState,
-	SelectionTimelineProps,
-} from "../types/selection-timeline.types";
-import type {
+	VideoStripThumbnailLoader,
 	VideoStripThumbnailState,
 	VideoStripThumbnailViewFrame,
 	VideoStripThumbnailViewport,
 } from "../types/selection-video-strip.types";
+import type { WaveformLaneLoader } from "../types/selection-waveform-lanes.types";
 import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
 import {
 	VIDEO_STRIP_THUMBNAIL_COUNT,
@@ -55,6 +54,10 @@ import {
 	loadBrowserWaveformLane,
 	useWaveformLaneStates,
 } from "../waveform/selection-waveform-lanes";
+import type {
+	SelectionTimelineMarkerPlacement,
+	TimelineTrackGeometry,
+} from "./selection-timeline-geometry";
 import {
 	MAXIMUM_TIMELINE_ZOOM,
 	MINIMUM_TIMELINE_ZOOM,
@@ -72,6 +75,46 @@ const VIDEO_STRIP_PLACEHOLDER_KEYS = Array.from(
 	(_, index) => `video-strip-placeholder-${index}`,
 );
 const TIMELINE_LANE_HEADER_WIDTH_PX = 168;
+
+export type SelectionTimelineProps = {
+	asset: ReadyMediaAsset;
+	audioMix?: AudioMix;
+	audioPreviewPreparingTrackIds?: ReadonlySet<string>;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
+	onSelectionEndCommitRequested: (playheadUs: MediaTimeUs) => void;
+	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
+	onSelectionResetRequested: () => void;
+	onSelectionStartCommitRequested: (playheadUs: MediaTimeUs) => void;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	playheadUs: MediaTimeUs;
+	playheadUpdatesAreLive?: boolean;
+	readLivePlayheadUs?: () => MediaTimeUs;
+	selection: Selection;
+	selectionEditingDisabled?: boolean;
+	soloedAudioTrackId?: string | null;
+	source: Blob;
+	videoStripThumbnailLoader?: VideoStripThumbnailLoader;
+	waveformLaneLoader?: WaveformLaneLoader;
+};
+
+export type DragState =
+	| {
+			type: "playhead";
+	  }
+	| {
+			initialSelection: Selection;
+			type: "end";
+	  }
+	| {
+			initialSelection: Selection;
+			startClientX: number;
+			type: "range";
+	  }
+	| {
+			initialSelection: Selection;
+			type: "start";
+	  };
 
 export function SelectionTimeline({
 	asset,

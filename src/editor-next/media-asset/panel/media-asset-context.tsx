@@ -9,7 +9,6 @@ import type {
 	VideoMediaTrack,
 } from "@/editor-core/model";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
-import type { MediaAssetContextPanelProps } from "../types/media-asset-context.types";
 
 type PanelIconElement = ReactElement<{
 	"aria-hidden"?: boolean;
@@ -24,6 +23,13 @@ type MediaAssetContextFact = {
 type AnalysisFactGroup = {
 	facts: MediaAssetContextFact[];
 	title: string;
+};
+
+export type MediaAssetContextPanelProps = {
+	asset: ReadyMediaAsset;
+	closeFileDisabled: boolean;
+	onCloseFileRequested: () => void;
+	selection: Selection;
 };
 
 export function MediaAssetContextPanel({

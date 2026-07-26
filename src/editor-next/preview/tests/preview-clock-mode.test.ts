@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
-import type { PreviewAudioResourcesState } from "../../audio/types/use-preview-audio-resources.types";
+import type { PreviewAudioResourcesState } from "../../audio/engine/use-preview-audio-resources";
 import { resolvePreviewClockMode } from "../transport/preview-clock-mode";
 
 describe("resolvePreviewClockMode", () => {

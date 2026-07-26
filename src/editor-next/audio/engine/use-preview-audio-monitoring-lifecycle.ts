@@ -1,17 +1,52 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
-import { createPreviewAdapterLifecycle } from "../../preview/lifecycle/preview-adapter-lifecycle";
-import type {
-	PreviewAudioMonitoringLifecycle,
-	PreviewAudioMonitoringStatus,
-	UsePreviewAudioMonitoringLifecycleOptions,
-} from "../types/use-preview-audio-monitoring-lifecycle.types";
 import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+
+import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
+import { createPreviewAdapterLifecycle } from "../../preview/lifecycle/preview-adapter-lifecycle";
+import {
+	type CreatePreviewAudioEngineOptions,
 	type PreviewAudioEngine,
 	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine as createDefaultPreviewAudioEngine,
 	setPreviewAudioEnginePlaybackRate,
 } from "./preview-audio-engine";
+import type { PreviewAudioResourcesState } from "./use-preview-audio-resources";
+
+export type PreviewAudioEngineFactory = (
+	options: CreatePreviewAudioEngineOptions,
+) => Promise<PreviewAudioEngine>;
+
+export type PreviewAudioMonitoringStatus =
+	| "degraded"
+	| "failed"
+	| "idle"
+	| "preparing"
+	| "ready";
+
+export type UsePreviewAudioMonitoringLifecycleOptions = {
+	audioMix: AudioMix;
+	previewAudioResources: PreviewAudioResourcesState;
+	createPreviewAudioEngine?: PreviewAudioEngineFactory;
+	getPlaybackRate: () => number;
+	getPlayheadUs: () => MediaTimeUs;
+	previewAudioEngineRef?: RefObject<PreviewAudioEngine | null>;
+	muted: boolean;
+	onReadyChange?: (ready: boolean) => void;
+	onStatusChange?: (status: PreviewAudioMonitoringStatus) => void;
+	soloedAudioTrackId?: string | null;
+	volume: number;
+};
+
+export type PreviewAudioMonitoringLifecycle = {
+	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
+	ready: boolean;
+	status: PreviewAudioMonitoringStatus;
+};
 
 export function usePreviewAudioMonitoringLifecycle({
 	audioMix,

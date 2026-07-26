@@ -16,15 +16,15 @@ import {
 	createActiveMediaAssetCleanupScopeController,
 } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import {
+	type PreviewAudioResourcesResult,
 	preparePreviewAudioResources,
 	revokePreviewAudioResources,
 } from "../engine/preview-audio-resources";
-import { usePreviewAudioResources } from "../engine/use-preview-audio-resources";
-import type {
-	PreviewAudioResource,
-	PreviewAudioResourcesResult,
-} from "../types/preview-audio-resources.types";
-import type { PreviewAudioResourcesState } from "../types/use-preview-audio-resources.types";
+import {
+	type PreviewAudioResourcesState,
+	usePreviewAudioResources,
+} from "../engine/use-preview-audio-resources";
+import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 
 vi.mock("../engine/preview-audio-resources", async (importOriginal) => {
 	const actual =

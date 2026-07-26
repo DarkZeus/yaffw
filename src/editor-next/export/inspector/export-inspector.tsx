@@ -9,9 +9,13 @@ import {
 	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import type {
+	AudioMix,
 	ExportProgress,
 	GeneratedMedia,
+	OutputSettings,
+	ReadyMediaAsset,
 	ResolvedOutputPlan,
+	Selection,
 } from "@/editor-core/model";
 import {
 	type ResolvedOutputAudioProfile,
@@ -23,8 +27,20 @@ import {
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportJob, ExportSessionState } from "@/editor-core/session";
 import { getMediabunnyOutputSupport } from "../adapters/mediabunny-output-support";
-import type { ExportInspectorPanelProps } from "../types/export-inspector.types";
 import { OutputSettingsPanel } from "./output-settings-panel";
+
+export type ExportInspectorPanelProps = {
+	asset: ReadyMediaAsset;
+	audioMix: AudioMix;
+	exportState: ExportSessionState;
+	onCancelExport: () => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onApplyOutputSettings: (outputSettings: OutputSettings) => void;
+	onStartExport: () => void;
+	outputSettings: OutputSettings;
+	runtime: RuntimeSupport;
+	selection: Selection;
+};
 
 const OUTPUT_SUPPORT = getMediabunnyOutputSupport();
 

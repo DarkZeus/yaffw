@@ -1,7 +1,10 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
 import { planDefaultExportCapability } from "@/editor-core/export-capability";
-import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
+import {
+	type LocalMediaAssetInspector,
+	analyzeLocalMediaAssetDraft,
+} from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
 	AudioTrackChannelMode,
@@ -10,7 +13,9 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import { areOutputSettingsEqual } from "@/editor-core/model";
+import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import {
+	type EditorSessionState,
 	canCloseEditorSession,
 	createInitialEditorSession,
 	editorSessionReducer,
@@ -23,6 +28,8 @@ import {
 } from "../../export/generated-media/generated-media-artifact-store";
 import { createGeneratedMediaMetadata } from "../../export/generated-media/generated-media-metadata";
 import { isDefaultExportCancelledError } from "../../export/runners/default-export-runner";
+import type { DefaultExportRunner } from "../../export/types/default-export-runner.types";
+import type { GeneratedMediaDeliveryRequest } from "../../export/types/generated-media-delivery.types";
 import {
 	type ActiveMediaAssetCleanupScope,
 	type ActiveMediaAssetCleanupScopeController,
@@ -32,13 +39,49 @@ import {
 	type CancellableMediaTaskController,
 	createCancellableMediaTaskController,
 } from "../../media-work/tasks/cancellable-media-task-controller";
-import type {
-	SingleAssetEditingSession,
-	UseSingleAssetEditingSessionOptions,
-} from "../types/single-asset-editing-session.types";
-
 const closeFileConfirmationMessage =
 	"Close this media asset? This clears the current selection, preview state, waveform state, and generated media result.";
+
+export type SingleAssetEditingSessionCommands = {
+	applyOutputSettings: (outputSettings: OutputSettings) => void;
+	cancelDefaultExport: () => void;
+	downloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	importLocalFile: (file: File) => Promise<void>;
+	moveSelectionRange: (deltaUs: number) => void;
+	requestCloseFile: () => void;
+	resetSelection: () => void;
+	setAudioTrackChannelMode: (
+		trackId: string,
+		channelMode: AudioTrackChannelMode,
+	) => void;
+	setAudioTrackIncluded: (trackId: string, include: boolean) => void;
+	setAudioTrackVolumePercent: (trackId: string, volumePercent: number) => void;
+	setSelectionEndFromPlayhead: (playheadUs: number) => void;
+	setSelectionRange: (selection: Selection) => void;
+	setSelectionStartFromPlayhead: (playheadUs: number) => void;
+	startDefaultExport: () => Promise<void>;
+};
+
+export type SingleAssetEditingSession = {
+	activeMediaAssetCleanupScope: ActiveMediaAssetCleanupScope | null;
+	commands: SingleAssetEditingSessionCommands;
+	localFileInputKey: number;
+	previewSource: Blob | null;
+	session: EditorSessionState;
+};
+
+export type UseSingleAssetEditingSessionOptions = {
+	confirmCloseFile?: (message: string) => boolean;
+	createAssetId: () => string;
+	createDraftId: () => string;
+	createExportJobId: () => string;
+	createGeneratedMediaId: () => string;
+	defaultExportRunner: DefaultExportRunner;
+	deliverGeneratedMedia: (request: GeneratedMediaDeliveryRequest) => void;
+	inspectLocalAsset: LocalMediaAssetInspector;
+	now: () => number;
+	runtime: RuntimeSupport;
+};
 
 export function useSingleAssetEditingSession({
 	confirmCloseFile = defaultConfirmCloseFile,

@@ -3,14 +3,12 @@ import type { RefObject } from "react";
 import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
 import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
 
-import type { Selection } from "@/editor-core/model";
+import type { MediaTimeUs, Selection } from "@/editor-core/model";
 import { createPreviewAdapterLifecycle } from "../../preview/lifecycle/preview-adapter-lifecycle";
 import type { WaveformSamples } from "../types/selection-waveform-lanes.types";
 import type {
 	WaveformRegionSelectionChange,
 	WaveformRegionUpdateSide,
-	WaveformRendererStatus,
-	WaveformSurfaceProps,
 } from "../types/selection-waveform-surface.types";
 import { createWavesurferPeaksFromSamples } from "./selection-waveform-surface.peaks";
 
@@ -19,6 +17,21 @@ const WAVEFORM_COLOR_FALLBACK = "#57bab6";
 const WAVEFORM_GUIDE_COLOR_FALLBACK = "#64748b";
 const SELECTION_REGION_COLOR = "rgba(87, 186, 182, 0.22)";
 const SELECTION_REGION_ID = "editor-selection-region";
+
+export type WaveformSurfaceProps = {
+	durationUs: MediaTimeUs;
+	label: string;
+	minimumSelectionDurationUs: MediaTimeUs;
+	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
+	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	samples: WaveformSamples;
+	selection: Selection;
+	selectionEditingDisabled: boolean;
+	selectionEditInProgress: boolean;
+};
+
+export type WaveformRendererStatus = "fallback" | "loading" | "wavesurfer";
 
 export function WaveformSurface({
 	durationUs,

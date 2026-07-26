@@ -1,13 +1,30 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+	type CSSProperties,
+	type RefObject,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
-import type {
-	PreviewApertureLayout,
-	PreviewApertureStyleOptions,
-	PreviewApertureSurfaceSize,
-} from "../types/preview-aperture-layout.types";
 
 const FALLBACK_PREVIEW_ASPECT_RATIO = 16 / 9;
+
+export type PreviewApertureSurfaceSize = {
+	height: number;
+	width: number;
+};
+
+export type PreviewApertureStyleOptions = {
+	aspectRatio: number;
+	surfaceSize: PreviewApertureSurfaceSize | null;
+};
+
+export type PreviewApertureLayout = {
+	previewApertureStyle: CSSProperties;
+	previewSurfaceRef: RefObject<HTMLElement | null>;
+};
 
 export function usePreviewApertureLayout(
 	asset: Pick<ReadyMediaAsset, "tracks">,

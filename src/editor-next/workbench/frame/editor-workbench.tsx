@@ -11,7 +11,7 @@ import {
 	Upload,
 } from "lucide-react";
 import { useState } from "react";
-import type { DragEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -22,14 +22,37 @@ import {
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 import { cn } from "@/lib/utils";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
-import type {
-	EditorSessionShellProps,
-	EditorWorkbenchFrameProps,
-	UnsupportedRuntimeStateProps,
-} from "../types/editor-workbench.types";
+
+export type EditorWorkbenchFrameProps = {
+	activeAsset: ReadyMediaAsset | null;
+	children: ReactNode;
+	previewStatus?: {
+		playheadUs: MediaTimeUs;
+		selectionDurationUs: MediaTimeUs;
+	} | null;
+	runtime: RuntimeSupport;
+	status: EditorSessionState["status"];
+};
+
+export type UnsupportedRuntimeStateProps = {
+	session: Extract<EditorSessionState, { status: "unsupported-runtime" }>;
+};
+
+export type EditorSessionShellProps = {
+	audioPanel: ReactNode;
+	exportInspector: ReactNode;
+	localFileInputKey: number;
+	mediaAssetContext: ReactNode;
+	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
+	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
+	previewPlayer: ReactNode;
+	session: Exclude<EditorSessionState, { status: "unsupported-runtime" }>;
+};
 
 type NonReadyEditorSession = Exclude<
 	EditorSessionShellProps["session"],

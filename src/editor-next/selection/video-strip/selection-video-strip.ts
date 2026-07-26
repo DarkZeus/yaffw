@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 import type {
-	UseVideoStripThumbnailsOptions,
 	VideoStripThumbnailFrame,
+	VideoStripThumbnailLoader,
 	VideoStripThumbnailProgress,
 	VideoStripThumbnailRequest,
 	VideoStripThumbnailResult,
 	VideoStripThumbnailState,
 	VideoStripThumbnailViewFrame,
 	VideoStripThumbnailViewport,
-	VideoStripThumbnailWindow,
 } from "../types/selection-video-strip.types";
 import {
 	VIDEO_STRIP_THUMBNAIL_COUNT,
@@ -34,6 +34,24 @@ const MAX_VIDEO_STRIP_CACHE_ENTRIES_PER_SOURCE = 240;
 const VIDEO_STRIP_OVERSCAN_VIEWPORTS = 1;
 const VIDEO_STRIP_TARGET_THUMBNAIL_WIDTH_PX = 128;
 export const MAX_VIDEO_STRIP_WINDOW_THUMBNAIL_COUNT = 72;
+
+export type UseVideoStripThumbnailsOptions = {
+	asset: ReadyMediaAsset;
+	source: Blob;
+	thumbnailWindow: VideoStripThumbnailWindow | null;
+	videoStripThumbnailLoader: VideoStripThumbnailLoader;
+};
+
+export type VideoStripThumbnailWindow = {
+	assetDurationUs: MediaTimeUs;
+	frameStepUs: MediaTimeUs;
+	key: string;
+	timestampsUs: MediaTimeUs[];
+	visibleEndUs: MediaTimeUs;
+	visibleStartUs: MediaTimeUs;
+	windowEndUs: MediaTimeUs;
+	windowStartUs: MediaTimeUs;
+};
 
 type CachedVideoStripThumbnailFrame = VideoStripThumbnailFrame & {
 	thumbnailHeightPx: number;

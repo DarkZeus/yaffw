@@ -3,7 +3,14 @@ import type {
 	LocalMediaAssetInspector,
 } from "@/editor-core/local-file-analysis";
 import type { FrameTiming } from "@/editor-core/model";
-import type { BrowserVideoTrack } from "../types/browser-local-asset-analyzer.types";
+
+export type BrowserVideoTrack = {
+	computePacketStats: (targetPacketCount?: number) => Promise<{
+		averagePacketRate: number;
+	}>;
+	displayHeight: number;
+	displayWidth: number;
+};
 
 export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 	async (draft) => {

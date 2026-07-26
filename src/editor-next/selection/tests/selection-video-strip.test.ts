@@ -6,11 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
-import type {
-	VideoStripThumbnailLoader,
-	VideoStripThumbnailWindow,
-} from "../types/selection-video-strip.types";
+import type { VideoStripThumbnailLoader } from "../types/selection-video-strip.types";
 import {
+	type VideoStripThumbnailWindow,
 	clearVideoStripThumbnailCache,
 	createVideoStripThumbnailDimensions,
 	createVideoStripThumbnailTimestamps,

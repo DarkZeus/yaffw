@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import type {
 	PreviewLevelMeterChannel,
 	PreviewLevelMeterOrientation,
-	PreviewLevelMeterProps,
 	PreviewLevelMeterState,
 	PreviewLevelMeterVisualRange,
 	PreviewLevelMeterZone,
@@ -17,11 +16,24 @@ import {
 export type {
 	PreviewLevelMeterChannel,
 	PreviewLevelMeterOrientation,
-	PreviewLevelMeterProps,
 	PreviewLevelMeterState,
 	PreviewLevelMeterVisualRange,
 	PreviewLevelMeterZone,
 } from "../types/preview-level-meter.types";
+
+export type PreviewLevelMeterProps = {
+	channelWidthRem?: number;
+	channels: PreviewLevelMeterChannel[];
+	label: string;
+	message?: string;
+	orientation?: PreviewLevelMeterOrientation;
+	showChannelLabels?: boolean;
+	showTickLabels?: boolean;
+	state: PreviewLevelMeterState;
+	ticks?: number[];
+	visualRange?: PreviewLevelMeterVisualRange;
+	zones?: PreviewLevelMeterZone[];
+};
 
 const defaultPreviewLevelMeterTicks = [0, -9, -20, -40, -72];
 

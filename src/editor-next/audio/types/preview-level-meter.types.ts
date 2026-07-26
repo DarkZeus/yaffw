@@ -20,17 +20,3 @@ export type PreviewLevelMeterZone = {
 	label: string;
 	toDb: number;
 };
-
-export type PreviewLevelMeterProps = {
-	channelWidthRem?: number;
-	channels: PreviewLevelMeterChannel[];
-	label: string;
-	message?: string;
-	orientation?: PreviewLevelMeterOrientation;
-	showChannelLabels?: boolean;
-	showTickLabels?: boolean;
-	state: PreviewLevelMeterState;
-	ticks?: number[];
-	visualRange?: PreviewLevelMeterVisualRange;
-	zones?: PreviewLevelMeterZone[];
-};

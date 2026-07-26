@@ -1,12 +1,20 @@
 import type { MediaTimeUs } from "@/editor-core/model";
 
-import type {
-	SelectionTimelineMarker,
-	TimelineTrackGeometry,
-} from "../types/selection-timeline-geometry.types";
-
 export const MINIMUM_TIMELINE_ZOOM = 1;
 export const MAXIMUM_TIMELINE_ZOOM = 4;
+
+export type TimelineTrackGeometry = {
+	leftPx: number;
+	widthPx: number;
+};
+
+export type SelectionTimelineMarkerPlacement = "end" | "middle" | "start";
+
+export type SelectionTimelineMarker = {
+	percent: number;
+	placement: SelectionTimelineMarkerPlacement;
+	timeUs: MediaTimeUs;
+};
 
 export function createSelectionTimelineMarkers(
 	durationUs: MediaTimeUs,

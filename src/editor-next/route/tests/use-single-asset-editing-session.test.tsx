@@ -9,7 +9,7 @@ import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { useSingleAssetEditingSession } from "../session/use-single-asset-editing-session";
-import type { SingleAssetEditingSession } from "../types/single-asset-editing-session.types";
+import type { SingleAssetEditingSession } from "../session/use-single-asset-editing-session";
 
 afterEach(() => {
 	cleanup();

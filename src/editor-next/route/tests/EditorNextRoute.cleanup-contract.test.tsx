@@ -14,11 +14,11 @@ import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysi
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/engine/preview-audio-engine";
-import { preparePreviewAudioResources } from "../../audio/engine/preview-audio-resources";
-import type {
-	PreviewAudioResource,
-	PreviewAudioResourcesResult,
-} from "../../audio/types/preview-audio-resources.types";
+import {
+	type PreviewAudioResourcesResult,
+	preparePreviewAudioResources,
+} from "../../audio/engine/preview-audio-resources";
+import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { loadBrowserWaveformLane } from "../../selection/waveform/selection-waveform-lanes";
 import { EditorNextRoute } from "../entry/EditorNextRoute";
 

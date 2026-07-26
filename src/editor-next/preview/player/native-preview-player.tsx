@@ -7,15 +7,23 @@ import {
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import type { MediaTimeUs } from "@/editor-core/model";
+import type {
+	AudioMix,
+	MediaTimeUs,
+	ReadyMediaAsset,
+	Selection,
+} from "@/editor-core/model";
 import {
 	type PreviewAudioEngine,
 	canUsePreviewAudioEngine,
 } from "../../audio/engine/preview-audio-engine";
-import { usePreviewAudioMonitoringLifecycle } from "../../audio/engine/use-preview-audio-monitoring-lifecycle";
+import {
+	type PreviewAudioMonitoringStatus,
+	usePreviewAudioMonitoringLifecycle,
+} from "../../audio/engine/use-preview-audio-monitoring-lifecycle";
 import { usePreviewAudioResources } from "../../audio/engine/use-preview-audio-resources";
 import { usePreviewMeteringSource } from "../../audio/meters/preview-metering-provider";
-import type { PreviewAudioMonitoringStatus } from "../../audio/types/use-preview-audio-monitoring-lifecycle.types";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { PreviewSelectionWaveformRegion } from "../regions/preview-selection-waveform-region";
@@ -23,9 +31,27 @@ import { PreviewTransportRegion } from "../regions/preview-transport-region";
 import { PreviewViewerRegion } from "../regions/preview-viewer-region";
 import { resolvePreviewClockMode } from "../transport/preview-clock-mode";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
-import type { NativePreviewPlayerProps } from "../types/native-preview-player.types";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
+
+export type NativePreviewPlayerProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
+	asset: ReadyMediaAsset;
+	audioMix?: AudioMix;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
+	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
+	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
+	onSelectionResetRequested: () => void;
+	onSelectionReplaceRequested?: (selection: Selection) => void;
+	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
+	selection: Selection;
+	selectionEditingDisabled?: boolean;
+	shortcutsDisabled?: boolean;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloedAudioTrackId?: string | null;
+	source: Blob;
+};
 
 export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	activeMediaAssetCleanupScope,

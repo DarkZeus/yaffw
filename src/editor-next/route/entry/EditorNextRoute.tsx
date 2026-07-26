@@ -8,14 +8,20 @@ import {
 	useState,
 } from "react";
 
+import type { LocalMediaAssetInspector } from "@/editor-core/local-file-analysis";
 import type { MediaTimeUs } from "@/editor-core/model";
-import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import {
+	type RuntimeSupport,
+	detectRuntimeSupport,
+} from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
 import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
 import { deliverBrowserGeneratedMedia } from "../../export/generated-media/generated-media-delivery";
 import { ExportInspectorPanel } from "../../export/inspector/export-inspector";
 import { browserDefaultExportRunner } from "../../export/runners/default-export-runner";
+import type { DefaultExportRunner } from "../../export/types/default-export-runner.types";
+import type { GeneratedMediaDeliveryRequest } from "../../export/types/generated-media-delivery.types";
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import { MediaAssetContextPanel } from "../../media-asset/panel/media-asset-context";
 import { NativePreviewPlayer } from "../../preview/player/native-preview-player";
@@ -24,9 +30,23 @@ import {
 	EditorWorkbenchFrame,
 	UnsupportedRuntimeState,
 } from "../../workbench/frame/editor-workbench";
-import { useSingleAssetEditingSession } from "../session/use-single-asset-editing-session";
-import type { EditorNextRouteProps } from "../types/EditorNextRoute.types";
-import type { SingleAssetEditingSessionCommands } from "../types/single-asset-editing-session.types";
+import {
+	type SingleAssetEditingSessionCommands,
+	useSingleAssetEditingSession,
+} from "../session/use-single-asset-editing-session";
+
+export type EditorNextRouteProps = {
+	confirmCloseFile?: (message: string) => boolean;
+	createAssetId?: () => string;
+	createDraftId?: () => string;
+	createExportJobId?: () => string;
+	createGeneratedMediaId?: () => string;
+	defaultExportRunner?: DefaultExportRunner;
+	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
+	initialRuntime?: RuntimeSupport;
+	inspectLocalAsset?: LocalMediaAssetInspector;
+	now?: () => number;
+};
 
 export function EditorNextRoute({
 	confirmCloseFile,

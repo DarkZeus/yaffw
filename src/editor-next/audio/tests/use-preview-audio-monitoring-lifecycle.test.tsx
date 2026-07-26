@@ -11,10 +11,12 @@ import type {
 } from "@/editor-core/model";
 
 import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
-import { usePreviewAudioMonitoringLifecycle } from "../engine/use-preview-audio-monitoring-lifecycle";
+import {
+	type PreviewAudioEngineFactory,
+	usePreviewAudioMonitoringLifecycle,
+} from "../engine/use-preview-audio-monitoring-lifecycle";
+import type { PreviewAudioResourcesState } from "../engine/use-preview-audio-resources";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
-import type { PreviewAudioEngineFactory } from "../types/use-preview-audio-monitoring-lifecycle.types";
-import type { PreviewAudioResourcesState } from "../types/use-preview-audio-resources.types";
 
 const createPreviewAudioEngineMock = vi.fn<PreviewAudioEngineFactory>();
 const createdPreviewAudioEngines: PreviewAudioEngineSpy[] = [];

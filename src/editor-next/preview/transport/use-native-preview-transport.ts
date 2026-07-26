@@ -1,14 +1,42 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
-import { setPreviewAudioEnginePlaybackRate } from "../../audio/engine/preview-audio-engine";
-import type { UseNativePreviewTransportOptions } from "../types/use-native-preview-transport.types";
+import {
+	type PreviewAudioEngine,
+	setPreviewAudioEnginePlaybackRate,
+} from "../../audio/engine/preview-audio-engine";
+import type { PreviewClockMode } from "./preview-clock-mode";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
 const PREVIEW_AV_HARD_RESYNC_FRAME_TOLERANCE = 2;
 const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 250;
 const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 250_000;
+
+export type PreviewMediaTransportHandle = {
+	currentTime: number;
+	muted: boolean;
+	pause: () => Promise<void> | void;
+	play: () => Promise<void>;
+	playbackRate: number;
+	volume: number;
+};
+
+export type UseNativePreviewTransportOptions = {
+	durationUs: MediaTimeUs;
+	frameDurationUs: MediaTimeUs;
+	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
+	previewClockMode: PreviewClockMode;
+	selection: Selection;
+	source: Blob;
+	videoRef: RefObject<PreviewMediaTransportHandle | null>;
+};
 
 type PlayheadCommitOptions =
 	| {

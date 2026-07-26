@@ -1,8 +1,25 @@
-import type {
-	WaveformLaneIdentityInput,
-	WaveformLaneIdentityViewModel,
-} from "../types/selection-waveform-lane.types";
+import type { AudioMediaTrack } from "@/editor-core/model";
 import type { WaveformLaneState } from "../types/selection-waveform-lanes.types";
+
+export type WaveformLaneIdentityInput = {
+	status: WaveformLaneState["status"];
+	track: AudioMediaTrack;
+	trackIndex: number;
+};
+
+export type WaveformLaneIdentityStatusTone =
+	| "pending"
+	| "ready"
+	| "unavailable";
+
+export type WaveformLaneIdentityViewModel = {
+	metadata: string[];
+	status: {
+		label: string;
+		tone: WaveformLaneIdentityStatusTone;
+	};
+	title: string;
+};
 
 export function createWaveformLaneIdentityViewModel({
 	status,

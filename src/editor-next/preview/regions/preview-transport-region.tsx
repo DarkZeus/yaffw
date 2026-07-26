@@ -14,8 +14,22 @@ import type { ChangeEvent, ReactNode } from "react";
 import { memo } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { MediaTimeUs } from "@/editor-core/model";
 
-import type { PreviewTransportRegionProps } from "../types/preview-transport-region.types";
+export type PreviewTransportRegionProps = {
+	isPlaying: boolean;
+	muted: boolean;
+	onPlaybackRateChange: (playbackRate: number) => void;
+	onSeekByUs: (deltaUs: MediaTimeUs) => void;
+	onStepFrame: (direction: -1 | 1) => void;
+	onToggleMuted: () => void;
+	onTogglePlayback: () => void | Promise<void>;
+	onToggleSelectionLoop: () => void;
+	onVolumeChange: (volume: number) => void;
+	playbackRate: number;
+	selectionLoopEnabled: boolean;
+	volume: number;
+};
 
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 

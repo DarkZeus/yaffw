@@ -1,19 +1,46 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type {
 	PreviewAudioResource,
 	PreviewAudioResourceFailure,
 } from "../types/preview-audio-resources.types";
-import type {
-	PreviewAudioResourcesLifecycle,
-	PreviewAudioResourcesState,
-	UsePreviewAudioResourcesOptions,
-} from "../types/use-preview-audio-resources.types";
 import {
 	preparePreviewAudioResources,
 	revokePreviewAudioResources,
 } from "./preview-audio-resources";
+
+export type PreviewAudioResourcesState =
+	| {
+			status: "disabled";
+	  }
+	| {
+			preparingTrackIds: ReadonlySet<string>;
+			resources: PreviewAudioResource[];
+			status: "loading";
+	  }
+	| {
+			failures: PreviewAudioResourceFailure[];
+			resources: PreviewAudioResource[];
+			status: "ready";
+	  }
+	| {
+			failures: PreviewAudioResourceFailure[];
+			reason: string;
+			status: "failed";
+	  };
+
+export type PreviewAudioResourcesLifecycle = PreviewAudioResourcesState & {
+	retryTrack: (trackId: string) => void;
+};
+
+export type UsePreviewAudioResourcesOptions = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
+	asset: ReadyMediaAsset;
+	enabled: boolean;
+	source: Blob;
+};
 
 type PreviewAudioResourcePreparation = {
 	cancel: () => void;

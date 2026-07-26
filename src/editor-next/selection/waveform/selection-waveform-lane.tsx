@@ -1,5 +1,9 @@
 import { Headphones, Loader2, Volume2, VolumeX } from "lucide-react";
-import { memo } from "react";
+import {
+	type MouseEvent as ReactMouseEvent,
+	type PointerEvent as ReactPointerEvent,
+	memo,
+} from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,14 +12,42 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 import type {
-	WaveformLaneIdentityViewModel,
-	WaveformLaneProps,
-} from "../types/selection-waveform-lane.types";
+	AudioMixTrackDecision,
+	MediaTimeUs,
+	Selection,
+} from "@/editor-core/model";
 import type { WaveformLaneState } from "../types/selection-waveform-lanes.types";
-import { createWaveformLaneIdentityViewModel } from "./selection-waveform-lane.identity";
+import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
+import {
+	type WaveformLaneIdentityViewModel,
+	createWaveformLaneIdentityViewModel,
+} from "./selection-waveform-lane.identity";
 import { WaveformSurface } from "./selection-waveform-surface";
+
+export type WaveformLanePointerEvent =
+	| ReactMouseEvent<HTMLButtonElement>
+	| ReactPointerEvent<HTMLButtonElement>;
+
+export type WaveformLaneProps = {
+	audioDecision?: AudioMixTrackDecision;
+	audioPreviewPreparing: boolean;
+	durationUs: MediaTimeUs;
+	lane: WaveformLaneState;
+	laneHeaderWidthPx: number;
+	minimumSelectionDurationUs: MediaTimeUs;
+	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
+	onPointerDown: (event: WaveformLanePointerEvent) => void;
+	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	selection: Selection;
+	selectionEditingDisabled: boolean;
+	selectionEditInProgress: boolean;
+	onSoloedAudioTrackChange?: (trackId: string | null) => void;
+	soloedAudioTrackId?: string | null;
+	trackIndex: number;
+};
 
 export const WaveformLane = memo(function WaveformLane({
 	audioDecision,

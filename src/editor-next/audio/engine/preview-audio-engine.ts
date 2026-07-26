@@ -9,12 +9,14 @@ import type {
 	ReadyMediaAsset,
 } from "@/editor-core/model";
 
-import type { ResolvedChannelTransform } from "../types/browser-audio-mix.types";
 import type {
 	PreviewAudioResource,
 	PreviewAudioResourceFailure,
 } from "../types/preview-audio-resources.types";
-import { resolveChannelTransform } from "./browser-audio-mix";
+import {
+	type ResolvedChannelTransform,
+	resolveChannelTransform,
+} from "./browser-audio-mix";
 
 export type PreviewAudioEngine = {
 	destroy: () => void;

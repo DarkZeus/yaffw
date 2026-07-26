@@ -209,11 +209,11 @@ vi.mock(
 	},
 );
 
-import { preparePreviewAudioResources } from "../../audio/engine/preview-audio-resources";
-import type {
-	PreviewAudioResource,
-	PreviewAudioResourcesResult,
-} from "../../audio/types/preview-audio-resources.types";
+import {
+	type PreviewAudioResourcesResult,
+	preparePreviewAudioResources,
+} from "../../audio/engine/preview-audio-resources";
+import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { EXPORT_CORRECTNESS_FIXTURES } from "../../export/harness/export-correctness-fixtures";
 import { createActiveMediaAssetCleanupScopeController } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { NativePreviewPlayer } from "../player/native-preview-player";

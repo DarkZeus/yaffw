@@ -7,23 +7,45 @@ import {
 	audioMixPlanTrackOutputChannelCount,
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
-import type { AudioTrackChannelMode } from "@/editor-core/model";
+import type {
+	AudioMix,
+	AudioTrackChannelMode,
+	Selection,
+} from "@/editor-core/model";
 
 import {
 	type DisposableMediaWorkScope,
 	createDisposableMediaCleanup,
 	withDisposableMediaWorkScope,
 } from "../../media-work/scopes/disposable-media-work-scope";
-import type {
-	BrowserAudioMixRequest,
-	BrowserAudioMixResult,
-	ChannelAnalysis,
-	ResolvedChannelTransform,
-} from "../types/browser-audio-mix.types";
 
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
 const ONE_SIDED_RELATIVE_SILENCE_RATIO = 0.01;
+
+export type BrowserAudioMixRequest = {
+	audioMix: AudioMix;
+	selection: Selection;
+	signal: AbortSignal;
+	source: Blob;
+};
+
+export type BrowserAudioMixResult = {
+	audioBuffer: AudioBuffer;
+	includedTrackCount: number;
+};
+
+export type ChannelAnalysis = {
+	channels: { peak: number; rms: number }[];
+	oneSidedStereo: "left-active" | "right-active" | null;
+	reason: string;
+};
+
+export type ResolvedChannelTransform = {
+	analysis: ChannelAnalysis;
+	requestedMode: AudioTrackChannelMode;
+	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
+};
 
 export async function renderBrowserAudioMix({
 	audioMix,

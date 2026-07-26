@@ -1,17 +1,35 @@
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import { planDefaultExportCapability } from "@/editor-core/export-capability";
 import {
+	type ExportCapabilityReview,
+	planDefaultExportCapability,
+} from "@/editor-core/export-capability";
+import {
+	type ExportRangeAccuracyReport,
 	type GeneratedMediaInspection,
 	classifyExportRangeAccuracy,
 } from "@/editor-core/export-correctness";
-import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
+import {
+	type LocalMediaAssetInspector,
+	analyzeLocalMediaAssetDraft,
+} from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import {
 	type ExportProgress,
+	type GeneratedMedia,
+	type LocalFileSource,
+	type OutputSettings,
+	type ReadyMediaAsset,
+	type Selection,
 	createDefaultOutputSettings,
 } from "@/editor-core/model";
-import { resolveOutputPlan } from "@/editor-core/output-settings";
-import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import {
+	type BrowserLocalOutputSupport,
+	resolveOutputPlan,
+} from "@/editor-core/output-settings";
+import {
+	type RuntimeSupport,
+	detectRuntimeSupport,
+} from "@/editor-core/runtime-capabilities";
 
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
@@ -19,23 +37,132 @@ import { inspectGeneratedMediaBlob } from "../generated-media/generated-media-in
 import { createGeneratedMediaMetadata } from "../generated-media/generated-media-metadata";
 import { browserDefaultExportRunner } from "../runners/default-export-runner";
 import type { DefaultExportRunner } from "../types/default-export-runner.types";
-import type {
-	ExportArtifactHarnessFailureStage,
-	ExportArtifactHarnessOptions,
-	ExportArtifactHarnessReport,
-	ExportArtifactHarnessResult,
-	ExportFixtureCatalogHarnessOptions,
-	ExportFixtureCatalogHarnessResult,
-	ExportFixtureCatalogResult,
-	ExportFixtureCatalogSelectionKind,
-	FixtureSource,
-	FullAssetExportArtifactHarnessOptions,
-	FullAssetExportArtifactHarnessResult,
-} from "../types/export-artifact-harness.types";
 import {
 	EXPORT_CORRECTNESS_FIXTURES,
 	type ExportCorrectnessFixture,
 } from "./export-correctness-fixtures";
+
+export type FixtureSource = Blob & LocalFileSource;
+
+export type ExportArtifactHarnessOptions = {
+	createAssetId?: () => string;
+	createDraftId?: () => string;
+	createGeneratedMediaId?: () => string;
+	createFixtureSource?: (
+		blob: Blob,
+		fixture: ExportCorrectnessFixture,
+	) => FixtureSource;
+	fetchFixtureBlob?: (fixture: ExportCorrectnessFixture) => Promise<Blob>;
+	fixture?: ExportCorrectnessFixture;
+	inspectGeneratedMedia?: (blob: Blob) => Promise<GeneratedMediaInspection>;
+	inspectLocalAsset?: LocalMediaAssetInspector;
+	now?: () => number;
+	outputSettings?: OutputSettings;
+	outputSupport?: BrowserLocalOutputSupport;
+	runner?: DefaultExportRunner;
+	runnerLabel?: string;
+	runtime?: RuntimeSupport;
+	selection?: Selection;
+	selectionLabel?: string;
+	signal?: AbortSignal;
+};
+
+export type ExportArtifactHarnessResult = {
+	artifact: {
+		blob: Blob;
+		bytes: Uint8Array;
+		fileName?: string;
+		mimeType: string;
+		sizeBytes: number;
+	};
+	report: ExportArtifactHarnessReport;
+};
+
+export type ExportArtifactHarnessFailureStage =
+	| "asset-capability"
+	| "export-runner"
+	| "fixture-source"
+	| "generated-media-inspection"
+	| "profile-capability"
+	| "runtime-capability";
+
+export type ExportFixtureCatalogSelectionKind =
+	keyof ExportCorrectnessFixture["selections"];
+
+export type ExportFixtureCatalogHarnessOptions = Omit<
+	ExportArtifactHarnessOptions,
+	"fixture" | "selection" | "selectionLabel"
+> & {
+	fixtures?: readonly ExportCorrectnessFixture[];
+	selectionKind?: ExportFixtureCatalogSelectionKind;
+};
+
+export type ExportFixtureCatalogHarnessResult = {
+	results: ExportFixtureCatalogResult[];
+	summary: {
+		exported: number;
+		total: number;
+		unsupported: number;
+	};
+};
+
+export type ExportFixtureCatalogResult =
+	| {
+			artifact: ExportArtifactHarnessResult["artifact"];
+			fixture: ExportArtifactHarnessReport["fixture"];
+			report: ExportArtifactHarnessReport;
+			status: "exported";
+	  }
+	| {
+			failure: {
+				reason: string;
+				stage: ExportArtifactHarnessFailureStage;
+				technicalDetails?: string;
+			};
+			fixture: ExportArtifactHarnessReport["fixture"];
+			selection: Selection;
+			status: "unsupported";
+	  };
+
+export type ExportArtifactHarnessReport = {
+	delivery: {
+		performed: false;
+		reason: string;
+		required: true;
+	};
+	execution: {
+		generatedMedia: GeneratedMedia;
+		progress: ExportProgress[];
+		requestedSelection: Selection;
+		runner: string;
+	};
+	exportReview: ExportCapabilityReview;
+	fixture: {
+		fileName: string;
+		id: string;
+		label: string;
+		publicPath: string;
+		selectionLabel: string;
+	};
+	inspection: GeneratedMediaInspection;
+	rangeAccuracy: ExportRangeAccuracyReport;
+	source: {
+		asset: Pick<
+			ReadyMediaAsset,
+			"durationUs" | "frameTiming" | "id" | "label" | "tracks"
+		>;
+		blob: {
+			mimeType: string;
+			sizeBytes: number;
+		};
+		selection: Selection;
+	};
+};
+
+export type FullAssetExportArtifactHarnessOptions =
+	ExportArtifactHarnessOptions;
+export type FullAssetExportArtifactHarnessResult = ExportArtifactHarnessResult;
+export type FullAssetExportArtifactHarnessReport = ExportArtifactHarnessReport;
 
 export async function runFixtureCatalogExportArtifactHarness({
 	fixtures = EXPORT_CORRECTNESS_FIXTURES,
