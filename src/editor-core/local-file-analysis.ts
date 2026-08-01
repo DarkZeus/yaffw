@@ -48,12 +48,18 @@ export type LocalMediaAssetAnalysisResult =
 
 export type LocalMediaAssetInspector = (
 	draft: MediaAssetDraft,
+	request: LocalMediaAssetInspectionRequest,
 ) => LocalMediaAssetInspection | Promise<LocalMediaAssetInspection>;
+
+export type LocalMediaAssetInspectionRequest = {
+	signal?: AbortSignal;
+};
 
 type LocalMediaAssetAnalysisOptions = {
 	createAssetId?: () => string;
 	inspect: LocalMediaAssetInspector;
 	runtime: RuntimeSupport;
+	signal?: AbortSignal;
 };
 
 export async function analyzeLocalMediaAssetDraft(
@@ -63,7 +69,7 @@ export async function analyzeLocalMediaAssetDraft(
 	let inspection: LocalMediaAssetInspection;
 
 	try {
-		inspection = await options.inspect(draft);
+		inspection = await options.inspect(draft, { signal: options.signal });
 	} catch (error) {
 		return unsupported(
 			"The media asset could not be read.",

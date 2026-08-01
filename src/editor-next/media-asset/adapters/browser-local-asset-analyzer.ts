@@ -13,10 +13,11 @@ export type BrowserVideoTrack = {
 };
 
 export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
-	async (draft) => {
+	async (draft, request) => {
 		if (!(draft.source instanceof Blob)) {
 			throw new Error("Local file analysis requires a browser Blob source.");
 		}
+		throwIfAborted(request.signal);
 
 		const { ALL_FORMATS, BlobSource, Input } = await import("mediabunny");
 
@@ -24,13 +25,16 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 			formats: ALL_FORMATS,
 			source: new BlobSource(draft.source),
 		});
+		const unregisterAbort = disposeInputOnAbort(input, request.signal);
 
 		try {
+			throwIfAborted(request.signal);
 			const [durationSeconds, videoTracks, audioTracks] = await Promise.all([
 				input.computeDuration(),
 				input.getVideoTracks(),
 				input.getAudioTracks(),
 			]);
+			throwIfAborted(request.signal);
 			const [videoTrackInspections, audioTrackInspections] = await Promise.all([
 				Promise.all(
 					videoTracks.map(async (track, index) => ({
@@ -60,14 +64,17 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 					})),
 				),
 			]);
+			const frameTiming = await computeFrameTiming(videoTracks[0]);
+			throwIfAborted(request.signal);
 
 			return {
 				audioTracks: audioTrackInspections,
 				durationUs: secondsToMicroseconds(durationSeconds),
-				frameTiming: await computeFrameTiming(videoTracks[0]),
+				frameTiming,
 				videoTracks: videoTrackInspections,
 			} satisfies LocalMediaAssetInspection;
 		} finally {
+			unregisterAbort();
 			input.dispose();
 		}
 	};
@@ -108,4 +115,27 @@ function secondsToMicroseconds(seconds: number): number {
 
 function readableCodec(codec: unknown): string | undefined {
 	return typeof codec === "string" && codec.length > 0 ? codec : undefined;
+}
+
+function throwIfAborted(signal: AbortSignal | undefined) {
+	if (signal?.aborted) {
+		throw signal.reason;
+	}
+}
+
+function disposeInputOnAbort(
+	input: { dispose: () => void },
+	signal: AbortSignal | undefined,
+) {
+	if (!signal) {
+		return () => {};
+	}
+
+	const disposeInput = () => input.dispose();
+	signal.addEventListener("abort", disposeInput, { once: true });
+	if (signal.aborted) {
+		disposeInput();
+	}
+
+	return () => signal.removeEventListener("abort", disposeInput);
 }

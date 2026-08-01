@@ -40,10 +40,6 @@ import {
 	type ActiveMediaAssetCleanupScopeController,
 	createActiveMediaAssetCleanupScopeController,
 } from "../../media-work/scopes/active-media-asset-cleanup-scope";
-import {
-	type CancellableMediaTaskController,
-	createCancellableMediaTaskController,
-} from "../../media-work/tasks/cancellable-media-task-controller";
 const closeFileConfirmationMessage =
 	"Close this media asset? This clears the current selection, preview state, waveform state, and generated media result.";
 
@@ -107,8 +103,9 @@ export function useSingleAssetEditingSession({
 	);
 	const activeMediaAssetCleanupControllerRef =
 		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
-	const activeImportAnalysisTaskControllerRef =
-		useRef<CancellableMediaTaskController | null>(null);
+	const activeImportAnalysisAbortControllerRef = useRef<AbortController | null>(
+		null,
+	);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
 	const generatedMediaArtifactStoreRef =
 		useRef<GeneratedMediaArtifactStore | null>(null);
@@ -137,7 +134,7 @@ export function useSingleAssetEditingSession({
 
 	useEffect(() => {
 		return () => {
-			activeImportAnalysisTaskControllerRef.current?.cancelCurrentTask();
+			abortActiveImportAnalysis();
 			activeExportAbortControllerRef.current?.abort();
 			activeExportAbortControllerRef.current = null;
 			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
@@ -146,7 +143,7 @@ export function useSingleAssetEditingSession({
 	}, []);
 
 	function clearSessionLocalResources() {
-		activeImportAnalysisTaskControllerRef.current?.cancelCurrentTask();
+		abortActiveImportAnalysis();
 		activeExportAbortControllerRef.current?.abort();
 		activeExportAbortControllerRef.current = null;
 		getActiveMediaAssetCleanupController().disposeCurrentScope();
@@ -172,16 +169,21 @@ export function useSingleAssetEditingSession({
 			type: "import.started",
 		});
 
-		const analysisTask = getActiveImportAnalysisTaskController().startTask();
+		const abortController = new AbortController();
+		activeImportAnalysisAbortControllerRef.current = abortController;
 
 		try {
 			const result = await analyzeLocalMediaAssetDraft(draft, {
 				createAssetId,
 				inspect: inspectLocalAsset,
 				runtime,
+				signal: abortController.signal,
 			});
 
-			if (!analysisTask.isCurrent()) {
+			if (
+				activeImportAnalysisAbortControllerRef.current !== abortController ||
+				abortController.signal.aborted
+			) {
 				return;
 			}
 
@@ -207,7 +209,9 @@ export function useSingleAssetEditingSession({
 				type: "session.failed",
 			});
 		} finally {
-			analysisTask.finish();
+			if (activeImportAnalysisAbortControllerRef.current === abortController) {
+				activeImportAnalysisAbortControllerRef.current = null;
+			}
 		}
 	}
 
@@ -371,13 +375,9 @@ export function useSingleAssetEditingSession({
 		return activeMediaAssetCleanupControllerRef.current;
 	}
 
-	function getActiveImportAnalysisTaskController() {
-		if (!activeImportAnalysisTaskControllerRef.current) {
-			activeImportAnalysisTaskControllerRef.current =
-				createCancellableMediaTaskController();
-		}
-
-		return activeImportAnalysisTaskControllerRef.current;
+	function abortActiveImportAnalysis() {
+		activeImportAnalysisAbortControllerRef.current?.abort();
+		activeImportAnalysisAbortControllerRef.current = null;
 	}
 
 	function setSelectionStartFromPlayhead(playheadUs: number) {

@@ -3,7 +3,10 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
+import type {
+	LocalMediaAssetInspection,
+	LocalMediaAssetInspector,
+} from "@/editor-core/local-file-analysis";
 import type { GeneratedMedia, OutputSettings } from "@/editor-core/model";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
@@ -63,7 +66,7 @@ describe("useSingleAssetEditingSession", () => {
 		});
 	});
 
-	it("ignores stale failed asset analysis after a newer Media asset is ready", async () => {
+	it("ignores stale successful Media asset analysis after a newer Media asset is ready", async () => {
 		const inspections: Array<{
 			deferred: Deferred<LocalMediaAssetInspection>;
 			fileName: string;
@@ -138,7 +141,240 @@ describe("useSingleAssetEditingSession", () => {
 				return;
 			}
 			expect(session.asset.label).toBe("second.mp4");
+			expect(sessionRef.current?.previewSource).toMatchObject({
+				name: "second.mp4",
+			});
+			expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
+				session.asset.id,
+			);
 		});
+	});
+
+	it("ignores stale failed Media asset analysis after a newer Media asset is ready", async () => {
+		const inspections: Deferred<LocalMediaAssetInspection>[] = [];
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+
+		render(
+			<SingleAssetEditingSessionProbe
+				inspectLocalAsset={() => {
+					const deferred = createDeferred<LocalMediaAssetInspection>();
+					inspections.push(deferred);
+
+					return deferred.promise;
+				}}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		let firstImport: Promise<void> | undefined;
+		let secondImport: Promise<void> | undefined;
+		act(() => {
+			firstImport = sessionRef.current?.commands.importLocalFile(
+				new File(["first video"], "first.mp4", { type: "video/mp4" }),
+			);
+			secondImport = sessionRef.current?.commands.importLocalFile(
+				new File(["second video"], "second.mp4", { type: "video/mp4" }),
+			);
+		});
+
+		await waitFor(() => {
+			expect(inspections).toHaveLength(2);
+		});
+		await act(async () => {
+			inspections[1]?.resolve(supportedInspection);
+			await secondImport;
+		});
+
+		const readyAssetId =
+			sessionRef.current?.activeMediaAssetCleanupScope?.assetId;
+		await act(async () => {
+			inspections[0]?.reject(new Error("First analysis failed late."));
+			await firstImport;
+		});
+
+		expect(sessionRef.current?.session).toMatchObject({
+			asset: { label: "second.mp4" },
+			status: "ready",
+		});
+		expect(sessionRef.current?.previewSource).toMatchObject({
+			name: "second.mp4",
+		});
+		expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
+			readyAssetId,
+		);
+	});
+
+	it("aborts the previous Media asset analysis when a newer import starts", async () => {
+		const inspections: Array<{
+			deferred: Deferred<LocalMediaAssetInspection>;
+			signal: AbortSignal;
+		}> = [];
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		const inspectLocalAsset: LocalMediaAssetInspector = vi.fn(
+			(_draft, request) => {
+				const deferred = createDeferred<LocalMediaAssetInspection>();
+				if (!request.signal) {
+					throw new Error("Expected Media asset analysis cancellation signal.");
+				}
+				inspections.push({ deferred, signal: request.signal });
+
+				return deferred.promise;
+			},
+		);
+
+		render(
+			<SingleAssetEditingSessionProbe
+				inspectLocalAsset={inspectLocalAsset}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		act(() => {
+			void sessionRef.current?.commands.importLocalFile(
+				new File(["first video"], "first.mp4", { type: "video/mp4" }),
+			);
+			void sessionRef.current?.commands.importLocalFile(
+				new File(["second video"], "second.mp4", { type: "video/mp4" }),
+			);
+		});
+
+		await waitFor(() => {
+			expect(inspections).toHaveLength(2);
+		});
+		expect(inspections[0]?.signal.aborted).toBe(true);
+		expect(inspections[1]?.signal.aborted).toBe(false);
+
+		await act(async () => {
+			inspections[0]?.deferred.resolve(supportedInspection);
+			inspections[1]?.deferred.resolve(supportedInspection);
+		});
+	});
+
+	it("keeps a re-import authoritative after Close file while an older analysis is pending", async () => {
+		const inspections: Array<{
+			deferred: Deferred<LocalMediaAssetInspection>;
+			fileName: string;
+		}> = [];
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		let assetId = 0;
+
+		render(
+			<SingleAssetEditingSessionProbe
+				createAssetId={() => `asset-${++assetId}`}
+				inspectLocalAsset={(draft) => {
+					const deferred = createDeferred<LocalMediaAssetInspection>();
+					inspections.push({
+						deferred,
+						fileName: draft.provenance.fileName,
+					});
+
+					return deferred.promise;
+				}}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		let firstImport: Promise<void> | undefined;
+		let secondImport: Promise<void> | undefined;
+		act(() => {
+			firstImport = sessionRef.current?.commands.importLocalFile(
+				new File(["first video"], "first.mp4", { type: "video/mp4" }),
+			);
+			secondImport = sessionRef.current?.commands.importLocalFile(
+				new File(["second video"], "second.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(inspections).toHaveLength(2);
+		});
+		await act(async () => {
+			inspections[1]?.deferred.resolve(supportedInspection);
+			await secondImport;
+		});
+
+		act(() => {
+			sessionRef.current?.commands.requestCloseFile();
+		});
+		await waitFor(() => {
+			expect(sessionRef.current?.session.status).toBe("empty");
+		});
+
+		let thirdImport: Promise<void> | undefined;
+		act(() => {
+			thirdImport = sessionRef.current?.commands.importLocalFile(
+				new File(["third video"], "third.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(inspections.map(({ fileName }) => fileName)).toEqual([
+				"first.mp4",
+				"second.mp4",
+				"third.mp4",
+			]);
+		});
+		await act(async () => {
+			inspections[2]?.deferred.resolve(supportedInspection);
+			await thirdImport;
+			inspections[0]?.deferred.resolve(supportedInspection);
+			await firstImport;
+		});
+
+		expect(sessionRef.current?.session).toMatchObject({
+			asset: { label: "third.mp4" },
+			status: "ready",
+		});
+		expect(sessionRef.current?.previewSource).toMatchObject({
+			name: "third.mp4",
+		});
+		const session = sessionRef.current?.session;
+		if (session?.status !== "ready") {
+			throw new Error("Expected the re-imported Media asset to remain ready.");
+		}
+		expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
+			session.asset.id,
+		);
+	});
+
+	it("aborts pending Media asset analysis and suppresses its completion after unmount", async () => {
+		const inspection = createDeferred<LocalMediaAssetInspection>();
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		let analysisSignal: AbortSignal | undefined;
+		const view = render(
+			<SingleAssetEditingSessionProbe
+				inspectLocalAsset={(_draft, request) => {
+					analysisSignal = request.signal;
+
+					return inspection.promise;
+				}}
+				sessionRef={sessionRef}
+			/>,
+		);
+
+		let pendingImport: Promise<void> | undefined;
+		act(() => {
+			pendingImport = sessionRef.current?.commands.importLocalFile(
+				new File(["video"], "pending.mp4", { type: "video/mp4" }),
+			);
+		});
+		await waitFor(() => {
+			expect(analysisSignal).toBeInstanceOf(AbortSignal);
+		});
+
+		view.unmount();
+		expect(analysisSignal?.aborted).toBe(true);
+		await act(async () => {
+			inspection.resolve(supportedInspection);
+			await pendingImport;
+		});
+		expect(sessionRef.current?.session.status).toBe("loading");
 	});
 
 	it("closes the active Media asset only after confirmation and resets session resources", async () => {
@@ -575,17 +811,21 @@ type SingleAssetEditingSessionOptions = Parameters<
 
 type Deferred<T> = {
 	promise: Promise<T>;
+	reject: (reason?: unknown) => void;
 	resolve: (value: T) => void;
 };
 
 function createDeferred<T>(): Deferred<T> {
+	let reject: (reason?: unknown) => void = () => {};
 	let resolve: (value: T) => void = () => {};
-	const promise = new Promise<T>((promiseResolve) => {
+	const promise = new Promise<T>((promiseResolve, promiseReject) => {
+		reject = promiseReject;
 		resolve = promiseResolve;
 	});
 
 	return {
 		promise,
+		reject,
 		resolve,
 	};
 }
