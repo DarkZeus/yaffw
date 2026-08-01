@@ -388,8 +388,8 @@ _Avoid_: first-slice requirement, automatic fallback
 - Live **Preview level meter** sampling should use a short peak window around 50 ms so the meter remains responsive without flickering on individual samples.
 - Cached peak buckets for **Preview level meters** are a deferred performance optimization, not part of the first meter architecture.
 - **Preview level meters** should be fed by a preview-metering adapter rather than directly reading the multitrack preview output, so metering can follow its own preview-signal rules.
-- The first preview-metering adapter should read decoded per-track sample data at the current **Playhead** rather than attaching to the live browser audio output graph.
-- The preview-metering adapter may reuse lower-level audio preparation and worker infrastructure used by waveform extraction, but it should not depend on **Waveform lane** artifacts or waveform availability.
+- The preview-metering adapter should read per-channel Web Audio analyser taps from the live **Preview audio engine** graph rather than resampling decoded buffers around the **Playhead**.
+- Preview metering may share the **Preview audio engine**'s prepared resources, but it should not depend on **Waveform lane** artifacts or waveform availability.
 - **Preview level meter** preparation failures should be isolated per audio **Media track**; one failed track meter should not disable the whole **Audio** panel or other track controls.
 - **Preview level meter** preparation or display failures should not block preview playback or export-affecting controls; they only reduce visual monitoring confidence.
 - Unavailable **Preview level meters** should reserve their normal strip space and render a disabled/unavailable state rather than being removed and shifting the **Audio** layout.

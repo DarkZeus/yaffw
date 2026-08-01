@@ -7,3 +7,5 @@ WaveSurfer may still render visual **Waveform lanes**, but it should not own pre
 `wavesurfer-multitrack` should be removed as soon as the preview transport replacement no longer imports it. `wavesurfer.js` may remain only for visual waveform rendering.
 
 This revises [ADR-0022](./0022-preview-level-metering-adapter.md): **Preview level meters** no longer depend on a separate decoded-sample simulation because the **Preview audio engine** provides per-track and combined graph taps.
+
+Each per-track tap branches after channel handling, **Track volume**, and **Preview audio monitoring** gain. A separate branch observes the explicit monitored-output mix before global **Preview volume** and mute. Every branch uses a `ChannelSplitterNode` and one `AnalyserNode` per displayed channel; analyser outputs remain disconnected so metering cannot duplicate audible output. The UI adapter owns smoothing, clip hold, and pause/stop decay, while the engine reports silence whenever its graph is not playing.

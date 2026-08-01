@@ -9,6 +9,7 @@ import {
 	previewTrackMonitorGainForAudioTrackResource,
 	previewTrackVolumeGainForAudioTrackResource,
 } from "../engine/preview-audio-engine";
+import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 
 describe("createPreviewAudioEngine", () => {
@@ -16,6 +17,7 @@ describe("createPreviewAudioEngine", () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [
 				createPreviewAudioResource("audio-1", 0),
 				createPreviewAudioResource("audio-2", 1.25),
@@ -39,8 +41,9 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.createdSources[0]?.start).toHaveBeenCalledWith(0, 0.5);
 		expect(context.createdSources[1]?.start).toHaveBeenCalledWith(0.5, 0);
 		expect(context.createdGains[0]?.gain.value).toBe(0.6);
-		expect(context.createdGains[1]?.gain.value).toBe(0.5);
-		expect(context.createdGains[2]?.gain.value).toBe(0.25);
+		expect(context.createdGains[1]?.gain.value).toBe(1);
+		expect(context.createdGains[2]?.gain.value).toBe(0.5);
+		expect(context.createdGains[3]?.gain.value).toBe(0.25);
 
 		context.currentTime = 2;
 		expect(engine.getCurrentTime()).toBe(3.5);
@@ -61,6 +64,7 @@ describe("createPreviewAudioEngine", () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [createPreviewAudioResource("audio-1", 0)],
 		});
 
@@ -70,12 +74,12 @@ describe("createPreviewAudioEngine", () => {
 		await engine.play();
 
 		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
-		expect(context.createdSplitters).toHaveLength(1);
+		expect(context.createdSplitters).toHaveLength(4);
 		expect(context.createdSources[0]?.connect).toHaveBeenCalledWith(
-			context.createdSplitters[0],
+			context.createdSplitters[2],
 		);
-		expect(context.createdSplitters[0]?.connect).toHaveBeenCalledWith(
-			context.createdGains[1],
+		expect(context.createdSplitters[2]?.connect).toHaveBeenCalledWith(
+			context.createdGains[2],
 			0,
 			0,
 		);
@@ -84,52 +88,52 @@ describe("createPreviewAudioEngine", () => {
 
 		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
 		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
-		expect(context.createdSplitters).toHaveLength(2);
+		expect(context.createdSplitters).toHaveLength(6);
 		expect(context.createdMergers).toHaveLength(1);
-		expect(context.createdSplitters[1]?.connect).toHaveBeenCalledWith(
+		expect(context.createdSplitters[4]?.connect).toHaveBeenCalledWith(
 			context.createdMergers[0],
 			1,
 			0,
 		);
-		expect(context.createdSplitters[1]?.connect).toHaveBeenCalledWith(
+		expect(context.createdSplitters[4]?.connect).toHaveBeenCalledWith(
 			context.createdMergers[0],
 			1,
 			1,
 		);
 		expect(context.createdMergers[0]?.connect).toHaveBeenCalledWith(
-			context.createdGains[1],
+			context.createdGains[2],
 		);
 	});
 
-	it("reads meter taps after channel handling and Track volume but before output gain", async () => {
+	it("reads silent per-channel analyser branches after track decisions and before output gain", async () => {
 		const context = createAudioContextSpy({
-			audioBuffers: [
-				createAudioBufferStub({
-					channels: [[[4_800, 1]], [[4_800, 0.25]]],
-				}),
-				createAudioBufferStub({
-					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
-				}),
-			],
+			audioBuffers: [createAudioBufferStub(), createAudioBufferStub()],
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [
 				createPreviewAudioResource("audio-1", 0),
 				createPreviewAudioResource("audio-2", 0),
 			],
 		});
 
-		engine.setTime(0.1);
-		engine.setTrackChannelMode(0, "use-left-as-mono");
 		engine.setTrackVolumeGain(0, 0.25);
 		engine.setTrackMonitorGain(0, 1);
 		engine.setTrackVolumeGain(1, 0.5);
 		engine.setTrackMonitorGain(1, 1);
 		engine.setOutputGain(0);
 		await engine.play();
+		setAnalyserFrames(context, [
+			[0.5, -0.75],
+			[0.25, -1.25],
+			[0.1, -0.25],
+			[0.05, -0.125],
+			[0.2, -0.5],
+			[0.1, -0.25],
+		]);
 
-		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		const snapshot = engine.readMeterSnapshot();
 		const voiceState = snapshot.trackStates["audio-1"];
 		const desktopState = snapshot.trackStates["audio-2"];
 
@@ -139,10 +143,10 @@ describe("createPreviewAudioEngine", () => {
 			throw new Error("Expected ready engine meter taps.");
 		}
 		expect(voiceState.channels.map((channel) => channel.peak)).toEqual([
-			0.25, 0.25,
+			0.25, 0.125,
 		]);
 		expect(desktopState.channels.map((channel) => channel.peak)).toEqual([
-			0.25, 0.125,
+			0.5, 0.25,
 		]);
 		expect(snapshot.combinedState.status).toBe("ready");
 		if (snapshot.combinedState.status !== "ready") {
@@ -150,10 +154,31 @@ describe("createPreviewAudioEngine", () => {
 		}
 		expect(
 			snapshot.combinedState.channels.map((channel) => channel.peak),
-		).toEqual([0.5, 0.375]);
+		).toEqual([0.75, 1.25]);
+		expect(context.createdGains[2]?.connect).toHaveBeenCalledWith(
+			context.createdGains[1],
+		);
+		expect(context.createdGains[2]?.connect).toHaveBeenCalledWith(
+			context.createdSplitters[1],
+		);
+		expect(context.createdGains[3]?.connect).toHaveBeenCalledWith(
+			context.createdGains[1],
+		);
+		expect(context.createdGains[3]?.connect).toHaveBeenCalledWith(
+			context.createdSplitters[2],
+		);
+		expect(context.createdGains[1]?.connect).toHaveBeenCalledWith(
+			context.createdGains[0],
+		);
+		expect(context.createdGains[1]?.connect).toHaveBeenCalledWith(
+			context.createdSplitters[0],
+		);
+		for (const analyser of context.createdAnalysers) {
+			expect(analyser.connect).not.toHaveBeenCalled();
+		}
 	});
 
-	it("caches auto channel meter plans across live meter snapshots", async () => {
+	it("rebuilds analyser channels for automatic one-sided and duplicated stereo handling", async () => {
 		const channelSampleIteration = vi.fn();
 		const context = createAudioContextSpy({
 			audioBuffers: [
@@ -168,19 +193,152 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [createPreviewAudioResource("audio-1", 0)],
 		});
 
 		engine.setTrackChannelMode(0, "auto-one-sided-stereo");
 		channelSampleIteration.mockClear();
+		setAnalyserFrames(context, [[0.4], [0.2], [], [], [0.3]]);
+		await engine.play();
 
-		engine.readMeterSnapshot({ outputChannels: 2 });
-		expect(channelSampleIteration).toHaveBeenCalled();
-
-		channelSampleIteration.mockClear();
-		engine.readMeterSnapshot({ outputChannels: 2 });
-
+		const autoTrack = engine.readMeterSnapshot().trackStates["audio-1"];
+		expect(autoTrack?.status).toBe("ready");
+		if (autoTrack?.status !== "ready") {
+			throw new Error("Expected a ready auto-one-sided meter.");
+		}
+		expect(autoTrack.channels[0]?.label).toBe("Mono");
+		expect(autoTrack.channels[0]?.peak).toBeCloseTo(0.3);
 		expect(channelSampleIteration).not.toHaveBeenCalled();
+
+		engine.setTrackChannelMode(0, "duplicate-left-to-stereo");
+		setAnalyserFrames(context, [[0.4], [0.2], [], [], [], [0.6], [0.6]]);
+		const duplicatedTrack = engine.readMeterSnapshot().trackStates["audio-1"];
+		expect(duplicatedTrack?.status).toBe("ready");
+		if (duplicatedTrack?.status !== "ready") {
+			throw new Error("Expected a ready duplicated stereo meter.");
+		}
+		expect(duplicatedTrack.channels.map((channel) => channel.label)).toEqual([
+			"Left",
+			"Right",
+		]);
+		expect(duplicatedTrack.channels[0]?.peak).toBeCloseTo(0.6);
+		expect(duplicatedTrack.channels[1]?.peak).toBeCloseTo(0.6);
+	});
+
+	it("preserves wider custom per-track channel layouts", async () => {
+		const context = createAudioContextSpy({
+			audioBuffers: [
+				createAudioBufferStub({ channels: [[], [], [], [], [], []] }),
+			],
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			outputChannels: 2,
+			resources: [createPreviewAudioResource("audio-1", 0)],
+		});
+
+		setAnalyserFrames(context, [
+			[0.4],
+			[0.2],
+			[0.1],
+			[0.2],
+			[0.3],
+			[0.4],
+			[0.5],
+			[0.6],
+		]);
+		await engine.play();
+		const track = engine.readMeterSnapshot().trackStates["audio-1"];
+
+		expect(track?.status).toBe("ready");
+		if (track?.status !== "ready") {
+			throw new Error("Expected a ready wider-layout meter.");
+		}
+		expect(track.channels.map((channel) => channel.label)).toEqual([
+			"Ch 1",
+			"Ch 2",
+			"Ch 3",
+			"Ch 4",
+			"Ch 5",
+			"Ch 6",
+		]);
+		for (const [index, expectedPeak] of [
+			0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
+		].entries()) {
+			expect(track.channels[index]?.peak).toBeCloseTo(expectedPeak);
+		}
+	});
+
+	it("keeps graph metering live through seeks and speed changes, then reports silence while paused or stopped", async () => {
+		const context = createAudioContextSpy();
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			outputChannels: 2,
+			resources: [createPreviewAudioResource("audio-1", 0)],
+		});
+		setAnalyserFrames(context, [[0.8], [0.4], [0.6], [0.2]]);
+
+		await engine.play();
+		expectMeterPeaksToBeCloseTo(
+			readyTrackPeaks(engine.readMeterSnapshot(), "audio-1"),
+			[0.6, 0.2],
+		);
+
+		engine.setTime(5);
+		engine.setPlaybackRate(1.75);
+		expectMeterPeaksToBeCloseTo(
+			readyTrackPeaks(engine.readMeterSnapshot(), "audio-1"),
+			[0.6, 0.2],
+		);
+
+		engine.pause();
+		engine.setTime(0);
+		expect(readyTrackPeaks(engine.readMeterSnapshot(), "audio-1")).toEqual([
+			0, 0,
+		]);
+		expect(engine.readMeterSnapshot().combinedState).toEqual({
+			channels: [
+				{ label: "Left", peak: 0 },
+				{ label: "Right", peak: 0 },
+			],
+			partial: false,
+			reason: undefined,
+			status: "ready",
+		});
+
+		engine.destroy();
+		for (const analyser of context.createdAnalysers) {
+			expect(analyser.disconnect).toHaveBeenCalledTimes(1);
+		}
+	});
+
+	it("keeps Preview playback ready while analyser creation is explicitly unavailable", async () => {
+		const context = createAudioContextSpy();
+		context.createAnalyser.mockImplementation(() => {
+			throw new Error("Analyser disabled");
+		});
+		const engine = await createPreviewAudioEngine({
+			createAudioContext: () => context,
+			outputChannels: 2,
+			resources: [createPreviewAudioResource("audio-1", 0)],
+		});
+
+		expect(engine.getStatus()).toBe("ready");
+		expect(engine.readMeterSnapshot()).toEqual({
+			combinedState: {
+				reason: "Preview audio engine meter tap unavailable: Analyser disabled",
+				status: "unavailable",
+			},
+			trackStates: {
+				"audio-1": {
+					reason:
+						"Preview audio engine meter tap unavailable: Analyser disabled",
+					status: "unavailable",
+					trackId: "audio-1",
+				},
+			},
+		});
 	});
 
 	it("keeps prepared tracks active in degraded mode when one Preview audio resource fails", async () => {
@@ -194,6 +352,7 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [
 				createPreviewAudioResource("audio-1", 0),
 				createPreviewAudioResource("audio-2", 0),
@@ -213,7 +372,7 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.createdSources).toHaveLength(1);
 		expect(context.createdSources[0]?.start).toHaveBeenCalledWith(0, 0.1);
 
-		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		const snapshot = engine.readMeterSnapshot();
 		const voiceState = snapshot.trackStates["audio-1"];
 
 		expect(voiceState?.status).toBe("ready");
@@ -228,6 +387,14 @@ describe("createPreviewAudioEngine", () => {
 		}
 		expect(snapshot.combinedState.partial).toBe(true);
 		expect(snapshot.combinedState.reason).toContain("Desktop decode failed");
+
+		engine.setTrackMonitorGain(1, 0);
+		const excludedSnapshot = engine.readMeterSnapshot();
+		expect(excludedSnapshot.combinedState.status).toBe("ready");
+		if (excludedSnapshot.combinedState.status !== "ready") {
+			throw new Error("Expected a ready combined meter state.");
+		}
+		expect(excludedSnapshot.combinedState.partial).toBe(false);
 	});
 
 	it("retries only a failed Preview audio resource while preserving prepared resources", async () => {
@@ -244,6 +411,7 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [
 				createPreviewAudioResource("audio-1", 0),
 				createPreviewAudioResource("audio-2", 0),
@@ -269,10 +437,10 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
 		expect(context.createdSources[1]?.start).toHaveBeenCalled();
 		expect(context.createdSources[2]?.start).toHaveBeenCalled();
-		expect(context.createdGains[1]?.gain.value).toBe(0.5);
-		expect(context.createdGains[2]?.gain.value).toBe(0.25);
+		expect(context.createdGains[2]?.gain.value).toBe(0.5);
+		expect(context.createdGains[3]?.gain.value).toBe(0.25);
 
-		const snapshot = engine.readMeterSnapshot({ outputChannels: 2 });
+		const snapshot = engine.readMeterSnapshot();
 		expect(snapshot.trackStates["audio-2"]?.status).toBe("ready");
 		expect(snapshot.combinedState.status).toBe("ready");
 		if (snapshot.combinedState.status !== "ready") {
@@ -295,6 +463,7 @@ describe("createPreviewAudioEngine", () => {
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
+			outputChannels: 2,
 			resources: [
 				createPreviewAudioResource("audio-1", 0),
 				createPreviewAudioResource("audio-2", 0),
@@ -331,6 +500,7 @@ describe("createPreviewAudioEngine", () => {
 		await expect(
 			createPreviewAudioEngine({
 				createAudioContext: () => context,
+				outputChannels: 2,
 				resources: [
 					createPreviewAudioResource("audio-1", 0),
 					createPreviewAudioResource("audio-2", 0),
@@ -442,6 +612,20 @@ function createAudioContextSpy({
 	const destination = createAudioNodeSpy();
 	const context = {
 		close: vi.fn(),
+		createAnalyser: vi.fn(() => {
+			const analyser = {
+				...createAudioNodeSpy(),
+				fftSize: 32,
+				getFloatTimeDomainData: vi.fn((destination: Float32Array) => {
+					destination.fill(0);
+					destination.set(analyser.samples.subarray(0, destination.length));
+				}),
+				samples: new Float32Array(),
+			};
+			context.createdAnalysers.push(analyser);
+
+			return analyser;
+		}),
 		createBufferSource: vi.fn(() => {
 			const source = {
 				...createAudioNodeSpy(),
@@ -478,6 +662,13 @@ function createAudioContextSpy({
 		createdGains: [] as Array<
 			ReturnType<typeof createAudioNodeSpy> & { gain: { value: number } }
 		>,
+		createdAnalysers: [] as Array<
+			ReturnType<typeof createAudioNodeSpy> & {
+				fftSize: number;
+				getFloatTimeDomainData: ReturnType<typeof vi.fn>;
+				samples: Float32Array;
+			}
+		>,
 		createdMergers: [] as Array<ReturnType<typeof createAudioNodeSpy>>,
 		createdSplitters: [] as Array<ReturnType<typeof createAudioNodeSpy>>,
 		createdSources: [] as Array<
@@ -500,9 +691,43 @@ function createAudioContextSpy({
 		}),
 		destination,
 		resume: vi.fn(),
+		sampleRate: 48_000,
 	};
 
 	return context;
+}
+
+function setAnalyserFrames(
+	context: ReturnType<typeof createAudioContextSpy>,
+	frames: number[][],
+) {
+	for (const [index, samples] of frames.entries()) {
+		const analyser = context.createdAnalysers[index];
+
+		if (analyser) {
+			analyser.samples = Float32Array.from(samples);
+		}
+	}
+}
+
+function readyTrackPeaks(
+	snapshot: PreviewAudioEngineMeterSnapshot,
+	trackId: string,
+) {
+	const track = snapshot.trackStates[trackId];
+
+	if (track?.status !== "ready") {
+		throw new Error(`Expected ready meter state for ${trackId}.`);
+	}
+
+	return track.channels.map((channel) => channel.peak);
+}
+
+function expectMeterPeaksToBeCloseTo(actual: number[], expected: number[]) {
+	expect(actual).toHaveLength(expected.length);
+	for (const [index, expectedPeak] of expected.entries()) {
+		expect(actual[index]).toBeCloseTo(expectedPeak);
+	}
 }
 
 function createAudioNodeSpy() {

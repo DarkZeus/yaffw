@@ -104,6 +104,7 @@ export function usePreviewAudioMonitoringLifecycle({
 
 		void createPreviewAudioEngine({
 			failures: previewAudioResources.failures,
+			outputChannels: audioControlsRef.current.audioMix.outputChannels,
 			resources: previewAudioResources.resources,
 		})
 			.then((previewAudioEngine) => {

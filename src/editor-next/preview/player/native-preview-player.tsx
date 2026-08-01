@@ -83,9 +83,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
 		getMeteringStatus: () => audioMonitoringStatusRef.current,
 		readMeterSnapshot: () =>
-			previewAudioEngineRef.current?.readMeterSnapshot({
-				outputChannels: audioMixRef.current.outputChannels,
-			}) ?? null,
+			previewAudioEngineRef.current?.readMeterSnapshot() ?? null,
 		retryTrack: (trackId: string) =>
 			retryPreviewMeteringTrackRef.current(trackId),
 	});

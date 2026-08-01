@@ -222,6 +222,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		);
 		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
 			failures: failedSourcesState.failures,
+			outputChannels: 2,
 			resources: [expect.objectContaining({ trackId: "audio-1" })],
 		});
 	});
