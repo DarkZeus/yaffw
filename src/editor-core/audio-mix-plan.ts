@@ -51,7 +51,7 @@ export function includedAudioMixPlanTracks(
 }
 
 export function audioMixPlanTrackIsIncluded(track: AudioMixPlanTrack): boolean {
-	return track.include && track.trackVolumeGain > 0;
+	return track.include;
 }
 
 export function audioMixPlanTrackOutputChannelCount({

@@ -1,14 +1,14 @@
 # YAFFW
 
-YAFFW is a local-first media editor for personal video editing workflows. The current rewrite centers on `editor-next`: a single-asset editor workbench for loading a local video, previewing it, choosing a media-time Selection, reviewing export capability, running a browser export job, and explicitly delivering the Generated media.
+YAFFW is a local-first media editor for personal video editing workflows. Its primary editor is `editor-next`: a single-asset editor workbench for loading a local video, previewing it, choosing a media-time Selection, reviewing export capability, running a browser export job, and explicitly delivering the Generated media.
 
-The long-term product is no longer an FFmpeg-wrapper UI. Legacy server-backed editor and bulk-download routes still exist while the browser-first editor model is being proven, but new editor work should follow the domain language in [CONTEXT.md](./CONTEXT.md).
+The product is no longer an FFmpeg-wrapper UI. Browser-local editor processing is the primary path, while standalone bulk download remains separate from the editor core. New editor work should follow the domain language in [CONTEXT.md](./CONTEXT.md).
 
 ## Current Surface
 
-- `/editor-next`: current rewrite path for local-file editing.
-- `/`: legacy media editor surface.
-- `/bulk-download`: legacy acquisition surface.
+- `/`: canonical editor-next surface for local-file editing.
+- `/editor-next`: compatibility redirect to `/`.
+- `/bulk-download`: standalone acquisition surface available in local environments.
 
 ## Editor-Next Capabilities
 

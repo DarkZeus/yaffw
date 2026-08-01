@@ -428,6 +428,29 @@ describe("Output settings generated audio mix resolution", () => {
 			kind: "resolved",
 		});
 	});
+
+	it("retains output audio when an included source track has zero Track volume", () => {
+		expect(
+			resolveOutputAudioProfile({
+				asset: singleAacAudioAsset,
+				audioMix: {
+					...includedSingleAudioMix,
+					tracks: {
+						"audio-1": {
+							...includedSingleAudioMix.tracks["audio-1"],
+							volumePercent: 0,
+						},
+					},
+				},
+				outputSettings: createDefaultOutputSettings(),
+				support,
+			}),
+		).toMatchObject({
+			audioCodec: "aac",
+			includedTrackCount: 1,
+			kind: "resolved",
+		});
+	});
 });
 
 const singleAacAudioAsset = {

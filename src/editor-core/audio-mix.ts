@@ -30,9 +30,7 @@ export function createDefaultAudioMixTrackDecision(
 }
 
 export function audioMixHasIncludedTracks(audioMix: AudioMix): boolean {
-	return Object.values(audioMix.tracks).some(
-		(decision) => decision.include && decision.volumePercent > 0,
-	);
+	return Object.values(audioMix.tracks).some((decision) => decision.include);
 }
 
 export function audioTrackVolumePercentToGain(volumePercent: number): number {

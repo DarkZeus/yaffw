@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { AudioMix } from "./model";
 import {
 	audioMixPlanHasIncludedTracks,
 	audioMixPlanTrackOutputChannelCount,
 	createAudioMixPlan,
 	includedAudioMixPlanTracks,
 } from "./audio-mix-plan";
+import type { AudioMix } from "./model";
 
 describe("Audio mix plan", () => {
 	it("represents committed Audio mix decisions without preview-only monitoring state", () => {
@@ -93,9 +93,32 @@ describe("Audio mix plan", () => {
 		expect(Object.keys(plan)).not.toContain("soloedAudioTrackId");
 		expect(Object.keys(plan)).not.toContain("previewVolume");
 		expect(Object.keys(plan)).not.toContain("previewMuted");
-		expect(includedAudioMixPlanTracks(plan).map((track) => track.trackId)).toEqual([
-			"audio-voice",
-		]);
+		expect(
+			includedAudioMixPlanTracks(plan).map((track) => track.trackId),
+		).toEqual(["audio-voice", "audio-music"]);
+		expect(audioMixPlanHasIncludedTracks(plan)).toBe(true);
+	});
+
+	it("keeps an included zero-volume track in the Generated audio mix plan", () => {
+		const plan = createAudioMixPlan({
+			audioMix: {
+				finalPeakGuardDb: -1,
+				outputChannels: 2,
+				tracks: {
+					"audio-silent": {
+						channelMode: "preserve",
+						include: true,
+						trackId: "audio-silent",
+						volumePercent: 0,
+					},
+				},
+			},
+			trackIds: ["audio-silent"],
+		});
+
+		expect(
+			includedAudioMixPlanTracks(plan).map((track) => track.trackId),
+		).toEqual(["audio-silent"]);
 		expect(audioMixPlanHasIncludedTracks(plan)).toBe(true);
 	});
 

@@ -512,6 +512,29 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.inputs).toHaveLength(1);
 	});
 
+	it("renders an included zero-volume track as a silent Generated audio mix", async () => {
+		const videoTrack = createVideoTrack();
+		mediabunnyMock.videoTracks = [videoTrack];
+		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({
+				audioMix: zeroVolumeIncludedAudioMix,
+			}),
+		);
+
+		expect(browserAudioMixMock.renderBrowserAudioMix).toHaveBeenCalledWith(
+			expect.objectContaining({
+				audioMix: zeroVolumeIncludedAudioMix,
+			}),
+		);
+		expect(mediabunnyMock.audioBufferSources).toHaveLength(1);
+	});
+
 	it("cancels and closes mixed-audio mux resources after mux failure", async () => {
 		const failure = new Error("Packet mux failed.");
 		const videoTrack = createVideoTrack();
@@ -719,6 +742,16 @@ const includedAudioMix = {
 			include: true,
 			trackId: "audio-1",
 			volumePercent: 100,
+		},
+	},
+} as const;
+
+const zeroVolumeIncludedAudioMix = {
+	...includedAudioMix,
+	tracks: {
+		"audio-1": {
+			...includedAudioMix.tracks["audio-1"],
+			volumePercent: 0,
 		},
 	},
 } as const;
