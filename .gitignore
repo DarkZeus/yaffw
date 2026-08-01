@@ -550,6 +550,8 @@ benchmarks/results/
 docs/build/
 docs/.docusaurus/
 docs/*
+!docs/agents/
+!docs/agents/*.md
 !docs/adr/
 !docs/adr/*.md
 
