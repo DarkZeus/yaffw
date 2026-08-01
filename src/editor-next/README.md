@@ -11,6 +11,4 @@
 - `selection/` owns the selection timeline, waveform lanes, and video strip. Timeline code lives in `timeline/`; waveform code in `waveform/`; video strip code in `video-strip/`.
 - `export/` owns export runners, export review UI, generated media delivery, and export test harnesses. Export runners live in `runners/`; export review UI in `inspector/`; generated media code in `generated-media/`; harness code in `harness/`.
 - `media-work/` owns disposable and cancellable browser media work scopes shared by preview and export adapters. Scope code lives in `scopes/`; cancellable task code lives in `tasks/`.
-- `prototypes/` contains reference prototypes and notes that are not published as the canonical route. Workbench prototypes live in `workbench/`; preview prototypes live in `preview/`.
-
 Keep types beside their implementation owner by default, and retain a separate contract module only for real shared interfaces such as worker messages, cross-module seams, or multiple production adapters or callers. Keep `*.test.*` files under `tests/`. When adding a module, place it next to the concern and role that owns the behavior it changes.

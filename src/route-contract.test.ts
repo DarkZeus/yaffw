@@ -18,21 +18,16 @@ import { getAppSidebarItems } from "./components/app-sidebar-items";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { routeTree } from "./routeTree.gen";
 
-const referencePrototypeRoutePath = "/editor-next-workbench-prototype";
 const legacyRoutePath = "/legacy-editor";
 const performanceDemoRoutePath = "/test";
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const legacyRouteFile = join(sourceDir, "routes/legacy-editor.tsx");
 const performanceDemoRouteFile = join(sourceDir, "routes/test.tsx");
-const referencePrototypeRouteFile = join(
-	sourceDir,
-	"routes/editor-next-workbench-prototype.tsx",
-);
-const referencePrototypeComponentFile = join(
-	sourceDir,
-	"editor-next/prototypes/workbench/editor-workbench-prototype.tsx",
-);
 const removedPrototypeRoutes = [
+	{
+		path: "/editor-next-workbench-prototype",
+		routeFile: join(sourceDir, "routes/editor-next-workbench-prototype.tsx"),
+	},
 	{
 		path: "/editor-layout-prototype",
 		routeFile: join(sourceDir, "routes/editor-layout-prototype.tsx"),
@@ -197,22 +192,6 @@ describe("app route contract", () => {
 			expect(appSidebarSource).not.toContain(removedPrototype.path);
 			expect(rootRouteSource).not.toContain(removedPrototype.path);
 		}
-	});
-
-	it("keeps the resolved workbench reference artifact unpublished", () => {
-		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
-		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-		const referencePrototypeComponentSource = readFileSync(
-			referencePrototypeComponentFile,
-			"utf8",
-		);
-
-		expect(routeTreeSource).not.toContain(referencePrototypeRoutePath);
-		expect(existsSync(referencePrototypeRouteFile)).toBe(false);
-		expect(appSidebarSource).not.toContain(referencePrototypeRoutePath);
-		expect(referencePrototypeComponentSource).toContain(
-			"export function EditorWorkbenchPrototype",
-		);
 	});
 });
 
