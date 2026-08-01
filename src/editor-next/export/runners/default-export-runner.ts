@@ -310,17 +310,18 @@ async function muxVideoOnlyExportWithMixedAudio({
 		});
 		const outputCleanup = registerCancellableUntilSettled(scope, output);
 		const videoTracks = await input.getVideoTracks();
-		const videoSources = videoTracks.map((track) => {
-			const source = new EncodedVideoPacketSource(
-				requiredVideoCodec(track.codec),
-			);
+		const videoSources = await Promise.all(
+			videoTracks.map(async (track) => {
+				const codec = await track.getCodec();
+				const source = new EncodedVideoPacketSource(requiredVideoCodec(codec));
 
-			return {
-				closeSource: registerClosableCleanup(scope, source),
-				source,
-				track,
-			};
-		});
+				return {
+					closeSource: registerClosableCleanup(scope, source),
+					source,
+					track,
+				};
+			}),
+		);
 		const audioSource = new AudioBufferSource({
 			codec: audioCodec,
 			...(audioQuality === undefined ? {} : { quality: audioQuality }),

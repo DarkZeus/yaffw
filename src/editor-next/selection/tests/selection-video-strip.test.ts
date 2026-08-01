@@ -390,14 +390,12 @@ describe("video strip thumbnail generation", () => {
 		expect(mediabunnyMock.inputInstances).toHaveLength(1);
 	});
 
-	it("accepts Mediabunny video tracks that expose deprecated metadata properties", async () => {
-		mediabunnyMock.primaryVideoTrack = createLegacyVideoTrack();
-		mediabunnyMock.canvases = [
-			createWrappedCanvas(1),
-			createWrappedCanvas(2.75),
-			createWrappedCanvas(4.5),
-			createWrappedCanvas(6.25),
-		];
+	it("returns unavailable when current video metadata getters reject", async () => {
+		const videoTrack = createVideoTrack();
+		videoTrack.getDisplayWidth.mockRejectedValueOnce(
+			new Error("Video dimensions are malformed."),
+		);
+		mediabunnyMock.primaryVideoTrack = videoTrack;
 
 		const result = await loadBrowserVideoStripThumbnails({
 			assetDurationUs: 8_000_000,
@@ -407,17 +405,11 @@ describe("video strip thumbnail generation", () => {
 			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
 		});
 
-		expect(result.status).toBe("ready");
-		if (result.status !== "ready") {
-			throw new Error("Expected ready thumbnail result.");
-		}
-		expect(result.frames).toHaveLength(4);
-		expect(mediabunnyMock.sinkOptions[0]).toEqual({
-			fit: "cover",
-			height: 108,
-			poolSize: 1,
-			width: 192,
+		expect(result).toEqual({
+			reason: "Video dimensions are malformed.",
+			status: "unavailable",
 		});
+		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
 	});
 
 	it("returns unavailable when there is no decodable video track", async () => {
@@ -442,12 +434,9 @@ describe("video strip thumbnail generation", () => {
 type MockVideoTrack = {
 	canDecode: ReturnType<typeof vi.fn>;
 	computeDuration: ReturnType<typeof vi.fn>;
-	codec?: string | null;
-	displayHeight?: number;
-	displayWidth?: number;
-	getCodec?: ReturnType<typeof vi.fn>;
-	getDisplayHeight?: ReturnType<typeof vi.fn>;
-	getDisplayWidth?: ReturnType<typeof vi.fn>;
+	getCodec: ReturnType<typeof vi.fn>;
+	getDisplayHeight: ReturnType<typeof vi.fn>;
+	getDisplayWidth: ReturnType<typeof vi.fn>;
 	getFirstTimestamp: ReturnType<typeof vi.fn>;
 };
 
@@ -461,18 +450,6 @@ function createVideoTrack(): MockVideoTrack {
 		getFirstTimestamp: vi.fn(async () => 1),
 	};
 }
-
-function createLegacyVideoTrack(): MockVideoTrack {
-	return {
-		canDecode: vi.fn(async () => true),
-		codec: "avc",
-		computeDuration: vi.fn(async () => 8),
-		displayHeight: 1080,
-		displayWidth: 1920,
-		getFirstTimestamp: vi.fn(async () => 1),
-	};
-}
-
 function createWrappedCanvas(timestamp: number) {
 	const imageBlob = new Blob([`frame-${timestamp}`], { type: "image/jpeg" });
 

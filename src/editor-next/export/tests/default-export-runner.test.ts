@@ -395,6 +395,7 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(
 			mediabunnyMock.encodedVideoPacketSources[0].close,
 		).toHaveBeenCalledTimes(1);
+		expect(videoTrack.getCodec).toHaveBeenCalledOnce();
 		expect(mediabunnyMock.audioBufferSources[0].add).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
@@ -566,6 +567,26 @@ describe("browserDefaultExportRunner cleanup", () => {
 		).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 	});
+
+	it("rejects and disposes when a generated video codec cannot be read", async () => {
+		const failure = new Error("Generated video codec is malformed.");
+		const videoTrack = createVideoTrack();
+		videoTrack.getCodec.mockRejectedValueOnce(failure);
+		mediabunnyMock.videoTracks = [videoTrack];
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+
+		await expect(
+			browserDefaultExportRunner.run(
+				createExportRequest({ audioMix: includedAudioMix }),
+			),
+		).rejects.toBe(failure);
+
+		expect(mediabunnyMock.inputs[1].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.encodedVideoPacketSources).toEqual([]);
+	});
 });
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -610,7 +631,7 @@ type MockConversionConfig = {
 };
 
 type MockVideoTrack = {
-	codec: "avc";
+	getCodec: MockFn;
 	getDecoderConfig: MockFn;
 	getFirstTimestamp: MockFn;
 };
@@ -679,7 +700,7 @@ async function waitForConversion() {
 
 function createVideoTrack(): MockVideoTrack {
 	return {
-		codec: "avc",
+		getCodec: vi.fn(async () => "avc"),
 		getDecoderConfig: vi.fn(async () => ({ codec: "avc1.42E01E" })),
 		getFirstTimestamp: vi.fn(async () => 1),
 	};

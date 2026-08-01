@@ -1,10 +1,4 @@
-import {
-	ALL_FORMATS,
-	BlobSource,
-	CanvasSink,
-	Input,
-	type InputVideoTrack,
-} from "mediabunny";
+import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 
 import type { MediaTimeUs } from "@/editor-core/model";
 
@@ -21,20 +15,6 @@ const MAX_THUMBNAIL_WIDTH_PX = 112;
 const THUMBNAIL_IMAGE_TYPE = "image/jpeg";
 const THUMBNAIL_IMAGE_QUALITY = 0.72;
 const CANVAS_POOL_SIZE = 1;
-
-type MaybePromise<T> = T | Promise<T>;
-
-type VideoStripReadableVideoTrack = Pick<
-	InputVideoTrack,
-	"canDecode" | "computeDuration" | "getFirstTimestamp"
-> & {
-	codec?: unknown;
-	displayHeight?: unknown;
-	displayWidth?: unknown;
-	getCodec?: () => MaybePromise<unknown>;
-	getDisplayHeight?: () => MaybePromise<unknown>;
-	getDisplayWidth?: () => MaybePromise<unknown>;
-};
 
 export async function loadVideoStripThumbnailsOnCurrentThread({
 	assetDurationUs,
@@ -63,7 +43,7 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 			};
 		}
 
-		if ((await readVideoTrackCodec(videoTrack)) === null) {
+		if ((await videoTrack.getCodec()) === null) {
 			return {
 				reason: "The primary video track uses an unsupported codec.",
 				status: "unavailable",
@@ -79,8 +59,8 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 
 		const [displayWidth, displayHeight, firstTimestamp, trackEndTimestamp] =
 			await Promise.all([
-				readVideoTrackDisplayWidth(videoTrack),
-				readVideoTrackDisplayHeight(videoTrack),
+				videoTrack.getDisplayWidth(),
+				videoTrack.getDisplayHeight(),
 				videoTrack.getFirstTimestamp(),
 				videoTrack.computeDuration(),
 			]);
@@ -305,40 +285,6 @@ function throwIfAborted(signal: AbortSignal | undefined) {
 	if (signal?.aborted) {
 		throw createAbortError();
 	}
-}
-
-async function readVideoTrackCodec(videoTrack: VideoStripReadableVideoTrack) {
-	if (typeof videoTrack.getCodec === "function") {
-		return videoTrack.getCodec();
-	}
-
-	return videoTrack.codec ?? null;
-}
-
-async function readVideoTrackDisplayWidth(
-	videoTrack: VideoStripReadableVideoTrack,
-) {
-	if (typeof videoTrack.getDisplayWidth === "function") {
-		return normalizeFiniteNumber(await videoTrack.getDisplayWidth());
-	}
-
-	return normalizeFiniteNumber(videoTrack.displayWidth);
-}
-
-async function readVideoTrackDisplayHeight(
-	videoTrack: VideoStripReadableVideoTrack,
-) {
-	if (typeof videoTrack.getDisplayHeight === "function") {
-		return normalizeFiniteNumber(await videoTrack.getDisplayHeight());
-	}
-
-	return normalizeFiniteNumber(videoTrack.displayHeight);
-}
-
-function normalizeFiniteNumber(value: unknown) {
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: Number.NaN;
 }
 
 async function canvasToThumbnailBlob(

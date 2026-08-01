@@ -157,10 +157,19 @@ export async function preparePreviewAudioResources({
 					continue;
 				}
 
-				const metadata = await describeAudioPreviewTrack(
-					inputTrack,
-					trackIndex,
-				);
+				let metadata: AudioPreviewTrackMetadata;
+				try {
+					metadata = await describeAudioPreviewTrack(inputTrack, trackIndex);
+				} catch (error) {
+					throwIfAborted(signal);
+					failures.push({
+						reason: errorToMessage(error),
+						track: assetTrack,
+						trackId: assetTrack.id,
+						trackIndex,
+					});
+					continue;
+				}
 				const preparedResource = await preparePreviewAudioTrackResource({
 					assetTrack,
 					createObjectURL,
@@ -549,15 +558,18 @@ async function describeAudioPreviewTrack(
 	track: InputAudioTrack,
 	index: number,
 ): Promise<AudioPreviewTrackMetadata> {
-	const firstTimestampSeconds = await track
-		.getFirstTimestamp()
-		.catch(() => null);
+	const [codec, firstTimestampSeconds, languageCode, name] = await Promise.all([
+		track.getCodec(),
+		track.getFirstTimestamp().catch(() => null),
+		track.getLanguageCode(),
+		track.getName(),
+	]);
 
 	return {
-		codec: track.codec,
+		codec,
 		firstTimestampSeconds,
-		languageCode: track.languageCode,
-		name: track.name,
+		languageCode,
+		name,
 		number: index + 1,
 	};
 }

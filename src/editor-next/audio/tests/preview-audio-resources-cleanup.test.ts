@@ -10,6 +10,7 @@ const mockMedia = vi.hoisted(() => ({
 	}>,
 	inputs: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
 	outputs: [] as Array<{ cancel: ReturnType<typeof vi.fn> }>,
+	tracks: [] as Array<typeof mockTrack>,
 }));
 
 function installMediabunnyMock() {
@@ -27,7 +28,7 @@ function installMediabunnyMock() {
 		}
 
 		async getAudioTracks() {
-			return [mockTrack];
+			return mockMedia.tracks;
 		}
 	}
 
@@ -101,10 +102,12 @@ function installMediabunnyMock() {
 }
 
 beforeEach(() => {
+	vi.clearAllMocks();
 	mockMedia.encodedAddShouldFail = false;
 	mockMedia.encodedSources = [];
 	mockMedia.inputs = [];
 	mockMedia.outputs = [];
+	mockMedia.tracks = [mockTrack];
 });
 
 afterEach(() => {
@@ -142,18 +145,49 @@ describe("preparePreviewAudioResources cleanup", () => {
 			expect(source.close).toHaveBeenCalledTimes(1);
 		}
 	});
+
+	it("records a metadata getter rejection as that Preview audio track failure", async () => {
+		installMediabunnyMock();
+		const failure = new Error("Audio codec metadata is malformed.");
+		mockMedia.tracks = [
+			{
+				...mockTrack,
+				getCodec: vi.fn(async () => {
+					throw failure;
+				}),
+			},
+		];
+		const { preparePreviewAudioResources } = await import(
+			"../engine/preview-audio-resources"
+		);
+
+		const result = await preparePreviewAudioResources({
+			asset: readyAsset,
+			createObjectURL: vi.fn(() => "blob:audio-preview"),
+			revokeObjectURL: vi.fn(),
+			signal: new AbortController().signal,
+			source: new Blob(["video"], { type: "video/mp4" }),
+		});
+
+		expect(result.resources).toEqual([]);
+		expect(result.failures).toEqual([
+			expect.objectContaining({
+				reason: "Audio codec metadata is malformed.",
+				trackId: "audio-1",
+			}),
+		]);
+		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledOnce();
+	});
 });
 
 const mockTrack = {
 	canDecode: vi.fn(async () => false),
-	codec: "aac",
+	getCodec: vi.fn(async () => "aac"),
 	getDecoderConfig: vi.fn(async () => ({ codec: "aac" })),
 	getFirstTimestamp: vi.fn(async () => 0),
+	getLanguageCode: vi.fn(async () => "und"),
+	getName: vi.fn(async () => "Voice"),
 	id: "audio-1",
-	languageCode: null,
-	name: "Voice",
-	numberOfChannels: 2,
-	sampleRate: 48_000,
 };
 
 const readyAsset = {

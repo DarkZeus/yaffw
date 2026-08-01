@@ -3,13 +3,12 @@ import type {
 	LocalMediaAssetInspector,
 } from "@/editor-core/local-file-analysis";
 import type { FrameTiming } from "@/editor-core/model";
+import { resolveMediabunnyInputTrackCodec } from "../../media-work/adapters/mediabunny-input-track-metadata";
 
 export type BrowserVideoTrack = {
 	computePacketStats: (targetPacketCount?: number) => Promise<{
 		averagePacketRate: number;
 	}>;
-	displayHeight: number;
-	displayWidth: number;
 };
 
 export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
@@ -46,31 +45,43 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 			throwIfAborted(request.signal);
 			const [videoTrackInspections, audioTrackInspections] = await Promise.all([
 				Promise.all(
-					videoTracks.map(async (track, index) => ({
-						codec: readableCodec(
-							(await track.getCodecParameterString()) ??
-								track.codec ??
-								track.internalCodecId,
-						),
-						height: track.displayHeight,
-						id: String(track.id),
-						label: track.name || `Video ${index + 1}`,
-						width: track.displayWidth,
-					})),
+					videoTracks.map(async (track, index) => {
+						const [codec, height, name, width] = await Promise.all([
+							resolveMediabunnyInputTrackCodec(track),
+							track.getDisplayHeight(),
+							track.getName(),
+							track.getDisplayWidth(),
+						]);
+
+						return {
+							codec,
+							height,
+							id: String(track.id),
+							label: name || `Video ${index + 1}`,
+							width,
+						};
+					}),
 				),
 				Promise.all(
-					audioTracks.map(async (track, index) => ({
-						channels: track.numberOfChannels,
-						codec: readableCodec(
-							(await track.getCodecParameterString()) ??
-								track.codec ??
-								track.internalCodecId,
-						),
-						id: String(track.id),
-						label: track.name || `Audio ${index + 1}`,
-						language: track.languageCode,
-						sampleRate: track.sampleRate,
-					})),
+					audioTracks.map(async (track, index) => {
+						const [channels, codec, language, name, sampleRate] =
+							await Promise.all([
+								track.getNumberOfChannels(),
+								resolveMediabunnyInputTrackCodec(track),
+								track.getLanguageCode(),
+								track.getName(),
+								track.getSampleRate(),
+							]);
+
+						return {
+							channels,
+							codec,
+							id: String(track.id),
+							label: name || `Audio ${index + 1}`,
+							language,
+							sampleRate,
+						};
+					}),
 				),
 			]);
 			const frameTiming = await computeFrameTiming(videoTracks[0]);
@@ -130,10 +141,6 @@ function isUsableDuration(
 		Number.isFinite(durationSeconds) &&
 		durationSeconds > 0
 	);
-}
-
-function readableCodec(codec: unknown): string | undefined {
-	return typeof codec === "string" && codec.length > 0 ? codec : undefined;
 }
 
 function throwIfAborted(signal: AbortSignal | undefined) {

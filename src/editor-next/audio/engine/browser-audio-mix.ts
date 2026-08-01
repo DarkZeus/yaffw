@@ -183,12 +183,16 @@ async function decodeAudioTrackRange({
 	scope: DisposableMediaWorkScope;
 	startSeconds: number;
 	track: {
-		numberOfChannels: number;
-		sampleRate: number;
+		getNumberOfChannels: () => Promise<number>;
+		getSampleRate: () => Promise<number>;
 	} & ConstructorParameters<typeof AudioSampleSink>[0];
 }): Promise<AudioBuffer> {
-	const sampleRate = track.sampleRate || 48_000;
-	const numberOfChannels = track.numberOfChannels || 1;
+	const [resolvedNumberOfChannels, resolvedSampleRate] = await Promise.all([
+		track.getNumberOfChannels(),
+		track.getSampleRate(),
+	]);
+	const sampleRate = positiveNumberOr(resolvedSampleRate, 48_000);
+	const numberOfChannels = positiveNumberOr(resolvedNumberOfChannels, 1);
 	const outputLength = Math.max(
 		1,
 		Math.ceil((endSeconds - startSeconds) * sampleRate),
@@ -251,6 +255,10 @@ async function decodeAudioTrackRange({
 	}
 
 	return output;
+}
+
+function positiveNumberOr(value: number, fallback: number) {
+	return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 export function resolveChannelTransform(

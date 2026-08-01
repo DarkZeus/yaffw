@@ -10,6 +10,7 @@ import type {
 	GeneratedMediaInspection,
 	GeneratedMediaTrackInspection,
 } from "@/editor-core/export-correctness";
+import { resolveMediabunnyInputTrackCodec } from "../../media-work/adapters/mediabunny-input-track-metadata";
 
 export async function inspectGeneratedMediaBlob(
 	blob: Blob,
@@ -47,18 +48,22 @@ async function inspectVideoTrack(
 	track: InputVideoTrack,
 	index: number,
 ): Promise<GeneratedMediaTrackInspection> {
+	const [codec, durationUs, height, name, width] = await Promise.all([
+		resolveMediabunnyInputTrackCodec(track),
+		readTrackDurationUs(track),
+		track.getDisplayHeight(),
+		track.getName(),
+		track.getDisplayWidth(),
+	]);
+
 	return {
-		codec: readableCodec(
-			(await track.getCodecParameterString()) ??
-				track.codec ??
-				track.internalCodecId,
-		),
-		durationUs: await readTrackDurationUs(track),
-		height: track.displayHeight,
+		codec,
+		durationUs,
+		height,
 		id: String(track.id),
 		kind: "video",
-		label: track.name || `Video ${index + 1}`,
-		width: track.displayWidth,
+		label: name || `Video ${index + 1}`,
+		width,
 	};
 }
 
@@ -66,19 +71,25 @@ async function inspectAudioTrack(
 	track: InputAudioTrack,
 	index: number,
 ): Promise<GeneratedMediaTrackInspection> {
+	const [channels, codec, durationUs, language, name, sampleRate] =
+		await Promise.all([
+			track.getNumberOfChannels(),
+			resolveMediabunnyInputTrackCodec(track),
+			readTrackDurationUs(track),
+			track.getLanguageCode(),
+			track.getName(),
+			track.getSampleRate(),
+		]);
+
 	return {
-		channels: track.numberOfChannels,
-		codec: readableCodec(
-			(await track.getCodecParameterString()) ??
-				track.codec ??
-				track.internalCodecId,
-		),
-		durationUs: await readTrackDurationUs(track),
+		channels,
+		codec,
+		durationUs,
 		id: String(track.id),
 		kind: "audio",
-		label: track.name || `Audio ${index + 1}`,
-		language: track.languageCode,
-		sampleRate: track.sampleRate,
+		label: name || `Audio ${index + 1}`,
+		language,
+		sampleRate,
 	};
 }
 
@@ -116,8 +127,4 @@ function containerFromMimeType(
 	}
 
 	return "unknown";
-}
-
-function readableCodec(codec: unknown): string | undefined {
-	return typeof codec === "string" && codec.length > 0 ? codec : undefined;
 }
