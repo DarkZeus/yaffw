@@ -25,6 +25,7 @@ import {
 
 afterEach(() => {
 	cleanup();
+	window.localStorage.clear();
 	vi.restoreAllMocks();
 });
 
@@ -269,6 +270,33 @@ describe("Editor workbench", () => {
 		expect(screen.getByLabelText("Preview slot")).toBeTruthy();
 		expect(screen.queryByLabelText("Local media file")).toBeNull();
 	});
+
+	it("restores the last opened ready inspector tab", () => {
+		const view = renderReadyEditorSessionShell();
+
+		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
+		activateTab(within(inspectorRegion).getByRole("tab", { name: "Audio" }));
+
+		expect(
+			window.localStorage.getItem("editor-next-workbench-inspector-tab"),
+		).toBe("audio");
+		expect(within(inspectorRegion).getByLabelText("Audio panel")).toBeTruthy();
+
+		view.unmount();
+		renderReadyEditorSessionShell();
+
+		const restoredInspectorRegion = screen.getByLabelText(
+			"Workbench inspector region",
+		);
+		expect(
+			within(restoredInspectorRegion)
+				.getByRole("tab", { name: "Audio" })
+				.getAttribute("aria-selected"),
+		).toBe("true");
+		expect(
+			within(restoredInspectorRegion).getByLabelText("Audio panel"),
+		).toBeTruthy();
+	});
 });
 
 const supportedRuntime = evaluateRuntimeSupport({
@@ -353,4 +381,23 @@ const loadingSession = {
 function activateTab(tab: HTMLElement) {
 	fireEvent.mouseDown(tab, { button: 0, ctrlKey: false });
 	fireEvent.click(tab);
+}
+
+function renderReadyEditorSessionShell() {
+	return render(
+		<EditorSessionShell
+			audioPanel={<section aria-label="Audio panel">Audio panel slot</section>}
+			exportInspector={
+				<section aria-label="Export inspector">Export inspector slot</section>
+			}
+			localFileInputKey={0}
+			mediaAssetContext={
+				<section aria-label="Media asset context">Media asset slot</section>
+			}
+			onLocalFileDropped={() => undefined}
+			onLocalFileSelected={() => undefined}
+			previewPlayer={<section aria-label="Preview slot">Preview slot</section>}
+			session={readySession}
+		/>,
+	);
 }

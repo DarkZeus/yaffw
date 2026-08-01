@@ -73,6 +73,11 @@ const supportedVideoAcceptAttribute = [
 	"video/*",
 	...supportedVideoExtensions,
 ].join(",");
+const workbenchInspectorTabValues = ["media", "audio", "export"] as const;
+const defaultWorkbenchInspectorTabValue = "media";
+const workbenchInspectorTabStorageKey = "editor-next-workbench-inspector-tab";
+
+type WorkbenchInspectorTabValue = (typeof workbenchInspectorTabValues)[number];
 
 export function EditorWorkbenchFrame({
 	activeAsset,
@@ -258,6 +263,19 @@ function WorkbenchInspectorTabs({
 	EditorSessionShellProps,
 	"audioPanel" | "exportInspector" | "mediaAssetContext"
 >) {
+	const [activeTab, setActiveTab] = useState<WorkbenchInspectorTabValue>(
+		readStoredWorkbenchInspectorTabValue,
+	);
+
+	function handleTabChange(nextTab: string) {
+		if (!isWorkbenchInspectorTabValue(nextTab)) {
+			return;
+		}
+
+		setActiveTab(nextTab);
+		writeStoredWorkbenchInspectorTabValue(nextTab);
+	}
+
 	return (
 		<aside
 			aria-label="Workbench inspector region"
@@ -265,7 +283,8 @@ function WorkbenchInspectorTabs({
 		>
 			<Tabs
 				className="flex min-h-0 flex-1 flex-col gap-0 xl:h-full"
-				defaultValue="media"
+				onValueChange={handleTabChange}
+				value={activeTab}
 			>
 				<div className="flex h-8 min-w-0 shrink-0 items-center justify-between border-b border-workbench-border bg-workbench">
 					<TabsList
@@ -306,6 +325,47 @@ function WorkbenchInspectorTabs({
 				</TabsContent>
 			</Tabs>
 		</aside>
+	);
+}
+
+function readStoredWorkbenchInspectorTabValue(): WorkbenchInspectorTabValue {
+	if (typeof window === "undefined") {
+		return defaultWorkbenchInspectorTabValue;
+	}
+
+	try {
+		const storedValue = window.localStorage.getItem(
+			workbenchInspectorTabStorageKey,
+		);
+
+		return isWorkbenchInspectorTabValue(storedValue)
+			? storedValue
+			: defaultWorkbenchInspectorTabValue;
+	} catch {
+		return defaultWorkbenchInspectorTabValue;
+	}
+}
+
+function writeStoredWorkbenchInspectorTabValue(
+	value: WorkbenchInspectorTabValue,
+) {
+	if (typeof window === "undefined") {
+		return;
+	}
+
+	try {
+		window.localStorage.setItem(workbenchInspectorTabStorageKey, value);
+	} catch {
+		// Ignore storage failures so tab navigation remains usable.
+	}
+}
+
+function isWorkbenchInspectorTabValue(
+	value: unknown,
+): value is WorkbenchInspectorTabValue {
+	return (
+		typeof value === "string" &&
+		workbenchInspectorTabValues.includes(value as WorkbenchInspectorTabValue)
 	);
 }
 

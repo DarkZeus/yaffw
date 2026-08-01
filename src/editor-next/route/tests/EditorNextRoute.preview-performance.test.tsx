@@ -77,6 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	window.localStorage.clear();
 	vi.restoreAllMocks();
 	restoreObjectUrl("createObjectURL", originalCreateObjectURL);
 	restoreObjectUrl("revokeObjectURL", originalRevokeObjectURL);

@@ -179,6 +179,7 @@ const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
 
 afterEach(() => {
 	cleanup();
+	window.localStorage.clear();
 	vi.clearAllMocks();
 	vi.unstubAllGlobals();
 	restoreObjectUrl("createObjectURL", originalCreateObjectURL);
