@@ -236,6 +236,7 @@ export function useSingleAssetEditingSession({
 		const jobId = createExportJobId();
 		const abortController = new AbortController();
 		activeExportAbortControllerRef.current = abortController;
+		getGeneratedMediaArtifactStore().clear();
 
 		dispatch({
 			cancelSupported: defaultExportRunner.cancelSupported,

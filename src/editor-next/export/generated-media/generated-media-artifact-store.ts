@@ -21,34 +21,42 @@ export type GeneratedMediaArtifactDeliveryRequest = {
 };
 
 export function createGeneratedMediaArtifactStore(): GeneratedMediaArtifactStore {
-	const blobs = new Map<string, Blob>();
+	let currentArtifact: {
+		blob: Blob;
+		generatedMediaId: string;
+	} | null = null;
 
 	return {
 		clear() {
-			blobs.clear();
+			currentArtifact = null;
 		},
 		deliver({ deliver, generatedMedia }) {
-			const blob = blobs.get(generatedMedia.id);
-
-			if (!blob) {
+			if (currentArtifact?.generatedMediaId !== generatedMedia.id) {
 				return false;
 			}
 
 			deliver({
-				blob,
+				blob: currentArtifact.blob,
 				generatedMedia,
 			});
 
 			return true;
 		},
 		invalidate(generatedMediaId) {
-			blobs.delete(generatedMediaId);
+			if (currentArtifact?.generatedMediaId === generatedMediaId) {
+				currentArtifact = null;
+			}
 		},
 		read(generatedMedia) {
-			return blobs.get(generatedMedia.id) ?? null;
+			return currentArtifact?.generatedMediaId === generatedMedia.id
+				? currentArtifact.blob
+				: null;
 		},
 		retain({ blob, generatedMedia }) {
-			blobs.set(generatedMedia.id, blob);
+			currentArtifact = {
+				blob,
+				generatedMediaId: generatedMedia.id,
+			};
 		},
 	};
 }
