@@ -329,7 +329,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:2000000");
 	});
 
-	it("samples high-frequency playback frames without committing every tiny playhead tick to React state", async () => {
+	it("samples high-frequency playback frames while committing smooth timer updates to React state", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
 		const transportHandleRef: {
@@ -372,7 +372,7 @@ describe("useNativePreviewTransport", () => {
 		runNextPreviewFrame(frameCallbacks, 52);
 
 		expect(transportHandleRef.current?.getPlayheadUs()).toBe(1_052_000);
-		expect(readState()).toContain("playhead:1000000");
+		expect(readState()).toContain("playhead:1052000");
 
 		video.currentTime = 1.252;
 		runNextPreviewFrame(frameCallbacks, 252);
@@ -381,7 +381,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:1252000");
 	});
 
-	it("does not commit post-seek playback ticks to React state at frame cadence", async () => {
+	it("commits post-seek playback ticks at timer cadence instead of every frame", async () => {
 		vi.spyOn(window.performance, "now").mockReturnValue(0);
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
@@ -402,21 +402,21 @@ describe("useNativePreviewTransport", () => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		});
 
-		previewAudioEngine.setCurrentTimeSeconds(10.05);
-		runNextPreviewFrame(frameCallbacks, 50);
-		previewAudioEngine.setCurrentTimeSeconds(10.1);
-		runNextPreviewFrame(frameCallbacks, 100);
-		previewAudioEngine.setCurrentTimeSeconds(10.15);
-		runNextPreviewFrame(frameCallbacks, 150);
-		previewAudioEngine.setCurrentTimeSeconds(10.2);
-		runNextPreviewFrame(frameCallbacks, 200);
-
+		previewAudioEngine.setCurrentTimeSeconds(10.016);
+		runNextPreviewFrame(frameCallbacks, 16);
 		expect(readState()).toContain("playhead:10000000");
 
-		previewAudioEngine.setCurrentTimeSeconds(10.25);
-		runNextPreviewFrame(frameCallbacks, 250);
+		previewAudioEngine.setCurrentTimeSeconds(10.052);
+		runNextPreviewFrame(frameCallbacks, 52);
+		expect(readState()).toContain("playhead:10052000");
 
-		expect(readState()).toContain("playhead:10250000");
+		previewAudioEngine.setCurrentTimeSeconds(10.068);
+		runNextPreviewFrame(frameCallbacks, 68);
+		expect(readState()).toContain("playhead:10052000");
+
+		previewAudioEngine.setCurrentTimeSeconds(10.104);
+		runNextPreviewFrame(frameCallbacks, 104);
+		expect(readState()).toContain("playhead:10104000");
 	});
 
 	it("hard-resyncs large native video drift to the audio-master clock", async () => {

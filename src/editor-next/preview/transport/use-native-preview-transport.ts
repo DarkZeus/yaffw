@@ -16,8 +16,8 @@ import type { PreviewClockMode } from "./preview-clock-mode";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
 const PREVIEW_AV_HARD_RESYNC_FRAME_TOLERANCE = 2;
-const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 250;
-const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 250_000;
+const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 50;
+const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 50_000;
 
 export type PreviewMediaTransportHandle = {
 	currentTime: number;
