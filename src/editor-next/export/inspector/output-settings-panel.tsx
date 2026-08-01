@@ -1,15 +1,19 @@
 import {
 	Captions,
 	Check,
+	Expand,
 	Film,
+	Gauge,
 	Monitor,
 	Music2,
 	RotateCcw,
 	Settings,
+	Shrink,
 	Sparkles,
+	Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +60,66 @@ type OutputSettingsPanelProps = {
 	outputSettings: OutputSettings;
 };
 
+const BITS_PER_MEGABIT = 1_000_000;
+const outputSettingsCategoryTabClassName =
+	"relative isolate justify-start gap-2 overflow-hidden px-3 data-[state=active]:border-workbench-border-strong data-[state=active]:bg-workbench-hover data-[state=active]:font-semibold data-[state=active]:shadow-sm data-[state=active]:before:absolute data-[state=active]:before:inset-y-1 data-[state=active]:before:left-0 data-[state=active]:before:w-0.5 data-[state=active]:before:rounded-r-full data-[state=active]:before:bg-workbench-selected";
+
+// Keep this deferred AI roadmap in the modal until these controls are fully implemented.
+const AI_UPSCALING_MODELS = [
+	{
+		description: "Best for photos and realistic source frames",
+		label: "ESRGAN",
+	},
+	{
+		description: "Improved real-world image recovery",
+		label: "Real-ESRGAN",
+	},
+	{
+		description: "Fast 2x enhancement pass",
+		label: "EDSR",
+	},
+	{
+		description: "Lightweight super-resolution model",
+		label: "SRCNN",
+	},
+	{
+		description: "Specialized for anime and artwork",
+		label: "WAIFU2X",
+	},
+	{
+		description: "Transformer-based high detail recovery",
+		label: "SwinIR",
+	},
+] as const;
+
+const FRAME_INTERPOLATION_MODELS = [
+	{
+		description: "Balanced speed and quality",
+		label: "RIFE",
+		maxFps: 120,
+	},
+	{
+		description: "Optimized for CPU and mobile inference",
+		label: "RIFE-NCNN",
+		maxFps: 60,
+	},
+	{
+		description: "Depth-aware interpolation for high quality motion",
+		label: "DAIN-NCNN",
+		maxFps: 60,
+	},
+	{
+		description: "Fast flow-agnostic interpolation",
+		label: "FLAVR",
+		maxFps: 120,
+	},
+	{
+		description: "Quality-biased extreme interpolation",
+		label: "XVFI",
+		maxFps: 60,
+	},
+] as const;
+
 export function OutputSettingsPanel({
 	asset,
 	audioMix,
@@ -64,17 +128,20 @@ export function OutputSettingsPanel({
 	outputSettings,
 }: OutputSettingsPanelProps) {
 	const [open, setOpen] = useState(false);
-	const [draft, setDraft] = useState(outputSettings);
-	const [openingSnapshot, setOpeningSnapshot] = useState(outputSettings);
+	const [draft, setDraft] = useState<OutputSettings | null>(null);
+	const openingSnapshotRef = useRef<OutputSettings | null>(null);
+	const visibleDraft = draft ?? outputSettings;
 
 	function openModal() {
 		const snapshot = cloneOutputSettings(outputSettings);
 		setDraft(snapshot);
-		setOpeningSnapshot(snapshot);
+		openingSnapshotRef.current = cloneOutputSettings(snapshot);
 		setOpen(true);
 	}
 
 	function closeModal() {
+		openingSnapshotRef.current = null;
+		setDraft(null);
 		setOpen(false);
 	}
 
@@ -83,14 +150,14 @@ export function OutputSettingsPanel({
 			return;
 		}
 
-		const appliedOutputSettings = cloneOutputSettings(draft ?? outputSettings);
+		const appliedOutputSettings = cloneOutputSettings(visibleDraft);
 		onApplyOutputSettings(appliedOutputSettings);
 		try {
 			saveLastUsedSettings(window.localStorage, appliedOutputSettings);
 		} catch {
 			// Applying session-local settings must still succeed when storage is unavailable.
 		}
-		setOpen(false);
+		closeModal();
 	}
 	function changeContainer(containerId: string) {
 		const nextDraft = cloneOutputSettings(activeDraft);
@@ -238,6 +305,14 @@ export function OutputSettingsPanel({
 		setDraft(nextDraft);
 	}
 	const sourceDimensions = formatSourceDimensions(asset);
+	const sourceVideoTrack = asset.tracks.video[0];
+	const sourceResolution =
+		sourceVideoTrack?.width && sourceVideoTrack.height
+			? {
+					height: sourceVideoTrack.height,
+					width: sourceVideoTrack.width,
+				}
+			: undefined;
 	const [automaticReplacementMessage, setAutomaticReplacementMessage] =
 		useState<string | null>(null);
 	const activeDraft = draft ?? outputSettings;
@@ -353,8 +428,8 @@ export function OutputSettingsPanel({
 					closeModal();
 				}}
 			>
-				<DialogContent className="max-h-[min(44rem,calc(100dvh-2rem))] overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-2xl shadow-black/80 sm:max-w-[42rem]">
-					<DialogHeader className="border-b border-workbench-border px-4 py-4">
+				<DialogContent className="quality-settings-dialog flex h-[min(44rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-2xl shadow-black/80 sm:max-w-[64rem]">
+					<DialogHeader className="border-b border-workbench-border px-5 py-4">
 						<DialogTitle className="flex min-w-0 items-center gap-2 text-base">
 							<Settings aria-hidden="true" className="size-4" />
 							<span className="min-w-0 truncate">Output settings</span>
@@ -365,42 +440,62 @@ export function OutputSettingsPanel({
 						</DialogDescription>
 					</DialogHeader>
 					<Tabs
-						className="min-h-0 gap-0"
+						className="grid min-h-0 flex-1 grid-cols-[10rem_minmax(0,1fr)_16rem] gap-0"
 						defaultValue="general"
-						orientation="horizontal"
+						orientation="vertical"
 					>
-						<div className="border-b border-workbench-border px-4 py-3">
-							<TabsList className="grid h-auto w-full grid-cols-5 bg-workbench-hover/55 p-1">
-								<TabsTrigger value="general">General</TabsTrigger>
-								<TabsTrigger value="video">Video</TabsTrigger>
-								<TabsTrigger value="audio">Audio</TabsTrigger>
-								<TabsTrigger disabled value="ai">
+						<div className="border-r border-workbench-border bg-workbench-hover/15 p-2.5">
+							<p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+								Categories
+							</p>
+							<TabsList className="flex h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
+								<TabsTrigger
+									className={outputSettingsCategoryTabClassName}
+									value="general"
+								>
+									<Film aria-hidden="true" className="size-3.5" />
+									General
+								</TabsTrigger>
+								<TabsTrigger
+									className={outputSettingsCategoryTabClassName}
+									value="video"
+								>
+									<Monitor aria-hidden="true" className="size-3.5" />
+									Video
+								</TabsTrigger>
+								<TabsTrigger
+									className={outputSettingsCategoryTabClassName}
+									value="audio"
+								>
+									<Music2 aria-hidden="true" className="size-3.5" />
+									Audio
+								</TabsTrigger>
+								<TabsTrigger
+									className={outputSettingsCategoryTabClassName}
+									disabled
+									value="ai"
+								>
+									<Sparkles aria-hidden="true" className="size-3.5" />
 									AI
 								</TabsTrigger>
-								<TabsTrigger disabled value="subtitles">
+								<TabsTrigger
+									className={outputSettingsCategoryTabClassName}
+									disabled
+									value="subtitles"
+								>
+									<Captions aria-hidden="true" className="size-3.5" />
 									Subtitles
 								</TabsTrigger>
 							</TabsList>
 						</div>
-						<ScrollArea className="h-[min(27rem,calc(100dvh-15rem))]">
-							<div className="px-4 py-4">
+						<ScrollArea className="min-h-0">
+							<div className="px-6 py-5">
 								<TabsContent className="m-0" value="general">
 									<OutputSettingsTabSection
 										description="Default profile and generated-media summary"
 										icon={<Film aria-hidden="true" className="size-4" />}
 										title="General"
 									>
-										<ExportPresetControls
-											draft={activeDraft}
-											draftIsValid={draftIsValid}
-											exportRunning={exportRunning}
-											onLoadPreset={(preset) =>
-												setReconciledDraft(
-													cloneOutputSettings(preset.outputSettings),
-												)
-											}
-										/>
-										<Separator />
 										<OutputSettingsChoice
 											label="Container"
 											onChange={changeContainer}
@@ -546,11 +641,16 @@ export function OutputSettingsPanel({
 										<OutputSettingsFactGrid>
 											<OutputSettingsFact
 												label="Audio codec"
-												value={formatCodecSetting(draft.audioCodec, "audio")}
+												value={formatCodecSetting(
+													activeDraft.audioCodec,
+													"audio",
+												)}
 											/>
 											<OutputSettingsFact
 												label="Audio quality"
-												value={formatOutputQualitySetting(draft.audioQuality)}
+												value={formatOutputQualitySetting(
+													activeDraft.audioQuality,
+												)}
 											/>
 											<OutputSettingsFact
 												label="Included source tracks"
@@ -577,10 +677,7 @@ export function OutputSettingsPanel({
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="ai">
-									<OutputSettingsDeferredSection
-										icon={<Sparkles aria-hidden="true" className="size-4" />}
-										title="AI"
-									/>
+									<OutputSettingsAiDeferredSection />
 								</TabsContent>
 								<TabsContent className="m-0" value="subtitles">
 									<OutputSettingsDeferredSection
@@ -590,42 +687,242 @@ export function OutputSettingsPanel({
 								</TabsContent>
 							</div>
 						</ScrollArea>
+						<OutputSettingsPlan
+							audioProfile={resolvedAudio}
+							outputSettings={activeDraft}
+							resolution={resolvedResolution}
+							sourceDimensions={sourceDimensions}
+							sourceResolution={sourceResolution}
+							videoProfile={resolvedDraft}
+						/>
 					</Tabs>
-					<DialogFooter className="border-t border-workbench-border px-4 py-3">
-						<Button
-							onClick={() => {
-								setAutomaticReplacementMessage(null);
-								setDraft(cloneOutputSettings(openingSnapshot));
-							}}
-							type="button"
-							variant="outline"
-						>
-							<RotateCcw data-icon="inline-start" />
-							Reset
-						</Button>
-						<Button onClick={closeModal} type="button" variant="outline">
-							Cancel
-						</Button>
-						<Button
-							className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
-							disabled={
-								exportRunning ||
-								resolvedDraft.kind === "invalid" ||
-								resolvedAudio.kind === "invalid" ||
-								resolvedResolution.kind === "invalid" ||
-								resolvedVideoQuality.kind === "invalid" ||
-								resolvedAudioQuality.kind === "invalid"
-							}
-							onClick={applyResolvedDraft}
-							type="button"
-						>
-							<Check data-icon="inline-start" />
-							Apply
-						</Button>
+					<DialogFooter className="block border-t border-workbench-border px-3 py-3">
+						<div className="grid grid-cols-[10rem_minmax(0,1fr)_auto] items-center gap-3">
+							<ExportPresetControls
+								draft={activeDraft}
+								draftIsValid={draftIsValid}
+								exportRunning={exportRunning}
+								onLoadPreset={(preset) =>
+									setReconciledDraft(cloneOutputSettings(preset.outputSettings))
+								}
+							/>
+							<div>
+								<Button
+									onClick={() => {
+										setAutomaticReplacementMessage(null);
+										if (openingSnapshotRef.current !== null) {
+											setDraft(cloneOutputSettings(openingSnapshotRef.current));
+										}
+									}}
+									type="button"
+									variant="ghost"
+								>
+									<RotateCcw data-icon="inline-start" />
+									Reset
+								</Button>
+							</div>
+							<div className="flex items-center justify-end gap-2">
+								<Button onClick={closeModal} type="button" variant="outline">
+									Cancel
+								</Button>
+								<Button
+									className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
+									disabled={exportRunning || !draftIsValid}
+									onClick={applyResolvedDraft}
+									type="button"
+								>
+									<Check data-icon="inline-start" />
+									Apply
+								</Button>
+							</div>
+						</div>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 		</section>
+	);
+}
+
+function OutputSettingsPlan({
+	audioProfile,
+	outputSettings,
+	resolution,
+	sourceDimensions,
+	sourceResolution,
+	videoProfile,
+}: {
+	audioProfile: ResolvedOutputAudioProfile;
+	outputSettings: OutputSettings;
+	resolution: ResolvedOutputResolution;
+	sourceDimensions: string;
+	sourceResolution?: {
+		height: number;
+		width: number;
+	};
+	videoProfile: ResolvedOutputVideoProfile;
+}) {
+	const resolutionLabel =
+		resolution.kind === "resolved" && resolution.dimensions
+			? `${resolution.dimensions.width}x${resolution.dimensions.height}`
+			: sourceDimensions;
+	const profileLabel =
+		videoProfile.kind === "resolved"
+			? `${videoProfile.container.label} / ${formatCodecName(videoProfile.videoCodec)}`
+			: "Invalid Output settings";
+	const audioLabel =
+		audioProfile.kind === "resolved"
+			? audioProfile.audioCodec
+				? `${formatCodecName(audioProfile.audioCodec)} · ${audioProfile.includedTrackCount} included`
+				: "No audio track"
+			: "Invalid Output settings";
+	const aspectRatioLabel =
+		resolution.kind === "resolved" && resolution.dimensions
+			? formatAspectRatio(
+					resolution.dimensions.width,
+					resolution.dimensions.height,
+				)
+			: "Source ratio";
+	const scaleDirection = resolveOutputScaleDirection(
+		sourceResolution,
+		resolution.kind === "resolved" ? resolution.dimensions : undefined,
+	);
+	const scaleDescription =
+		scaleDirection === "downscale"
+			? `Downscale from ${sourceDimensions}`
+			: scaleDirection === "upscale"
+				? `Upscale from ${sourceDimensions}`
+				: scaleDirection === "same"
+					? "Same as source"
+					: "Source comparison unavailable";
+
+	return (
+		<aside
+			aria-label="Output plan"
+			className="min-h-0 overflow-y-auto border-l border-workbench-border bg-workbench-hover/10 p-4"
+		>
+			<div className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+				<Gauge aria-hidden="true" className="size-3.5" />
+				Output plan
+			</div>
+			<figure
+				aria-label={`Output frame proportions, ${resolutionLabel}`}
+				className="mb-5 rounded border border-workbench-border bg-workbench-viewer/55 p-3"
+			>
+				<figcaption className="flex items-center justify-between gap-3 text-[9px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
+					<span>Output frame</span>
+					<span className="font-mono tracking-normal text-workbench-selected">
+						{aspectRatioLabel}
+					</span>
+				</figcaption>
+				<div className="relative mt-2 aspect-video overflow-hidden rounded border border-workbench-border-strong bg-workbench-viewer">
+					<div className="absolute inset-x-3 top-1/2 border-t border-dashed border-workbench-border" />
+					<div className="absolute inset-y-3 left-1/2 border-l border-dashed border-workbench-border" />
+					{scaleDirection === "downscale" ? (
+						<span
+							aria-label="Target resolution is smaller than source"
+							className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-workbench-border-strong bg-workbench-inspector/90 text-workbench-selected"
+							role="img"
+						>
+							<Shrink aria-hidden="true" className="size-5" />
+						</span>
+					) : null}
+					{scaleDirection === "upscale" ? (
+						<span
+							aria-label="Target resolution is larger than source"
+							className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-workbench-border-strong bg-workbench-inspector/90 text-workbench-selected"
+							role="img"
+						>
+							<Expand aria-hidden="true" className="size-5" />
+						</span>
+					) : null}
+					<span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[9px] text-white/80">
+						{resolutionLabel}
+					</span>
+				</div>
+				<p className="mt-2 text-[9px] leading-4 text-muted-foreground">
+					{scaleDescription}
+				</p>
+			</figure>
+			<dl className="flex flex-col gap-3">
+				<OutputPlanFact label="Format" value={profileLabel} />
+				<OutputPlanFact label="Size" value={resolutionLabel} />
+				<OutputPlanFact
+					label="Video quality"
+					value={formatOutputQualitySetting(outputSettings.videoQuality)}
+				/>
+				<OutputPlanFact label="Generated audio mix" value={audioLabel} />
+				<OutputPlanFact
+					label="Audio quality"
+					value={formatOutputQualitySetting(outputSettings.audioQuality)}
+				/>
+			</dl>
+			<p className="mt-5 rounded border border-workbench-border bg-workbench-hover/25 p-3 text-[11px] leading-5 text-muted-foreground">
+				Changing Output settings may re-encode video. Selected-range precision
+				remains conservative until the Export job proves otherwise.
+			</p>
+		</aside>
+	);
+}
+
+function formatAspectRatio(width: number, height: number) {
+	const divisor = greatestCommonDivisor(width, height);
+
+	return `${width / divisor}:${height / divisor}`;
+}
+
+function greatestCommonDivisor(left: number, right: number): number {
+	let dividend = Math.abs(Math.round(left));
+	let divisor = Math.abs(Math.round(right));
+
+	while (divisor !== 0) {
+		const remainder = dividend % divisor;
+		dividend = divisor;
+		divisor = remainder;
+	}
+
+	return dividend || 1;
+}
+
+function resolveOutputScaleDirection(
+	source:
+		| {
+				height: number;
+				width: number;
+		  }
+		| undefined,
+	target:
+		| {
+				height: number;
+				width: number;
+		  }
+		| undefined,
+) {
+	if (!source || !target) {
+		return "unknown" as const;
+	}
+
+	const sourcePixelCount = source.width * source.height;
+	const targetPixelCount = target.width * target.height;
+
+	if (targetPixelCount < sourcePixelCount) {
+		return "downscale" as const;
+	}
+
+	if (targetPixelCount > sourcePixelCount) {
+		return "upscale" as const;
+	}
+
+	return "same" as const;
+}
+
+function OutputPlanFact({ label, value }: { label: string; value: string }) {
+	return (
+		<div>
+			<dt className="text-[9px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
+				{label}
+			</dt>
+			<dd className="mt-1 text-xs leading-5 text-foreground">{value}</dd>
+		</div>
 	);
 }
 
@@ -698,17 +995,26 @@ function OutputQualityChoice({
 			</OutputSettingsChoice>
 			{setting.kind === "custom-bitrate" ? (
 				<label className="grid gap-1.5">
-					<span>Custom {label.toLowerCase()} bitrate (bps)</span>
+					<span>Custom {label.toLowerCase()} bitrate (Mbps)</span>
 					<input
-						aria-label={`Custom ${label.toLowerCase()} bitrate`}
+						aria-label={`Custom ${label.toLowerCase()} bitrate in Mbps`}
 						className="h-9 w-full rounded border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
-						min="1"
-						onChange={(event) =>
-							onBitrateChange(event.currentTarget.valueAsNumber)
-						}
-						step="1"
+						min="0.000001"
+						onChange={(event) => {
+							const bitrateMbps = event.currentTarget.valueAsNumber;
+							onBitrateChange(
+								Number.isNaN(bitrateMbps)
+									? Number.NaN
+									: Math.round(bitrateMbps * BITS_PER_MEGABIT),
+							);
+						}}
+						step="0.001"
 						type="number"
-						value={Number.isNaN(setting.bitrateBps) ? "" : setting.bitrateBps}
+						value={
+							Number.isNaN(setting.bitrateBps)
+								? ""
+								: setting.bitrateBps / BITS_PER_MEGABIT
+						}
 					/>
 				</label>
 			) : null}
@@ -823,6 +1129,98 @@ function OutputSettingsDeferredSection({
 	);
 }
 
+function OutputSettingsAiDeferredSection() {
+	return (
+		<OutputSettingsTabSection
+			description="Planned browser-local AI output controls"
+			icon={<Sparkles aria-hidden="true" className="size-4" />}
+			title="AI"
+		>
+			<div className="rounded border border-workbench-border bg-workbench-hover/25 p-2.5 text-xs leading-5 text-muted-foreground">
+				<div className="flex items-center justify-between gap-2">
+					<span className="font-medium text-foreground">Deferred controls</span>
+					<Badge variant="secondary">Disabled</Badge>
+				</div>
+				<p className="mt-1">
+					These settings remain blocked until generated media can run AI
+					processing without changing the v1 export path.
+				</p>
+			</div>
+			<div className="grid gap-2 sm:grid-cols-2" aria-disabled="true">
+				<OutputSettingsRoadmapCard
+					description="Super-resolution output after the normal resolution decision"
+					icon={<Sparkles aria-hidden="true" className="size-4" />}
+					title="AI Upscaling"
+				>
+					<OutputSettingsRoadmapFact label="Default state" value="Off" />
+					<OutputSettingsRoadmapFact label="Default model" value="ESRGAN" />
+					<OutputSettingsRoadmapFact
+						label="Model choices"
+						value={formatAiModelList(AI_UPSCALING_MODELS)}
+					/>
+				</OutputSettingsRoadmapCard>
+				<OutputSettingsRoadmapCard
+					description="Intermediate-frame generation for smoother exports"
+					icon={<Zap aria-hidden="true" className="size-4" />}
+					title="Frame Interpolation"
+				>
+					<OutputSettingsRoadmapFact label="Default state" value="Off" />
+					<OutputSettingsRoadmapFact label="Default model" value="RIFE" />
+					<OutputSettingsRoadmapFact label="Target frame rate" value="60 fps" />
+					<OutputSettingsRoadmapFact
+						label="Model choices"
+						value={formatFrameInterpolationModelList(
+							FRAME_INTERPOLATION_MODELS,
+						)}
+					/>
+				</OutputSettingsRoadmapCard>
+			</div>
+		</OutputSettingsTabSection>
+	);
+}
+
+function OutputSettingsRoadmapCard({
+	children,
+	description,
+	icon,
+	title,
+}: {
+	children: ReactNode;
+	description: string;
+	icon: ReactNode;
+	title: string;
+}) {
+	return (
+		<section className="flex flex-col gap-3 rounded border border-dashed border-workbench-border bg-workbench-hover/15 p-2.5 opacity-80">
+			<div className="flex items-start gap-2">
+				<div className="mt-0.5 text-muted-foreground">{icon}</div>
+				<div className="min-w-0">
+					<div className="text-sm font-semibold text-foreground">{title}</div>
+					<p className="mt-1 text-xs leading-5 text-muted-foreground">
+						{description}
+					</p>
+				</div>
+			</div>
+			<div className="flex flex-col gap-2">{children}</div>
+		</section>
+	);
+}
+
+function OutputSettingsRoadmapFact({
+	label,
+	value,
+}: {
+	label: string;
+	value: string;
+}) {
+	return (
+		<div className="rounded border border-workbench-border bg-workbench-hover/25 px-2 py-1.5 text-[11px]">
+			<div className="text-muted-foreground">{label}</div>
+			<div className="font-medium leading-5 text-foreground">{value}</div>
+		</div>
+	);
+}
+
 function formatOutputProfileSummary(outputSettings: OutputSettings): string {
 	if (
 		outputSettings.container.kind === "default-output-profile" &&
@@ -928,6 +1326,25 @@ function formatSourceDimensions(asset: ReadyMediaAsset): string {
 	}
 
 	return `${videoTrack.width}x${videoTrack.height}`;
+}
+
+function formatAiModelList(
+	models: typeof AI_UPSCALING_MODELS | typeof FRAME_INTERPOLATION_MODELS,
+): string {
+	return models
+		.map((model) => `${model.label}: ${model.description}`)
+		.join("; ");
+}
+
+function formatFrameInterpolationModelList(
+	models: typeof FRAME_INTERPOLATION_MODELS,
+): string {
+	return models
+		.map(
+			(model) =>
+				`${model.label}: ${model.description}, up to ${model.maxFps} fps`,
+		)
+		.join("; ");
 }
 
 function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {

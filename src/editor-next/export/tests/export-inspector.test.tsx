@@ -111,9 +111,13 @@ describe("ExportInspectorPanel", () => {
 		const outputSettingsDialog = screen.getByRole("dialog", {
 			name: "Output settings",
 		});
-		expect(
-			within(outputSettingsDialog).getByRole("tab", { name: "General" }),
-		).toBeTruthy();
+		expect(outputSettingsDialog.className).toContain("quality-settings-dialog");
+		const generalTab = within(outputSettingsDialog).getByRole("tab", {
+			name: "General",
+		});
+		expect(generalTab.className).toContain(
+			"data-[state=active]:before:bg-workbench-selected",
+		);
 		expect(
 			within(outputSettingsDialog).getByRole("tab", { name: "Video" }),
 		).toBeTruthy();
@@ -149,6 +153,25 @@ describe("ExportInspectorPanel", () => {
 		).toBeTruthy();
 		expect(
 			within(outputSettingsDialog).queryByText("GPU Acceleration"),
+		).toBeNull();
+		const outputPlan =
+			within(outputSettingsDialog).getByLabelText("Output plan");
+		expect(within(outputPlan).getByText("Output frame")).toBeTruthy();
+		expect(
+			within(outputPlan).getByRole("figure", {
+				name: "Output frame proportions, 1920x1080",
+			}),
+		).toBeTruthy();
+		expect(within(outputPlan).getByText("Same as source")).toBeTruthy();
+		expect(
+			within(outputPlan).queryByRole("img", {
+				name: "Target resolution is smaller than source",
+			}),
+		).toBeNull();
+		expect(
+			within(outputPlan).queryByRole("img", {
+				name: "Target resolution is larger than source",
+			}),
 		).toBeNull();
 
 		fireEvent.click(
@@ -200,6 +223,7 @@ describe("ExportInspectorPanel", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
 		let dialog = screen.getByRole("dialog", { name: "Output settings" });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Presets" }));
 		fireEvent.change(
 			within(dialog).getByRole("combobox", { name: "Container" }),
 			{ target: { value: "webm" } },
@@ -218,6 +242,7 @@ describe("ExportInspectorPanel", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
 		dialog = screen.getByRole("dialog", { name: "Output settings" });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Presets" }));
 		fireEvent.change(
 			within(dialog).getByRole("combobox", { name: "Saved Export preset" }),
 			{ target: { value: "Web sharing" } },
@@ -265,6 +290,7 @@ describe("ExportInspectorPanel", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Output settings" }));
 		const dialog = screen.getByRole("dialog", { name: "Output settings" });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Presets" }));
 		const presetName = within(dialog).getByRole("textbox", {
 			name: "Export preset name",
 		});
@@ -419,6 +445,12 @@ describe("ExportInspectorPanel", () => {
 		]);
 
 		fireEvent.change(resolutionSelect, { target: { value: "1280x720" } });
+		expect(
+			within(dialog).getByRole("img", {
+				name: "Target resolution is smaller than source",
+			}),
+		).toBeTruthy();
+		expect(within(dialog).getByText("Downscale from 1920x1080")).toBeTruthy();
 		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
 
 		expect(onApplyOutputSettings).toHaveBeenCalledWith({
@@ -467,7 +499,7 @@ describe("ExportInspectorPanel", () => {
 			{ target: { value: "custom-bitrate" } },
 		);
 		const customAudioBitrate = within(dialog).getByRole("spinbutton", {
-			name: "Custom audio quality bitrate",
+			name: "Custom audio quality bitrate in Mbps",
 		});
 		fireEvent.change(customAudioBitrate, { target: { value: "0" } });
 		expect(
@@ -483,7 +515,7 @@ describe("ExportInspectorPanel", () => {
 			),
 		).toBeTruthy();
 
-		fireEvent.change(customAudioBitrate, { target: { value: "256000" } });
+		fireEvent.change(customAudioBitrate, { target: { value: "0.256" } });
 		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
 
 		expect(onApplyOutputSettings).toHaveBeenCalledWith({
