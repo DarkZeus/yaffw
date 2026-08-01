@@ -160,6 +160,10 @@ _Avoid_: frame, marker, waveform label
 A user choice that changes how an audio track contributes to exported media.
 _Avoid_: waveform setting, player volume
 
+**Generated audio mix**:
+The single generated audio track produced by combining included source audio tracks for export.
+_Avoid_: downmix when meaning track merge, per-track output audio
+
 **Track volume**:
 An audio mix decision describing how loud one audio track should be in the generated mix, shown as a percentage where 100% preserves the source level and 0% silences the track.
 _Avoid_: preview volume, gain
@@ -168,13 +172,37 @@ _Avoid_: preview volume, gain
 A preview-only way to temporarily hear a subset of audio tracks without changing generated media.
 _Avoid_: audio mix decision, exported solo
 
+**Preview audio engine**:
+The preview-owned audio transport that prepares source audio tracks, applies preview-relevant audio decisions, and owns audio-master preview time.
+_Avoid_: multitrack adapter, audio meter, native video audio
+
 **Output settings**:
 Editing decisions that describe the intended generated media format and quality.
 _Avoid_: quality modal state, export form state
 
+**Output settings modal**:
+A pre-export UI for choosing supported output settings before an export job starts.
+_Avoid_: quality choices modal, FFmpeg settings modal
+
+**Documented output profile**:
+A codec and container combination documented as supported by YAFFW's browser-local media writing stack.
+_Avoid_: conservative allow-list, unverified preset
+
+**Subjective quality**:
+A browser-local media writing stack quality level that resolves to codec-aware bitrate during export.
+_Avoid_: YAFFW bitrate preset, hand-tuned quality tier
+
+**Preserve source**:
+An output setting choice that asks YAFFW not to set a custom value for that output dimension.
+_Avoid_: keep as-is, don't touch
+
 **Default output profile**:
 The output settings YAFFW uses when the user has not chosen custom export settings.
 _Avoid_: browser default, conversion preset
+
+**Export preset**:
+A named browser-local saved set of output settings that can be applied across media assets before export.
+_Avoid_: user preset, output settings preset
 
 **Export job**:
 A processing run that applies editing decisions to a media asset and produces generated media.
@@ -313,11 +341,16 @@ _Avoid_: first-slice requirement, automatic fallback
 - A **Media asset** contains zero or more **Media tracks**.
 - A **Subtitle track** is a kind of **Media track**, but subtitle support is deferred beyond the first slice.
 - A **Subtitle cue** is expressed in **Media time** and should be transformed by selection/export rules only when subtitle support is explicitly added.
+- V1 export treats the active media asset as having one exportable video **Media track**; preserving, warning about, or exporting multiple video tracks is deferred even though the implementation may model video tracks as an array.
+- Subtitle tracks are not exposed in the v1 **Output settings modal** or export output settings; subtitle export behavior is deferred until subtitle preview/export has its own model.
 - An **Audio mix decision** is an **Editing decision** for one **Media track**.
 - Audio-capable **Media tracks** are included in the mix by default so preview playback and generated media preserve all audible source context unless the user changes an **Audio mix decision**.
 - **Audio mix decisions** should affect both preview playback and generated media; what the user hears in preview should match what the export contains unless **Export review** explicitly says otherwise.
 - **Audio** may duplicate include/exclude and preview solo controls from **Waveform lanes**, but include/exclude should be labeled as output contribution rather than preview mute.
 - **Audio mix decisions** include whether an audio track is included in the generated mix and the **Track volume** used for that mix.
+- V1 export produces at most one **Generated audio mix**; preserving separate generated audio tracks is a future advanced export behavior.
+- When **Output settings** choose a specific audio codec, the **Generated audio mix** is encoded with that codec.
+- When **Output settings** use **Preserve source** for audio codec, the **Generated audio mix** uses the codec of the first included source audio track, subject to selected-container compatibility.
 - In **Audio**, channel handling should sit with track setup controls rather than beside the live meter or fader.
 - In **Audio**, **Track volume** should be presented as a vertical fader while remaining the same percentage-based **Audio mix decision**.
 - In each **Audio** strip, the **Preview level meter** should be the visual anchor and the **Track volume** fader should sit adjacent rather than acting as the central object.
@@ -348,7 +381,10 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Preview level meters** may show fixed dBFS tick labels in either orientation, and labels may be disabled when the surrounding UI already provides enough scale context.
 - Vertical **Preview level meters** should place fixed dBFS tick labels beside the meter; live numeric readouts are secondary and not required for the first version.
 - **Preview level meters** should preserve supplied channel identity and render the prepared channel list without assuming mono or stereo; sources may be mono, 2.0, 2.1, 5.1, 7.1, or custom channel layouts.
-- **Preview level meters** are live playback readouts; when preview is paused or stopped, they should fall to silence rather than analyze the paused playhead position.
+- **Preview level meters** are live playback readouts; when preview is paused or stopped, they should decay toward silence rather than snap to the paused playhead's analyzed level.
+- **Preview level meter** decay after pause or stop is presentation behavior; the **Preview audio engine** should report actual playback signal state rather than emitting artificial fading levels.
+- In a **Preview audio engine** graph, per-track **Preview level meter** taps should observe each track after channel handling and **Track volume**, while the combined **Preview level meter** tap should observe the monitored mix after include/exclude, **Track volume**, channel handling, and preview solo.
+- All **Preview level meter** taps in a **Preview audio engine** graph should sit before global **Preview volume** and preview mute.
 - Live **Preview level meter** sampling should use a short peak window around 50 ms so the meter remains responsive without flickering on individual samples.
 - Cached peak buckets for **Preview level meters** are a deferred performance optimization, not part of the first meter architecture.
 - **Preview level meters** should be fed by a preview-metering adapter rather than directly reading the multitrack preview output, so metering can follow its own preview-signal rules.
@@ -375,22 +411,61 @@ _Avoid_: first-slice requirement, automatic fallback
 - When tracks with different channel layouts are combined, preview metering should use the same channel-mapping policy as preview and export mixing rather than inventing a meter-only layout.
 - In the first implementation, the combined **Preview level meter** may use stereo 2.0 output channels when the actual preview/export mixer outputs stereo, even if per-track meters preserve richer source channel layouts.
 - If an audible track's metering data is unavailable, the combined **Preview level meter** should show a partial or unavailable state rather than silently exclude that track from the displayed combined level.
-- When a **Media asset** has audio tracks and preview can use a mix-capable multitrack adapter, that adapter should be the preview transport authority for play, pause, seeking, playback speed, and audio monitoring; the native video element should act as the visual renderer synchronized to the shared **Playhead**.
-- Mix-capable preview may expose each embedded audio **Media track** to the multitrack adapter through temporary playable audio sources derived from the source media; those preview resources are adapter-owned and must be disposed with the active **Media asset**.
-- Temporary audio sources should preserve the source track's encoded audio when it can be remuxed into a reliable browser-playable source; decoded fallback sources are used only when the encoded path is unavailable or unreliable.
-- Temporary audio source preparation should prepare every audio **Media track** for consistent mix-capable preview, even when some tracks are currently excluded by **Audio mix decisions**.
-- While temporary audio sources are being prepared for mix-capable preview, video may be visually previewable but audio monitoring controls should remain unavailable and native video audio should not be used as a temporary substitute.
-- If temporary audio source preparation fails for a **Media track**, audio monitoring should not silently omit that track; the failed track should expose a retry action that regenerates only that track's temporary preview audio source.
-- In mix-capable preview mode, the native video element should be muted so all audible preview output comes from the multitrack audio path.
-- In mix-capable preview mode, the multitrack audio clock is authoritative; if native video playback drifts from the shared **Playhead**, video should be corrected toward the multitrack time.
-- **Playback speed** applies to the whole preview; in mix-capable preview mode, the multitrack audio transport and synchronized video renderer should use the same speed value or explicitly reject unsupported speed values.
+- When a **Media asset** has audio tracks and preview can use a **Preview audio engine**, that engine should be the preview transport authority for play, pause, seeking, playback speed, and audio monitoring; the native video element should act as the visual renderer synchronized to the shared **Playhead**.
+- The **Preview audio engine** should completely replace the hidden `wavesurfer-multitrack` preview transport rather than run beside it as a long-term alternate path; WaveSurfer may still be used for visual **Waveform lanes** because they are selection context, not preview audio transport.
+- `wavesurfer-multitrack` should be removed once no preview transport code imports it; `wavesurfer.js` may remain only for visual waveform rendering.
+- Implementation names for the replacement should use **Preview audio engine** language rather than `multitrack` package language, while preserving support for multiple embedded audio **Media tracks**.
+- A **Preview audio engine** may expose each embedded audio **Media track** through adapter-owned preview audio resources derived from the source media; those resources must be disposed with the active **Media asset**.
+- The first **Preview audio engine** implementation may use full-track decoded `AudioBuffer` resources for simplicity, while preserving **Preview audio resource** as the domain term so chunked resources can replace them later.
+- A **Preview audio engine** should apply channel handling during playback routing rather than baking channel fixes into prepared **Preview audio resources**, so **Audio mix decisions** can change without regenerating those resources.
+- **Track volume**, include/exclude, preview solo, and preview mute should be applied by the **Preview audio engine** graph at playback time rather than baked into prepared **Preview audio resources**.
+- Preview audio resource preparation should eagerly prepare every audio **Media track** for consistent mix-capable preview, even when some tracks are currently excluded by **Audio mix decisions**; preparation may run in parallel, but preview audio readiness should not lazily omit unprepared tracks.
+- Preview and export may share audio graph-building or mix-plan logic so both consume the same **Audio mix decisions**; preview renders through a live audio context, while export renders the equivalent mix offline before handing audio to the media output pipeline.
+- While preview audio resources are being prepared, video may be visually previewable but audio monitoring controls should remain unavailable and native video audio should not be used as a temporary substitute.
+- If preview audio resource preparation fails for a **Media track**, the **Preview audio engine** may continue in an explicit degraded state; audio monitoring should not silently omit that track, and the failed track should expose a retry action that regenerates only that track's preview audio resource.
+- When a **Preview audio engine** is active, the native video element should be muted so all audible preview output comes from the engine.
+- When a **Preview audio engine** is active, the engine's audio clock is authoritative, including in explicit degraded preview states; if native video playback drifts from the shared **Playhead**, video should be corrected toward the engine time.
+- **Playback speed** applies to the whole preview; when a **Preview audio engine** is active, the engine and synchronized video renderer should use the same speed value and preserve sync, while pitch preservation is not required for the first implementation.
 - For video-only media, the native video element may remain the preview transport authority.
-- **Output settings** are **Editing decisions** even when the UI only supports default output.
+- **Output settings** are **Editing decisions**; editor-next v1 lets the user choose supported resolution, bitrate, codec, and container before starting an export job.
 - The **Default output profile** is MP4 with H.264 video and AAC audio when the current **Runtime capability** supports it; editor-next does not silently fall back to another generated-media format.
-- Under the **Default output profile**, included audio tracks are mixed into one generated AAC audio track; preserving separate audio tracks is a future advanced export behavior.
+- Under the **Default output profile**, included audio tracks are mixed into one generated AAC audio track; custom **Output settings** may choose another supported audio codec for the same single **Generated audio mix**.
 - If all audio tracks are excluded by **Audio mix decisions**, export remains valid and produces generated media with no audio track.
-- The first-slice **Default output profile** does not include a user-defined target bitrate; source bitrate may only be used as an export-runner hint if the runtime needs one.
-- Custom **Output settings** such as target bitrate are future options and may require re-encoding the selected media.
+- The v1 **Output settings modal** should expose resolution, **Subjective quality** or custom target bitrate, and **Documented output profiles** rather than a conservative app-owned codec/container allow-list.
+- Every customizable v1 **Output settings** dimension should include **Preserve source** as the first/default choice where that dimension can be left unspecified.
+- Codec and container choices in the **Output settings modal** should remain flexible: users may choose any container, video codec, and audio codec combination documented as supported by the browser-local media writing stack, with the UI filtering choices by container compatibility instead of limiting users to a small combined profile list.
+- Audio codec defaults to **Preserve source**; if the selected container cannot contain the source audio codec, the **Output settings modal** must require a compatible audio codec choice before export.
+- Video and audio codec choices may be changed automatically when a selected container cannot contain the preserved source codec; the modal should make the replacement visible rather than blocking the user on a manual codec choice.
+- Automatic replacement codec choices should follow the browser-local media writing stack's documented codec order for the selected container.
+- If no documented compatible codec/container combination can satisfy the current **Output settings**, the **Output settings modal** should block applying settings and export should remain blocked with a visible error.
+- YAFFW should trust documented codec/container support in the browser-local media writing stack; if a documented profile fails in a specific runtime, the failure is reported as an **Export job** failure or profile availability issue, not treated as a reason to hide the profile by default.
+- Active v1 resolution choices are limited to keeping the source resolution or downscaling; non-AI canvas upscaling may be possible in the media writing stack, but it should not be presented as a v1 quality feature.
+- The default v1 bitrate choice is **Preserve source**: YAFFW does not set a target bitrate unless the user chooses a **Subjective quality** or Custom bitrate.
+- V1 bitrate choices should use **Preserve source**, the media writing stack's **Subjective quality** levels, and Custom for an explicit target bitrate; YAFFW should not invent separate bitrate preset names such as Compact, Balanced, or High.
+- **Preserve source** for bitrate means "do not set a user target bitrate"; if other **Output settings** force transcoding, the media writing stack may still choose the bitrate needed for that conversion.
+- V1 should let users choose video and audio bitrate/quality independently, using **Preserve source**, **Subjective quality**, or Custom bitrate for each.
+- The **Output settings modal** should explain that changing output settings may re-encode video and can change output size, quality, and processing time.
+- The export runner should let the browser-local media writing stack avoid transcoding when possible; YAFFW should not force transcode merely because the user opened or applied **Output settings**.
+- Applying the **Output settings modal** commits **Output settings** to the **Single-asset editing session** immediately; **Export review** should reflect the applied settings before an **Export job** starts.
+- Applying changed **Output settings** invalidates any existing **Generated media** result because that result no longer represents the current editing decisions.
+- Closing or cancelling the **Output settings modal** discards draft changes; only Apply commits draft **Output settings** to the **Single-asset editing session**.
+- Reset inside the **Output settings modal** restores the draft to the applied settings snapshot from when that modal session was opened; it does not reset to product defaults unless those were the opening values.
+- V1 includes browser-local **Export presets** with simple save, load, update/overwrite, and delete actions inside the **Output settings modal**.
+- V1 **Export presets** include user-created presets plus one system-managed Last used settings preset; built-in preset templates are deferred.
+- **Export presets** store **Preserve source** symbolically; when a preset is loaded for another media asset, preserved dimensions resolve against that active asset's source settings rather than the asset that created the preset.
+- Loading an **Export preset** changes only the modal draft; Apply is still required before the preset affects the **Single-asset editing session** or **Export review**.
+- Saving an **Export preset** captures the current modal draft without committing that draft to the **Single-asset editing session**.
+- Invalid **Output settings** drafts block Apply, saving a new **Export preset**, and updating an existing **Export preset**.
+- Deleting a user-created **Export preset** should use a small confirmation popover; the system-managed Last used settings preset cannot be deleted.
+- User-created **Export preset** names are case-sensitive and may collide only after an explicit overwrite-or-cancel choice; overwriting replaces the existing preset with that exact name rather than creating a second same-name preset.
+- Last used settings is a reserved system preset name.
+- User-created **Export preset** names are trimmed before validation and storage; empty names are invalid.
+- **Export presets** persist internally as versioned browser-local JSON; user-facing preset import/export files are deferred beyond v1.
+- Active **Output settings** belong to the **Single-asset editing session** and are not restored across page refresh in v1.
+- The Last used settings preset is populated whenever **Output settings** are applied, loads into modal draft like any other preset, requires Apply, and is not auto-applied to new media assets.
+- The v1 **Output settings modal** should organize settings into General, Video, Audio, AI, and Subtitles tabs; AI and Subtitles are disabled/deferred tabs until those export models exist.
+- AI upscaling and frame interpolation are future **Output settings** ideas; they may appear as disabled/deferred controls in the **Output settings modal**, but should not appear active until an export runner can honor them.
+- GPU vendor choices such as NVENC, AMF, and VideoToolbox are legacy FFmpeg-oriented language and should not appear in v1 browser-local **Output settings**; WebCodecs capability should be surfaced through runtime support and codec/container availability instead.
 - A **Waveform** may be derived from a **Media track**, but it is not the track and is not required for readiness or export.
 - The first slice should load per-track **Waveform lanes** progressively for audio tracks when available because separate tracks may carry different selection context, such as desktop audio versus voice.
 - A **Waveform lane** may expose only quick audio controls for include/exclude and preview solo; dense audio controls belong in **Audio**.
@@ -416,10 +491,12 @@ _Avoid_: first-slice requirement, automatic fallback
 - A running **Export job** reports minimal **Export progress** such as preparing, encoding, muxing, or finalizing.
 - **Export cancellation** is available only when the active export runner can stop safely; the UI should not imply cancellation when it is unsupported.
 - The first slice disables editing changes while an **Export job** is running.
+- The **Output settings modal** and **Export preset** mutations are blocked while an **Export job** is running.
 - **Runtime capability** determines which import, preview, analysis, and export paths are available; it does not create a separate editor model.
 - **Export capability** is checked before an **Export job** starts and should expose the planned export strategy, expected precision, and user-facing reason without using codec/container preflight guesses to block otherwise valid media.
 - If the default output runner cannot convert or mux the active asset, the asset remains ready and the failure is reported on the **Export job**.
-- The first-slice **Export review** should make export strategy and precision visible without introducing custom output controls.
+- The v1 Export tab should keep **Output settings**, **Export review**, **Export progress**, and **Generated media** status together while keeping their meanings distinct.
+- **Export review** should summarize the chosen **Output settings**, generated audio mix, export strategy, expected precision, and reason before the user starts an export job.
 - **Export review** should describe export strategies in product language such as fast export or precision export, while implementation labels may remain technical.
 - The first-slice **Export review** shows the chosen export strategy; it does not let the user manually choose between strategies.
 - **Export review** should summarize the generated audio mix from **Audio mix decisions**, such as how many audio tracks are included and that included tracks are mixed to AAC under the **Default output profile**.
@@ -442,3 +519,4 @@ _Avoid_: first-slice requirement, automatic fallback
 - "Photoshop/Premiere-style panels" refers to **Customizable workbench layout** mechanics, not Premiere-style project concepts.
 - "slot" was used to mean a valid panel landing place. Resolved: use **Dock target** for user-facing layout mechanics.
 - "media asset inspector" was used informally for the current **Media asset** context panel. Resolved: keep **Media asset** context language unless the product deliberately renames that panel.
+- "quality choices modal" came from the legacy FFmpeg-oriented UI. Resolved: use **Output settings modal** for the v1 browser-local settings UI, while **Export review** remains the pre-export summary.
