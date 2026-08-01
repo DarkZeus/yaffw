@@ -354,7 +354,7 @@ async function runExportArtifactHarness({
 		);
 	}
 
-	let generatedBytes: Uint8Array;
+	let generatedBytes: Uint8Array<ArrayBuffer>;
 
 	try {
 		generatedBytes = new Uint8Array(await exportResult.blob.arrayBuffer());

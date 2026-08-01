@@ -554,7 +554,7 @@ function copySourceChannelToAllOutputs(
 	}
 }
 
-function averageChannels(audioBuffer: AudioBuffer): Float32Array {
+function averageChannels(audioBuffer: AudioBuffer): Float32Array<ArrayBuffer> {
 	const mono = new Float32Array(audioBuffer.length);
 
 	for (let channel = 0; channel < audioBuffer.numberOfChannels; channel += 1) {

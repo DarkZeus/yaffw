@@ -197,6 +197,10 @@ function installTestBrowserApis() {
 		configurable: true,
 		value: matchMedia,
 	});
+	Object.defineProperty(window, "scrollTo", {
+		configurable: true,
+		value: vi.fn(),
+	});
 	Object.defineProperty(globalThis, "IntersectionObserver", {
 		configurable: true,
 		value: TestIntersectionObserver,

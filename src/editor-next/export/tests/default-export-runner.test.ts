@@ -23,7 +23,6 @@ const mediabunnyMock = vi.hoisted(() => ({
 	outputFinalizeFailure: undefined as Error | undefined,
 	outputs: [] as MockOutput[],
 	packetBatches: new Map<MockVideoTrack, MockPacket[]>(),
-	qualityHigh: { name: "QUALITY_HIGH" },
 	videoTracks: [] as MockVideoTrack[],
 }));
 
@@ -174,18 +173,26 @@ vi.mock("mediabunny", () => {
 		readonly close = vi.fn();
 		readonly options: unknown;
 
-		constructor(options: { bitrate?: unknown; codec: string }) {
+		constructor(options: { codec: string; quality?: unknown }) {
 			if (
-				options.bitrate === undefined &&
+				options.quality === undefined &&
 				options.codec !== "flac" &&
 				!options.codec.startsWith("pcm-")
 			) {
 				throw new TypeError(
-					"config.bitrate must be provided for compressed audio codecs.",
+					"config.quality must be provided for compressed audio codecs.",
 				);
 			}
 			this.options = options;
 			mediabunnyMock.audioBufferSources.push(this);
+		}
+	}
+
+	class Quality {
+		readonly options: unknown;
+
+		constructor(options: unknown) {
+			this.options = options;
 		}
 	}
 
@@ -203,11 +210,7 @@ vi.mock("mediabunny", () => {
 		Mp4OutputFormat,
 		MpegTsOutputFormat,
 		Output,
-		QUALITY_HIGH: mediabunnyMock.qualityHigh,
-		QUALITY_LOW: { name: "QUALITY_LOW" },
-		QUALITY_MEDIUM: { name: "QUALITY_MEDIUM" },
-		QUALITY_VERY_HIGH: { name: "QUALITY_VERY_HIGH" },
-		QUALITY_VERY_LOW: { name: "QUALITY_VERY_LOW" },
+		Quality,
 		WebMOutputFormat,
 	};
 });
@@ -395,8 +398,8 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources[0].add).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			bitrate: { name: "QUALITY_MEDIUM" },
 			codec: "aac",
+			quality: { options: "medium" },
 		});
 	});
 
@@ -425,7 +428,7 @@ describe("browserDefaultExportRunner cleanup", () => {
 			codec: "flac",
 		});
 		expect(mediabunnyMock.audioBufferSources[0].options).not.toHaveProperty(
-			"bitrate",
+			"quality",
 		);
 	});
 
@@ -457,9 +460,9 @@ describe("browserDefaultExportRunner cleanup", () => {
 			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
 		);
 
-		expect(conversionConfig?.video.bitrate).toBe(mediabunnyMock.qualityHigh);
+		expect(conversionConfig?.video.quality).toMatchObject({ options: "high" });
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			bitrate: 256_000,
+			quality: { options: { bitrate: 256_000 } },
 		});
 	});
 
@@ -491,9 +494,11 @@ describe("browserDefaultExportRunner cleanup", () => {
 			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
 		);
 
-		expect(conversionConfig?.video.bitrate).toBe(4_000_000);
+		expect(conversionConfig?.video.quality).toMatchObject({
+			options: { bitrate: 4_000_000 },
+		});
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			bitrate: mediabunnyMock.qualityHigh,
+			quality: { options: "high" },
 		});
 	});
 
@@ -596,10 +601,10 @@ type MockConversion = {
 type MockConversionConfig = {
 	output: MockOutput;
 	video: {
-		bitrate?: unknown;
 		codec: string;
 		fit?: string;
 		height?: number;
+		quality?: unknown;
 		width?: number;
 	};
 };

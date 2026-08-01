@@ -2,7 +2,15 @@ packages:
   - .
 
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - mediabunny
 trustPolicy: no-downgrade
+
+overrides:
+  '@tanstack/react-router': ^1.170.18
+  diff: 8.0.4
+  postcss: 8.5.23
+  rollup: 4.62.2
 
 onlyBuiltDependencies:
   - '@biomejs/biome'

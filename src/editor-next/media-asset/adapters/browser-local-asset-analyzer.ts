@@ -29,11 +29,20 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 
 		try {
 			throwIfAborted(request.signal);
-			const [durationSeconds, videoTracks, audioTracks] = await Promise.all([
-				input.computeDuration(),
-				input.getVideoTracks(),
-				input.getAudioTracks(),
-			]);
+			if (!(await input.canRead())) {
+				throw new Error("Mediabunny cannot read this local media asset.");
+			}
+			throwIfAborted(request.signal);
+			const [metadataDurationSeconds, videoTracks, audioTracks] =
+				await Promise.all([
+					input.getDurationFromMetadata().catch(() => null),
+					input.getVideoTracks(),
+					input.getAudioTracks(),
+				]);
+			throwIfAborted(request.signal);
+			const durationSeconds = isUsableDuration(metadataDurationSeconds)
+				? metadataDurationSeconds
+				: await input.computeDuration();
 			throwIfAborted(request.signal);
 			const [videoTrackInspections, audioTrackInspections] = await Promise.all([
 				Promise.all(
@@ -111,6 +120,16 @@ async function computeFrameTiming(
 
 function secondsToMicroseconds(seconds: number): number {
 	return Math.round(seconds * 1_000_000);
+}
+
+function isUsableDuration(
+	durationSeconds: number | null,
+): durationSeconds is number {
+	return (
+		typeof durationSeconds === "number" &&
+		Number.isFinite(durationSeconds) &&
+		durationSeconds > 0
+	);
 }
 
 function readableCodec(codec: unknown): string | undefined {

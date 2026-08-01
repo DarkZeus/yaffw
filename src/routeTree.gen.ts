@@ -9,13 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as EditorNextRouteImport } from './routes/editor-next'
-import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
+import { Route as EditorNextRouteImport } from './routes/editor-next'
 
-const EditorNextRoute = EditorNextRouteImport.update({
-  id: '/editor-next',
-  path: '/editor-next',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BulkDownloadRoute = BulkDownloadRouteImport.update({
@@ -23,9 +23,9 @@ const BulkDownloadRoute = BulkDownloadRouteImport.update({
   path: '/bulk-download',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const EditorNextRoute = EditorNextRouteImport.update({
+  id: '/editor-next',
+  path: '/editor-next',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -61,11 +61,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/editor-next': {
-      id: '/editor-next'
-      path: '/editor-next'
-      fullPath: '/editor-next'
-      preLoaderRoute: typeof EditorNextRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bulk-download': {
@@ -75,11 +75,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BulkDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/editor-next': {
+      id: '/editor-next'
+      path: '/editor-next'
+      fullPath: '/editor-next'
+      preLoaderRoute: typeof EditorNextRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

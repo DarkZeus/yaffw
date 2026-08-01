@@ -29,8 +29,8 @@ import {
 	withDisposableMediaWorkScope,
 } from "../../media-work/scopes/disposable-media-work-scope";
 import {
-	toMediabunnyAudioBitrate,
-	toMediabunnyBitrate,
+	toMediabunnyAudioQuality,
+	toMediabunnyQuality,
 } from "../adapters/mediabunny-output-quality";
 import {
 	MEDIABUNNY_OUTPUT_SUPPORT,
@@ -145,7 +145,7 @@ async function runBrowserDefaultExport({
 
 	const blob = await muxVideoOnlyExportWithMixedAudio({
 		audioBuffer: mixedAudio.audioBuffer,
-		audioBitrate: toMediabunnyAudioBitrate({
+		audioQuality: toMediabunnyAudioQuality({
 			codec: resolvedOutput.audioCodec as AudioCodec,
 			quality: audioQuality,
 		}),
@@ -194,7 +194,7 @@ async function runBrowserVideoOnlyExport({
 		if (videoQuality.kind === "invalid") {
 			throw new Error(videoQuality.error);
 		}
-		const videoBitrate = toMediabunnyBitrate(videoQuality);
+		const mediabunnyVideoQuality = toMediabunnyQuality(videoQuality);
 
 		const input = scope.registerDisposable(
 			new Input({
@@ -223,7 +223,9 @@ async function runBrowserVideoOnlyExport({
 			},
 			video: {
 				codec: (resolvedOutput?.videoCodec ?? "avc") as VideoCodec,
-				...(videoBitrate === undefined ? {} : { bitrate: videoBitrate }),
+				...(mediabunnyVideoQuality === undefined
+					? {}
+					: { quality: mediabunnyVideoQuality }),
 				...(resolution.conversionDimensions
 					? {
 							...resolution.conversionDimensions,
@@ -277,15 +279,15 @@ async function runBrowserVideoOnlyExport({
 
 async function muxVideoOnlyExportWithMixedAudio({
 	audioBuffer,
-	audioBitrate,
 	audioCodec,
+	audioQuality,
 	containerId,
 	signal,
 	videoOnlyBlob,
 }: {
 	audioBuffer: AudioBuffer;
-	audioBitrate: ConstructorParameters<typeof AudioBufferSource>[0]["bitrate"];
 	audioCodec: AudioCodec;
+	audioQuality: ConstructorParameters<typeof AudioBufferSource>[0]["quality"];
 	containerId: string;
 	signal: AbortSignal;
 	videoOnlyBlob: Blob;
@@ -320,8 +322,8 @@ async function muxVideoOnlyExportWithMixedAudio({
 			};
 		});
 		const audioSource = new AudioBufferSource({
-			...(audioBitrate === undefined ? {} : { bitrate: audioBitrate }),
 			codec: audioCodec,
+			...(audioQuality === undefined ? {} : { quality: audioQuality }),
 		});
 		const closeAudioSource = registerClosableCleanup(scope, audioSource);
 
