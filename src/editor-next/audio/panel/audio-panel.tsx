@@ -175,15 +175,13 @@ function AudioTrackStrip({
 					<span className="truncate text-xs font-medium text-foreground">
 						{label}
 					</span>
-					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
-						{meterDisplay.statusLabel}
-					</span>
+					<MeterStatusBadge statusLabel={meterDisplay.statusLabel} />
 				</div>
 				<div className="truncate text-[10px] leading-tight text-muted-foreground">
 					{formatAudioTrackMeta(track)}
 				</div>
 			</div>
-			<div className="grid min-h-0 min-w-0 grid-cols-[2.25rem_2.25rem] justify-center gap-2">
+			<div className="grid min-h-0 min-w-0 grid-cols-[2.25rem_4.25rem] justify-center gap-2">
 				<label className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] justify-items-center gap-1 rounded-sm border border-workbench-border bg-workbench-viewer px-1 py-2">
 					<span className="font-mono text-[10px] text-workbench-progress">
 						{volumePercent}%
@@ -214,7 +212,6 @@ function AudioTrackStrip({
 						label={`${label} preview meter`}
 						message={meterDisplay.message}
 						showChannelLabels={false}
-						showTickLabels={false}
 						state={meterDisplay.state}
 					/>
 				</div>
@@ -387,30 +384,27 @@ function CombinedPreviewStrip({
 
 	return (
 		<section
-			aria-label="Combined preview strip"
+			aria-label="Master strip"
 			className="grid h-[24rem] w-28 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 border-r border-workbench-border-strong bg-workbench-lane-alt px-2 py-2"
 		>
 			<div className="grid min-w-0 gap-1">
 				<div className="flex min-w-0 items-center justify-between gap-2">
 					<span className="truncate text-xs font-medium text-foreground">
-						Combined preview
+						Master
 					</span>
-					<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
-						{meterDisplay.statusLabel}
-					</span>
+					<MeterStatusBadge statusLabel={meterDisplay.statusLabel} />
 				</div>
 				<div className="truncate text-[10px] leading-tight text-muted-foreground">
 					Monitored output
 				</div>
 			</div>
-			<div className="mx-auto min-h-0 w-9">
+			<div className="mx-auto min-h-0 w-16">
 				<PreviewLevelMeter
 					channelWidthRem={0.7}
 					channels={meterDisplay.channels}
-					label="Combined preview output meter"
+					label="Master output meter"
 					message={meterDisplay.message}
 					showChannelLabels={false}
-					showTickLabels={false}
 					state={meterDisplay.state}
 				/>
 			</div>
@@ -422,6 +416,18 @@ function CombinedPreviewStrip({
 				) : null}
 			</div>
 		</section>
+	);
+}
+
+function MeterStatusBadge({ statusLabel }: { statusLabel: string }) {
+	if (statusLabel === "Ready") {
+		return null;
+	}
+
+	return (
+		<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+			{statusLabel}
+		</span>
 	);
 }
 
@@ -470,7 +476,7 @@ function createStaticTrackMeterChannels(
 	return Array.from({ length: channelCount }, (_, channelIndex) => ({
 		clipHeld: false,
 		label: formatPreviewMeterChannelLabel(channelCount, channelIndex),
-		peakDb: Math.max(-72, -18 - trackIndex * 4 - channelIndex * 3),
+		peakDb: Math.max(-90, -18 - trackIndex * 4 - channelIndex * 3),
 	}));
 }
 

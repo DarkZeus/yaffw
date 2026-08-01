@@ -94,8 +94,49 @@ describe("useLivePreviewMetering", () => {
 
 		const decayedPeak = Number(screen.getByLabelText("voice peak").textContent);
 		expect(decayedPeak).toBeLessThan(0);
-		expect(decayedPeak).toBeGreaterThan(-72);
+		expect(decayedPeak).toBeGreaterThan(-90);
 		expect(timeoutCallbacks).toHaveLength(1);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
+	});
+
+	it("continues paused meter release on animation frames without resampling snapshots", () => {
+		let currentNowMs = 0;
+		let isPlaying = true;
+		const readMeterSnapshot = vi.fn(() => createReadySnapshot(1));
+		const clock = createMeteringClock({
+			getIsPlaying: () => isPlaying,
+			readMeterSnapshot,
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(0);
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(1);
+
+		isPlaying = false;
+		currentNowMs = 50;
+		act(() => {
+			timeoutCallbacks.shift()?.callback();
+		});
+
+		const pausePollPeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+		expect(pausePollPeak).toBeLessThan(0);
+		expect(pausePollPeak).toBeGreaterThan(-90);
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
+
+		currentNowMs = 66;
+		act(() => {
+			frameCallbacks.shift()?.(66);
+		});
+
+		const frameReleasePeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+		expect(frameReleasePeak).toBeLessThan(pausePollPeak);
+		expect(frameReleasePeak).toBeGreaterThan(-90);
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
 		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
 	});
 
@@ -181,7 +222,7 @@ describe("useLivePreviewMetering", () => {
 		expect(timeoutCallbacks[0]?.delayMs).toBe(50);
 	});
 
-	it("uses low-frequency paused polling instead of an animation-frame loop", () => {
+	it("uses low-frequency paused polling without a frame loop when already silent", () => {
 		const clock = createMeteringClock({
 			getIsPlaying: () => false,
 			readMeterSnapshot: () => createReadySnapshot(1),
@@ -189,7 +230,7 @@ describe("useLivePreviewMetering", () => {
 
 		render(<LivePreviewMeteringProbe clock={clock} now={fixedNow} />);
 
-		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(-72);
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(-90);
 		expect(window.requestAnimationFrame).not.toHaveBeenCalled();
 		expect(timeoutCallbacks).toHaveLength(1);
 		expect(timeoutCallbacks[0]?.delayMs).toBe(250);

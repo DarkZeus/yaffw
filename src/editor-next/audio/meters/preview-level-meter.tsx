@@ -1,4 +1,11 @@
-import type { CSSProperties } from "react";
+import {
+	type CSSProperties,
+	type RefObject,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 
 import { cn } from "@/lib/utils";
 import type {
@@ -8,6 +15,7 @@ import type {
 	PreviewLevelMeterVisualRange,
 	PreviewLevelMeterZone,
 } from "../types/preview-level-meter.types";
+import { selectPreviewLevelMeterTicksForHeight } from "./preview-level-meter-scale";
 import {
 	previewPeakMeterVisualRange,
 	previewPeakMeterZones,
@@ -35,8 +43,6 @@ export type PreviewLevelMeterProps = {
 	zones?: PreviewLevelMeterZone[];
 };
 
-const defaultPreviewLevelMeterTicks = [0, -9, -20, -40, -72];
-
 export function PreviewLevelMeter({
 	channelWidthRem,
 	channels,
@@ -46,11 +52,12 @@ export function PreviewLevelMeter({
 	showChannelLabels = true,
 	showTickLabels = true,
 	state,
-	ticks = defaultPreviewLevelMeterTicks,
+	ticks,
 	visualRange = previewPeakMeterVisualRange,
 	zones = previewPeakMeterZones,
 }: PreviewLevelMeterProps) {
 	const range = normalizeVisualRange(visualRange);
+	const resolvedTicks = ticks ?? createDefaultPreviewLevelMeterTicks(range);
 
 	return (
 		<section
@@ -73,7 +80,7 @@ export function PreviewLevelMeter({
 					range={range}
 					showChannelLabels={showChannelLabels}
 					showTickLabels={showTickLabels}
-					ticks={ticks}
+					ticks={resolvedTicks}
 					zones={zones}
 				/>
 			) : (
@@ -104,6 +111,24 @@ function ReadyPreviewLevelMeter({
 	ticks: number[];
 	zones: PreviewLevelMeterZone[];
 }) {
+	const gridRef = useRef<HTMLDivElement>(null);
+	const shouldMeasureVerticalTicks =
+		showTickLabels && orientation === "vertical";
+	const measuredHeightPx = useElementHeightPx(
+		gridRef,
+		shouldMeasureVerticalTicks,
+	);
+	const visibleTicks = useMemo(
+		() =>
+			selectPreviewLevelMeterTicksForHeight({
+				heightPx: measuredHeightPx,
+				orientation,
+				range,
+				ticks,
+			}),
+		[measuredHeightPx, orientation, range, ticks],
+	);
+
 	return (
 		<div aria-label={`${label} channels`} className="min-w-0 overflow-x-auto">
 			<div
@@ -112,16 +137,22 @@ function ReadyPreviewLevelMeter({
 					orientation === "vertical"
 						? "grid-flow-col items-stretch"
 						: "auto-rows-[1.5rem]",
+					showTickLabels && orientation === "vertical" ? "pr-9" : "",
 				)}
 				style={meterChannelsStyle(
 					channels.length,
 					orientation,
 					channelWidthRem,
 				)}
+				ref={gridRef}
 			>
 				<ZoneDescriptions zones={zones} />
 				{showTickLabels ? (
-					<TickLabels orientation={orientation} range={range} ticks={ticks} />
+					<TickLabels
+						orientation={orientation}
+						range={range}
+						ticks={visibleTicks}
+					/>
 				) : null}
 				{channels.map((channel, channelIndex) => (
 					<PreviewLevelMeterChannelBar
@@ -137,6 +168,59 @@ function ReadyPreviewLevelMeter({
 			</div>
 		</div>
 	);
+}
+
+function useElementHeightPx(
+	ref: RefObject<HTMLElement | null>,
+	enabled: boolean,
+): number | null {
+	const [heightPx, setHeightPx] = useState<number | null>(null);
+
+	useEffect(() => {
+		if (!enabled) {
+			return;
+		}
+
+		const element = ref.current;
+
+		if (!element) {
+			return;
+		}
+
+		function commitHeight(nextHeightPx: number) {
+			if (!Number.isFinite(nextHeightPx) || nextHeightPx <= 0) {
+				return;
+			}
+
+			setHeightPx((previousHeightPx) =>
+				previousHeightPx !== null &&
+				Math.abs(previousHeightPx - nextHeightPx) < 0.5
+					? previousHeightPx
+					: nextHeightPx,
+			);
+		}
+
+		commitHeight(element.getBoundingClientRect().height);
+
+		if (typeof ResizeObserver === "undefined") {
+			return;
+		}
+
+		const observer = new ResizeObserver((entries) => {
+			const entry = entries[0];
+			commitHeight(
+				entry?.contentRect.height ?? element.getBoundingClientRect().height,
+			);
+		});
+
+		observer.observe(element);
+
+		return () => {
+			observer.disconnect();
+		};
+	}, [enabled, ref]);
+
+	return heightPx;
 }
 
 function PreviewLevelMeterChannelBar({
@@ -257,33 +341,64 @@ function TickLabels({
 	return (
 		<div
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 z-20"
+			className={cn(
+				"pointer-events-none absolute z-20",
+				orientation === "vertical" ? "bottom-0 right-0 top-0 w-8" : "inset-0",
+			)}
 		>
+			{orientation === "vertical" ? (
+				<span className="absolute right-0 top-0 font-mono text-[7px] uppercase leading-3 text-muted-foreground/60">
+					dBFS
+				</span>
+			) : null}
 			{ticks.map((tick) => (
 				<div
 					className={cn(
-						"absolute border-workbench-border-strong/50",
+						"absolute",
 						orientation === "vertical"
-							? "left-0 right-0 border-t"
+							? "left-0 right-0"
 							: "bottom-0 top-0 border-l",
 					)}
 					key={tick}
 					style={tickStyle(tick, range, orientation)}
 				>
+					{orientation === "vertical" ? (
+						<span className="absolute left-0 top-0 h-px w-1.5 bg-workbench-border-strong/45" />
+					) : null}
 					<span
 						className={cn(
-							"absolute rounded-sm bg-workbench-viewer/80 px-0.5 font-mono text-[8px] leading-3 text-muted-foreground",
+							"absolute font-mono text-[8px] leading-3 text-muted-foreground",
 							orientation === "vertical"
-								? "right-0 top-0 -translate-y-1/2"
-								: "bottom-0 left-0 -translate-x-1/2",
+								? verticalTickLabelClassName(tick, range)
+								: "bottom-0 left-0 -translate-x-1/2 rounded-sm bg-workbench-viewer/85 px-0.5",
 						)}
 					>
-						{formatDb(tick)} dBFS
+						{orientation === "vertical"
+							? formatDb(tick)
+							: `${formatDb(tick)} dBFS`}
 					</span>
 				</div>
 			))}
 		</div>
 	);
+}
+
+function verticalTickLabelClassName(
+	tick: number,
+	{ ceilingDb, floorDb }: PreviewLevelMeterVisualRange,
+): string {
+	const baseClassName =
+		"left-2 text-[9px] tabular-nums text-muted-foreground/75";
+
+	if (tick >= ceilingDb) {
+		return `${baseClassName} top-0`;
+	}
+
+	if (tick <= floorDb) {
+		return `${baseClassName} bottom-0`;
+	}
+
+	return `${baseClassName} top-0 -translate-y-1/2`;
 }
 
 function ZoneDescriptions({ zones }: { zones: PreviewLevelMeterZone[] }) {
@@ -325,6 +440,35 @@ function meterChannelsStyle(
 				: undefined,
 		minWidth: minimumWidthRem ? `${minimumWidthRem}rem` : undefined,
 	};
+}
+
+function createDefaultPreviewLevelMeterTicks({
+	ceilingDb,
+	floorDb,
+}: PreviewLevelMeterVisualRange): number[] {
+	const ticks = [ceilingDb];
+	const denseScaleFloorDb = Math.max(floorDb, -40);
+
+	for (let tick = ceilingDb - 4; tick >= denseScaleFloorDb; tick -= 4) {
+		ticks.push(tick);
+	}
+
+	const firstWideTick = Math.floor((denseScaleFloorDb - 10) / 10) * 10;
+	for (let tick = firstWideTick; tick >= floorDb; tick -= 10) {
+		ticks.push(tick);
+	}
+
+	if (!ticks.includes(floorDb)) {
+		ticks.push(floorDb);
+	}
+
+	return Array.from(
+		new Set(
+			ticks.filter(
+				(tick) => Number.isFinite(tick) && tick <= ceilingDb && tick >= floorDb,
+			),
+		),
+	).sort((left, right) => right - left);
 }
 
 function zoneStyle(

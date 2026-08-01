@@ -4,6 +4,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PreviewLevelMeter } from "../meters/preview-level-meter";
+import { selectPreviewLevelMeterTicksForHeight } from "../meters/preview-level-meter-scale";
 import {
 	previewPeakMeterClipDb,
 	previewPeakMeterVisualRange,
@@ -34,7 +35,7 @@ describe("PreviewLevelMeter", () => {
 		const left = within(meter).getByRole("meter", { name: "Left level" });
 		const right = within(meter).getByRole("meter", { name: "Right level" });
 
-		expect(left.getAttribute("aria-valuemin")).toBe("-72");
+		expect(left.getAttribute("aria-valuemin")).toBe("-90");
 		expect(left.getAttribute("aria-valuemax")).toBe("0");
 		expect(left.getAttribute("aria-valuenow")).toBe("-18");
 		expect(left.getAttribute("aria-valuetext")).toBe("-18 dBFS");
@@ -44,7 +45,7 @@ describe("PreviewLevelMeter", () => {
 		expect(within(meter).getByLabelText("Right clip held")).toBeTruthy();
 	});
 
-	it("supports horizontal orientation and can hide fixed dBFS tick labels", () => {
+	it("supports horizontal orientation and can hide dBFS tick labels", () => {
 		render(
 			<PreviewLevelMeter
 				channels={[{ clipHeld: false, label: "Mono", peakDb: -40 }]}
@@ -63,7 +64,7 @@ describe("PreviewLevelMeter", () => {
 				.getAttribute("aria-valuenow"),
 		).toBe("-40");
 		expect(within(meter).getByText("0 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("-72 dBFS")).toBeTruthy();
+		expect(within(meter).getByText("-90 dBFS")).toBeTruthy();
 
 		cleanup();
 
@@ -81,13 +82,13 @@ describe("PreviewLevelMeter", () => {
 			"Compact horizontal preview meter",
 		);
 		expect(within(compactMeter).queryByText("0 dBFS")).toBeNull();
-		expect(within(compactMeter).queryByText("-72 dBFS")).toBeNull();
+		expect(within(compactMeter).queryByText("-90 dBFS")).toBeNull();
 	});
 
 	it("uses the default preview peak meter range and OBS-style zones", () => {
 		expect(previewPeakMeterVisualRange).toEqual({
 			ceilingDb: 0,
-			floorDb: -72,
+			floorDb: -90,
 		});
 		expect(previewPeakMeterClipDb).toBe(0);
 		expect(
@@ -97,7 +98,7 @@ describe("PreviewLevelMeter", () => {
 				toDb,
 			})),
 		).toEqual([
-			{ fromDb: -72, id: "green", toDb: -20 },
+			{ fromDb: -90, id: "green", toDb: -20 },
 			{ fromDb: -20, id: "yellow", toDb: -9 },
 			{ fromDb: -9, id: "red", toDb: 0 },
 		]);
@@ -111,13 +112,58 @@ describe("PreviewLevelMeter", () => {
 		);
 
 		const meter = screen.getByLabelText("Zone preview meter");
-		expect(within(meter).getByText("0 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("-9 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("-20 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("-72 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("Green zone -72 to -20 dBFS")).toBeTruthy();
+		expect(within(meter).getByText("dBFS")).toBeTruthy();
+		expect(within(meter).getByText("0")).toBeTruthy();
+		expect(within(meter).getByText("-4")).toBeTruthy();
+		expect(within(meter).getByText("-20")).toBeTruthy();
+		expect(within(meter).getByText("-80")).toBeTruthy();
+		expect(within(meter).getByText("-90")).toBeTruthy();
+		expect(within(meter).getByText("0").className).toContain("top-0");
+		expect(within(meter).getByText("0").className).not.toContain(
+			"-translate-y-1/2",
+		);
+		expect(within(meter).getByText("-90").className).toContain("bottom-0");
+		expect(within(meter).getByText("-90").className).not.toContain(
+			"-translate-y-1/2",
+		);
+		expect(within(meter).getByText("-20").className).toContain(
+			"-translate-y-1/2",
+		);
+		expect(within(meter).getByText("Green zone -90 to -20 dBFS")).toBeTruthy();
 		expect(within(meter).getByText("Yellow zone -20 to -9 dBFS")).toBeTruthy();
 		expect(within(meter).getByText("Red zone -9 to 0 dBFS")).toBeTruthy();
+	});
+
+	it("progressively reduces vertical dBFS markers when the meter is short", () => {
+		const fullTicks = [
+			0, -4, -8, -12, -16, -20, -24, -28, -32, -36, -40, -50, -60, -70, -80,
+			-90,
+		];
+		const compactTicks = selectPreviewLevelMeterTicksForHeight({
+			heightPx: 180,
+			orientation: "vertical",
+			range: previewPeakMeterVisualRange,
+			ticks: fullTicks,
+		});
+		const mediumTicks = selectPreviewLevelMeterTicksForHeight({
+			heightPx: 340,
+			orientation: "vertical",
+			range: previewPeakMeterVisualRange,
+			ticks: fullTicks,
+		});
+		const tallTicks = selectPreviewLevelMeterTicksForHeight({
+			heightPx: 640,
+			orientation: "vertical",
+			range: previewPeakMeterVisualRange,
+			ticks: fullTicks,
+		});
+
+		expect(compactTicks).toEqual([0, -24, -50, -90]);
+		expect(mediumTicks.length).toBeGreaterThan(compactTicks.length);
+		expect(mediumTicks.length).toBeLessThan(fullTicks.length);
+		expect(tallTicks).toEqual(fullTicks);
+		expect(compactTicks).not.toContain(-4);
+		expect(tallTicks).toContain(-4);
 	});
 
 	it("renders generic preparing and unavailable states without owning actions", () => {

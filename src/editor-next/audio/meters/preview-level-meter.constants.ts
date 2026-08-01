@@ -5,7 +5,7 @@ import type {
 
 export const previewPeakMeterVisualRange = {
 	ceilingDb: 0,
-	floorDb: -72,
+	floorDb: -90,
 } satisfies PreviewLevelMeterVisualRange;
 
 export const previewPeakMeterClipDb = 0;
@@ -13,7 +13,7 @@ export const previewPeakMeterClipDb = 0;
 export const previewPeakMeterZones = [
 	{
 		className: "bg-emerald-500/80",
-		fromDb: -72,
+		fromDb: -90,
 		id: "green",
 		label: "Green",
 		toDb: -20,

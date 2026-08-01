@@ -41,12 +41,10 @@ describe("AudioPanel", () => {
 				"This media asset has no audio tracks available for preview monitoring.",
 			),
 		).toBeTruthy();
-		expect(
-			within(audioPanel).queryByLabelText("Combined preview strip"),
-		).toBeNull();
+		expect(within(audioPanel).queryByLabelText("Master strip")).toBeNull();
 	});
 
-	it("renders one per-track strip and one combined preview strip without mixer controls", () => {
+	it("renders one per-track strip and one master strip without mixer controls", () => {
 		renderAudioPanel({ asset: readyAsset });
 
 		const audioPanel = screen.getByLabelText("Audio panel");
@@ -56,9 +54,7 @@ describe("AudioPanel", () => {
 		const desktopStrip = within(audioPanel).getByLabelText(
 			"Audio track strip Desktop",
 		);
-		const combinedStrip = within(audioPanel).getByLabelText(
-			"Combined preview strip",
-		);
+		const combinedStrip = within(audioPanel).getByLabelText("Master strip");
 		const stripBank = within(audioPanel).getByLabelText(
 			"Audio channel strip bank",
 		);
@@ -86,15 +82,21 @@ describe("AudioPanel", () => {
 		expect(
 			within(voiceStrip).getByRole("meter", { name: "Left level" }),
 		).toBeTruthy();
-		expect(within(voiceStrip).queryByText("Left")).toBeNull();
+		const voiceMeter = within(voiceStrip).getByLabelText("Voice preview meter");
+		expect(within(voiceMeter).queryByText("Left")).toBeNull();
+		expect(within(voiceMeter).queryByText("Right")).toBeNull();
+		expect(within(voiceMeter).getByText("dBFS")).toBeTruthy();
+		expect(within(voiceMeter).getByText("0")).toBeTruthy();
+		expect(within(voiceMeter).getByText("-4")).toBeTruthy();
+		expect(within(voiceMeter).getByText("-90")).toBeTruthy();
 		expect(within(desktopStrip).getByText("Desktop")).toBeTruthy();
 		expect(
 			within(desktopStrip).getByLabelText("Desktop preview meter"),
 		).toBeTruthy();
-		expect(within(combinedStrip).getByText("Combined preview")).toBeTruthy();
+		expect(within(combinedStrip).getByText("Master")).toBeTruthy();
 		expect(within(combinedStrip).getByText("Monitored output")).toBeTruthy();
 		expect(
-			within(combinedStrip).getByLabelText("Combined preview output meter"),
+			within(combinedStrip).getByLabelText("Master output meter"),
 		).toBeTruthy();
 		expect(within(audioPanel).queryByText("Scaffold")).toBeNull();
 		expect(within(combinedStrip).queryByText(/track volume/i)).toBeNull();
@@ -257,9 +259,17 @@ describe("AudioPanel", () => {
 			within(voiceMeter)
 				.getByRole("meter", { name: "Left level" })
 				.getAttribute("aria-valuenow"),
-		).toBe("-72");
-		expect(within(voiceStrip).getByText("Ready")).toBeTruthy();
+		).toBe("-90");
+		expect(within(voiceMeter).queryByText("Left")).toBeNull();
+		expect(within(voiceMeter).queryByText("Right")).toBeNull();
+		expect(within(voiceMeter).getByText("-90")).toBeTruthy();
+		expect(within(voiceStrip).queryByText("Ready")).toBeNull();
 		expect(desktopMeter.getAttribute("data-state")).toBe("preparing");
+		expect(
+			within(screen.getByLabelText("Audio track strip Desktop")).getByText(
+				"Preparing",
+			),
+		).toBeTruthy();
 		expect(
 			within(desktopMeter).getByText("Preparing preview meters"),
 		).toBeTruthy();
@@ -315,6 +325,7 @@ describe("AudioPanel", () => {
 		expect(
 			within(desktopStrip).getByText("Desktop decode failed"),
 		).toBeTruthy();
+		expect(within(desktopStrip).getByText("Unavailable")).toBeTruthy();
 		expect(within(desktopMeter).queryByRole("button")).toBeNull();
 		expect(
 			within(desktopStrip).getByRole("button", {
@@ -394,9 +405,9 @@ describe("AudioPanel", () => {
 			}),
 		});
 
-		const combinedStrip = screen.getByLabelText("Combined preview strip");
+		const combinedStrip = screen.getByLabelText("Master strip");
 		const combinedMeter = within(combinedStrip).getByLabelText(
-			"Combined preview output meter",
+			"Master output meter",
 		);
 
 		await waitFor(() => {
@@ -415,14 +426,15 @@ describe("AudioPanel", () => {
 					.getAttribute("aria-valuenow"),
 			),
 		).toBeCloseTo(-6.02, 2);
-		expect(within(combinedStrip).getByText("Ready")).toBeTruthy();
+		expect(within(combinedStrip).queryByText("Ready")).toBeNull();
 		expect(within(combinedStrip).queryByText(/track volume/i)).toBeNull();
 		expect(within(combinedStrip).queryByText(/channel handling/i)).toBeNull();
-		expect(within(combinedStrip).queryByText(/master/i)).toBeNull();
+		expect(within(combinedStrip).queryByText(/master gain/i)).toBeNull();
+		expect(within(combinedStrip).queryByText(/master fader/i)).toBeNull();
 		expect(within(combinedStrip).queryByText(/routing/i)).toBeNull();
 	});
 
-	it("shows a partial combined output meter when an audible track is unavailable without blocking track controls", async () => {
+	it("shows a partial master output meter when an audible track is unavailable without blocking track controls", async () => {
 		const onAudioTrackIncludedChange = vi.fn();
 		const onAudioTrackVolumePercentChange = vi.fn();
 
@@ -461,9 +473,9 @@ describe("AudioPanel", () => {
 			onAudioTrackVolumePercentChange,
 		});
 
-		const combinedStrip = screen.getByLabelText("Combined preview strip");
+		const combinedStrip = screen.getByLabelText("Master strip");
 		const combinedMeter = within(combinedStrip).getByLabelText(
-			"Combined preview output meter",
+			"Master output meter",
 		);
 		const desktopStrip = screen.getByLabelText("Audio track strip Desktop");
 

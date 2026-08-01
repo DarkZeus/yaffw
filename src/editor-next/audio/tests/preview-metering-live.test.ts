@@ -122,7 +122,7 @@ describe("createLivePreviewMeteringTrackStates", () => {
 			throw new Error("Expected ready Voice meter state.");
 		}
 		expect(voiceState.channels.map((channel) => channel.peakDb)).toEqual([
-			-72, -72,
+			-90, -90,
 		]);
 	});
 

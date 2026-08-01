@@ -183,9 +183,7 @@ describe("EditorNextRoute", () => {
 		expect(
 			within(audioPanel).getByLabelText("Audio track strip Voice"),
 		).toBeTruthy();
-		expect(
-			within(audioPanel).getByLabelText("Combined preview strip"),
-		).toBeTruthy();
+		expect(within(audioPanel).getByLabelText("Master strip")).toBeTruthy();
 		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
 	});
 

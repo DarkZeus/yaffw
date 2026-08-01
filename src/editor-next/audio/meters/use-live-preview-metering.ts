@@ -12,8 +12,8 @@ import {
 const EMPTY_LIVE_PREVIEW_METERING_STATE = {
 	combinedState: {
 		channels: [
-			{ clipHeld: false, label: "Left", peakDb: -72 },
-			{ clipHeld: false, label: "Right", peakDb: -72 },
+			{ clipHeld: false, label: "Left", peakDb: -90 },
+			{ clipHeld: false, label: "Right", peakDb: -90 },
 		],
 		partial: false,
 		status: "ready",
@@ -142,6 +142,17 @@ export function useLivePreviewMetering({
 			lastDisplayUpdateTimestampMs = displayTimestampMs;
 		}
 
+		function scheduleFrameIfDisplayNeedsSmoothing() {
+			if (
+				!livePreviewMeteringStatesEqual(
+					liveMeteringStateRef.current,
+					targetMeteringState,
+				)
+			) {
+				scheduleAnimationFrame();
+			}
+		}
+
 		function updateLiveMeterTarget() {
 			if (cancelled) {
 				return;
@@ -175,6 +186,7 @@ export function useLivePreviewMetering({
 				scheduleAnimationFrame();
 			} else {
 				commitSmoothedMeteringState(displayTimestampMs);
+				scheduleFrameIfDisplayNeedsSmoothing();
 			}
 
 			scheduleNextPoll(isPlaying);
@@ -189,12 +201,22 @@ export function useLivePreviewMetering({
 
 			const isPlaying = clock?.getIsPlaying() ?? false;
 
-			if (!isPlaying) {
+			if (
+				!isPlaying &&
+				livePreviewMeteringStatesEqual(
+					liveMeteringStateRef.current,
+					targetMeteringState,
+				)
+			) {
 				return;
 			}
 
 			commitSmoothedMeteringState(timestampMs);
-			scheduleAnimationFrame();
+			if (isPlaying) {
+				scheduleAnimationFrame();
+			} else {
+				scheduleFrameIfDisplayNeedsSmoothing();
+			}
 		}
 
 		updateLiveMeterTarget();
