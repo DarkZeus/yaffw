@@ -20,8 +20,10 @@ import { routeTree } from "./routeTree.gen";
 
 const referencePrototypeRoutePath = "/editor-next-workbench-prototype";
 const legacyRoutePath = "/legacy-editor";
+const performanceDemoRoutePath = "/test";
 const sourceDir = dirname(fileURLToPath(import.meta.url));
 const legacyRouteFile = join(sourceDir, "routes/legacy-editor.tsx");
+const performanceDemoRouteFile = join(sourceDir, "routes/test.tsx");
 const referencePrototypeRouteFile = join(
 	sourceDir,
 	"routes/editor-next-workbench-prototype.tsx",
@@ -113,6 +115,17 @@ describe("app route contract", () => {
 		expect(routeTreeSource).not.toContain(legacyRoutePath);
 		expect(existsSync(legacyRouteFile)).toBe(false);
 		expect(appSidebarSource).not.toContain(legacyRoutePath);
+	});
+
+	it("does not publish or retain the React performance demo route", () => {
+		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
+		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
+		const rootRouteSource = readFileSync(rootRouteFile, "utf8");
+
+		expect(routeTreeSource).not.toContain(performanceDemoRoutePath);
+		expect(existsSync(performanceDemoRouteFile)).toBe(false);
+		expect(appSidebarSource).not.toContain(performanceDemoRoutePath);
+		expect(rootRouteSource).not.toContain(performanceDemoRoutePath);
 	});
 
 	it("keeps bulk download reachable in the normal app shell", async () => {

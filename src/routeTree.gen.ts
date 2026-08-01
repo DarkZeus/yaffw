@@ -9,16 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TestRouteImport } from './routes/test'
 import { Route as EditorNextRouteImport } from './routes/editor-next'
 import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
 import { Route as IndexRouteImport } from './routes/index'
 
-const TestRoute = TestRouteImport.update({
-  id: '/test',
-  path: '/test',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const EditorNextRoute = EditorNextRouteImport.update({
   id: '/editor-next',
   path: '/editor-next',
@@ -39,45 +33,34 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
-  '/test': typeof TestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
-  '/test': typeof TestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
-  '/test': typeof TestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bulk-download' | '/editor-next' | '/test'
+  fullPaths: '/' | '/bulk-download' | '/editor-next'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bulk-download' | '/editor-next' | '/test'
-  id: '__root__' | '/' | '/bulk-download' | '/editor-next' | '/test'
+  to: '/' | '/bulk-download' | '/editor-next'
+  id: '__root__' | '/' | '/bulk-download' | '/editor-next'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BulkDownloadRoute: typeof BulkDownloadRoute
   EditorNextRoute: typeof EditorNextRoute
-  TestRoute: typeof TestRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/test': {
-      id: '/test'
-      path: '/test'
-      fullPath: '/test'
-      preLoaderRoute: typeof TestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/editor-next': {
       id: '/editor-next'
       path: '/editor-next'
@@ -106,7 +89,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BulkDownloadRoute: BulkDownloadRoute,
   EditorNextRoute: EditorNextRoute,
-  TestRoute: TestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
