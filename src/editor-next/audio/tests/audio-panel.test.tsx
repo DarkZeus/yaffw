@@ -581,6 +581,7 @@ function createMeteringClock({
 		getIsPlaying: () => isPlaying,
 		getMeteringStatus: () => status,
 		readMeterSnapshot: () => snapshot,
+		subscribeToPlaybackStateChange: () => () => undefined,
 	};
 }
 

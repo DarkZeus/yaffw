@@ -1396,6 +1396,7 @@ function lastOutputGain(
 
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];
+	const meterFrameCallbacks: FrameRequestCallback[] = [];
 	const timelineFrameCallbacks: FrameRequestCallback[] = [];
 	const requestPreviewAnimationFrame = vi.fn(
 		(callback: FrameRequestCallback) => {
@@ -1408,6 +1409,10 @@ function stubPreviewAnimationFrames() {
 			timelineFrameCallbacks.push(callback);
 			return 10_000 + timelineFrameCallbacks.length;
 		}
+		if (callback.name === "animateLiveMeters") {
+			meterFrameCallbacks.push(callback);
+			return 20_000 + meterFrameCallbacks.length;
+		}
 
 		return requestPreviewAnimationFrame(callback);
 	};
@@ -1418,6 +1423,7 @@ function stubPreviewAnimationFrames() {
 	return {
 		cancelAnimationFrame,
 		frameCallbacks,
+		meterFrameCallbacks,
 		requestAnimationFrame: requestPreviewAnimationFrame,
 	};
 }

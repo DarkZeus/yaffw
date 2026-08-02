@@ -59,6 +59,7 @@ export type LivePreviewMeteringClock = {
 	getIsPlaying: () => boolean;
 	getMeteringStatus: () => LivePreviewMeteringSourceStatus;
 	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot | null;
+	subscribeToPlaybackStateChange: (listener: () => void) => () => void;
 };
 
 export type LivePreviewMeteringClipHoldState = Record<

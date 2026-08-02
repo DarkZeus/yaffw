@@ -76,6 +76,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
 	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
+	const previewMeteringPlaybackStateListenersRef = useRef(
+		new Set<() => void>(),
+	);
 	const retryPreviewMeteringTrackRef = useRef<(trackId: string) => void>(
 		() => undefined,
 	);
@@ -86,6 +89,13 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			previewAudioEngineRef.current?.readMeterSnapshot() ?? null,
 		retryTrack: (trackId: string) =>
 			retryPreviewMeteringTrackRef.current(trackId),
+		subscribeToPlaybackStateChange: (listener: () => void) => {
+			previewMeteringPlaybackStateListenersRef.current.add(listener);
+
+			return () => {
+				previewMeteringPlaybackStateListenersRef.current.delete(listener);
+			};
+		},
 	});
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
@@ -202,6 +212,17 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	getPlayheadUsRef.current = getPlayheadUs;
 	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
 	usePreviewMeteringSource(previewMeteringSourceRef.current);
+	const previousPreviewMeteringIsPlayingRef = useRef(isPlaying);
+	useEffect(() => {
+		if (previousPreviewMeteringIsPlayingRef.current === isPlaying) {
+			return;
+		}
+
+		previousPreviewMeteringIsPlayingRef.current = isPlaying;
+		for (const listener of previewMeteringPlaybackStateListenersRef.current) {
+			listener();
+		}
+	}, [isPlaying]);
 
 	useEffect(() => {
 		onPreviewPlayheadChange?.(playheadUs);

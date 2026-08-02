@@ -175,6 +175,7 @@ function createMeteringClock(
 		getIsPlaying: () => true,
 		getMeteringStatus: () => "ready",
 		readMeterSnapshot,
+		subscribeToPlaybackStateChange: () => () => undefined,
 	};
 }
 

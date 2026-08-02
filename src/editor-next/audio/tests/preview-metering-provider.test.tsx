@@ -36,6 +36,7 @@ describe("Preview metering ownership", () => {
 			getMeteringStatus: () => "degraded",
 			readMeterSnapshot: () => meterSnapshot,
 			retryTrack,
+			subscribeToPlaybackStateChange: () => () => undefined,
 		};
 
 		render(

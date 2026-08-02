@@ -8,33 +8,64 @@ import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-en
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
 import { useLivePreviewMetering } from "../meters/use-live-preview-metering";
 
-const frameCallbacks: FrameRequestCallback[] = [];
-const timeoutCallbacks: Array<{ callback: () => void; delayMs?: number }> = [];
+const frameCallbacks: Array<{
+	callback: FrameRequestCallback;
+	id: number;
+}> = [];
+const timeoutCallbacks: Array<{
+	callback: () => void;
+	delayMs?: number;
+	id: number;
+}> = [];
+let nextTimeoutId = 1;
+let nextFrameId = 1;
 
 beforeEach(() => {
 	frameCallbacks.length = 0;
 	timeoutCallbacks.length = 0;
+	nextFrameId = 1;
+	nextTimeoutId = 1;
 	Object.defineProperty(window, "requestAnimationFrame", {
 		configurable: true,
 		value: vi.fn((callback: FrameRequestCallback) => {
-			frameCallbacks.push(callback);
-			return frameCallbacks.length;
+			const id = nextFrameId;
+			nextFrameId += 1;
+			frameCallbacks.push({ callback, id });
+			return id;
 		}),
 	});
 	Object.defineProperty(window, "cancelAnimationFrame", {
 		configurable: true,
-		value: vi.fn(),
+		value: vi.fn((frameId: number) => {
+			const callbackIndex = frameCallbacks.findIndex(
+				(callback) => callback.id === frameId,
+			);
+
+			if (callbackIndex >= 0) {
+				frameCallbacks.splice(callbackIndex, 1);
+			}
+		}),
 	});
 	Object.defineProperty(window, "setTimeout", {
 		configurable: true,
 		value: vi.fn((callback: () => void, delayMs?: number) => {
-			timeoutCallbacks.push({ callback, delayMs });
-			return timeoutCallbacks.length;
+			const id = nextTimeoutId;
+			nextTimeoutId += 1;
+			timeoutCallbacks.push({ callback, delayMs, id });
+			return id;
 		}),
 	});
 	Object.defineProperty(window, "clearTimeout", {
 		configurable: true,
-		value: vi.fn(),
+		value: vi.fn((timeoutId: number) => {
+			const callbackIndex = timeoutCallbacks.findIndex(
+				(callback) => callback.id === timeoutId,
+			);
+
+			if (callbackIndex >= 0) {
+				timeoutCallbacks.splice(callbackIndex, 1);
+			}
+		}),
 	});
 });
 
@@ -65,7 +96,7 @@ describe("useLivePreviewMetering", () => {
 			timeoutCallbacks.shift()?.callback();
 		});
 		act(() => {
-			frameCallbacks.shift()?.(80);
+			frameCallbacks.shift()?.callback(80);
 		});
 
 		const attackPeak = Number(screen.getByLabelText("voice peak").textContent);
@@ -128,7 +159,7 @@ describe("useLivePreviewMetering", () => {
 
 		currentNowMs = 66;
 		act(() => {
-			frameCallbacks.shift()?.(66);
+			frameCallbacks.shift()?.callback(66);
 		});
 
 		const frameReleasePeak = Number(
@@ -138,6 +169,112 @@ describe("useLivePreviewMetering", () => {
 		expect(frameReleasePeak).toBeGreaterThan(-90);
 		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
 		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
+	});
+
+	it("interrupts paused decay immediately when playback resumes", () => {
+		let currentNowMs = 0;
+		let isPlaying = true;
+		const playbackStateListeners = new Set<() => void>();
+		const readMeterSnapshot = vi.fn(() => createReadySnapshot(1));
+		const clock = createMeteringClock({
+			getIsPlaying: () => isPlaying,
+			readMeterSnapshot,
+			subscribeToPlaybackStateChange: (listener) => {
+				playbackStateListeners.add(listener);
+
+				return () => playbackStateListeners.delete(listener);
+			},
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		isPlaying = false;
+		currentNowMs = 50;
+		act(() => {
+			timeoutCallbacks.shift()?.callback();
+		});
+		const pausedPeak = Number(screen.getByLabelText("voice peak").textContent);
+		expect(pausedPeak).toBeLessThan(0);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(250);
+
+		isPlaying = true;
+		currentNowMs = 75;
+		act(() => {
+			for (const listener of playbackStateListeners) {
+				listener();
+			}
+		});
+
+		expect(readMeterSnapshot).toHaveBeenCalledTimes(3);
+		expect(timeoutCallbacks).toHaveLength(1);
+		expect(timeoutCallbacks[0]?.delayMs).toBe(50);
+
+		act(() => {
+			frameCallbacks.shift()?.callback(75);
+		});
+		expect(
+			Number(screen.getByLabelText("voice peak").textContent),
+		).toBeGreaterThan(pausedPeak);
+	});
+
+	it("ignores stale frames after pause and continues fading on newer frames", () => {
+		let currentNowMs = 0;
+		let isPlaying = true;
+		const playbackStateListeners = new Set<() => void>();
+		const clock = createMeteringClock({
+			getIsPlaying: () => isPlaying,
+			readMeterSnapshot: () => createReadySnapshot(1),
+			subscribeToPlaybackStateChange: (listener) => {
+				playbackStateListeners.add(listener);
+
+				return () => playbackStateListeners.delete(listener);
+			},
+		});
+
+		render(<LivePreviewMeteringProbe clock={clock} now={() => currentNowMs} />);
+
+		const alreadyDequeuedPlayingFrame = frameCallbacks.shift();
+		expect(alreadyDequeuedPlayingFrame).toBeDefined();
+
+		isPlaying = false;
+		currentNowMs = 50;
+		act(() => {
+			for (const listener of playbackStateListeners) {
+				listener();
+			}
+		});
+
+		const pausePeak = Number(screen.getByLabelText("voice peak").textContent);
+		expect(pausePeak).toBeLessThan(0);
+		expect(pausePeak).toBeGreaterThan(-90);
+		expect(window.cancelAnimationFrame).toHaveBeenCalledWith(
+			alreadyDequeuedPlayingFrame?.id,
+		);
+
+		act(() => {
+			alreadyDequeuedPlayingFrame?.callback(49);
+		});
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(
+			pausePeak,
+		);
+
+		const staleTransitionFrame = frameCallbacks.shift();
+		expect(staleTransitionFrame).toBeDefined();
+		act(() => {
+			staleTransitionFrame?.callback(49);
+		});
+		expect(Number(screen.getByLabelText("voice peak").textContent)).toBe(
+			pausePeak,
+		);
+
+		act(() => {
+			frameCallbacks.shift()?.callback(66);
+		});
+		const continuedFadePeak = Number(
+			screen.getByLabelText("voice peak").textContent,
+		);
+		expect(continuedFadePeak).toBeLessThan(pausePeak);
+		expect(continuedFadePeak).toBeGreaterThan(-90);
 	});
 
 	it("animates playing meter values on animation frames between snapshot reads", () => {
@@ -158,7 +295,7 @@ describe("useLivePreviewMetering", () => {
 		snapshot = createReadySnapshot(1);
 		currentNowMs = 16;
 		act(() => {
-			frameCallbacks.shift()?.(16);
+			frameCallbacks.shift()?.callback(16);
 		});
 
 		expect(Number(screen.getByLabelText("voice peak").textContent)).toBeCloseTo(
@@ -171,7 +308,7 @@ describe("useLivePreviewMetering", () => {
 			timeoutCallbacks.shift()?.callback();
 		});
 		act(() => {
-			frameCallbacks.shift()?.(64);
+			frameCallbacks.shift()?.callback(64);
 		});
 
 		const committedPeak = Number(
@@ -195,7 +332,7 @@ describe("useLivePreviewMetering", () => {
 		for (const frameTimestampMs of [16, 32, 48]) {
 			currentNowMs = frameTimestampMs;
 			act(() => {
-				frameCallbacks.shift()?.(frameTimestampMs);
+				frameCallbacks.shift()?.callback(frameTimestampMs);
 			});
 		}
 
@@ -271,14 +408,17 @@ function LivePreviewMeteringProbe({
 function createMeteringClock({
 	getIsPlaying,
 	readMeterSnapshot,
+	subscribeToPlaybackStateChange = () => () => undefined,
 }: {
 	getIsPlaying: () => boolean;
 	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot | null;
+	subscribeToPlaybackStateChange?: LivePreviewMeteringClock["subscribeToPlaybackStateChange"];
 }): LivePreviewMeteringClock {
 	return {
 		getIsPlaying,
 		getMeteringStatus: () => "ready",
 		readMeterSnapshot,
+		subscribeToPlaybackStateChange,
 	};
 }
 
