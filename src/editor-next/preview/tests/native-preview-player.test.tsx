@@ -41,7 +41,6 @@ const adapterMockState = vi.hoisted(() => ({
 		play: ReturnType<typeof vi.fn>;
 		getStatus: ReturnType<typeof vi.fn>;
 		readMeterSnapshot: ReturnType<typeof vi.fn>;
-		retryTrackResource: ReturnType<typeof vi.fn>;
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
@@ -265,7 +264,6 @@ beforeEach(() => {
 			pause: vi.fn(),
 			play: vi.fn(),
 			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
-			retryTrackResource: vi.fn(async () => "ready"),
 			setPlaybackRate: vi.fn(),
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
@@ -1487,16 +1485,16 @@ function createPreparedPreviewAudioResourcesForRequest(
 			}
 
 			return {
-				blob: new Blob(["audio"], { type: "audio/mp4" }),
-				byteLength: 5,
-				downloadName: `${trackId}.m4a`,
-				mimeType: "audio/mp4",
+				audioBuffer: {
+					duration: 1,
+					length: 48_000,
+					numberOfChannels: 2,
+					sampleRate: 48_000,
+				} as AudioBuffer,
 				startPositionSeconds: 0,
-				strategy: "same-codec-remux",
 				track,
 				trackId,
 				trackIndex: resourceIndex,
-				url: `blob:audio:${request.asset.id}:${trackId}`,
 			} satisfies PreviewAudioResource;
 		}),
 	};

@@ -13,7 +13,7 @@ import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-en
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 
 describe("createPreviewAudioEngine", () => {
-	it("decodes every prepared audio resource before first playback and schedules all tracks", async () => {
+	it("schedules every directly prepared audio resource", async () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
@@ -23,8 +23,6 @@ describe("createPreviewAudioEngine", () => {
 				createPreviewAudioResource("audio-2", 1.25),
 			],
 		});
-
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
 
 		engine.setTrackVolumeGain(0, 0.5);
 		engine.setTrackMonitorGain(0, 1);
@@ -60,7 +58,7 @@ describe("createPreviewAudioEngine", () => {
 		expect(context.close).toHaveBeenCalledTimes(1);
 	});
 
-	it("routes channel handling through the graph without decoding another preview resource", async () => {
+	it("routes channel handling through the graph without replacing the prepared resource", async () => {
 		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
@@ -68,12 +66,9 @@ describe("createPreviewAudioEngine", () => {
 			resources: [createPreviewAudioResource("audio-1", 0)],
 		});
 
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
-
 		engine.setTrackChannelMode(0, "use-left-as-mono");
 		await engine.play();
 
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
 		expect(context.createdSplitters).toHaveLength(4);
 		expect(context.createdSources[0]?.connect).toHaveBeenCalledWith(
 			context.createdSplitters[2],
@@ -86,7 +81,6 @@ describe("createPreviewAudioEngine", () => {
 
 		engine.setTrackChannelMode(0, "duplicate-right-to-stereo");
 
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(1);
 		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
 		expect(context.createdSplitters).toHaveLength(6);
 		expect(context.createdMergers).toHaveLength(1);
@@ -106,9 +100,7 @@ describe("createPreviewAudioEngine", () => {
 	});
 
 	it("reads silent per-channel analyser branches after track decisions and before output gain", async () => {
-		const context = createAudioContextSpy({
-			audioBuffers: [createAudioBufferStub(), createAudioBufferStub()],
-		});
+		const context = createAudioContextSpy();
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
 			outputChannels: 2,
@@ -180,21 +172,18 @@ describe("createPreviewAudioEngine", () => {
 
 	it("rebuilds analyser channels for automatic one-sided and duplicated stereo handling", async () => {
 		const channelSampleIteration = vi.fn();
-		const context = createAudioContextSpy({
-			audioBuffers: [
-				createIterableAudioBufferStub({
-					channels: [
-						[0.25, 0.25, 0.25, 0.25],
-						[0, 0, 0, 0],
-					],
-					onSampleIterated: channelSampleIteration,
-				}),
+		const context = createAudioContextSpy();
+		const audioBuffer = createIterableAudioBufferStub({
+			channels: [
+				[0.25, 0.25, 0.25, 0.25],
+				[0, 0, 0, 0],
 			],
+			onSampleIterated: channelSampleIteration,
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
 			outputChannels: 2,
-			resources: [createPreviewAudioResource("audio-1", 0)],
+			resources: [createPreviewAudioResource("audio-1", 0, audioBuffer)],
 		});
 
 		engine.setTrackChannelMode(0, "auto-one-sided-stereo");
@@ -227,15 +216,14 @@ describe("createPreviewAudioEngine", () => {
 	});
 
 	it("preserves wider custom per-track channel layouts", async () => {
-		const context = createAudioContextSpy({
-			audioBuffers: [
-				createAudioBufferStub({ channels: [[], [], [], [], [], []] }),
-			],
+		const context = createAudioContextSpy();
+		const audioBuffer = createAudioBufferStub({
+			channels: [[], [], [], [], [], []],
 		});
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
 			outputChannels: 2,
-			resources: [createPreviewAudioResource("audio-1", 0)],
+			resources: [createPreviewAudioResource("audio-1", 0, audioBuffer)],
 		});
 
 		setAnalyserFrames(context, [
@@ -342,24 +330,28 @@ describe("createPreviewAudioEngine", () => {
 	});
 
 	it("keeps prepared tracks active in degraded mode when one Preview audio resource fails", async () => {
-		const context = createAudioContextSpy({
-			audioBuffers: [
-				createAudioBufferStub({
-					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
-				}),
-			],
-			decodeFailures: [null, new Error("Desktop decode failed")],
-		});
+		const context = createAudioContextSpy();
+		const voiceResource = createPreviewAudioResource(
+			"audio-1",
+			0,
+			createAudioBufferStub({
+				channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
+			}),
+		);
 		const engine = await createPreviewAudioEngine({
 			createAudioContext: () => context,
-			outputChannels: 2,
-			resources: [
-				createPreviewAudioResource("audio-1", 0),
-				createPreviewAudioResource("audio-2", 0),
+			failures: [
+				{
+					reason: "Desktop decode failed",
+					track: { id: "audio-2", kind: "audio" },
+					trackId: "audio-2",
+					trackIndex: 1,
+				},
 			],
+			outputChannels: 2,
+			resources: [voiceResource],
 		});
 
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
 		expect(engine.getStatus()).toBe("degraded");
 
 		engine.setTrackVolumeGain(0, 0.5);
@@ -397,114 +389,22 @@ describe("createPreviewAudioEngine", () => {
 		expect(excludedSnapshot.combinedState.partial).toBe(false);
 	});
 
-	it("retries only a failed Preview audio resource while preserving prepared resources", async () => {
-		const context = createAudioContextSpy({
-			audioBuffers: [
-				createAudioBufferStub({
-					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
-				}),
-				createAudioBufferStub({
-					channels: [[[4_800, 0.75]], [[4_800, 0.5]]],
-				}),
-			],
-			decodeFailures: [null, new Error("Desktop decode failed"), null],
-		});
-		const engine = await createPreviewAudioEngine({
-			createAudioContext: () => context,
-			outputChannels: 2,
-			resources: [
-				createPreviewAudioResource("audio-1", 0),
-				createPreviewAudioResource("audio-2", 0),
-			],
-		});
-
-		expect(engine.getStatus()).toBe("degraded");
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(2);
-
-		engine.setTrackVolumeGain(0, 0.5);
-		engine.setTrackMonitorGain(0, 1);
-		engine.setTrackVolumeGain(1, 0.25);
-		engine.setTrackMonitorGain(1, 1);
-		await engine.play();
-
-		expect(context.createdSources).toHaveLength(1);
-
-		await expect(engine.retryTrackResource("audio-2")).resolves.toBe("ready");
-
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(3);
-		expect(engine.getStatus()).toBe("ready");
-		expect(context.createdSources).toHaveLength(3);
-		expect(context.createdSources[0]?.stop).toHaveBeenCalledTimes(1);
-		expect(context.createdSources[1]?.start).toHaveBeenCalled();
-		expect(context.createdSources[2]?.start).toHaveBeenCalled();
-		expect(context.createdGains[2]?.gain.value).toBe(0.5);
-		expect(context.createdGains[3]?.gain.value).toBe(0.25);
-
-		const snapshot = engine.readMeterSnapshot();
-		expect(snapshot.trackStates["audio-2"]?.status).toBe("ready");
-		expect(snapshot.combinedState.status).toBe("ready");
-		if (snapshot.combinedState.status !== "ready") {
-			throw new Error("Expected ready combined meter state.");
-		}
-		expect(snapshot.combinedState.partial).toBe(false);
-	});
-
-	it("ignores a retried Preview audio resource that resolves after engine cleanup", async () => {
-		const context = createAudioContextSpy({
-			audioBuffers: [
-				createAudioBufferStub({
-					channels: [[[4_800, 0.5]], [[4_800, 0.25]]],
-				}),
-				createAudioBufferStub({
-					channels: [[[4_800, 0.75]], [[4_800, 0.5]]],
-				}),
-			],
-			decodeFailures: [null, new Error("Desktop decode failed")],
-		});
-		const engine = await createPreviewAudioEngine({
-			createAudioContext: () => context,
-			outputChannels: 2,
-			resources: [
-				createPreviewAudioResource("audio-1", 0),
-				createPreviewAudioResource("audio-2", 0),
-			],
-		});
-		const retryDecode = createDeferred<AudioBuffer>();
-
-		context.decodeAudioData.mockImplementationOnce(() => retryDecode.promise);
-
-		const retry = engine.retryTrackResource("audio-2");
-		await Promise.resolve();
-		await Promise.resolve();
-
-		expect(context.decodeAudioData).toHaveBeenCalledTimes(3);
-
-		const gainCountBeforeCleanup = context.createdGains.length;
-		engine.destroy();
-		retryDecode.resolve(createAudioBufferStub());
-		await retry;
-
-		expect(context.createdGains).toHaveLength(gainCountBeforeCleanup);
-		expect(context.createdSources).toHaveLength(0);
-		expect(context.close).toHaveBeenCalledTimes(1);
-	});
-
 	it("rejects total Preview audio engine resource failure so native video can own preview", async () => {
-		const context = createAudioContextSpy({
-			decodeFailures: [
-				new Error("Voice decode failed"),
-				new Error("Desktop decode failed"),
-			],
-		});
+		const context = createAudioContextSpy();
 
 		await expect(
 			createPreviewAudioEngine({
 				createAudioContext: () => context,
-				outputChannels: 2,
-				resources: [
-					createPreviewAudioResource("audio-1", 0),
-					createPreviewAudioResource("audio-2", 0),
+				failures: [
+					{
+						reason: "Voice decode failed",
+						track: { id: "audio-1", kind: "audio" },
+						trackId: "audio-1",
+						trackIndex: 0,
+					},
 				],
+				outputChannels: 2,
+				resources: [],
 			}),
 		).rejects.toThrow("No Preview audio resources could be prepared");
 		expect(context.close).toHaveBeenCalledTimes(1);
@@ -584,31 +484,21 @@ describe("createPreviewAudioEngine", () => {
 function createPreviewAudioResource(
 	trackId: string,
 	startPositionSeconds: number,
+	audioBuffer = createAudioBufferStub(),
 ): PreviewAudioResource {
 	return {
-		blob: new Blob([trackId], { type: "audio/wav" }),
-		byteLength: trackId.length,
-		downloadName: `${trackId}.wav`,
-		mimeType: "audio/wav",
+		audioBuffer,
 		startPositionSeconds,
-		strategy: "decoded-wav-fallback",
 		track: {
 			id: trackId,
 			kind: "audio",
 		},
 		trackId,
 		trackIndex: 0,
-		url: `blob:${trackId}`,
 	};
 }
 
-function createAudioContextSpy({
-	audioBuffers = [createAudioBufferStub()],
-	decodeFailures = [],
-}: {
-	audioBuffers?: AudioBuffer[];
-	decodeFailures?: Array<Error | null>;
-} = {}) {
+function createAudioContextSpy() {
 	const destination = createAudioNodeSpy();
 	const context = {
 		close: vi.fn(),
@@ -680,15 +570,6 @@ function createAudioContextSpy({
 			}
 		>,
 		currentTime: 0,
-		decodeAudioData: vi.fn(async () => {
-			const failure = decodeFailures.shift();
-
-			if (failure) {
-				throw failure;
-			}
-
-			return audioBuffers.shift() ?? createAudioBufferStub();
-		}),
 		destination,
 		resume: vi.fn(),
 		sampleRate: 48_000,
@@ -833,21 +714,6 @@ function createIterableAudioBufferStub({
 		numberOfChannels: channelData.length,
 		sampleRate: 48_000,
 	} as AudioBuffer;
-}
-
-function createDeferred<T>() {
-	let resolve!: (value: T | PromiseLike<T>) => void;
-	let reject!: (reason?: unknown) => void;
-	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-		resolve = resolvePromise;
-		reject = rejectPromise;
-	});
-
-	return {
-		promise,
-		reject,
-		resolve,
-	};
 }
 
 const readyAsset = {

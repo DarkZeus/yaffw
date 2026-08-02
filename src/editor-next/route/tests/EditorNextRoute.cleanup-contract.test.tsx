@@ -265,9 +265,6 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
 			"blob:preview:close-contract.mp4",
 		);
-		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
-			"blob:audio:asset-close-contract:audio-1",
-		);
 		expect(
 			adapterMockState.previewAudioEngines[0]?.destroy,
 		).toHaveBeenCalledTimes(1);
@@ -392,11 +389,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			status: "ready",
 		});
 
-		await waitFor(() => {
-			expect(URL.revokeObjectURL).toHaveBeenCalledWith(
-				"blob:audio:asset-replace-first:audio-1",
-			);
-		});
+		await Promise.resolve();
 		expect(waveformRuns.map((run) => run.sourceName)).toEqual([
 			"replace-first.mp4",
 			"replace-second.mp4",
@@ -408,9 +401,6 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(
 			"blob:preview:replace-second.mp4",
 		);
-		expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(
-			"blob:audio:asset-replace-second:audio-1",
-		);
 		expect(
 			adapterMockState.previewAudioEngines[0]?.destroy,
 		).not.toHaveBeenCalled();
@@ -421,9 +411,6 @@ describe("EditorNextRoute cleanup contract", () => {
 
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
 			"blob:preview:replace-second.mp4",
-		);
-		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
-			"blob:audio:asset-replace-second:audio-1",
 		);
 		expect(
 			adapterMockState.previewAudioEngines[0]?.destroy,
@@ -535,18 +522,19 @@ const supportedInspection = {
 } satisfies LocalMediaAssetInspection;
 
 function createPreparedPreviewAudioResources(
-	assetId: string,
+	_assetId: string,
 ): PreviewAudioResourcesResult {
 	return {
 		failures: [],
 		resources: [
 			{
-				blob: new Blob(["audio"], { type: "audio/mp4" }),
-				byteLength: 5,
-				downloadName: "audio-1.m4a",
-				mimeType: "audio/mp4",
+				audioBuffer: {
+					duration: 1,
+					length: 48_000,
+					numberOfChannels: 2,
+					sampleRate: 48_000,
+				} as AudioBuffer,
 				startPositionSeconds: 0,
-				strategy: "same-codec-remux",
 				track: {
 					codec: "aac",
 					id: "audio-1",
@@ -555,7 +543,6 @@ function createPreparedPreviewAudioResources(
 				},
 				trackId: "audio-1",
 				trackIndex: 0,
-				url: `blob:audio:${assetId}:audio-1`,
 			} satisfies PreviewAudioResource,
 		],
 	};

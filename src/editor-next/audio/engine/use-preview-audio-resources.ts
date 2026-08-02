@@ -6,10 +6,7 @@ import type {
 	PreviewAudioResource,
 	PreviewAudioResourceFailure,
 } from "../types/preview-audio-resources.types";
-import {
-	preparePreviewAudioResources,
-	revokePreviewAudioResources,
-} from "./preview-audio-resources";
+import { preparePreviewAudioResources } from "./preview-audio-resources";
 
 export type PreviewAudioResourcesState =
 	| {
@@ -194,7 +191,6 @@ export function usePreviewAudioResources({
 						!activeMediaAssetCleanupScope.isCurrent()) ||
 					!previewAudioResourceOwnershipMatches(ownership, { asset, source })
 				) {
-					revokePreviewAudioResources({ resources: result.resources });
 					return;
 				}
 
@@ -310,16 +306,9 @@ function releasePreviewAudioResourceOwnership(
 	ownership.preparation = null;
 	ownership.requestVersion += 1;
 	ownership.failuresByTrackId.clear();
-	const resources = Array.from(ownership.resourcesByTrackId.values());
 	ownership.resourcesByTrackId.clear();
 	ownership.assetId = null;
 	ownership.source = null;
-
-	if (resources.length > 0) {
-		revokePreviewAudioResources({
-			resources,
-		});
-	}
 }
 
 function beginPreviewAudioResourcePreparation({
@@ -456,17 +445,11 @@ function storeOwnedPreviewAudioResourceResult({
 			!requestedTrackIds.has(resource.trackId) ||
 			!assetTrackIds.has(resource.trackId)
 		) {
-			revokePreviewAudioResources({ resources: [resource] });
 			continue;
 		}
 
-		const currentResource = ownership.resourcesByTrackId.get(resource.trackId);
 		ownership.failuresByTrackId.delete(resource.trackId);
 		ownership.resourcesByTrackId.set(resource.trackId, resource);
-
-		if (currentResource && currentResource !== resource) {
-			revokePreviewAudioResources({ resources: [currentResource] });
-		}
 	}
 }
 

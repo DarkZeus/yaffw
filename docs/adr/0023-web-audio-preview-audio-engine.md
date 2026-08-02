@@ -1,8 +1,10 @@
 # Web Audio preview audio engine
 
-Editor-next should replace the hidden `wavesurfer-multitrack` preview transport with a project-owned **Preview audio engine** built on Web Audio. Mediabunny prepares source-derived per-track **Preview audio resources** through same-codec remux when possible and decoded WAV fallback when necessary. The engine decodes those resources into full-track `AudioBuffer` data through Web Audio, then owns preview playback, multitrack scheduling, channel handling, **Track volume**, include/exclude, preview solo, preview mute, meter taps, and the audio-master clock in one graph. This prevents preview state from being split across a third-party multitrack player, transformed temporary blobs, and separate meter simulation.
+Editor-next should replace the hidden `wavesurfer-multitrack` preview transport with a project-owned **Preview audio engine** built on Web Audio. Mediabunny directly prepares one timestamp-aligned full-track `AudioBuffer` **Preview audio resource** per source track. The engine consumes those buffers without an intermediate Blob or `decodeAudioData()` pass, then owns preview playback, multitrack scheduling, channel handling, **Track volume**, include/exclude, preview solo, preview mute, meter taps, and the audio-master clock in one graph. This prevents preview state from being split across a third-party multitrack player, transformed temporary blobs, and separate meter simulation.
 
 WaveSurfer may still render visual **Waveform lanes**, but it should not own preview audio transport. The first implementation uses full-track decoded `AudioBuffer` data for simplicity, while keeping **Preview audio resource** as the broader domain term so chunked resources can replace full-track resources later.
+
+Preparation owns browser decode capability checks, timestamp/gap assembly, cancellation, per-track failure isolation, and retry. The engine owns only ready resources plus explicit failures; a retry regenerates the failed resource through the preparation boundary rather than retaining a second engine-level decode lifecycle.
 
 `wavesurfer-multitrack` should be removed as soon as the preview transport replacement no longer imports it. `wavesurfer.js` may remain only for visual waveform rendering.
 

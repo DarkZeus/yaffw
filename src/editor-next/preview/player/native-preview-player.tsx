@@ -134,27 +134,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const previewAudioResourcesRef = useRef(previewAudioResources);
 	previewAudioResourcesRef.current = previewAudioResources;
 	const handlePreviewMeteringRetry = useCallback((trackId: string) => {
-		const previewAudioResources = previewAudioResourcesRef.current;
-		const sourceFailures =
-			previewAudioResources.status === "ready" ||
-			previewAudioResources.status === "failed"
-				? previewAudioResources.failures
-				: [];
-
-		if (sourceFailures.some((failure) => failure.trackId === trackId)) {
-			previewAudioResources.retryTrack(trackId);
-			return;
-		}
-
-		const retry = previewAudioEngineRef.current?.retryTrackResource(trackId);
-
-		if (!retry) {
-			return;
-		}
-
-		void retry.then((nextStatus) => {
-			setAudioMonitoringStatus(nextStatus);
-		});
+		previewAudioResourcesRef.current.retryTrack(trackId);
 	}, []);
 	retryPreviewMeteringTrackRef.current = handlePreviewMeteringRetry;
 	const audioPreviewPreparingTrackIds =

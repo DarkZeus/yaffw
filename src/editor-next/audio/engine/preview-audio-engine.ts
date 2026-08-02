@@ -25,7 +25,6 @@ export type PreviewAudioEngine = {
 	pause: () => void;
 	play: () => Promise<void>;
 	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot;
-	retryTrackResource: (trackId: string) => Promise<PreviewAudioEngineStatus>;
 	setOutputGain: (gain: number) => void;
 	setPlaybackRate: (playbackRate: number) => void;
 	setTime: (timeSeconds: number) => void;
@@ -81,7 +80,6 @@ export type PreviewAudioContextLike = {
 	createChannelSplitter?: (numberOfOutputs?: number) => PreviewAudioNodeLike;
 	createGain: () => PreviewAudioGainNodeLike;
 	currentTime: number;
-	decodeAudioData: (audioData: ArrayBuffer) => Promise<AudioBuffer>;
 	destination: PreviewAudioNodeLike;
 	resume?: () => Promise<void> | void;
 	sampleRate: number;
@@ -126,13 +124,8 @@ export type CreatePreviewAudioEngineOptions = {
 	resources: PreviewAudioResource[];
 };
 
-type DecodedPreviewAudioResource = {
-	buffer: AudioBuffer;
-	source: PreviewAudioResource;
-};
-
 type PreviewAudioReadyResourceTrack = {
-	resource: DecodedPreviewAudioResource;
+	resource: PreviewAudioResource;
 	status: "ready";
 	trackId: string;
 	trackIndex: number;
@@ -148,7 +141,7 @@ type PreviewAudioReadyEngineTrack = {
 	gainNode: PreviewAudioGainNodeLike;
 	meterTap: PreviewAudioMeterTapState;
 	monitorGain: number;
-	resource: DecodedPreviewAudioResource;
+	resource: PreviewAudioResource;
 	sourceNode: PreviewAudioBufferSourceNodeLike | null;
 	status: "ready";
 	trackId: string;
@@ -160,7 +153,6 @@ type PreviewAudioUnavailableEngineTrack = {
 	channelMode: AudioTrackChannelMode;
 	monitorGain: number;
 	reason: string;
-	source?: PreviewAudioResource;
 	status: "unavailable";
 	trackId: string;
 	trackIndex: number;
@@ -200,8 +192,7 @@ export function canUsePreviewAudioEngine(asset: ReadyMediaAsset) {
 		asset.tracks.audio.length > 0 &&
 		typeof window !== "undefined" &&
 		typeof AudioContext !== "undefined" &&
-		typeof Blob.prototype.arrayBuffer === "function" &&
-		typeof URL.createObjectURL === "function"
+		typeof AudioBuffer !== "undefined"
 	);
 }
 
@@ -212,35 +203,27 @@ export async function createPreviewAudioEngine({
 	resources,
 }: CreatePreviewAudioEngineOptions): Promise<PreviewAudioEngine> {
 	const audioContext = createAudioContext();
-	const decodedTracks = await Promise.all(
-		resources.map((source) =>
-			decodePreviewAudioEngineTrack({
-				audioContext,
-				source,
-			}),
-		),
-	);
-	const readyTrackCount = decodedTracks.filter(
-		(track) => track.status === "ready",
-	).length;
+	const preparedTracks: PreviewAudioPreparedTrack[] = [
+		...resources.map((resource) => ({
+			resource,
+			status: "ready" as const,
+			trackId: resource.trackId,
+			trackIndex: resource.trackIndex,
+		})),
+		...failures.map(createUnavailablePreviewAudioTrackFromFailure),
+	];
 
-	if (readyTrackCount === 0) {
+	if (resources.length === 0) {
 		await audioContext.close?.();
 		throw new Error(
-			createTotalPreviewAudioResourceFailureReason([
-				...decodedTracks,
-				...failures.map(createUnavailablePreviewAudioTrackFromFailure),
-			]),
+			createTotalPreviewAudioResourceFailureReason(preparedTracks),
 		);
 	}
 
 	return createPreparedPreviewAudioEngine({
 		audioContext,
 		outputChannels,
-		tracks: [
-			...decodedTracks,
-			...failures.map(createUnavailablePreviewAudioTrackFromFailure),
-		],
+		tracks: preparedTracks,
 	});
 }
 
@@ -480,15 +463,15 @@ function createPreparedPreviewAudioEngine({
 			}
 
 			const sourceNode = audioContext.createBufferSource();
-			const trackStartSeconds = track.resource.source.startPositionSeconds;
+			const trackStartSeconds = track.resource.startPositionSeconds;
 			const offsetSeconds = currentTimeSeconds - trackStartSeconds;
 			const startOffsetSeconds = Math.max(0, offsetSeconds);
 
-			if (startOffsetSeconds >= track.resource.buffer.duration) {
+			if (startOffsetSeconds >= track.resource.audioBuffer.duration) {
 				continue;
 			}
 
-			sourceNode.buffer = track.resource.buffer;
+			sourceNode.buffer = track.resource.audioBuffer;
 			sourceNode.playbackRate.value = playbackRate;
 			sourceNode.connect(track.channelRouting.inputNode);
 
@@ -615,89 +598,6 @@ function createPreparedPreviewAudioEngine({
 			startTrackSources();
 		},
 		readMeterSnapshot,
-		async retryTrackResource(trackId: string) {
-			if (destroyed) {
-				return getPreviewAudioEngineStatus(tracks);
-			}
-
-			const trackIndex = tracks.findIndex(
-				(track) => track.status === "unavailable" && track.trackId === trackId,
-			);
-			const track = tracks[trackIndex];
-
-			if (!track || track.status !== "unavailable" || !track.source) {
-				return getPreviewAudioEngineStatus(tracks);
-			}
-
-			const wasPlaying = playing;
-
-			if (wasPlaying) {
-				syncCurrentTimeFromContext();
-				playing = false;
-				stopTrackSources();
-			}
-
-			try {
-				const buffer = await decodePreviewAudioResource(
-					audioContext,
-					track.source,
-				);
-
-				if (destroyed) {
-					return getPreviewAudioEngineStatus(tracks);
-				}
-
-				const resource = {
-					buffer,
-					source: track.source,
-				};
-				const gainNode = audioContext.createGain();
-				gainNode.gain.value = 0;
-				gainNode.connect(monitoredMixNode);
-				const readyTrack: PreviewAudioReadyEngineTrack = {
-					channelMode: track.channelMode,
-					channelRouting: createPreviewAudioTrackChannelRouting({
-						audioContext,
-						channelMode: track.channelMode,
-						gainNode,
-						resource,
-					}),
-					gainNode,
-					meterTap: createPreviewAudioTrackMeterTapState({
-						audioContext,
-						channelMode: track.channelMode,
-						gainNode,
-						resource,
-					}),
-					monitorGain: track.monitorGain,
-					resource,
-					sourceNode: null,
-					status: "ready",
-					trackId: track.trackId,
-					trackIndex: track.trackIndex,
-					trackVolumeGain: track.trackVolumeGain,
-				};
-
-				updatePreviewAudioTrackGainNode(readyTrack);
-				tracks[trackIndex] = readyTrack;
-			} catch (error) {
-				if (destroyed) {
-					return getPreviewAudioEngineStatus(tracks);
-				}
-
-				tracks[trackIndex] = {
-					...track,
-					reason: errorToMessage(error),
-				};
-			}
-
-			if (wasPlaying && !destroyed) {
-				playing = true;
-				startTrackSources();
-			}
-
-			return getPreviewAudioEngineStatus(tracks);
-		},
 		setPlaybackRate(nextPlaybackRate: number) {
 			if (!playing) {
 				playbackRate = clampPlaybackRate(nextPlaybackRate);
@@ -802,10 +702,10 @@ function createPreviewAudioTrackChannelRouting({
 	audioContext: PreviewAudioContextLike;
 	channelMode: AudioTrackChannelMode;
 	gainNode: PreviewAudioGainNodeLike;
-	resource: DecodedPreviewAudioResource;
+	resource: PreviewAudioResource;
 }): PreviewAudioTrackChannelRouting {
 	const resolvedChannelMode = resolvePreviewAudioChannelMode({
-		audioBuffer: resource.buffer,
+		audioBuffer: resource.audioBuffer,
 		channelMode,
 	});
 
@@ -820,7 +720,7 @@ function createPreviewAudioTrackChannelRouting({
 	}
 
 	const splitter = audioContext.createChannelSplitter(
-		Math.max(1, resource.buffer.numberOfChannels),
+		Math.max(1, resource.audioBuffer.numberOfChannels),
 	);
 	const createdNodes: PreviewAudioNodeLike[] = [splitter];
 
@@ -830,7 +730,7 @@ function createPreviewAudioTrackChannelRouting({
 	) {
 		const sourceChannelIndex = sourceChannelIndexForMode(
 			resolvedChannelMode,
-			resource.buffer,
+			resource.audioBuffer,
 		);
 		splitter.connect(gainNode, sourceChannelIndex, 0);
 
@@ -846,7 +746,7 @@ function createPreviewAudioTrackChannelRouting({
 	) {
 		const sourceChannelIndex = sourceChannelIndexForMode(
 			resolvedChannelMode,
-			resource.buffer,
+			resource.audioBuffer,
 		);
 
 		if (!audioContext.createChannelMerger) {
@@ -860,7 +760,7 @@ function createPreviewAudioTrackChannelRouting({
 
 		const merger = audioContext.createChannelMerger(
 			audioMixPlanTrackOutputChannelCount({
-				inputChannelCount: resource.buffer.numberOfChannels,
+				inputChannelCount: resource.audioBuffer.numberOfChannels,
 				resolvedChannelMode,
 			}),
 		);
@@ -878,12 +778,12 @@ function createPreviewAudioTrackChannelRouting({
 	if (resolvedChannelMode === "average-to-mono") {
 		for (
 			let channelIndex = 0;
-			channelIndex < resource.buffer.numberOfChannels;
+			channelIndex < resource.audioBuffer.numberOfChannels;
 			channelIndex += 1
 		) {
 			const averageGainNode = audioContext.createGain();
 			averageGainNode.gain.value =
-				1 / Math.max(1, resource.buffer.numberOfChannels);
+				1 / Math.max(1, resource.audioBuffer.numberOfChannels);
 			createdNodes.push(averageGainNode);
 			splitter.connect(averageGainNode, channelIndex, 0);
 			averageGainNode.connect(gainNode);
@@ -947,15 +847,15 @@ function createPreviewAudioTrackMeterTapState({
 	audioContext: PreviewAudioContextLike;
 	channelMode: AudioTrackChannelMode;
 	gainNode: PreviewAudioGainNodeLike;
-	resource: DecodedPreviewAudioResource;
+	resource: PreviewAudioResource;
 }): PreviewAudioMeterTapState {
 	const resolvedMode = resolvePreviewAudioChannelMode({
-		audioBuffer: resource.buffer,
+		audioBuffer: resource.audioBuffer,
 		channelMode,
 	});
 	const channelCount = normalizePreviewAudioMeterOutputChannelCount(
 		audioMixPlanTrackOutputChannelCount({
-			inputChannelCount: resource.buffer.numberOfChannels,
+			inputChannelCount: resource.audioBuffer.numberOfChannels,
 			resolvedChannelMode: resolvedMode,
 		}),
 	);
@@ -964,7 +864,7 @@ function createPreviewAudioTrackMeterTapState({
 		audioContext,
 		channelCount,
 		labels: createPreviewAudioMeterChannelLabels({
-			audioBuffer: resource.buffer,
+			audioBuffer: resource.audioBuffer,
 			outputChannels: channelCount,
 			resolvedMode,
 		}),
@@ -1171,50 +1071,6 @@ function disconnectPreviewAudioNodes(nodes: PreviewAudioNodeLike[]) {
 	}
 }
 
-async function decodePreviewAudioEngineTrack({
-	audioContext,
-	source,
-}: {
-	audioContext: PreviewAudioContextLike;
-	source: PreviewAudioResource;
-}): Promise<PreviewAudioPreparedTrack> {
-	try {
-		return {
-			resource: {
-				buffer: await decodePreviewAudioResource(audioContext, source),
-				source,
-			},
-			status: "ready",
-			trackId: source.trackId,
-			trackIndex: source.trackIndex,
-		};
-	} catch (error) {
-		return createUnavailablePreviewAudioTrackFromSource({
-			reason: errorToMessage(error),
-			source,
-		});
-	}
-}
-
-function createUnavailablePreviewAudioTrackFromSource({
-	reason,
-	source,
-}: {
-	reason: string;
-	source: PreviewAudioResource;
-}): PreviewAudioUnavailableEngineTrack {
-	return {
-		channelMode: "preserve",
-		monitorGain: 0,
-		reason,
-		source,
-		status: "unavailable",
-		trackId: source.trackId,
-		trackIndex: source.trackIndex,
-		trackVolumeGain: 1,
-	};
-}
-
 function createUnavailablePreviewAudioTrackFromFailure(
 	failure: PreviewAudioResourceFailure,
 ): PreviewAudioUnavailableEngineTrack {
@@ -1255,15 +1111,6 @@ function createTotalPreviewAudioResourceFailureReason(
 	}
 
 	return `No Preview audio resources could be prepared: ${reasons.join(", ")}`;
-}
-
-async function decodePreviewAudioResource(
-	audioContext: PreviewAudioContextLike,
-	source: PreviewAudioResource,
-) {
-	const audioData = await source.blob.arrayBuffer();
-
-	return audioContext.decodeAudioData(audioData.slice(0));
 }
 
 function errorToMessage(error: unknown) {

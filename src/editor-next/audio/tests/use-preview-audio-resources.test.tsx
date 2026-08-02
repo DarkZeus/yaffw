@@ -18,7 +18,6 @@ import {
 import {
 	type PreviewAudioResourcesResult,
 	preparePreviewAudioResources,
-	revokePreviewAudioResources,
 } from "../engine/preview-audio-resources";
 import {
 	type PreviewAudioResourcesState,
@@ -33,20 +32,16 @@ vi.mock("../engine/preview-audio-resources", async (importOriginal) => {
 	return {
 		...actual,
 		preparePreviewAudioResources: vi.fn(),
-		revokePreviewAudioResources: vi.fn(),
 	};
 });
 
 const preparePreviewAudioResourcesMock = vi.mocked(
 	preparePreviewAudioResources,
 );
-const revokePreviewAudioResourcesMock = vi.mocked(revokePreviewAudioResources);
-
 type PrepareRequest = Parameters<typeof preparePreviewAudioResources>[0];
 
 beforeEach(() => {
 	preparePreviewAudioResourcesMock.mockReset();
-	revokePreviewAudioResourcesMock.mockReset();
 });
 
 afterEach(() => {
@@ -85,29 +80,22 @@ describe("usePreviewAudioResources", () => {
 		);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 
 		rerender(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 		expect(prepareRuns).toHaveLength(1);
 
 		rerender(<PreviewAudioResourcesProbe />);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 		expect(prepareRuns).toHaveLength(1);
-		expect(revokePreviewAudioResourcesMock).not.toHaveBeenCalled();
 	});
 
 	it("prepares only a newly discovered track for the same Media asset source", async () => {
@@ -148,9 +136,7 @@ describe("usePreviewAudioResources", () => {
 		);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 
 		rerender(<PreviewAudioResourcesProbe asset={expandedAsset} />);
@@ -162,7 +148,7 @@ describe("usePreviewAudioResources", () => {
 			"audio-3",
 		]);
 		expect(readState()).toBe(
-			"loading|preparing:audio-3|resources:blob:audio-1:resource,blob:audio-2:resource",
+			"loading|preparing:audio-3|resources:audio-1@1,audio-2@1",
 		);
 
 		prepareRuns[1].deferred.resolve(
@@ -170,9 +156,7 @@ describe("usePreviewAudioResources", () => {
 		);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource,blob:audio-3:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1,audio-3@1");
 		});
 	});
 
@@ -193,7 +177,7 @@ describe("usePreviewAudioResources", () => {
 		expect(preparePreviewAudioResourcesMock).not.toHaveBeenCalled();
 	});
 
-	it("revokes cached resources when the active Media asset cleanup scope is disposed", async () => {
+	it("releases cached resources when the active Media asset cleanup scope is disposed", async () => {
 		const controller = createActiveMediaAssetCleanupScopeController();
 		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
 
@@ -208,21 +192,14 @@ describe("usePreviewAudioResources", () => {
 		);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 
 		cleanupScope.dispose();
 		cleanup();
-
-		expect(revokedUrls()).toEqual([
-			"blob:audio-1:resource",
-			"blob:audio-2:resource",
-		]);
 	});
 
-	it("aborts active preparation on cleanup and revokes a late result exactly once", async () => {
+	it("aborts active preparation on cleanup and ignores a late result", async () => {
 		const controller = createActiveMediaAssetCleanupScopeController();
 		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
 		const deferred = createDeferred<PreviewAudioResourcesResult>();
@@ -255,21 +232,10 @@ describe("usePreviewAudioResources", () => {
 			],
 		});
 
-		await waitFor(() => {
-			expect(revokedUrls()).toEqual([
-				"blob:audio-1:resource",
-				"blob:audio-2:resource",
-			]);
-		});
-
 		cleanup();
-		expect(revokedUrls()).toEqual([
-			"blob:audio-1:resource",
-			"blob:audio-2:resource",
-		]);
 	});
 
-	it("revokes stale prepared resources after media asset replacement", async () => {
+	it("ignores stale prepared resources after media asset replacement", async () => {
 		const prepareRuns: Array<{
 			deferred: Deferred<PreviewAudioResourcesResult>;
 			request: PrepareRequest;
@@ -319,14 +285,7 @@ describe("usePreviewAudioResources", () => {
 			createPreparedResourcesResult(prepareRuns[0].request),
 		);
 
-		await waitFor(() => {
-			expect(revokePreviewAudioResourcesMock).toHaveBeenCalledWith({
-				resources: [
-					expect.objectContaining({ url: "blob:audio-1:resource" }),
-					expect.objectContaining({ url: "blob:audio-2:resource" }),
-				],
-			});
-		});
+		await Promise.resolve();
 		expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
 
 		prepareRuns[1].deferred.resolve(
@@ -334,9 +293,7 @@ describe("usePreviewAudioResources", () => {
 		);
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
 	});
 
@@ -377,7 +334,7 @@ describe("usePreviewAudioResources", () => {
 		});
 
 		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:blob:audio-1:resource");
+			expect(readState()).toBe("ready|resources:audio-1@1");
 		});
 
 		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
@@ -388,9 +345,7 @@ describe("usePreviewAudioResources", () => {
 		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
 			"audio-2",
 		]);
-		expect(readState()).toBe(
-			"loading|preparing:audio-2|resources:blob:audio-1:resource",
-		);
+		expect(readState()).toBe("loading|preparing:audio-2|resources:audio-1@1");
 
 		prepareRuns[1].deferred.resolve({
 			failures: [],
@@ -398,14 +353,11 @@ describe("usePreviewAudioResources", () => {
 		});
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:resource",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
 		});
-		expect(revokePreviewAudioResourcesMock).not.toHaveBeenCalled();
 	});
 
-	it("replaces only an explicitly retried track resource and revokes each URL once", async () => {
+	it("replaces only an explicitly retried track resource", async () => {
 		const prepareRuns: Array<{
 			deferred: Deferred<PreviewAudioResourcesResult>;
 			request: PrepareRequest;
@@ -442,27 +394,17 @@ describe("usePreviewAudioResources", () => {
 		prepareRuns[1].deferred.resolve({
 			failures: [],
 			resources: [
-				{
-					...createPreviewResource({ trackId: "audio-2", trackIndex: 1 }),
-					url: "blob:audio-2:replacement",
-				},
+				createPreviewResource({
+					duration: 2,
+					trackId: "audio-2",
+					trackIndex: 1,
+				}),
 			],
 		});
 
 		await waitFor(() => {
-			expect(readState()).toBe(
-				"ready|resources:blob:audio-1:resource,blob:audio-2:replacement",
-			);
+			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@2");
 		});
-		expect(revokedUrls()).toEqual(["blob:audio-2:resource"]);
-
-		cleanup();
-
-		expect(revokedUrls()).toEqual([
-			"blob:audio-2:resource",
-			"blob:audio-1:resource",
-			"blob:audio-2:replacement",
-		]);
 	});
 
 	it("keeps unrelated track failures visible while retrying one failed track", async () => {
@@ -576,14 +518,12 @@ function formatState(state: PreviewAudioResourcesState) {
 		return [
 			"loading",
 			`preparing:${Array.from(state.preparingTrackIds).join(",")}`,
-			`resources:${state.resources.map((resource) => resource.url).join(",")}`,
+			`resources:${state.resources.map(formatResource).join(",")}`,
 		].join("|");
 	}
 
 	if (state.status === "ready") {
-		return `ready|resources:${state.resources
-			.map((resource) => resource.url)
-			.join(",")}`;
+		return `ready|resources:${state.resources.map(formatResource).join(",")}`;
 	}
 
 	return state.status;
@@ -597,10 +537,8 @@ function readFailures() {
 	return screen.getByLabelText("audio preview failures").textContent;
 }
 
-function revokedUrls() {
-	return revokePreviewAudioResourcesMock.mock.calls.flatMap(([{ resources }]) =>
-		resources.map((resource) => resource.url),
-	);
+function formatResource(resource: PreviewAudioResource) {
+	return `${resource.trackId}@${resource.audioBuffer.duration}`;
 }
 
 function createPreparedResourcesResult(
@@ -624,26 +562,28 @@ function createPreparedResourcesResult(
 }
 
 function createPreviewResource({
+	duration = 1,
 	trackId,
 	trackIndex,
 }: {
+	duration?: number;
 	trackId: string;
 	trackIndex: number;
 }): PreviewAudioResource {
 	return {
-		blob: new Blob(["audio"], { type: "audio/mp4" }),
-		byteLength: 5,
-		downloadName: `${trackId}.m4a`,
-		mimeType: "audio/mp4",
+		audioBuffer: {
+			duration,
+			length: Math.round(duration * 48_000),
+			numberOfChannels: 2,
+			sampleRate: 48_000,
+		} as AudioBuffer,
 		startPositionSeconds: 0,
-		strategy: "same-codec-remux",
 		track: {
 			id: trackId,
 			kind: "audio",
 		},
 		trackId,
 		trackIndex,
-		url: `blob:${trackId}:resource`,
 	};
 }
 

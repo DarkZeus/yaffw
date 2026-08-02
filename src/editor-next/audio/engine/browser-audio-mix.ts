@@ -1,4 +1,4 @@
-import { ALL_FORMATS, AudioSampleSink, BlobSource, Input } from "mediabunny";
+import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
 
 import { DEFAULT_AUDIO_MIX_FINAL_PEAK_GUARD_DB } from "@/editor-core/audio-mix";
 import {
@@ -13,11 +13,11 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 
+import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 import {
-	type DisposableMediaWorkScope,
-	createDisposableMediaCleanup,
-	withDisposableMediaWorkScope,
-} from "../../media-work/scopes/disposable-media-work-scope";
+	createBrowserAudioBuffer,
+	decodeMediabunnyAudioTrackRange,
+} from "../../media-work/adapters/mediabunny-audio-buffer";
 
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
@@ -96,10 +96,14 @@ export async function renderBrowserAudioMix({
 
 		for (const { planTrack, track } of selectedTracks) {
 			throwIfAborted(signal);
-			const decoded = await decodeAudioTrackRange({
+			const [numberOfChannels, sampleRate] = await Promise.all([
+				track.getNumberOfChannels(),
+				track.getSampleRate(),
+			]);
+			const decoded = await decodeMediabunnyAudioTrackRange({
 				endSeconds,
+				format: { numberOfChannels, sampleRate },
 				signal,
-				scope,
 				startSeconds,
 				track,
 			});
@@ -171,96 +175,6 @@ export async function renderBrowserAudioMix({
 	});
 }
 
-async function decodeAudioTrackRange({
-	endSeconds,
-	signal,
-	scope,
-	startSeconds,
-	track,
-}: {
-	endSeconds: number;
-	signal: AbortSignal;
-	scope: DisposableMediaWorkScope;
-	startSeconds: number;
-	track: {
-		getNumberOfChannels: () => Promise<number>;
-		getSampleRate: () => Promise<number>;
-	} & ConstructorParameters<typeof AudioSampleSink>[0];
-}): Promise<AudioBuffer> {
-	const [resolvedNumberOfChannels, resolvedSampleRate] = await Promise.all([
-		track.getNumberOfChannels(),
-		track.getSampleRate(),
-	]);
-	const sampleRate = positiveNumberOr(resolvedSampleRate, 48_000);
-	const numberOfChannels = positiveNumberOr(resolvedNumberOfChannels, 1);
-	const outputLength = Math.max(
-		1,
-		Math.ceil((endSeconds - startSeconds) * sampleRate),
-	);
-	const output = createAudioBuffer({
-		length: outputLength,
-		numberOfChannels,
-		sampleRate,
-	});
-	const sink = new AudioSampleSink(track);
-
-	for await (const sample of sink.samples(startSeconds, endSeconds)) {
-		throwIfAborted(signal);
-		const closeSample = createDisposableMediaCleanup(async () => {
-			sample.close();
-		});
-		scope.registerCleanup(closeSample);
-
-		try {
-			const sampleBuffer = sample.toAudioBuffer();
-
-			if (sampleBuffer.sampleRate !== sampleRate) {
-				throw new Error(
-					`Decoded sample rate changed from ${sampleRate}Hz to ${sampleBuffer.sampleRate}Hz.`,
-				);
-			}
-
-			const sourceStartFrame = Math.max(
-				0,
-				Math.floor((startSeconds - sample.timestamp) * sampleRate),
-			);
-			const targetStartFrame = Math.max(
-				0,
-				Math.round(
-					(sample.timestamp + sourceStartFrame / sampleRate - startSeconds) *
-						sampleRate,
-				),
-			);
-			const frameCount = Math.max(
-				0,
-				Math.min(
-					sampleBuffer.length - sourceStartFrame,
-					output.length - targetStartFrame,
-				),
-			);
-
-			for (
-				let channel = 0;
-				channel <
-				Math.min(output.numberOfChannels, sampleBuffer.numberOfChannels);
-				channel += 1
-			) {
-				const channelData = new Float32Array(frameCount);
-				sampleBuffer.copyFromChannel(channelData, channel, sourceStartFrame);
-				output.copyToChannel(channelData, channel, targetStartFrame);
-			}
-		} finally {
-			await closeSample();
-		}
-	}
-
-	return output;
-}
-
-function positiveNumberOr(value: number, fallback: number) {
-	return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
 export function resolveChannelTransform(
 	audioBuffer: AudioBuffer,
 	requestedMode: AudioTrackChannelMode,
@@ -308,7 +222,7 @@ export function createTransformedAudioBuffer(
 		outputChannels: number;
 	},
 ): AudioBuffer {
-	const transformed = createAudioBuffer({
+	const transformed = createBrowserAudioBuffer({
 		length: audioBuffer.length,
 		numberOfChannels: outputChannels,
 		sampleRate: audioBuffer.sampleRate,
@@ -598,7 +512,7 @@ function applyGainToAudioBuffer(
 		return audioBuffer;
 	}
 
-	const adjustedBuffer = createAudioBuffer({
+	const adjustedBuffer = createBrowserAudioBuffer({
 		length: audioBuffer.length,
 		numberOfChannels: audioBuffer.numberOfChannels,
 		sampleRate: audioBuffer.sampleRate,
@@ -614,30 +528,6 @@ function applyGainToAudioBuffer(
 	}
 
 	return adjustedBuffer;
-}
-
-export function createAudioBuffer({
-	length,
-	numberOfChannels,
-	sampleRate,
-}: {
-	length: number;
-	numberOfChannels: number;
-	sampleRate: number;
-}): AudioBuffer {
-	if (typeof AudioBuffer !== "undefined") {
-		return new AudioBuffer({
-			length,
-			numberOfChannels,
-			sampleRate,
-		});
-	}
-
-	return new OfflineAudioContext(
-		numberOfChannels,
-		length,
-		sampleRate,
-	).createBuffer(numberOfChannels, length, sampleRate);
 }
 
 function dbToLinear(db: number): number {

@@ -485,20 +485,24 @@ function createAudioMix(
 
 function createPreviewAudioResource(trackId: string): PreviewAudioResource {
 	return {
-		blob: new Blob(["audio"], { type: "audio/mp4" }),
-		byteLength: 5,
-		downloadName: `${trackId}.m4a`,
-		mimeType: "audio/mp4",
+		audioBuffer: createAudioBufferStub(),
 		startPositionSeconds: 0,
-		strategy: "same-codec-remux",
 		track: {
 			id: trackId,
 			kind: "audio",
 		},
 		trackId,
 		trackIndex: 0,
-		url: `blob:${trackId}`,
 	};
+}
+
+function createAudioBufferStub(): AudioBuffer {
+	return {
+		duration: 1,
+		length: 48_000,
+		numberOfChannels: 2,
+		sampleRate: 48_000,
+	} as AudioBuffer;
 }
 
 function lastTrackGain(
@@ -569,7 +573,6 @@ function createPreviewAudioEngineSpy({
 		pause: vi.fn(),
 		play: vi.fn(),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
-		retryTrackResource: vi.fn(async () => status),
 		setOutputGain: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setTime: vi.fn(),

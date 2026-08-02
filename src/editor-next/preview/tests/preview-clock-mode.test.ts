@@ -109,19 +109,19 @@ function readyPreviewAudioResourcesState(): PreviewAudioResourcesState {
 		failures: [],
 		resources: [
 			{
-				blob: new Blob(["audio"], { type: "audio/mp4" }),
-				byteLength: 5,
-				downloadName: "audio-1.m4a",
-				mimeType: "audio/mp4",
+				audioBuffer: {
+					duration: 1,
+					length: 48_000,
+					numberOfChannels: 2,
+					sampleRate: 48_000,
+				} as AudioBuffer,
 				startPositionSeconds: 0,
-				strategy: "same-codec-remux",
 				track: {
 					id: "audio-1",
 					kind: "audio",
 				},
 				trackId: "audio-1",
 				trackIndex: 0,
-				url: "blob:audio-1",
 			},
 		],
 		status: "ready",

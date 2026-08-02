@@ -1,31 +1,8 @@
-import {
-	ALL_FORMATS,
-	AdtsOutputFormat,
-	type AudioCodec,
-	AudioSampleSink,
-	AudioSampleSource,
-	BlobSource,
-	BufferTarget,
-	EncodedAudioPacketSource,
-	EncodedPacketSink,
-	FlacOutputFormat,
-	Input,
-	Mp3OutputFormat,
-	Mp4OutputFormat,
-	OggOutputFormat,
-	Output,
-	type OutputFormat,
-	WavOutputFormat,
-	WebMOutputFormat,
-} from "mediabunny";
+import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
 
 import type { AudioMediaTrack, ReadyMediaAsset } from "@/editor-core/model";
-import {
-	type DisposableMediaCleanup,
-	type DisposableMediaWorkScope,
-	createDisposableMediaCleanup,
-	withDisposableMediaWorkScope,
-} from "../../media-work/scopes/disposable-media-work-scope";
+import { decodeMediabunnyAudioTrackRange } from "../../media-work/adapters/mediabunny-audio-buffer";
+import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 import type {
 	PreviewAudioResource,
 	PreviewAudioResourceFailure,
@@ -38,8 +15,6 @@ export type PreviewAudioResourcesResult = {
 
 export type PreviewAudioResourcesRequest = {
 	asset: ReadyMediaAsset;
-	createObjectURL?: (blob: Blob) => string;
-	revokeObjectURL?: (url: string) => void;
 	signal: AbortSignal;
 	source: Blob;
 	trackIds?: ReadonlySet<string>;
@@ -50,66 +25,20 @@ export type InputAudioTrack = Awaited<
 >[number];
 
 export type AudioPreviewTrackMetadata = {
-	codec: AudioCodec | null;
-	firstTimestampSeconds: number | null;
-	languageCode: string | null;
-	name: string | null;
-	number: number;
+	canDecode: boolean;
+	endTimestampSeconds: number;
+	firstTimestampSeconds: number;
+	numberOfChannels: number;
+	sampleRate: number;
 };
 
-export type RemuxCandidate = {
-	createFormat: () => OutputFormat;
-	extension: string;
-	label: string;
-	mimeType: string;
-};
-
-export type PreviewAudioTrackResourceOptions = {
-	assetTrack: AudioMediaTrack;
-	createObjectURL: (blob: Blob) => string;
-	metadata: AudioPreviewTrackMetadata;
-	revokeObjectURL: (url: string) => void;
-	signal: AbortSignal;
-	scope: DisposableMediaWorkScope;
-	track: InputAudioTrack;
-	trackIndex: number;
-};
-
-export type PreparePreviewAudioTrackResourceOptions =
-	PreviewAudioTrackResourceOptions;
-
-export type PreparePreviewAudioTrackResourceResult =
-	| {
-			resource: PreviewAudioResource;
-			status: "ready";
-	  }
-	| {
-			reason: string;
-			status: "failed";
-	  };
-
-export type RemuxPreviewAudioTrackResourceOptions =
-	PreviewAudioTrackResourceOptions & {
-		candidate: RemuxCandidate;
-	};
-
-export type CreatePreviewAudioResourceOptions = {
-	assetTrack: AudioMediaTrack;
-	blob: Blob;
-	createObjectURL: (blob: Blob) => string;
-	downloadName: string;
-	metadata: AudioPreviewTrackMetadata;
-	mimeType: string;
-	revokeObjectURL: (url: string) => void;
-	scope: DisposableMediaWorkScope;
-	strategy: PreviewAudioResource["strategy"];
-	trackIndex: number;
-};
+type PreviewAudioTrackPreparation =
+	| { kind: "failure"; value: PreviewAudioResourceFailure }
+	| { kind: "resource"; value: PreviewAudioResource }
+	| null;
 
 export async function preparePreviewAudioResources({
 	asset,
-	createObjectURL = URL.createObjectURL,
-	revokeObjectURL = URL.revokeObjectURL,
 	signal,
 	source,
 	trackIds,
@@ -118,10 +47,7 @@ export async function preparePreviewAudioResources({
 		throwIfAborted(signal);
 
 		if (asset.tracks.audio.length === 0) {
-			return {
-				failures: [],
-				resources: [],
-			};
+			return { failures: [], resources: [] };
 		}
 
 		const input = scope.registerDisposable(
@@ -130,495 +56,182 @@ export async function preparePreviewAudioResources({
 				source: new BlobSource(source),
 			}),
 		);
-		const resources: PreviewAudioResource[] = [];
-		const failures: PreviewAudioResourceFailure[] = [];
+		const unregisterAbort = disposeInputOnAbort(input, signal);
 
 		try {
 			const inputTracks = await input.getAudioTracks();
-
-			for (const [trackIndex, assetTrack] of asset.tracks.audio.entries()) {
-				throwIfAborted(signal);
-
-				if (trackIds && !trackIds.has(assetTrack.id)) {
-					continue;
-				}
-
-				const inputTrack =
-					inputTracks.find((track) => String(track.id) === assetTrack.id) ??
-					inputTracks[trackIndex];
-
-				if (!inputTrack) {
-					failures.push({
-						reason: "The analyzed audio track is no longer available.",
-						track: assetTrack,
-						trackId: assetTrack.id,
+			const preparations = await Promise.all(
+				asset.tracks.audio.map(
+					async (
+						assetTrack,
 						trackIndex,
-					});
-					continue;
-				}
+					): Promise<PreviewAudioTrackPreparation> => {
+						throwIfAborted(signal);
 
-				let metadata: AudioPreviewTrackMetadata;
-				try {
-					metadata = await describeAudioPreviewTrack(inputTrack, trackIndex);
-				} catch (error) {
-					throwIfAborted(signal);
-					failures.push({
-						reason: errorToMessage(error),
-						track: assetTrack,
-						trackId: assetTrack.id,
-						trackIndex,
-					});
-					continue;
-				}
-				const preparedResource = await preparePreviewAudioTrackResource({
-					assetTrack,
-					createObjectURL,
-					metadata,
-					revokeObjectURL,
-					scope,
-					signal,
-					track: inputTrack,
-					trackIndex,
-				});
+						if (trackIds && !trackIds.has(assetTrack.id)) {
+							return null;
+						}
 
-				if (preparedResource.status === "ready") {
-					resources.push(preparedResource.resource);
-					continue;
-				}
+						const inputTrack =
+							inputTracks.find((track) => String(track.id) === assetTrack.id) ??
+							inputTracks[trackIndex];
 
-				failures.push({
-					reason: preparedResource.reason,
-					track: assetTrack,
-					trackId: assetTrack.id,
-					trackIndex,
-				});
+						if (!inputTrack) {
+							return {
+								kind: "failure",
+								value: createPreviewAudioResourceFailure({
+									assetTrack,
+									reason: "The analyzed audio track is no longer available.",
+									trackIndex,
+								}),
+							};
+						}
+
+						try {
+							const metadata = await describeAudioPreviewTrack(inputTrack);
+							const resource = await decodePreviewAudioTrackResource({
+								assetTrack,
+								metadata,
+								signal,
+								track: inputTrack,
+								trackIndex,
+							});
+
+							return { kind: "resource", value: resource };
+						} catch (error) {
+							throwIfAborted(signal);
+
+							return {
+								kind: "failure",
+								value: createPreviewAudioResourceFailure({
+									assetTrack,
+									reason: errorToMessage(error),
+									trackIndex,
+								}),
+							};
+						}
+					},
+				),
+			);
+			throwIfAborted(signal);
+
+			const resources: PreviewAudioResource[] = [];
+			const failures: PreviewAudioResourceFailure[] = [];
+
+			for (const preparation of preparations) {
+				if (preparation?.kind === "resource") {
+					resources.push(preparation.value);
+				} else if (preparation?.kind === "failure") {
+					failures.push(preparation.value);
+				}
 			}
 
-			return {
-				failures,
-				resources,
-			};
-		} catch (error) {
-			revokePreviewAudioResources({
-				revokeObjectURL,
-				resources,
-			});
-			throw error;
+			return { failures, resources };
+		} finally {
+			unregisterAbort();
 		}
 	});
 }
 
-export function revokePreviewAudioResources({
-	revokeObjectURL = URL.revokeObjectURL,
-	resources,
+async function decodePreviewAudioTrackResource({
+	assetTrack,
+	metadata,
+	signal,
+	track,
+	trackIndex,
 }: {
-	revokeObjectURL?: (url: string) => void;
-	resources: PreviewAudioResource[];
-}) {
-	for (const resource of resources) {
-		revokeObjectURL(resource.url);
-	}
-}
-
-export function remuxCandidatesForAudioPreviewCodec(
-	codec: AudioCodec | null | undefined,
-): RemuxCandidate[] {
-	if (!codec) {
-		return [];
-	}
-
-	const mp4Candidate = {
-		createFormat: () => new Mp4OutputFormat({ fastStart: "in-memory" }),
-		extension: codec === "aac" ? ".m4a" : ".mp4",
-		label: "audio-only-mp4",
-		mimeType: "audio/mp4",
-	} satisfies RemuxCandidate;
-
-	if (codec === "aac") {
-		return [
-			mp4Candidate,
-			{
-				createFormat: () => new AdtsOutputFormat(),
-				extension: ".aac",
-				label: "adts-aac",
-				mimeType: "audio/aac",
-			},
-		];
-	}
-
-	if (codec === "mp3") {
-		return [
-			{
-				createFormat: () => new Mp3OutputFormat(),
-				extension: ".mp3",
-				label: "mp3",
-				mimeType: "audio/mpeg",
-			},
-			mp4Candidate,
-		];
-	}
-
-	if (codec === "opus" || codec === "vorbis") {
-		return [
-			{
-				createFormat: () => new WebMOutputFormat(),
-				extension: ".webm",
-				label: "audio-only-webm",
-				mimeType: "audio/webm",
-			},
-			{
-				createFormat: () => new OggOutputFormat(),
-				extension: ".ogg",
-				label: "ogg",
-				mimeType: "audio/ogg",
-			},
-		];
-	}
-
-	if (codec === "flac") {
-		return [
-			{
-				createFormat: () => new FlacOutputFormat(),
-				extension: ".flac",
-				label: "flac",
-				mimeType: "audio/flac",
-			},
-			mp4Candidate,
-		];
-	}
-
-	if (codec.startsWith("pcm-") || codec === "ulaw" || codec === "alaw") {
-		return [
-			{
-				createFormat: () => new WavOutputFormat(),
-				extension: ".wav",
-				label: "wav-same-codec",
-				mimeType: "audio/wav",
-			},
-		];
-	}
-
-	return [mp4Candidate];
-}
-
-async function preparePreviewAudioTrackResource({
-	assetTrack,
-	createObjectURL,
-	metadata,
-	revokeObjectURL,
-	scope,
-	signal,
-	track,
-	trackIndex,
-}: PreparePreviewAudioTrackResourceOptions): Promise<PreparePreviewAudioTrackResourceResult> {
-	const reasons: string[] = [];
-
-	for (const candidate of remuxCandidatesForAudioPreviewCodec(metadata.codec)) {
-		throwIfAborted(signal);
-
-		try {
-			const resource = await remuxPreviewAudioTrackResource({
-				assetTrack,
-				candidate,
-				createObjectURL,
-				metadata,
-				revokeObjectURL,
-				scope,
-				signal,
-				track,
-				trackIndex,
-			});
-
-			return {
-				resource,
-				status: "ready",
-			};
-		} catch (error) {
-			reasons.push(`${candidate.label}: ${errorToMessage(error)}`);
-		}
-	}
-
-	try {
-		const resource = await createWavPreviewAudioResourceFallback({
-			assetTrack,
-			createObjectURL,
-			metadata,
-			revokeObjectURL,
-			scope,
-			signal,
-			track,
-			trackIndex,
-		});
-
-		return {
-			resource,
-			status: "ready",
-		};
-	} catch (error) {
-		reasons.push(`wav-fallback: ${errorToMessage(error)}`);
-	}
-
-	return {
-		reason:
-			reasons.join("; ") || "No Preview audio resource could be prepared.",
-		status: "failed",
-	};
-}
-
-async function remuxPreviewAudioTrackResource({
-	assetTrack,
-	candidate,
-	createObjectURL,
-	metadata,
-	revokeObjectURL,
-	scope,
-	signal,
-	track,
-	trackIndex,
-}: RemuxPreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
-	if (!metadata.codec) {
-		throw new Error("Track codec is unknown.");
-	}
-
-	const format = candidate.createFormat();
-	if (!format.getSupportedAudioCodecs().includes(metadata.codec)) {
-		throw new Error(`${candidate.label} does not support ${metadata.codec}.`);
-	}
-
-	const target = new BufferTarget();
-	const output = new Output({ format, target });
-	const outputCleanup = registerCancellableUntilSettled(scope, output);
-	const source = new EncodedAudioPacketSource(metadata.codec);
-	const closeSource = registerClosableCleanup(scope, source);
-	output.addAudioTrack(source, audioTrackOutputMetadata(metadata));
-	await output.start();
-
-	const sink = new EncodedPacketSink(track);
-	const decoderConfig = await track.getDecoderConfig().catch(() => null);
-	const shiftSeconds = Number.isFinite(metadata.firstTimestampSeconds)
-		? (metadata.firstTimestampSeconds ?? 0)
-		: 0;
-
-	for await (const packet of sink.packets()) {
-		throwIfAborted(signal);
-
-		const normalizedPacket =
-			shiftSeconds === 0
-				? packet
-				: packet.clone({
-						timestamp: packet.timestamp - shiftSeconds,
-					});
-
-		await source.add(normalizedPacket, {
-			decoderConfig: decoderConfig ?? undefined,
-		});
-	}
-
-	await closeSource();
-	await output.finalize();
-	outputCleanup.markSettled();
-
-	if (!target.buffer) {
-		throw new Error("Remux output produced no buffer.");
-	}
-
-	return createPreviewAudioResource({
-		assetTrack,
-		blob: new Blob([target.buffer], { type: candidate.mimeType }),
-		createObjectURL,
-		downloadName: `track-${metadata.number}-${candidate.label}${candidate.extension}`,
-		metadata,
-		mimeType: candidate.mimeType,
-		revokeObjectURL,
-		scope,
-		strategy: "same-codec-remux",
-		trackIndex,
-	});
-}
-
-async function createWavPreviewAudioResourceFallback({
-	assetTrack,
-	createObjectURL,
-	metadata,
-	revokeObjectURL,
-	scope,
-	signal,
-	track,
-	trackIndex,
-}: PreviewAudioTrackResourceOptions): Promise<PreviewAudioResource> {
-	if (!(await track.canDecode())) {
+	assetTrack: AudioMediaTrack;
+	metadata: AudioPreviewTrackMetadata;
+	signal: AbortSignal;
+	track: InputAudioTrack;
+	trackIndex: number;
+}): Promise<PreviewAudioResource> {
+	if (!metadata.canDecode) {
 		throw new Error("Track is not decodable in this browser.");
 	}
 
-	const target = new BufferTarget();
-	const output = new Output({
-		format: new WavOutputFormat(),
-		target,
-	});
-	const outputCleanup = registerCancellableUntilSettled(scope, output);
-	const sampleSource = new AudioSampleSource({ codec: "pcm-s16" });
-	const closeSampleSource = registerClosableCleanup(scope, sampleSource);
-	output.addAudioTrack(sampleSource, audioTrackOutputMetadata(metadata));
-	await output.start();
-
-	const sink = new AudioSampleSink(track);
-	const shiftSeconds = Number.isFinite(metadata.firstTimestampSeconds)
-		? (metadata.firstTimestampSeconds ?? 0)
-		: 0;
-
-	for await (const sample of sink.samples()) {
-		throwIfAborted(signal);
-		const closeSample = registerClosableCleanup(scope, sample);
-
-		try {
-			if (shiftSeconds === 0) {
-				await sampleSource.add(sample);
-				continue;
-			}
-
-			const normalizedSample = sample.clone();
-			const closeNormalizedSample = registerClosableCleanup(
-				scope,
-				normalizedSample,
-			);
-			normalizedSample.setTimestamp(
-				Math.max(0, sample.timestamp - shiftSeconds),
-			);
-
-			try {
-				await sampleSource.add(normalizedSample);
-			} finally {
-				await closeNormalizedSample();
-			}
-		} finally {
-			await closeSample();
-		}
+	const startPositionSeconds = Math.max(0, metadata.firstTimestampSeconds);
+	if (metadata.endTimestampSeconds <= startPositionSeconds) {
+		throw new Error(
+			`Track has no presentable audio range after ${startPositionSeconds} seconds.`,
+		);
 	}
 
-	await closeSampleSource();
-	await output.finalize();
-	outputCleanup.markSettled();
-
-	if (!target.buffer) {
-		throw new Error("WAV output produced no buffer.");
-	}
-
-	return createPreviewAudioResource({
-		assetTrack,
-		blob: new Blob([target.buffer], { type: "audio/wav" }),
-		createObjectURL,
-		downloadName: `track-${metadata.number}-wav-fallback.wav`,
-		metadata,
-		mimeType: "audio/wav",
-		revokeObjectURL,
-		scope,
-		strategy: "decoded-wav-fallback",
-		trackIndex,
+	const audioBuffer = await decodeMediabunnyAudioTrackRange({
+		endSeconds: metadata.endTimestampSeconds,
+		format: {
+			numberOfChannels: metadata.numberOfChannels,
+			sampleRate: metadata.sampleRate,
+		},
+		signal,
+		startSeconds: startPositionSeconds,
+		track,
 	});
-}
-
-function createPreviewAudioResource({
-	assetTrack,
-	blob,
-	createObjectURL,
-	downloadName,
-	metadata,
-	mimeType,
-	revokeObjectURL,
-	scope,
-	strategy,
-	trackIndex,
-}: CreatePreviewAudioResourceOptions): PreviewAudioResource {
-	const url = createObjectURL(blob);
-	let transferred = false;
-
-	scope.registerCleanup(() => {
-		if (!transferred) {
-			revokeObjectURL(url);
-		}
-	});
-
-	transferred = true;
 
 	return {
-		blob,
-		byteLength: blob.size,
-		downloadName,
-		mimeType,
-		startPositionSeconds: Math.max(0, metadata.firstTimestampSeconds ?? 0),
-		strategy,
+		audioBuffer,
+		startPositionSeconds,
 		track: assetTrack,
 		trackId: assetTrack.id,
 		trackIndex,
-		url,
 	};
 }
 
 async function describeAudioPreviewTrack(
 	track: InputAudioTrack,
-	index: number,
 ): Promise<AudioPreviewTrackMetadata> {
-	const [codec, firstTimestampSeconds, languageCode, name] = await Promise.all([
-		track.getCodec(),
-		track.getFirstTimestamp().catch(() => null),
-		track.getLanguageCode(),
-		track.getName(),
+	const [
+		canDecode,
+		endTimestampSeconds,
+		firstTimestampSeconds,
+		numberOfChannels,
+		sampleRate,
+	] = await Promise.all([
+		track.canDecode(),
+		track.computeDuration(),
+		track.getFirstTimestamp(),
+		track.getNumberOfChannels(),
+		track.getSampleRate(),
 	]);
 
 	return {
-		codec,
+		canDecode,
+		endTimestampSeconds,
 		firstTimestampSeconds,
-		languageCode,
-		name,
-		number: index + 1,
+		numberOfChannels,
+		sampleRate,
 	};
 }
 
-function audioTrackOutputMetadata(metadata: AudioPreviewTrackMetadata) {
+function createPreviewAudioResourceFailure({
+	assetTrack,
+	reason,
+	trackIndex,
+}: {
+	assetTrack: AudioMediaTrack;
+	reason: string;
+	trackIndex: number;
+}): PreviewAudioResourceFailure {
 	return {
-		languageCode:
-			metadata.languageCode && metadata.languageCode !== "und"
-				? metadata.languageCode
-				: undefined,
-		name: metadata.name ?? undefined,
+		reason,
+		track: assetTrack,
+		trackId: assetTrack.id,
+		trackIndex,
 	};
 }
 
-function registerClosableCleanup<T extends { close: () => void }>(
-	scope: DisposableMediaWorkScope,
-	resource: T,
-): DisposableMediaCleanup {
-	const close = createDisposableMediaCleanup(async () => {
-		resource.close();
-	});
+function disposeInputOnAbort(
+	input: { dispose: () => void },
+	signal: AbortSignal,
+) {
+	const disposeInput = () => input.dispose();
+	signal.addEventListener("abort", disposeInput, { once: true });
 
-	scope.registerCleanup(close);
+	if (signal.aborted) {
+		disposeInput();
+	}
 
-	return close;
-}
-
-function registerCancellableUntilSettled<
-	T extends { cancel: () => Promise<unknown> | unknown },
->(scope: DisposableMediaWorkScope, resource: T) {
-	let settled = false;
-	const cancel = createDisposableMediaCleanup(async () => {
-		await resource.cancel();
-	});
-
-	scope.registerCleanup(async () => {
-		if (settled) {
-			return;
-		}
-
-		await cancel();
-	});
-
-	return {
-		cancel,
-		markSettled() {
-			settled = true;
-		},
-	};
+	return () => signal.removeEventListener("abort", disposeInput);
 }
 
 function throwIfAborted(signal: AbortSignal) {
@@ -631,9 +244,5 @@ function throwIfAborted(signal: AbortSignal) {
 }
 
 function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
+	return error instanceof Error ? error.message : String(error);
 }

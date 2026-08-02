@@ -21,13 +21,22 @@ vi.mock("mediabunny", () => {
 	}
 
 	class AudioSampleSink {
-		async *samples() {}
+		constructor(private readonly track: MockAudioTrack) {}
+
+		async *samples() {
+			yield this.track.sample;
+		}
+	}
+
+	class EncodedPacketSink {
+		async *packets() {}
 	}
 
 	return {
 		ALL_FORMATS: [],
 		AudioSampleSink,
 		BlobSource: class BlobSource {},
+		EncodedPacketSink,
 		Input,
 	};
 });
@@ -94,6 +103,7 @@ type MockAudioTrack = {
 	getNumberOfChannels: ReturnType<typeof vi.fn>;
 	getSampleRate: ReturnType<typeof vi.fn>;
 	id: string;
+	sample: ReturnType<typeof createDecodedSample>;
 };
 
 function createAudioTrack(
@@ -107,6 +117,24 @@ function createAudioTrack(
 		getNumberOfChannels: vi.fn(async () => numberOfChannels),
 		getSampleRate: vi.fn(async () => sampleRate),
 		id,
+		sample: createDecodedSample({ numberOfChannels, sampleRate }),
+	};
+}
+
+function createDecodedSample({
+	numberOfChannels,
+	sampleRate,
+}: {
+	numberOfChannels: number;
+	sampleRate: number;
+}) {
+	return {
+		close: vi.fn(),
+		copyTo: vi.fn(),
+		numberOfChannels,
+		numberOfFrames: sampleRate,
+		sampleRate,
+		timestamp: 0,
 	};
 }
 

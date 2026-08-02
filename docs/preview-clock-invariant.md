@@ -58,8 +58,9 @@ Preview audio monitoring is a separate adapter concern. It prepares
 source-derived Preview audio resources, creates the Preview audio engine, and
 applies preview volume, preview mute, preview-only solo, Track volume, channel
 handling, and include/exclude decisions to what the user hears. Those preview
-resources are adapter-owned browser resources and must be disposed with the
-active Media asset.
+resources are direct, timestamp-aligned `AudioBuffer` references owned by the
+adapter. The active Media asset cleanup scope aborts preparation, destroys the
+engine, and drops those references.
 
 ## Export boundary
 
