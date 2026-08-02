@@ -1,18 +1,18 @@
 # Single-pass mixed-audio export investigation
 
-This note records the issue #105 prototype and adopt/reject decision under
-ADR-0015, ADR-0017, ADR-0018, ADR-0021, and ADR-0024. Production export behavior
-is unchanged by the investigation.
+This note records the issue #105 investigation, decision, and subsequent
+production adoption under ADR-0015, ADR-0017, ADR-0018, ADR-0021, and ADR-0024.
 
 ## Decision
 
-Adopt composable Mediabunny `Conversion` in a separate production follow-up.
-The prototype preserves the current Generated media artifact while removing the
-intermediate video-only Blob, its second `Input`, and the encoded-video packet
-copy pass. The representative warmed Chromium measurement was 481.85 ms for the
-candidate versus 530.8 ms for the current path. The short fixture does not
-justify a general performance claim, but the lifecycle and intermediate-memory
-reduction are architectural improvements independent of that timing result.
+Adopted. The default mixed-audio runner now uses composable Mediabunny
+`Conversion` and a single shared `Output`. This preserves the Generated media
+contract while removing the intermediate video-only Blob, its second `Input`,
+and the encoded-video packet-copy pass. The representative warmed Chromium
+investigation measured 481.85 ms for the candidate versus 530.8 ms for the old
+path. The short fixture does not justify a general performance claim, but the
+lifecycle and intermediate-memory reduction are architectural improvements
+independent of that timing result.
 
 ## Representative browser measurement
 
@@ -22,10 +22,11 @@ duplicates the known sync-click track so the default Audio mix must combine two
 included Media tracks into one Generated audio mix. The measured half-open
 Selection was `[2,000,000us, 8,000,000us)`.
 
-The standalone investigation page warmed both paths, then ran two alternating
-trials per path and recorded the median runner time. It also ran the current
+The temporary investigation page warmed both paths, then ran two alternating
+trials per path and recorded the median runner time. It also ran the old
 video-only stage separately to measure the otherwise private intermediate
-artifact.
+artifact. The page and prototype were removed after their lifecycle cases moved
+to the production runner tests.
 
 | Measurement | Current two-stage path | Composable candidate |
 | --- | ---: | ---: |
@@ -59,23 +60,25 @@ not invoked because it remains a separate explicit Delivery action.
 
 ## Resource ownership
 
-The prototype calls `Conversion.init({ composable: true })`, allowing Conversion
-to add and drive the video track without owning the Output lifecycle.
+The production mixed-audio runner calls
+`Conversion.init({ composable: true })`, allowing Conversion to add and drive
+the video track without owning the Output lifecycle.
 
 | Resource | Owner and normal lifecycle | Abort or failure cleanup |
 | --- | --- | --- |
-| Mediabunny `Input` | Prototype creates it from the source Blob; disposable scope disposes it after the artifact is captured. | Disposable scope disposes it. |
-| `Conversion` | Prototype initializes and executes it; it drives only video and is marked settled after `execute()` resolves. | Prototype cancels it while execution is unsettled. |
-| `AudioBufferSource` | Prototype adds it to the same Output, adds the rendered Generated audio mix in parallel with Conversion, then closes it. | Disposable scope closes it exactly once. |
-| `Output` | Prototype creates it; after all tracks are registered, the prototype starts it. After Conversion and audio source completion, the prototype finalizes it. | Prototype cancels it until finalization succeeds. |
-| `BufferTarget` | Output writes the sole final artifact into it; the prototype reads it only after finalization. | Output cancellation releases encoder and muxer resources; the target is then collectible. |
+| Mediabunny `Input` | The runner creates it from the source Blob; disposable scope disposes it after the artifact is captured. | Disposable scope disposes it. |
+| `Conversion` | The runner initializes and executes it; it drives only video and is marked settled after `execute()` resolves. | The runner cancels it while execution is unsettled. |
+| `AudioBufferSource` | The runner adds it to the same Output, adds the rendered Generated audio mix in parallel with Conversion, then closes it. | Disposable scope closes it exactly once. |
+| `Output` | The runner creates it; after all tracks are registered, the runner starts it. After Conversion and audio source completion, the runner finalizes it. | The runner cancels it until finalization succeeds. |
+| `BufferTarget` | Output writes the sole final artifact into it; the runner reads it only after finalization. | Output cancellation releases encoder and muxer resources; the target is then collectible. |
 | Rendered `AudioBuffer` | `renderBrowserAudioMix` creates it before Output work; Web Audio exposes no explicit disposal API. | It becomes collectible after the Export job settles. |
 
-Automated failure injection covers Export cancellation, Conversion execution
-failure, audio-source failure, and Output finalization failure. Each case checks
+Production-runner failure injection covers Export cancellation, Conversion
+execution failure, audio-source failure, Output finalization failure, and a
+composable Conversion that utilizes no video track. Each case checks
 Conversion/Output cancellation as applicable, AudioBufferSource closure, and
-Input disposal. Success checks exactly one source `BlobSource`, one Output,
-one start/finalize pair, and no cancellation.
+Input disposal. Success checks exactly one source `BlobSource`, one Output, one
+start/finalize pair, and no cancellation.
 
 ## Compatibility and measurement limits
 
@@ -91,23 +94,26 @@ one start/finalize pair, and no cancellation.
   lifecycle proof, not throughput extrapolation to long or high-resolution
   Media assets.
 - Composable Conversion is valid even when it utilizes zero video tracks. The
-  production follow-up must reject a discarded/missing video track explicitly
-  instead of allowing an accidental audio-only artifact.
-- The standalone HTML entry is a source-only investigation surface. It is not a
-  product route and is not imported by the application.
+  production runner therefore rejects a discarded or missing video track
+  explicitly instead of allowing an accidental audio-only artifact.
 
-## Smallest production follow-up
+## Production adoption
 
-Replace the current mixed-audio branch inside `default-export-runner.ts` with
-the proven shared-Output orchestration. Keep the existing direct video-only
-path for an all-excluded Audio mix, preserve Output settings and progress
-semantics, and reject a composable conversion that does not utilize the expected
-video track. Then remove the obsolete intermediate-Blob demux/remux helpers and
-their encoded-packet copying dependencies.
+`default-export-runner.ts` now keeps the direct non-composable Conversion for an
+all-excluded Audio mix and uses shared-Output orchestration when the mix includes
+Audio. Output settings, quality choices, Selection trimming, progress, and the
+separate Generated media delivery boundary remain intact. The old remux helper,
+encoded-packet copy dependencies, temporary prototype, and comparison page were
+deleted.
 
-Regression coverage should move the prototype lifecycle cases to the production
-runner boundary, retain all-excluded and zero-volume Audio mix cases, cover
-documented container/codec/quality choices, and run this two-audio fixture
-through the real Chromium artifact harness for Selection duration, signal-level
-A/V synchronization, cancellation, failure cleanup, and explicit Generated
-media delivery separation.
+The two-audio source is now a normal export-correctness fixture rather than a
+prototype-private input. Production-runner tests retain all-excluded and
+zero-volume Audio mix cases and cover the mixed path's success, cancellation,
+failure cleanup, and missing-video guard.
+
+The production route was re-verified in the user-owned Chromium runtime with
+the two-audio fixture. Local analysis exposed both `Sync clicks A` and
+`Sync clicks B`; Export review reported two included source tracks to one AAC
+Generated audio track; and the runner reached `Export complete` with an
+MP4/H.264/AAC, 160×90 Generated media artifact. Download was not invoked, so
+Delivery remained an explicit post-export action.

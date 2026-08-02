@@ -183,4 +183,29 @@ export const EXPORT_CORRECTNESS_FIXTURES = [
 			},
 		},
 	},
+	{
+		container: "mp4",
+		expected: {
+			audioTrackCount: 2,
+			durationUs: TEN_SECONDS_US,
+			mimeTypePrefix: "video/mp4",
+			syncEventDurationUs: SYNC_FLASH_CLICK_EVENT_DURATION_US,
+			syncEventsUs: SYNC_FLASH_CLICK_EVENTS_US,
+			videoTrackCount: 1,
+		},
+		fileName: "sync-flash-click-two-audio.mp4",
+		id: "mp4-sync-flash-click-two-audio",
+		label: "Sync flash/click MP4 with two audio tracks",
+		publicPath: "/export-correctness-fixtures/sync-flash-click-two-audio.mp4",
+		selections: {
+			full: {
+				endUs: TEN_SECONDS_US,
+				startUs: 0,
+			},
+			selectedRange: {
+				endUs: 8_000_000,
+				startUs: 2_000_000,
+			},
+		},
+	},
 ] satisfies ExportCorrectnessFixture[];

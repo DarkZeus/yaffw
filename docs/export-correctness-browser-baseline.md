@@ -13,6 +13,7 @@ The repeatable real-media fixtures live under
 - `tiny-video-with-audio.mp4`: 2.0 seconds, 160x90 H.264 video, AAC audio.
 - `tiny-video-only.webm`: 2.0 seconds, 160x90 VP8 video, no audio.
 - `sync-flash-click.mp4`: 10.0 seconds, 160x90 H.264 video with AAC audio. It has full-frame white flashes and matching 100 ms, 1 kHz audio beeps once per second from 1.0s through 9.0s for preview A/V sync regression checks.
+- `sync-flash-click-two-audio.mp4`: the same 10.0-second H.264 sync signal with two included AAC source tracks for mixed-audio export regression checks.
 
 The generated-media inspector reads these fixtures through Mediabunny and
 reports container, duration, track inventory, and primary video dimensions. The
@@ -75,13 +76,14 @@ because the requested Selection is `[0, durationUs)`. The tiny MP4 video-only
 fixture is inspected as a roughly 2-second MP4 with one video track and no audio
 track.
 
-Catalog measurement covers three registered 2-second fixtures plus one
-10-second sync fixture. The current
+Catalog measurement covers three registered 2-second fixtures plus two
+10-second sync fixtures. The current
 default MP4/H.264/AAC profile supports the MP4 video-only, MP4 video-with-AAC,
-and MP4 sync flash/click cases in the harness report shape, including generated
-track inventory checks: the video-only result has one generated video track and
-no generated audio tracks; the video-with-audio and sync flash/click results
-each have one generated video track and one generated audio track. The WebM
+MP4 sync flash/click, and MP4 two-audio sync cases in the harness report shape,
+including generated track inventory checks: the video-only result has one
+generated video track and no generated audio tracks; the video-with-audio and
+sync results have one generated video track and one generated audio track. The
+two-audio source likewise produces one Generated audio mix. The WebM
 video-only fixture is explicit rather than silent fallback: if the runtime
 cannot export it with the default profile, the catalog result is `unsupported`
 at the capability stage with technical details.
@@ -134,8 +136,9 @@ The current committed baseline can guarantee:
 - Fixture inspection can report duration and track inventory for tiny MP4 and
   WebM assets.
 - Catalog fixture export measurement can cover the tiny MP4 video-only, MP4
-  video-with-audio, and MP4 sync flash/click cases through the same artifact
-  report shape, including generated video/audio track inventory checks.
+  video-with-audio, MP4 sync flash/click, and MP4 two-audio sync cases through
+  the same artifact report shape, including generated video/audio track
+  inventory checks.
 - WebM fixture measurement is explicit: it either produces inspected Generated
   media through the current runtime or records an unsupported capability result
   with technical details. It does not silently change the default output
@@ -153,16 +156,17 @@ The current baseline does not yet prove:
 - Browser-runner selected-range boundary accuracy.
 - Start or end boundary drift for generated export artifacts.
 - Audio/video alignment in generated export artifacts.
-- Track inventory beyond the registered tiny fixture catalog.
+- Track inventory beyond the registered fixture catalog.
 - Runtime support across broader browsers, containers, codecs, durations, and
   multi-track media.
 - Real Chromium encoder availability for every documented output profile; the
   fast non-default profile test uses an injected runner artifact.
 
-Track inventory measurement currently proves only whether inspected generated
-tracks are present in the fixture result. It does not prove audio/video sync,
-codec suitability beyond the default profile facts, or behavior for media with
-more than one audio track.
+Track inventory measurement currently proves only whether inspected tracks are
+present in the fixture result. It does not by itself prove audio/video sync or
+codec suitability beyond the default profile facts. The dedicated mixed-audio
+investigation records the stronger signal-level evidence for the two-audio
+fixture.
 
 Out of scope for this baseline: server export fallback, native FFmpeg export,
 smart rendering, exhaustive documented-profile coverage, and generated media

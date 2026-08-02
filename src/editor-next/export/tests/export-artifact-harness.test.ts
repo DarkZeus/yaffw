@@ -311,6 +311,18 @@ describe("fixture catalog export artifact harness", () => {
 					"WebM input cannot be exported with the default MP4/H.264/AAC profile in this runtime.",
 				);
 			}
+			if (fixture.id === "mp4-sync-flash-click-two-audio") {
+				const generatedFixture = requiredFixture("mp4-sync-flash-click");
+
+				return {
+					blob: await readFixtureBlob(
+						generatedFixture.publicPath,
+						generatedFixture.expected.mimeTypePrefix,
+					),
+					fileName: `${fixture.id}-export.mp4`,
+					mimeType: "video/mp4",
+				};
+			}
 
 			return {
 				blob: source,
@@ -332,11 +344,11 @@ describe("fixture catalog export artifact harness", () => {
 		});
 
 		expect(catalog.summary).toEqual({
-			exported: 3,
-			total: 4,
+			exported: 4,
+			total: 5,
 			unsupported: 1,
 		});
-		expect(run).toHaveBeenCalledTimes(4);
+		expect(run).toHaveBeenCalledTimes(5);
 
 		const videoOnly = exportedCatalogResult(catalog, "mp4-video-only");
 		expect(videoOnly.report.inspection.container).toBe("mp4");
@@ -372,6 +384,14 @@ describe("fixture catalog export artifact harness", () => {
 				],
 			}),
 		);
+
+		const twoAudioSyncFixture = exportedCatalogResult(
+			catalog,
+			"mp4-sync-flash-click-two-audio",
+		);
+		expect(twoAudioSyncFixture.report.inspection.container).toBe("mp4");
+		expect(twoAudioSyncFixture.report.inspection.tracks.video).toHaveLength(1);
+		expect(twoAudioSyncFixture.report.inspection.tracks.audio).toHaveLength(1);
 
 		const webm = unsupportedCatalogResult(catalog, "webm-video-only");
 		expect(webm.failure.stage).toBe("export-runner");
@@ -498,18 +518,16 @@ function inspectionForFixtureLabel(label: string): LocalMediaAssetInspection {
 
 	return {
 		...supportedInspection,
-		audioTracks:
-			fixture.expected.audioTrackCount === 0
-				? []
-				: [
-						{
-							channels: 2,
-							codec: "mp4a.40.2",
-							id: "audio-1",
-							label: "Audio 1",
-							sampleRate: 44_100,
-						},
-					],
+		audioTracks: Array.from(
+			{ length: fixture.expected.audioTrackCount },
+			(_, index) => ({
+				channels: 2,
+				codec: "mp4a.40.2",
+				id: `audio-${index + 1}`,
+				label: `Audio ${index + 1}`,
+				sampleRate: 44_100,
+			}),
+		),
 		durationUs: fixture.expected.durationUs,
 		videoTracks: [
 			{

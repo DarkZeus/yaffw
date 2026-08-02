@@ -9,6 +9,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
+	audioAddFailure: undefined as Error | undefined,
 	audioBufferSources: [] as MockAudioBufferSource[],
 	conversionExecute: undefined as
 		| ((
@@ -16,14 +17,11 @@ const mediabunnyMock = vi.hoisted(() => ({
 				config: MockConversionConfig,
 		  ) => Promise<void>)
 		| undefined,
+	conversionUtilizedTracks: [{ type: "video" }] as Array<{ type: string }>,
 	conversions: [] as MockConversion[],
-	encodedVideoAddFailure: undefined as Error | undefined,
-	encodedVideoPacketSources: [] as MockEncodedVideoPacketSource[],
 	inputs: [] as MockInput[],
 	outputFinalizeFailure: undefined as Error | undefined,
 	outputs: [] as MockOutput[],
-	packetBatches: new Map<MockVideoTrack, MockPacket[]>(),
-	videoTracks: [] as MockVideoTrack[],
 }));
 
 const browserAudioMixMock = vi.hoisted(() => ({
@@ -82,7 +80,6 @@ vi.mock("mediabunny", () => {
 	const Input = vi.fn().mockImplementation(() => {
 		const input: MockInput = {
 			dispose: vi.fn(),
-			getVideoTracks: vi.fn(async () => mediabunnyMock.videoTracks),
 		};
 		mediabunnyMock.inputs.push(input);
 
@@ -121,17 +118,21 @@ vi.mock("mediabunny", () => {
 		init: vi.fn(async (config: MockConversionConfig) => {
 			const conversion: MockConversion = {
 				cancel: vi.fn(async () => {}),
+				config,
 				execute: vi.fn(() => {
 					if (mediabunnyMock.conversionExecute) {
 						return mediabunnyMock.conversionExecute(conversion, config);
 					}
 
-					config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+					if (!config.composable) {
+						config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
+					}
 					conversion.onProgress?.(0.5);
 
 					return Promise.resolve();
 				}),
 				onProgress: undefined,
+				utilizedTracks: mediabunnyMock.conversionUtilizedTracks,
 			};
 			mediabunnyMock.conversions.push(conversion);
 
@@ -139,37 +140,12 @@ vi.mock("mediabunny", () => {
 		}),
 	};
 
-	class EncodedPacketSink {
-		readonly track: MockVideoTrack;
-
-		constructor(track: MockVideoTrack) {
-			this.track = track;
-		}
-
-		async *packets() {
-			for (const packet of mediabunnyMock.packetBatches.get(this.track) ?? []) {
-				yield packet;
-			}
-		}
-	}
-
-	class EncodedVideoPacketSource {
+	class AudioBufferSource {
 		readonly add = vi.fn(async () => {
-			if (mediabunnyMock.encodedVideoAddFailure) {
-				throw mediabunnyMock.encodedVideoAddFailure;
+			if (mediabunnyMock.audioAddFailure) {
+				throw mediabunnyMock.audioAddFailure;
 			}
 		});
-		readonly close = vi.fn();
-		readonly codec: string;
-
-		constructor(codec: string) {
-			this.codec = codec;
-			mediabunnyMock.encodedVideoPacketSources.push(this);
-		}
-	}
-
-	class AudioBufferSource {
-		readonly add = vi.fn(async () => {});
 		readonly close = vi.fn();
 		readonly options: unknown;
 
@@ -202,8 +178,6 @@ vi.mock("mediabunny", () => {
 		BlobSource,
 		BufferTarget,
 		Conversion,
-		EncodedPacketSink,
-		EncodedVideoPacketSource,
 		Input,
 		MkvOutputFormat,
 		MovOutputFormat,
@@ -222,16 +196,14 @@ import {
 import type { DefaultExportRunnerRequest } from "../types/default-export-runner.types";
 
 beforeEach(() => {
+	mediabunnyMock.audioAddFailure = undefined;
 	mediabunnyMock.audioBufferSources = [];
 	mediabunnyMock.conversionExecute = undefined;
+	mediabunnyMock.conversionUtilizedTracks = [{ type: "video" }];
 	mediabunnyMock.conversions = [];
-	mediabunnyMock.encodedVideoAddFailure = undefined;
-	mediabunnyMock.encodedVideoPacketSources = [];
 	mediabunnyMock.inputs = [];
 	mediabunnyMock.outputFinalizeFailure = undefined;
 	mediabunnyMock.outputs = [];
-	mediabunnyMock.packetBatches = new Map();
-	mediabunnyMock.videoTracks = [];
 	browserAudioMixMock.renderBrowserAudioMix.mockReset();
 	browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue(null);
 });
@@ -362,11 +334,7 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
 	});
 
-	it("closes mixed-audio mux sources after successful export", async () => {
-		const videoTrack = createVideoTrack();
-		const packet = createPacket(2);
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [packet]);
+	it("drives video conversion and the Generated audio mix into one Output", async () => {
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -383,19 +351,20 @@ describe("browserDefaultExportRunner cleanup", () => {
 			3,
 		);
 		expect(browserAudioMixMock.renderBrowserAudioMix).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.inputs).toHaveLength(2);
+		expect(mediabunnyMock.inputs).toHaveLength(1);
 		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.inputs[1].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[1].start).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[1].finalize).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[1].cancel).not.toHaveBeenCalled();
-		expect(
-			mediabunnyMock.encodedVideoPacketSources[0].add,
-		).toHaveBeenCalledTimes(1);
-		expect(
-			mediabunnyMock.encodedVideoPacketSources[0].close,
-		).toHaveBeenCalledTimes(1);
-		expect(videoTrack.getCodec).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.outputs).toHaveLength(1);
+		expect(mediabunnyMock.conversions[0]?.config.composable).toBe(true);
+		expect(mediabunnyMock.conversions[0]?.config.output).toBe(
+			mediabunnyMock.outputs[0],
+		);
+		expect(mediabunnyMock.outputs[0].addAudioTrack).toHaveBeenCalledWith(
+			mediabunnyMock.audioBufferSources[0],
+			{ name: "Mixed audio" },
+		);
+		expect(mediabunnyMock.outputs[0].start).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.outputs[0].finalize).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.outputs[0].cancel).not.toHaveBeenCalled();
 		expect(mediabunnyMock.audioBufferSources[0].add).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
@@ -405,9 +374,6 @@ describe("browserDefaultExportRunner cleanup", () => {
 	});
 
 	it("encodes the Generated audio mix with the resolved explicit codec", async () => {
-		const videoTrack = createVideoTrack();
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -440,9 +406,6 @@ describe("browserDefaultExportRunner cleanup", () => {
 			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
 			return Promise.resolve();
 		};
-		const videoTrack = createVideoTrack();
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -474,9 +437,6 @@ describe("browserDefaultExportRunner cleanup", () => {
 			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
 			return Promise.resolve();
 		};
-		const videoTrack = createVideoTrack();
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -519,9 +479,6 @@ describe("browserDefaultExportRunner cleanup", () => {
 	});
 
 	it("renders an included zero-volume track as a silent Generated audio mix", async () => {
-		const videoTrack = createVideoTrack();
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(0)]);
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -541,12 +498,9 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources).toHaveLength(1);
 	});
 
-	it("cancels and closes mixed-audio mux resources after mux failure", async () => {
-		const failure = new Error("Packet mux failed.");
-		const videoTrack = createVideoTrack();
-		mediabunnyMock.videoTracks = [videoTrack];
-		mediabunnyMock.packetBatches.set(videoTrack, [createPacket(2)]);
-		mediabunnyMock.encodedVideoAddFailure = failure;
+	it("cancels and closes mixed-audio resources after audio-source failure", async () => {
+		const failure = new Error("Generated audio mix encoding failed.");
+		mediabunnyMock.audioAddFailure = failure;
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -560,19 +514,15 @@ describe("browserDefaultExportRunner cleanup", () => {
 			),
 		).rejects.toBe(failure);
 
-		expect(mediabunnyMock.inputs[1].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[1].cancel).toHaveBeenCalledTimes(1);
-		expect(
-			mediabunnyMock.encodedVideoPacketSources[0].close,
-		).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
 	});
 
-	it("rejects and disposes when a generated video codec cannot be read", async () => {
-		const failure = new Error("Generated video codec is malformed.");
-		const videoTrack = createVideoTrack();
-		videoTrack.getCodec.mockRejectedValueOnce(failure);
-		mediabunnyMock.videoTracks = [videoTrack];
+	it("cancels and closes mixed-audio resources after Conversion failure", async () => {
+		const failure = new Error("Video conversion failed.");
+		mediabunnyMock.conversionExecute = () => Promise.reject(failure);
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
 			includedTrackCount: 1,
@@ -584,8 +534,74 @@ describe("browserDefaultExportRunner cleanup", () => {
 			),
 		).rejects.toBe(failure);
 
-		expect(mediabunnyMock.inputs[1].dispose).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.encodedVideoPacketSources).toEqual([]);
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
+	});
+
+	it("cancels composable Conversion and Output after an abort", async () => {
+		const controller = new AbortController();
+		mediabunnyMock.conversionExecute = () => new Promise(() => undefined);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+		const exportPromise = browserDefaultExportRunner.run(
+			createExportRequest({
+				audioMix: includedAudioMix,
+				signal: controller.signal,
+			}),
+		);
+		await waitForConversion();
+		controller.abort();
+
+		await expect(exportPromise).rejects.toBeInstanceOf(
+			DefaultExportCancelledError,
+		);
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
+	});
+
+	it("cancels Output after mixed-audio finalization failure", async () => {
+		const failure = new Error("Output finalization failed.");
+		mediabunnyMock.outputFinalizeFailure = failure;
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+
+		await expect(
+			browserDefaultExportRunner.run(
+				createExportRequest({ audioMix: includedAudioMix }),
+			),
+		).rejects.toBe(failure);
+
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.conversions[0].cancel).not.toHaveBeenCalled();
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
+	});
+
+	it("rejects a composable export when Conversion cannot utilize video", async () => {
+		mediabunnyMock.conversionUtilizedTracks = [];
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+
+		await expect(
+			browserDefaultExportRunner.run(
+				createExportRequest({ audioMix: includedAudioMix }),
+			),
+		).rejects.toThrow("could not utilize a video track");
+
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.audioBufferSources).toEqual([]);
 	});
 });
 
@@ -593,7 +609,6 @@ type MockFn = ReturnType<typeof vi.fn>;
 
 type MockInput = {
 	dispose: MockFn;
-	getVideoTracks: MockFn;
 };
 
 type MockOutput = {
@@ -615,11 +630,14 @@ type MockOutputFormat = {
 
 type MockConversion = {
 	cancel: MockFn;
+	config: MockConversionConfig;
 	execute: MockFn;
 	onProgress?: (completedRatio: number) => void;
+	utilizedTracks: Array<{ type: string }>;
 };
 
 type MockConversionConfig = {
+	composable?: boolean;
 	output: MockOutput;
 	video: {
 		codec: string;
@@ -628,22 +646,6 @@ type MockConversionConfig = {
 		quality?: unknown;
 		width?: number;
 	};
-};
-
-type MockVideoTrack = {
-	getCodec: MockFn;
-	getDecoderConfig: MockFn;
-	getFirstTimestamp: MockFn;
-};
-
-type MockPacket = {
-	clone: MockFn;
-	timestamp: number;
-};
-
-type MockEncodedVideoPacketSource = {
-	add: MockFn;
-	close: MockFn;
 };
 
 type MockAudioBufferSource = {
@@ -696,23 +698,6 @@ async function waitForConversion() {
 	}
 
 	throw new Error("Expected the export conversion to start.");
-}
-
-function createVideoTrack(): MockVideoTrack {
-	return {
-		getCodec: vi.fn(async () => "avc"),
-		getDecoderConfig: vi.fn(async () => ({ codec: "avc1.42E01E" })),
-		getFirstTimestamp: vi.fn(async () => 1),
-	};
-}
-
-function createPacket(timestamp: number): MockPacket {
-	return {
-		clone: vi.fn(({ timestamp: normalizedTimestamp }) => ({
-			timestamp: normalizedTimestamp,
-		})),
-		timestamp,
-	};
 }
 
 const readyAsset = {
