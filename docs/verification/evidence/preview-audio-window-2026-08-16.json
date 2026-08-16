@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "issue": 108,
+  "recordedAt": "2026-08-16T17:09:12.516Z",
+  "revision": {
+    "baseGitSha": "9036d2393dc2b9ec958b7502b75ca4034ee6de86",
+    "scope": "Accepted issue #108 browser comparison; the enclosing commit also adds a stricter source-hole regression"
+  },
+  "runtime": {
+    "mediabunnyVersion": "1.52.2",
+    "platform": "MacIntel",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
+  },
+  "fixture": {
+    "durationSeconds": 120,
+    "fileName": "yaffw-waveform-106-large-two-aac.mp4",
+    "mimeType": "video/mp4",
+    "sha256": "75d390a7cf42f52b6360c28d8408447075742720bc3f7b3e31d467eab613400a",
+    "sizeBytes": 3998229,
+    "trackCount": 2
+  },
+  "config": {
+    "chunkTargetSeconds": 0.2,
+    "initialPlayheadSeconds": 0,
+    "lookaheadSeconds": 1.5,
+    "playbackRate": 1,
+    "playbackSeconds": 30,
+    "pumpIntervalMs": 50,
+    "stallSchedule": [
+      { "atPlaybackSeconds": 4, "durationMs": 250 },
+      { "atPlaybackSeconds": 10, "durationMs": 500 },
+      { "atPlaybackSeconds": 18, "durationMs": 1000 }
+    ],
+    "windowSeconds": 2
+  },
+  "trialOrder": [
+    ["playhead-window", "full-track-direct", "remux-decode-bridge"],
+    ["full-track-direct", "remux-decode-bridge", "playhead-window"],
+    ["remux-decode-bridge", "playhead-window", "full-track-direct"],
+    ["playhead-window", "remux-decode-bridge", "full-track-direct"],
+    ["full-track-direct", "playhead-window", "remux-decode-bridge"]
+  ],
+  "summariesByStrategy": {
+    "playhead-window": {
+      "cleanupPassed": true,
+      "medianPeakPcmBytes": 1687552,
+      "medianReadinessMs": 23.30000001192093,
+      "p95ReadinessMs": 24.5,
+      "totalUnderruns": 0,
+      "trialCount": 5
+    },
+    "full-track-direct": {
+      "cleanupPassed": true,
+      "medianPeakPcmBytes": 92160000,
+      "medianReadinessMs": 301.60000002384186,
+      "p95ReadinessMs": 307.4000000357628,
+      "totalUnderruns": 0,
+      "trialCount": 5
+    },
+    "remux-decode-bridge": {
+      "cleanupPassed": true,
+      "medianPeakPcmBytes": 92176384,
+      "medianReadinessMs": 259,
+      "p95ReadinessMs": 262,
+      "totalUnderruns": 0,
+      "trialCount": 5
+    }
+  },
+  "trialColumns": [
+    "id",
+    "strategy",
+    "readinessMs",
+    "peakPcmBytes",
+    "decodedFrames",
+    "decodedMediaSeconds",
+    "decoderRangeRequests",
+    "windowPulls",
+    "timerP95Ms",
+    "timerMaxMs",
+    "underruns",
+    "underrunMs",
+    "nodesCreated",
+    "peakLiveNodes",
+    "contextsClosed",
+    "providersDisposed",
+    "inputsDisposed",
+    "residualNodes",
+    "residualPcmBytes",
+    "residualTimers",
+    "errorCount"
+  ],
+  "trials": [
+    ["round-1-playhead-window", "playhead-window", 21.100000023841858, 1687552, 3053568, 63.61600000000006, 2, 57, 11.100000023841858, 1002.7000000476837, 0, 0, 364, 24, 1, 1, 0, 0, 0, 0, 0],
+    ["round-1-full-track-direct", "full-track-direct", 286.89999997615814, 92160000, 11520000, 239.99999999997783, 2, 0, 11.100000023841858, 1000.1000000238419, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-1-remux-decode-bridge", "remux-decode-bridge", 259, 92176384, 11522048, 240.04266666666666, 0, 0, 11.100000023841858, 1001.1999999880791, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-2-full-track-direct", "full-track-direct", 307.4000000357628, 92160000, 11520000, 239.99999999997783, 2, 0, 11.100000023841858, 1002.5, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-2-remux-decode-bridge", "remux-decode-bridge", 260.4000000357628, 92176384, 11522048, 240.04266666666666, 0, 0, 11.100000023841858, 1005.8000000119209, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-2-playhead-window", "playhead-window", 23.69999998807907, 1687552, 3032576, 63.178666666666714, 2, 56, 11.100000023841858, 1008.9000000357628, 0, 0, 356, 26, 1, 1, 0, 0, 0, 0, 0],
+    ["round-3-remux-decode-bridge", "remux-decode-bridge", 262, 92176384, 11522048, 240.04266666666666, 0, 0, 11.100000023841858, 1004.6000000238419, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-3-playhead-window", "playhead-window", 24.5, 1689600, 3042304, 63.3813333333334, 2, 55, 11.100000023841858, 1002.8000000119209, 0, 0, 356, 26, 1, 1, 0, 0, 0, 0, 0],
+    ["round-3-full-track-direct", "full-track-direct", 301.60000002384186, 92160000, 11520000, 239.99999999997783, 2, 0, 11.100000023841858, 1002.4000000357628, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-4-playhead-window", "playhead-window", 20.600000023841858, 1687552, 3060736, 63.76533333333342, 2, 56, 11.100000023841858, 1008.3999999761581, 0, 0, 364, 26, 1, 1, 0, 0, 0, 0, 0],
+    ["round-4-remux-decode-bridge", "remux-decode-bridge", 254, 92176384, 11522048, 240.04266666666666, 0, 0, 11.100000023841858, 1006.7999999523163, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-4-full-track-direct", "full-track-direct", 307.19999998807907, 92160000, 11520000, 239.99999999997783, 2, 0, 11.100000023841858, 1002.4000000357628, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-5-full-track-direct", "full-track-direct", 297.39999997615814, 92160000, 11520000, 239.99999999997783, 2, 0, 11.100000023841858, 1000.2000000476837, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0],
+    ["round-5-playhead-window", "playhead-window", 23.30000001192093, 1658880, 3027968, 63.082666666666725, 2, 55, 11.100000023841858, 1002.5, 0, 0, 356, 26, 1, 1, 0, 0, 0, 0, 0],
+    ["round-5-remux-decode-bridge", "remux-decode-bridge", 244.69999998807907, 92176384, 11522048, 240.04266666666666, 0, 0, 11.100000023841858, 1001.3999999761581, 0, 0, 2, 2, 1, 0, 1, 0, 0, 0, 0]
+  ]
+}

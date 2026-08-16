@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Preview audio window evidence</title>
+		<style>
+			:root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+			body { margin: 0; background: #101216; color: #e9edf3; }
+			main { width: min(1180px, calc(100% - 40px)); margin: 32px auto; }
+			h1 { font: 600 26px/1.2 system-ui, sans-serif; }
+			p { color: #aab3c0; line-height: 1.55; }
+			.controls { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; padding: 18px; border: 1px solid #303743; border-radius: 10px; background: #171b21; }
+			label { display: grid; gap: 7px; color: #bdc6d3; }
+			input, button { font: inherit; }
+			input[type="number"] { width: 90px; padding: 8px; color: inherit; background: #0f1216; border: 1px solid #3b4553; border-radius: 6px; }
+			button { padding: 9px 14px; border: 0; border-radius: 6px; background: #6d8cff; color: #081022; font-weight: 700; cursor: pointer; }
+			button:disabled { cursor: not-allowed; opacity: .45; }
+			table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 13px; }
+			th, td { padding: 8px 10px; border: 1px solid #303743; text-align: right; }
+			th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+			pre { max-height: 420px; overflow: auto; padding: 16px; border: 1px solid #303743; border-radius: 8px; background: #0c0e11; font-size: 12px; }
+			.status { min-height: 24px; color: #a9baff; }
+			.error { color: #ff9a9a; }
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>Issue #108 — Preview audio window evidence</h1>
+			<p>
+				Development-only harness. Select the exact 120-second, two-track fixture.
+				One suite runs five counterbalanced rounds across the bounded window,
+				current full-track direct, and retired remux/decode bridge strategies.
+			</p>
+			<section class="controls">
+				<label>Fixture <input id="fixture" type="file" accept="audio/*,video/*,.mp4" /></label>
+				<label>Playback / trial (s) <input id="playback-seconds" type="number" min="1" step="1" value="30" /></label>
+				<label>Window (s) <input id="window-seconds" type="number" min="0.1" step="0.1" value="2" /></label>
+				<label>Lookahead (s) <input id="lookahead-seconds" type="number" min="0.1" step="0.1" value="1.5" /></label>
+				<button id="run" type="button">Run 15 trials</button>
+				<button id="functional" type="button">Run lifecycle/stall scenario</button>
+				<button id="download" type="button" disabled>Download JSON</button>
+			</section>
+			<p id="status" class="status" aria-live="polite"></p>
+			<table>
+				<thead><tr><th>Trial</th><th>Strategy</th><th>Ready ms</th><th>Peak PCM</th><th>Timer p95</th><th>Underruns</th><th>Nodes</th><th>Cleanup</th></tr></thead>
+				<tbody id="results"></tbody>
+			</table>
+			<pre id="json">No evidence recorded.</pre>
+		</main>
+		<script type="module" src="./main.ts"></script>
+	</body>
+</html>
