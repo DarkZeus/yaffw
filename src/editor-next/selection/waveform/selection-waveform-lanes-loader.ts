@@ -1,4 +1,10 @@
-import { ALL_FORMATS, AudioBufferSink, BlobSource, Input } from "mediabunny";
+import {
+	ALL_FORMATS,
+	type AudioSample,
+	AudioSampleSink,
+	BlobSource,
+	Input,
+} from "mediabunny";
 
 import type {
 	WaveformLaneRequest,
@@ -10,7 +16,7 @@ export const WAVEFORM_SAMPLE_COUNT = 8192;
 type MutableWaveformBuckets = Float32Array | number[];
 type WaveformLaneLoadRequest = Omit<WaveformLaneRequest, "track">;
 
-export async function loadWaveformLaneOnCurrentThread({
+export async function loadDecodedWaveformLane({
 	assetDurationUs,
 	signal,
 	source,
@@ -60,12 +66,12 @@ export async function loadWaveformLaneOnCurrentThread({
 			};
 		}
 
-		const sink = new AudioBufferSink(track);
+		const sink = new AudioSampleSink(track);
 		const buckets = new Float32Array(WAVEFORM_SAMPLE_COUNT);
 		let framesRead = 0;
 		let sampleRate = 0;
 		const iterator = sink
-			.buffers(0, Math.min(assetDurationSeconds, trackEndTimestamp))
+			.samples(0, Math.min(assetDurationSeconds, trackEndTimestamp))
 			[Symbol.asyncIterator]();
 
 		try {
@@ -79,20 +85,22 @@ export async function loadWaveformLaneOnCurrentThread({
 
 				throwIfAborted(signal);
 
-				const { buffer, timestamp } = value;
-				sampleRate = buffer.sampleRate;
-				addAudioBufferToBuckets({
-					buffer,
-					buckets,
-					mediaDurationSeconds: assetDurationSeconds,
-					timestampSeconds: timestamp,
-				});
-				framesRead += buffer.length;
+				const sample = value;
+				try {
+					throwIfAborted(signal);
+					sampleRate = sample.sampleRate;
+					addAudioSampleToBuckets({
+						buckets,
+						mediaDurationSeconds: assetDurationSeconds,
+						sample,
+					});
+					framesRead += sample.numberOfFrames;
+				} finally {
+					sample.close();
+				}
 			}
 		} finally {
-			if (signal?.aborted) {
-				await iterator.return?.();
-			}
+			await iterator.return?.();
 		}
 
 		if (framesRead === 0 || sampleRate === 0) {
@@ -120,26 +128,55 @@ export async function loadWaveformLaneOnCurrentThread({
 	}
 }
 
-export function addAudioBufferToBuckets({
-	buffer,
+export function addAudioSampleToBuckets({
 	buckets,
 	mediaDurationSeconds,
-	timestampSeconds,
+	sample,
 }: {
-	buffer: AudioBuffer;
 	buckets: MutableWaveformBuckets;
 	mediaDurationSeconds: number;
-	timestampSeconds: number;
+	sample: Pick<
+		AudioSample,
+		| "copyTo"
+		| "numberOfChannels"
+		| "numberOfFrames"
+		| "sampleRate"
+		| "timestamp"
+	>;
 }) {
-	const channelData = Array.from(
-		{ length: buffer.numberOfChannels },
-		(_, index) => buffer.getChannelData(index),
-	);
+	const frameAmplitudes = new Float32Array(sample.numberOfFrames);
+	const channelData = new Float32Array(sample.numberOfFrames);
+
+	for (
+		let channelIndex = 0;
+		channelIndex < sample.numberOfChannels;
+		channelIndex += 1
+	) {
+		sample.copyTo(channelData, {
+			format: "f32-planar",
+			planeIndex: channelIndex,
+		});
+
+		for (
+			let frameIndex = 0;
+			frameIndex < sample.numberOfFrames;
+			frameIndex += 1
+		) {
+			frameAmplitudes[frameIndex] =
+				(frameAmplitudes[frameIndex] ?? 0) +
+				Math.abs(channelData[frameIndex] ?? 0);
+		}
+	}
+
 	const secondsPerBucket = mediaDurationSeconds / buckets.length;
 
-	for (let frameIndex = 0; frameIndex < buffer.length; frameIndex += 1) {
+	for (
+		let frameIndex = 0;
+		frameIndex < sample.numberOfFrames;
+		frameIndex += 1
+	) {
 		const sampleTimestampSeconds =
-			timestampSeconds + frameIndex / buffer.sampleRate;
+			sample.timestamp + frameIndex / sample.sampleRate;
 
 		if (
 			sampleTimestampSeconds < 0 ||
@@ -148,19 +185,13 @@ export function addAudioBufferToBuckets({
 			continue;
 		}
 
-		let amplitude = 0;
-
-		for (const channel of channelData) {
-			amplitude += Math.abs(channel[frameIndex] ?? 0);
-		}
-
 		const bucketIndex = Math.min(
 			buckets.length - 1,
 			Math.floor(sampleTimestampSeconds / secondsPerBucket),
 		);
 		buckets[bucketIndex] = Math.max(
 			buckets[bucketIndex] ?? 0,
-			amplitude / Math.max(1, channelData.length),
+			(frameAmplitudes[frameIndex] ?? 0) / Math.max(1, sample.numberOfChannels),
 		);
 	}
 }

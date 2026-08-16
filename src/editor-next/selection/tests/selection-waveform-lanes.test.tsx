@@ -5,15 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
 	audioTracks: [] as object[],
-	buffersByTrack: new Map<
-		object,
-		Array<{ buffer: AudioBuffer; timestamp: number }>
-	>(),
 	getAudioTracksError: undefined as Error | undefined,
 	inputInstances: [] as Array<{
 		dispose: ReturnType<typeof vi.fn>;
 		getAudioTracks: ReturnType<typeof vi.fn>;
 	}>,
+	iterators: [] as Array<{
+		next: ReturnType<typeof vi.fn>;
+		return: ReturnType<typeof vi.fn>;
+	}>,
+	samplesByTrack: new Map<
+		object,
+		Array<ReturnType<typeof createAudioSampleLike>>
+	>(),
 }));
 
 const waveformWorkerMock = vi.hoisted(() => ({
@@ -30,6 +34,7 @@ const waveformWorkerMock = vi.hoisted(() => ({
 		samples: new Float32Array([0.25, 1]),
 		status: "ready",
 	} as unknown,
+	throwOnConstruct: undefined as Error | undefined,
 }));
 
 vi.mock("mediabunny", () => {
@@ -37,13 +42,31 @@ vi.mock("mediabunny", () => {
 		constructor(readonly source: Blob) {}
 	}
 
-	class AudioBufferSink {
+	class AudioSampleSink {
 		constructor(readonly track: object) {}
 
-		async *buffers() {
-			for (const chunk of mediabunnyMock.buffersByTrack.get(this.track) ?? []) {
-				yield chunk;
-			}
+		samples() {
+			const samples = mediabunnyMock.samplesByTrack.get(this.track) ?? [];
+			let index = 0;
+			const iterator = {
+				next: vi.fn(async () => {
+					const value = samples[index];
+					index += 1;
+
+					return value
+						? { done: false as const, value }
+						: { done: true as const, value: undefined };
+				}),
+				return: vi.fn(async () => ({
+					done: true as const,
+					value: undefined,
+				})),
+			};
+			mediabunnyMock.iterators.push(iterator);
+
+			return {
+				[Symbol.asyncIterator]: () => iterator,
+			};
 		}
 	}
 
@@ -65,7 +88,7 @@ vi.mock("mediabunny", () => {
 
 	return {
 		ALL_FORMATS: {},
-		AudioBufferSink,
+		AudioSampleSink,
 		BlobSource,
 		Input,
 	};
@@ -116,6 +139,10 @@ vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 		terminate = vi.fn();
 
 		constructor() {
+			if (waveformWorkerMock.throwOnConstruct) {
+				throw waveformWorkerMock.throwOnConstruct;
+			}
+
 			waveformWorkerMock.instances.push(this);
 		}
 
@@ -139,7 +166,7 @@ import type {
 	WaveformLaneState,
 } from "../types/selection-waveform-lanes.types";
 import {
-	addAudioBufferToBuckets,
+	addAudioSampleToBuckets,
 	clearWaveformLaneCache,
 	loadBrowserWaveformLane,
 	useWaveformLaneStates,
@@ -148,9 +175,10 @@ import {
 beforeEach(() => {
 	clearWaveformLaneCache();
 	mediabunnyMock.audioTracks = [];
-	mediabunnyMock.buffersByTrack = new Map();
 	mediabunnyMock.getAudioTracksError = undefined;
 	mediabunnyMock.inputInstances = [];
+	mediabunnyMock.iterators = [];
+	mediabunnyMock.samplesByTrack = new Map();
 	waveformWorkerMock.deferResponse = false;
 	waveformWorkerMock.errorMessage = "";
 	waveformWorkerMock.instances = [];
@@ -158,6 +186,7 @@ beforeEach(() => {
 		samples: new Float32Array([0.25, 1]),
 		status: "ready",
 	};
+	waveformWorkerMock.throwOnConstruct = undefined;
 	vi.stubGlobal("Worker", undefined);
 });
 
@@ -235,12 +264,8 @@ describe("loadBrowserWaveformLane", () => {
 	it("disposes the media input after loading a ready waveform lane", async () => {
 		const audioTrack = createMockAudioTrack();
 		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.buffersByTrack.set(audioTrack, [
-			{
-				buffer: createAudioBufferLike([[0.5, 1]], 2),
-				timestamp: 0,
-			},
-		]);
+		const sample = createAudioSampleLike([[0.5, 1]], 2);
+		mediabunnyMock.samplesByTrack.set(audioTrack, [sample]);
 
 		const result = await loadBrowserWaveformLane({
 			assetDurationUs: readyAsset.durationUs,
@@ -256,6 +281,8 @@ describe("loadBrowserWaveformLane", () => {
 			expect(Math.max(...result.samples)).toBe(1);
 		}
 		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+		expect(sample.close).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
 	});
 
 	it("disposes the media input when the requested audio track is unavailable", async () => {
@@ -290,14 +317,36 @@ describe("loadBrowserWaveformLane", () => {
 		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
 	});
 
+	it("closes decoded samples and returns the iterator when bucket generation fails", async () => {
+		const audioTrack = createMockAudioTrack();
+		const sample = createAudioSampleLike([[0.5, 1]], 2);
+		sample.copyTo.mockImplementationOnce(() => {
+			throw new Error("PCM copy failed");
+		});
+		mediabunnyMock.audioTracks = [audioTrack];
+		mediabunnyMock.samplesByTrack.set(audioTrack, [sample]);
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result).toEqual({
+			reason: "PCM copy failed",
+			status: "unavailable",
+		});
+		expect(sample.close).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
 	it("caches completed waveform lanes for the same source and track", async () => {
 		const audioTrack = createMockAudioTrack();
 		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.buffersByTrack.set(audioTrack, [
-			{
-				buffer: createAudioBufferLike([[0.5, 1]], 2),
-				timestamp: 0,
-			},
+		mediabunnyMock.samplesByTrack.set(audioTrack, [
+			createAudioSampleLike([[0.5, 1]], 2),
 		]);
 
 		const firstResult = await loadBrowserWaveformLane({
@@ -346,21 +395,43 @@ describe("loadBrowserWaveformLane", () => {
 			type: "generate",
 		});
 		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+		expect(
+			waveformWorkerMock.instances[0]?.removeEventListener,
+		).toHaveBeenCalledWith("error", expect.any(Function));
+		expect(
+			waveformWorkerMock.instances[0]?.removeEventListener,
+		).toHaveBeenCalledWith("message", expect.any(Function));
 	});
 
-	it("falls back to the current thread when the worker cannot produce a waveform", async () => {
+	it("treats a functioning worker's unavailable result as final", async () => {
 		vi.stubGlobal("Worker", vi.fn());
 		waveformWorkerMock.result = {
 			reason: "Worker cannot decode this audio track.",
 			status: "unavailable",
 		};
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result).toEqual({
+			reason: "Worker cannot decode this audio track.",
+			status: "unavailable",
+		});
+		expect(waveformWorkerMock.instances).toHaveLength(1);
+		expect(mediabunnyMock.inputInstances).toHaveLength(0);
+	});
+
+	it("falls back to the current thread when the worker fails to start", async () => {
+		vi.stubGlobal("Worker", vi.fn());
+		waveformWorkerMock.throwOnConstruct = new Error("Worker startup failed");
 		const audioTrack = createMockAudioTrack();
 		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.buffersByTrack.set(audioTrack, [
-			{
-				buffer: createAudioBufferLike([[0.5, 1]], 2),
-				timestamp: 0,
-			},
+		mediabunnyMock.samplesByTrack.set(audioTrack, [
+			createAudioSampleLike([[0.5, 1]], 2),
 		]);
 
 		const result = await loadBrowserWaveformLane({
@@ -371,7 +442,28 @@ describe("loadBrowserWaveformLane", () => {
 		});
 
 		expect(result.status).toBe("ready");
-		expect(waveformWorkerMock.instances).toHaveLength(1);
+		expect(waveformWorkerMock.instances).toHaveLength(0);
+		expect(mediabunnyMock.inputInstances).toHaveLength(1);
+	});
+
+	it("falls back to the current thread when the worker script fails to start", async () => {
+		vi.stubGlobal("Worker", vi.fn());
+		waveformWorkerMock.errorMessage = "Worker script failed";
+		const audioTrack = createMockAudioTrack();
+		mediabunnyMock.audioTracks = [audioTrack];
+		mediabunnyMock.samplesByTrack.set(audioTrack, [
+			createAudioSampleLike([[0.5, 1]], 2),
+		]);
+
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+
+		expect(result.status).toBe("ready");
+		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.inputInstances).toHaveLength(1);
 	});
 
@@ -379,6 +471,10 @@ describe("loadBrowserWaveformLane", () => {
 		vi.stubGlobal("Worker", vi.fn());
 		waveformWorkerMock.deferResponse = true;
 		const abortController = new AbortController();
+		const removeAbortListener = vi.spyOn(
+			abortController.signal,
+			"removeEventListener",
+		);
 
 		const result = loadBrowserWaveformLane({
 			assetDurationUs: readyAsset.durationUs,
@@ -393,30 +489,41 @@ describe("loadBrowserWaveformLane", () => {
 			name: "AbortError",
 		});
 		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
+		expect(removeAbortListener).toHaveBeenCalledWith(
+			"abort",
+			expect.any(Function),
+		);
 		expect(mediabunnyMock.inputInstances).toHaveLength(0);
 	});
 });
 
-describe("addAudioBufferToBuckets", () => {
+describe("addAudioSampleToBuckets", () => {
 	it("maps waveform samples by media timestamps instead of lane-local offsets", () => {
 		const delayedBuckets = new Array<number>(10).fill(0);
+		const delayedSample = createAudioSampleLike(
+			[
+				[0.5, 1, 0.25, 0.75],
+				[0.25, 0.5, 0.75, 0.25],
+			],
+			2,
+			4,
+		);
 
-		addAudioBufferToBuckets({
+		addAudioSampleToBuckets({
 			buckets: delayedBuckets,
-			buffer: createAudioBufferLike([[0.5, 1, 0.25, 0.75]], 2),
 			mediaDurationSeconds: 10,
-			timestampSeconds: 4,
+			sample: delayedSample,
 		});
 
-		expect(delayedBuckets).toEqual([0, 0, 0, 0, 1, 0.75, 0, 0, 0, 0]);
+		expect(delayedBuckets).toEqual([0, 0, 0, 0, 0.75, 0.5, 0, 0, 0, 0]);
+		expect(delayedSample.copyTo).toHaveBeenCalledTimes(2);
 
 		const clippedBuckets = new Array<number>(4).fill(0);
 
-		addAudioBufferToBuckets({
+		addAudioSampleToBuckets({
 			buckets: clippedBuckets,
-			buffer: createAudioBufferLike([[1, 0.5, 0.25, 0.125]], 2),
 			mediaDurationSeconds: 4,
-			timestampSeconds: -0.5,
+			sample: createAudioSampleLike([[1, 0.5, 0.25, 0.125]], 2, -0.5),
 		});
 
 		expect(clippedBuckets).toEqual([0.5, 0.125, 0, 0]);
@@ -568,14 +675,45 @@ const readyAsset = {
 	},
 } satisfies ReadyMediaAsset;
 
-function createAudioBufferLike(
+function createAudioSampleLike(
 	channels: number[][],
 	sampleRate: number,
-): AudioBuffer {
+	timestamp = 0,
+) {
 	return {
-		getChannelData: (index: number) => Float32Array.from(channels[index] ?? []),
-		length: channels[0]?.length ?? 0,
+		close: vi.fn(),
+		copyTo: vi.fn(
+			(
+				destination: Float32Array,
+				{
+					format,
+					planeIndex,
+				}: { format: "f32" | "f32-planar"; planeIndex: number },
+			) => {
+				if (format === "f32-planar") {
+					destination.set(channels[planeIndex] ?? []);
+					return;
+				}
+
+				for (
+					let frameIndex = 0;
+					frameIndex < (channels[0]?.length ?? 0);
+					frameIndex += 1
+				) {
+					for (
+						let channelIndex = 0;
+						channelIndex < channels.length;
+						channelIndex += 1
+					) {
+						destination[frameIndex * channels.length + channelIndex] =
+							channels[channelIndex]?.[frameIndex] ?? 0;
+					}
+				}
+			},
+		),
+		numberOfFrames: channels[0]?.length ?? 0,
 		numberOfChannels: channels.length,
 		sampleRate,
-	} as AudioBuffer;
+		timestamp,
+	};
 }

@@ -1,4 +1,4 @@
-import { loadWaveformLaneOnCurrentThread } from "./selection-waveform-lanes-loader";
+import { loadDecodedWaveformLane } from "./selection-waveform-lanes-loader";
 
 import type {
 	WaveformLaneRequest,
@@ -41,7 +41,7 @@ workerScope.addEventListener("message", (event) => {
 });
 
 async function generateWaveform({ request, requestId }: WorkerRequestMessage) {
-	const result = await loadWaveformLaneOnCurrentThread(request);
+	const result = await loadDecodedWaveformLane(request);
 	const message = {
 		requestId,
 		result,

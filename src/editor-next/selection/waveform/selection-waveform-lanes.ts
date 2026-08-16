@@ -11,14 +11,14 @@ import type {
 import {
 	createWaveformAbortError,
 	isWaveformAbortError,
-	loadWaveformLaneOnCurrentThread,
+	loadDecodedWaveformLane,
 } from "./selection-waveform-lanes-loader";
 import WaveformLaneWorker from "./selection-waveform-lanes.worker?worker";
 
 export {
 	WAVEFORM_SAMPLE_COUNT,
-	addAudioBufferToBuckets,
-	loadWaveformLaneOnCurrentThread,
+	addAudioSampleToBuckets,
+	loadDecodedWaveformLane,
 } from "./selection-waveform-lanes-loader";
 
 const MAX_WAVEFORM_CACHE_ENTRIES_PER_SOURCE = 8;
@@ -143,8 +143,8 @@ export async function loadBrowserWaveformLane({
 		}
 	}
 
-	if (result?.status !== "ready") {
-		result = await loadWaveformLaneOnCurrentThread({
+	if (!result) {
+		result = await loadDecodedWaveformLane({
 			assetDurationUs,
 			signal,
 			source,
@@ -182,7 +182,14 @@ function loadWorkerWaveformLane({
 
 	return new Promise((resolve, reject) => {
 		const requestId = nextWorkerRequestId++;
-		const worker = new WaveformLaneWorker();
+		let worker: InstanceType<typeof WaveformLaneWorker>;
+
+		try {
+			worker = new WaveformLaneWorker();
+		} catch (error) {
+			reject(error instanceof Error ? error : new Error(String(error)));
+			return;
+		}
 
 		let settled = false;
 
@@ -232,15 +239,25 @@ function loadWorkerWaveformLane({
 		signal?.addEventListener("abort", handleAbort, { once: true });
 		worker.addEventListener("error", handleError);
 		worker.addEventListener("message", handleMessage);
-		worker.postMessage({
-			request: {
-				assetDurationUs,
-				source,
-				trackIndex,
-			},
-			requestId,
-			type: "generate",
-		} satisfies WaveformWorkerRequestMessage);
+
+		if (signal?.aborted) {
+			handleAbort();
+			return;
+		}
+
+		try {
+			worker.postMessage({
+				request: {
+					assetDurationUs,
+					source,
+					trackIndex,
+				},
+				requestId,
+				type: "generate",
+			} satisfies WaveformWorkerRequestMessage);
+		} catch (error) {
+			rejectSettled(error instanceof Error ? error : new Error(String(error)));
+		}
 	});
 }
 

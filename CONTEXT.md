@@ -474,6 +474,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Track volume** and channel handling should live in **Audio**, not in **Waveform lanes**.
 - Per-track **Preview level meters** should not be embedded as persistent decoration inside **Waveform lanes**; lanes remain selection context.
 - **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context without a selection affordance.
+- Supported Chromium should decode **Waveform lane** samples and calculate the compact waveform buckets in a dedicated worker. A domain-level unavailable result from a functioning worker is final; current-thread generation is only a runtime fallback when worker infrastructure is absent or cannot start.
 - The first slice shows all available **Waveform lanes** and uses vertical scrolling if the lanes exceed the available viewport.
 - All **Waveform lanes** align to the same **Media time** ruler and share one **Selection** and **Playhead** overlay.
 - When the waveform adapter can preserve existing behavior, the **Waveform**, mirrored **Selection** affordances, **Playhead** cursor, time ruler, and **Timeline zoom**/scroll should be rendered by the same media-time surface rather than split across independent overlays.
