@@ -51,6 +51,48 @@ const adapterMockState = vi.hoisted(() => ({
 	}>,
 }));
 
+const scrubPreviewMockState = vi.hoisted(() => ({
+	providers: [] as Array<{
+		dispose: ReturnType<typeof vi.fn>;
+		onFrame: (frame: {
+			accuracy: "exact" | "keyframe";
+			actualTimestampUs: number;
+			canvas: HTMLCanvasElement;
+			requestId: number;
+			requestedAtMs: number;
+			timestampUs: number;
+		}) => void;
+		requestFrame: ReturnType<typeof vi.fn>;
+		warm: ReturnType<typeof vi.fn>;
+	}>,
+}));
+
+vi.mock("../scrub/mediabunny-scrub-frame-provider", () => ({
+	createMediabunnyScrubFrameProvider: (options: {
+		onFrame: (frame: {
+			accuracy: "exact" | "keyframe";
+			actualTimestampUs: number;
+			canvas: HTMLCanvasElement;
+			requestId: number;
+			requestedAtMs: number;
+			timestampUs: number;
+		}) => void;
+	}) => {
+		let requestId = 0;
+		const provider = {
+			dispose: vi.fn(),
+			onFrame: options.onFrame,
+			requestFrame: vi.fn(() => {
+				requestId += 1;
+				return requestId;
+			}),
+			warm: vi.fn(),
+		};
+		scrubPreviewMockState.providers.push(provider);
+		return provider;
+	},
+}));
+
 vi.mock("@vidstack/react", async () => {
 	const React = await import("react");
 	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
@@ -254,6 +296,7 @@ beforeEach(() => {
 	});
 	adapterMockState.previewAudioEngines.length = 0;
 	adapterMockState.mediaPlayerRenderCount = 0;
+	scrubPreviewMockState.providers.length = 0;
 	adapterMockState.previewAudioEngineCreate.mockReset();
 	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
 		let currentTimeSeconds = 0;
@@ -347,6 +390,9 @@ describe("NativePreviewPlayer", () => {
 
 		expect(revokeObjectURL).toHaveBeenCalledTimes(1);
 		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
+		expect(scrubPreviewMockState.providers[0]?.dispose).toHaveBeenCalledTimes(
+			1,
+		);
 	});
 
 	it("renders preview and transport as separate workbench chrome regions", async () => {
@@ -480,12 +526,13 @@ describe("NativePreviewPlayer", () => {
 					name: "Open fullscreen preview",
 				}),
 			).toBeTruthy();
+			expect(scrubPreviewMockState.providers[0]?.warm).toHaveBeenCalledTimes(1);
 		} finally {
 			getBoundingClientRect.mockRestore();
 		}
 	});
 
-	it("drives play, pause, seek, speed, volume, mute, and frame-step through native video commands", async () => {
+	it("keeps paused seek commands on the scrub preview and synchronizes native video on play", async () => {
 		renderPlayer();
 
 		const video = screen.getByLabelText(
@@ -503,17 +550,29 @@ describe("NativePreviewPlayer", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Seek forward 10 seconds" }),
 		);
-		expect(video.currentTime).toBe(10);
+		expect(video.currentTime).toBe(0);
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenCalledWith(10_000_000, { priority: "final" });
 
 		fireEvent.click(
 			screen.getByRole("button", { name: "Step forward one frame" }),
 		);
-		expect(video.currentTime).toBeCloseTo(10.033333, 5);
+		expect(video.currentTime).toBe(0);
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenCalledWith(10_033_333, { priority: "final" });
 
 		fireEvent.click(
 			screen.getByRole("button", { name: "Seek backward 1 second" }),
 		);
+		expect(video.currentTime).toBe(0);
+
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
 		expect(video.currentTime).toBeCloseTo(9.033333, 5);
+		await waitFor(() => {
+			expect(play).toHaveBeenCalledTimes(2);
+		});
 
 		fireEvent.change(screen.getByLabelText("Playback speed"), {
 			target: { value: "1.5" },
@@ -527,6 +586,62 @@ describe("NativePreviewPlayer", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 		expect(video.muted).toBe(true);
+	});
+
+	it("keeps a decoded scrub frame visible while native video synchronizes on playback", async () => {
+		const context = {
+			clearRect: vi.fn(),
+			drawImage: vi.fn(),
+		};
+		const getContext = vi
+			.spyOn(HTMLCanvasElement.prototype, "getContext")
+			.mockReturnValue(context as unknown as CanvasRenderingContext2D);
+
+		try {
+			renderPlayer();
+			const video = screen.getByLabelText(
+				"Preview for clip.mp4",
+			) as HTMLVideoElement;
+			const overlay = screen.getByTestId("scrub-preview-canvas");
+
+			fireEvent.click(
+				screen.getByRole("button", { name: "Seek forward 10 seconds" }),
+			);
+			expect(video.currentTime).toBe(0);
+			const provider = scrubPreviewMockState.providers[0];
+			const decodedCanvas = document.createElement("canvas");
+			decodedCanvas.width = 640;
+			decodedCanvas.height = 360;
+
+			act(() => {
+				provider?.onFrame({
+					accuracy: "exact",
+					actualTimestampUs: 10_000_000,
+					canvas: decodedCanvas,
+					requestId: 1,
+					requestedAtMs: 0,
+					timestampUs: 10_000_000,
+				});
+			});
+
+			await waitFor(() => {
+				expect(overlay.className).toContain("block");
+				expect(overlay.className).not.toContain("hidden");
+			});
+			expect(context.drawImage).toHaveBeenCalled();
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			expect(video.currentTime).toBe(10);
+			expect(overlay.className).toContain("block");
+
+			fireEvent.playing(video);
+
+			await waitFor(() => {
+				expect(overlay.className).toContain("hidden");
+			});
+		} finally {
+			getContext.mockRestore();
+		}
 	});
 
 	it("keeps audio preview preparation visible while blocking pending audio-master playback", async () => {
@@ -848,7 +963,7 @@ describe("NativePreviewPlayer", () => {
 		);
 	});
 
-	it("keeps Playhead seek, Selection commit, and Selection range move channels separate in the lower region", () => {
+	it("keeps paused timeline edits off native video until playback resumes", async () => {
 		const onSelectionEndRequested = vi.fn();
 		const onSelectionRangeMoveRequested = vi.fn();
 		const onSelectionStartRequested = vi.fn();
@@ -880,16 +995,37 @@ describe("NativePreviewPlayer", () => {
 			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
 				clientX: 600,
 			});
-			expect(video.currentTime).toBe(6);
+			expect(video.currentTime).toBe(0);
 			expect(onSelectionStartRequested).not.toHaveBeenCalled();
 			expect(onSelectionEndRequested).not.toHaveBeenCalled();
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
+
+			fireEvent.mouseDown(screen.getByLabelText("Playhead handle"), {
+				clientX: 600,
+			});
+			fireEvent.mouseMove(window, { clientX: 700 });
+			await waitFor(() => {
+				expect(
+					scrubPreviewMockState.providers[0]?.requestFrame,
+				).toHaveBeenLastCalledWith(7_000_000, {
+					priority: "interactive",
+				});
+			});
+			expect(video.currentTime).toBe(0);
+			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+				"00:00:07.000",
+			);
+			fireEvent.mouseUp(window, { clientX: 800 });
+			expect(video.currentTime).toBe(0);
+			expect(
+				scrubPreviewMockState.providers[0]?.requestFrame,
+			).toHaveBeenLastCalledWith(8_000_000, { priority: "final" });
 
 			fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
 				clientX: 200,
 			});
 			fireEvent.mouseUp(window, { clientX: 300 });
-			expect(video.currentTime).toBe(3);
+			expect(video.currentTime).toBe(0);
 			expect(onSelectionStartRequested).toHaveBeenCalledWith(3_000_000);
 			expect(onSelectionEndRequested).not.toHaveBeenCalled();
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
@@ -898,7 +1034,7 @@ describe("NativePreviewPlayer", () => {
 				clientX: 800,
 			});
 			fireEvent.mouseUp(window, { clientX: 900 });
-			expect(video.currentTime).toBe(9);
+			expect(video.currentTime).toBe(0);
 			expect(onSelectionEndRequested).toHaveBeenCalledWith(9_000_000);
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
@@ -907,6 +1043,9 @@ describe("NativePreviewPlayer", () => {
 			});
 			fireEvent.mouseUp(window, { clientX: 500 });
 			expect(onSelectionRangeMoveRequested).toHaveBeenCalledWith(3_000_000);
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			expect(video.currentTime).toBe(9);
 		} finally {
 			getBoundingClientRect.mockRestore();
 		}
@@ -975,8 +1114,9 @@ describe("NativePreviewPlayer", () => {
 		fireEvent.click(
 			screen.getByRole("button", { name: "Seek forward 10 seconds" }),
 		);
-		expect(video.currentTime).toBe(10);
+		expect(video.currentTime).toBe(0);
 		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+		expect(video.currentTime).toBe(10);
 
 		await waitFor(() => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
@@ -1117,9 +1257,10 @@ describe("NativePreviewPlayer", () => {
 			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
 				clientX: 600,
 			});
-			expect(video.currentTime).toBe(6);
+			expect(video.currentTime).toBe(0);
 
 			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			expect(video.currentTime).toBe(6);
 
 			await waitFor(() => {
 				expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
@@ -1173,11 +1314,14 @@ describe("NativePreviewPlayer", () => {
 		) as HTMLVideoElement;
 
 		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
-		expect(video.currentTime).toBe(10);
+		expect(video.currentTime).toBe(0);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:10.000",
+		);
 
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 		expect(onSelectionStartRequested).toHaveBeenCalledWith(10_000_000);
-		expect(video.currentTime).toBe(10);
+		expect(video.currentTime).toBe(0);
 
 		fireEvent.keyDown(window, { code: "BracketRight", key: "]" });
 		expect(onSelectionEndRequested).toHaveBeenCalledWith(10_000_000);
@@ -1187,7 +1331,10 @@ describe("NativePreviewPlayer", () => {
 			key: "ArrowRight",
 			shiftKey: true,
 		});
-		expect(video.currentTime).toBeCloseTo(10.033333, 5);
+		expect(video.currentTime).toBe(0);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:10.033",
+		);
 	});
 });
 

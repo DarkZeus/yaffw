@@ -41,6 +41,8 @@ export type PreviewViewerRegionProps = {
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
+	onNativePlaying: () => void;
+	onNativeSeeked: () => void;
 	onRequestFullscreen: () => void;
 	onSyncPlayhead: () => void;
 	playbackRate: number;
@@ -49,6 +51,8 @@ export type PreviewViewerRegionProps = {
 	previewSourceMimeType: string;
 	previewSurfaceRef: RefObject<HTMLElement | null>;
 	previewUrl: string;
+	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
+	scrubFrameVisible: boolean;
 	videoRef: RefObject<MediaPlayerInstance | null>;
 };
 
@@ -61,6 +65,8 @@ export function PreviewViewerRegion({
 	onEnded,
 	onNativePause,
 	onNativePlay,
+	onNativePlaying,
+	onNativeSeeked,
 	onRequestFullscreen,
 	onSyncPlayhead,
 	playbackRate,
@@ -69,6 +75,8 @@ export function PreviewViewerRegion({
 	previewSourceMimeType,
 	previewSurfaceRef,
 	previewUrl,
+	scrubCanvasRef,
+	scrubFrameVisible,
 	videoRef,
 }: PreviewViewerRegionProps) {
 	const playerSrc = useMemo(
@@ -130,10 +138,14 @@ export function PreviewViewerRegion({
 					onEnded={onEnded}
 					onNativePause={onNativePause}
 					onNativePlay={onNativePlay}
+					onNativePlaying={onNativePlaying}
+					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
 					playerSrc={playerSrc}
 					previewApertureStyle={previewApertureStyle}
 					previewSurfaceRef={previewSurfaceRef}
+					scrubCanvasRef={scrubCanvasRef}
+					scrubFrameVisible={scrubFrameVisible}
 					videoRef={videoRef}
 				/>
 			</section>
@@ -148,10 +160,14 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded,
 	onNativePause,
 	onNativePlay,
+	onNativePlaying,
+	onNativeSeeked,
 	onSyncPlayhead,
 	playerSrc,
 	previewApertureStyle,
 	previewSurfaceRef,
+	scrubCanvasRef,
+	scrubFrameVisible,
 	videoRef,
 }: {
 	asset: ReadyMediaAsset;
@@ -160,10 +176,14 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
+	onNativePlaying: () => void;
+	onNativeSeeked: () => void;
 	onSyncPlayhead: () => void;
 	playerSrc: PlayerSrc | undefined;
 	previewApertureStyle: PreviewViewerRegionProps["previewApertureStyle"];
 	previewSurfaceRef: PreviewViewerRegionProps["previewSurfaceRef"];
+	scrubCanvasRef: PreviewViewerRegionProps["scrubCanvasRef"];
+	scrubFrameVisible: boolean;
 	videoRef: PreviewViewerRegionProps["videoRef"];
 }) {
 	return (
@@ -185,7 +205,8 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					onEnded={onEnded}
 					onPause={onNativePause}
 					onPlay={onNativePlay}
-					onSeeked={onSyncPlayhead}
+					onPlaying={onNativePlaying}
+					onSeeked={onNativeSeeked}
 					onTimeUpdate={onSyncPlayhead}
 					onProviderChange={handlePreviewProviderChange}
 					playsInline
@@ -221,6 +242,13 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 						}}
 					/>
 				</MediaPlayer>
+				<canvas
+					className={`pointer-events-none absolute inset-0 z-[100] h-full w-full bg-black object-contain ${
+						scrubFrameVisible ? "block" : "hidden"
+					}`}
+					data-testid="scrub-preview-canvas"
+					ref={scrubCanvasRef}
+				/>
 			</section>
 		</section>
 	);

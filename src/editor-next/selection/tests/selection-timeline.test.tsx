@@ -239,6 +239,7 @@ describe("SelectionTimeline", () => {
 							},
 						},
 					}}
+					onPlayheadPreviewRequested={() => {}}
 					onPlayheadSeekRequested={() => {}}
 					onSelectionEndCommitRequested={() => {}}
 					onSelectionRangeMoveRequested={() => {}}
@@ -299,10 +300,12 @@ describe("SelectionTimeline", () => {
 		).toBe("");
 	});
 
-	it("seeks from waveform clicks, commits range drags as deltas, and zooms with horizontal width", () => {
+	it("previews playhead drags separately from committed seeks and range moves", async () => {
+		const onPlayheadPreviewRequested = vi.fn();
 		const onPlayheadSeekRequested = vi.fn();
 		const onSelectionRangeMoveRequested = vi.fn();
 		renderTimeline({
+			onPlayheadPreviewRequested,
 			onPlayheadSeekRequested,
 			onSelectionRangeMoveRequested,
 			selection: {
@@ -336,6 +339,11 @@ describe("SelectionTimeline", () => {
 		expect(screen.getByLabelText("Playhead handle").className).toContain(
 			"transition-none",
 		);
+		fireEvent.mouseMove(window, { clientX: 700 });
+		await waitFor(() => {
+			expect(onPlayheadPreviewRequested).toHaveBeenLastCalledWith(7_000_000);
+		});
+		expect(onPlayheadSeekRequested).not.toHaveBeenCalledWith(7_000_000);
 		fireEvent.mouseUp(window, { clientX: 900 });
 		expect(onPlayheadSeekRequested).toHaveBeenCalledWith(9_000_000);
 
@@ -364,6 +372,7 @@ function renderTimeline(
 		<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
 			<SelectionTimeline
 				asset={readyAsset}
+				onPlayheadPreviewRequested={() => {}}
 				onPlayheadSeekRequested={() => {}}
 				onSelectionEndCommitRequested={() => {}}
 				onSelectionRangeMoveRequested={() => {}}

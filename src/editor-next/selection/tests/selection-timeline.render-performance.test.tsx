@@ -167,6 +167,7 @@ const selection = {
 	startUs: 0,
 } satisfies Selection;
 const timelineCallbacks = {
+	onPlayheadPreviewRequested: () => {},
 	onPlayheadSeekRequested: () => {},
 	onSelectionEndCommitRequested: () => {},
 	onSelectionRangeMoveRequested: () => {},
@@ -186,6 +187,9 @@ function createTimelineElement({
 			<SelectionTimeline
 				asset={readyAsset}
 				audioMix={audioMix}
+				onPlayheadPreviewRequested={
+					timelineCallbacks.onPlayheadPreviewRequested
+				}
 				onPlayheadSeekRequested={timelineCallbacks.onPlayheadSeekRequested}
 				onSelectionEndCommitRequested={
 					timelineCallbacks.onSelectionEndCommitRequested

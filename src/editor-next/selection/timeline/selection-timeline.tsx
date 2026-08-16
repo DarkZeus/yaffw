@@ -81,6 +81,7 @@ export type SelectionTimelineProps = {
 	audioMix?: AudioMix;
 	audioPreviewPreparingTrackIds?: ReadonlySet<string>;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPlayheadPreviewRequested: (playheadUs: MediaTimeUs) => void;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndCommitRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
@@ -119,6 +120,7 @@ export function SelectionTimeline({
 	audioMix = createDefaultAudioMix(asset),
 	audioPreviewPreparingTrackIds = EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS,
 	onAudioTrackIncludedChange,
+	onPlayheadPreviewRequested,
 	onPlayheadSeekRequested,
 	onSelectionEndCommitRequested,
 	onSelectionRangeMoveRequested,
@@ -229,14 +231,14 @@ export function SelectionTimeline({
 			setDraftSelection(nextSelection);
 
 			if (change.side === "start") {
-				onPlayheadSeekRequested(nextSelection.startUs);
+				onPlayheadPreviewRequested(nextSelection.startUs);
 			}
 
 			if (change.side === "end") {
-				onPlayheadSeekRequested(nextSelection.endUs);
+				onPlayheadPreviewRequested(nextSelection.endUs);
 			}
 		},
-		[normalizeRegionSelectionChange, onPlayheadSeekRequested],
+		[normalizeRegionSelectionChange, onPlayheadPreviewRequested],
 	);
 	const commitRegionSelectionChange = useCallback(
 		(change: WaveformRegionSelectionChange) => {
@@ -287,7 +289,7 @@ export function SelectionTimeline({
 					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
 				});
 				setDraftPlayheadUs(nextPlayheadUs);
-				onPlayheadSeekRequested(nextPlayheadUs);
+				onPlayheadPreviewRequested(nextPlayheadUs);
 				return;
 			}
 
@@ -302,7 +304,7 @@ export function SelectionTimeline({
 					selectionContext,
 				);
 				setDraftSelection(nextSelection);
-				onPlayheadSeekRequested(nextSelection.startUs);
+				onPlayheadPreviewRequested(nextSelection.startUs);
 				return;
 			}
 
@@ -317,7 +319,7 @@ export function SelectionTimeline({
 					selectionContext,
 				);
 				setDraftSelection(nextSelection);
-				onPlayheadSeekRequested(nextSelection.endUs);
+				onPlayheadPreviewRequested(nextSelection.endUs);
 				return;
 			}
 
@@ -443,6 +445,7 @@ export function SelectionTimeline({
 	}, [
 		asset.durationUs,
 		dragState,
+		onPlayheadPreviewRequested,
 		onPlayheadSeekRequested,
 		onSelectionEndCommitRequested,
 		onSelectionRangeMoveRequested,

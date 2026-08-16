@@ -65,6 +65,7 @@ export function useNativePreviewTransport({
 	const playbackStartRequestIdRef = useRef(0);
 	const playbackStartPendingRef = useRef(false);
 	const previewAudioEnginePlaybackStartedRef = useRef(false);
+	const previewScrubActiveRef = useRef(false);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const playheadStateCommitTimestampRef = useRef<number | null>(null);
 	const playheadStateRef = useRef<MediaTimeUs>(0);
@@ -94,6 +95,7 @@ export function useNativePreviewTransport({
 		playbackStartRequestIdRef.current += 1;
 		playbackStartPendingRef.current = false;
 		previewAudioEnginePlaybackStartedRef.current = false;
+		previewScrubActiveRef.current = false;
 		selectionLoopEnteredRef.current = false;
 		setPlayheadUsState(0);
 		setIsPlaying(false);
@@ -183,6 +185,7 @@ export function useNativePreviewTransport({
 				durationUs,
 			);
 
+			previewScrubActiveRef.current = false;
 			setPreviewTransportTime(clampedPlayheadUs);
 			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
@@ -192,6 +195,43 @@ export function useNativePreviewTransport({
 			setPlayheadUs,
 			setPreviewTransportTime,
 			updateSelectionLoopEntryFromPlayhead,
+		],
+	);
+
+	const previewScrubToUs = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const clampedPlayheadUs = clampMediaTime(
+				Math.round(nextPlayheadUs),
+				0,
+				durationUs,
+			);
+
+			if (!previewScrubActiveRef.current) {
+				const nativePlaybackShouldPause =
+					isPlaying || playbackStartPendingRef.current;
+				playbackStartRequestIdRef.current += 1;
+				playbackStartPendingRef.current = false;
+				previewAudioEngineRef.current?.pause();
+				if (nativePlaybackShouldPause) {
+					videoRef.current?.pause();
+				}
+				previewAudioEnginePlaybackStartedRef.current = false;
+				previewScrubActiveRef.current = true;
+				setIsPlaying(false);
+			}
+			pendingVideoFollowerSeekSecondsRef.current =
+				clampedPlayheadUs / 1_000_000;
+
+			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
+			setPlayheadUs(clampedPlayheadUs);
+		},
+		[
+			durationUs,
+			isPlaying,
+			previewAudioEngineRef,
+			setPlayheadUs,
+			updateSelectionLoopEntryFromPlayhead,
+			videoRef,
 		],
 	);
 
@@ -221,6 +261,10 @@ export function useNativePreviewTransport({
 		if (!video) {
 			return;
 		}
+		const pendingScrubSeekSeconds = previewScrubActiveRef.current
+			? playheadRef.current / 1_000_000
+			: null;
+		previewScrubActiveRef.current = false;
 
 		if (isPlaying) {
 			playbackStartRequestIdRef.current += 1;
@@ -286,6 +330,15 @@ export function useNativePreviewTransport({
 				previewAudioEnginePlaybackStartedRef.current = true;
 				setIsPlaying(true);
 				return;
+			}
+
+			if (pendingScrubSeekSeconds !== null) {
+				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
+					video,
+					secondsToMicroseconds(pendingScrubSeekSeconds),
+				)
+					? pendingScrubSeekSeconds
+					: null;
 			}
 
 			await video.play();
@@ -412,6 +465,10 @@ export function useNativePreviewTransport({
 
 	const syncPlayheadWithNativeVideo = useCallback(
 		(options?: PreviewSyncOptions) => {
+			if (previewScrubActiveRef.current) {
+				return;
+			}
+
 			const video = videoRef.current;
 
 			if (!video) {
@@ -653,6 +710,7 @@ export function useNativePreviewTransport({
 		playbackRate,
 		previewClockMode,
 		playheadUs,
+		previewScrubToUs,
 		seekByUs,
 		seekToUs,
 		selectionLoopEnabled,

@@ -11,6 +11,7 @@ export type PreviewSelectionWaveformRegionProps = {
 	audioMix: AudioMix;
 	audioPreviewPreparingTrackIds: ReadonlySet<string>;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
+	onPlayheadPreviewRequested: (playheadUs: MediaTimeUs) => void;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionEndCommitRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionRangeMoveRequested: (deltaUs: MediaTimeUs) => void;
@@ -29,6 +30,7 @@ export function PreviewSelectionWaveformRegion({
 	audioMix,
 	audioPreviewPreparingTrackIds,
 	onAudioTrackIncludedChange,
+	onPlayheadPreviewRequested,
 	onPlayheadSeekRequested,
 	onSelectionEndCommitRequested,
 	onSelectionRangeMoveRequested,
@@ -51,6 +53,7 @@ export function PreviewSelectionWaveformRegion({
 				audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 				asset={asset}
 				onAudioTrackIncludedChange={onAudioTrackIncludedChange}
+				onPlayheadPreviewRequested={onPlayheadPreviewRequested}
 				onPlayheadSeekRequested={onPlayheadSeekRequested}
 				onSelectionEndCommitRequested={onSelectionEndCommitRequested}
 				onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}

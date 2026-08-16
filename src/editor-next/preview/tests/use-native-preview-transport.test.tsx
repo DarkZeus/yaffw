@@ -90,6 +90,36 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("muted:false");
 	});
 
+	it("keeps transient scrub previews off the native video and commits only the final seek", () => {
+		const previewAudioEngine = createPreviewAudioEngineSpy();
+
+		render(
+			<NativePreviewTransportProbe previewAudioEngine={previewAudioEngine} />,
+		);
+
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		previewAudioEngine.pause.mockClear();
+		previewAudioEngine.setTime.mockClear();
+		pause.mockClear();
+
+		fireEvent.click(screen.getByRole("button", { name: "Preview scrub" }));
+		fireEvent.click(
+			screen.getByRole("button", { name: "Preview scrub ahead" }),
+		);
+
+		expect(video.currentTime).toBe(0);
+		expect(previewAudioEngine.setTime).not.toHaveBeenCalled();
+		expect(previewAudioEngine.pause).toHaveBeenCalledTimes(1);
+		expect(pause).not.toHaveBeenCalled();
+		expect(readState()).toContain("playhead:3000000");
+
+		fireEvent.click(screen.getByRole("button", { name: "Seek to sync event" }));
+
+		expect(video.currentTime).toBe(2);
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(2);
+		expect(readState()).toContain("playhead:2000000");
+	});
+
 	it("waits for native video playback before starting the audio-master clock", async () => {
 		const playStarted = createDeferred<void>();
 		const previewAudioEngine = createPreviewAudioEngineSpy();
@@ -1041,6 +1071,18 @@ function NativePreviewTransportProbe({
 			</button>
 			<button onClick={() => transport.seekToUs(seekTargetUs)} type="button">
 				Seek to sync event
+			</button>
+			<button
+				onClick={() => transport.previewScrubToUs(seekTargetUs)}
+				type="button"
+			>
+				Preview scrub
+			</button>
+			<button
+				onClick={() => transport.previewScrubToUs(seekTargetUs + 1_000_000)}
+				type="button"
+			>
+				Preview scrub ahead
 			</button>
 			<button onClick={() => transport.stepFrame(1)} type="button">
 				Step forward

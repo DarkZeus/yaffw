@@ -30,6 +30,7 @@ import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { PreviewSelectionWaveformRegion } from "../regions/preview-selection-waveform-region";
 import { PreviewTransportRegion } from "../regions/preview-transport-region";
 import { PreviewViewerRegion } from "../regions/preview-viewer-region";
+import { useScrubPreview } from "../scrub/use-scrub-preview";
 import { resolvePreviewClockMode } from "../transport/preview-clock-mode";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
 
@@ -168,12 +169,10 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		muted,
 		playbackRate,
 		playheadUs,
-		seekByUs,
-		seekToUs,
+		previewScrubToUs,
 		selectionLoopEnabled,
 		setPreviewPlaybackRate,
 		setPreviewVolume,
-		stepFrame,
 		syncPlayheadWithNativeVideo,
 		toggleMuted,
 		togglePlayback,
@@ -188,6 +187,70 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		source,
 		videoRef,
 	});
+	const scrubPreview = useScrubPreview({
+		activeMediaAssetCleanupScope,
+		asset,
+		source,
+	});
+	const seekToUsWithScrubPreview = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const clampedPlayheadUs = Math.min(
+				Math.max(Math.round(nextPlayheadUs), 0),
+				asset.durationUs,
+			);
+			scrubPreview.requestFrame(clampedPlayheadUs, { priority: "final" });
+			previewScrubToUs(clampedPlayheadUs);
+		},
+		[asset.durationUs, previewScrubToUs, scrubPreview.requestFrame],
+	);
+	const seekByUsWithScrubPreview = useCallback(
+		(deltaUs: MediaTimeUs) => {
+			seekToUsWithScrubPreview(getPlayheadUs() + deltaUs);
+		},
+		[getPlayheadUs, seekToUsWithScrubPreview],
+	);
+	const previewPlayheadWithScrub = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			const clampedPlayheadUs = Math.min(
+				Math.max(Math.round(nextPlayheadUs), 0),
+				asset.durationUs,
+			);
+			scrubPreview.requestFrame(clampedPlayheadUs, {
+				priority: "interactive",
+			});
+			previewScrubToUs(clampedPlayheadUs);
+		},
+		[asset.durationUs, previewScrubToUs, scrubPreview.requestFrame],
+	);
+	const stepFrameWithScrubPreview = useCallback(
+		(direction: -1 | 1) => {
+			const nextPlayheadUs = Math.min(
+				Math.max(
+					getPlayheadUs() + direction * asset.frameTiming.frameDurationUs,
+					0,
+				),
+				asset.durationUs,
+			);
+			scrubPreview.requestFrame(nextPlayheadUs, { priority: "final" });
+			previewScrubToUs(nextPlayheadUs);
+		},
+		[
+			asset.durationUs,
+			asset.frameTiming.frameDurationUs,
+			getPlayheadUs,
+			previewScrubToUs,
+			scrubPreview.requestFrame,
+		],
+	);
+	const handleNativeSeeked = useCallback(() => {
+		syncPlayheadWithNativeVideo();
+		scrubPreview.handleNativeSeeked(
+			videoRef.current?.currentTime ?? Number.NaN,
+		);
+	}, [scrubPreview.handleNativeSeeked, syncPlayheadWithNativeVideo]);
+	const togglePlaybackWithScrubPreview = useCallback(() => {
+		void togglePlayback();
+	}, [togglePlayback]);
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
 	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
@@ -238,13 +301,11 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 
 	usePreviewKeyboardShortcuts({
 		getPlayheadUs,
-		onFrameStep: stepFrame,
-		onSeekBy: seekByUs,
+		onFrameStep: stepFrameWithScrubPreview,
+		onSeekBy: seekByUsWithScrubPreview,
 		onSelectionEndRequested,
 		onSelectionStartRequested,
-		onTogglePlayback: () => {
-			void togglePlayback();
-		},
+		onTogglePlayback: togglePlaybackWithScrubPreview,
 		shortcutsDisabled,
 	});
 
@@ -287,6 +348,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onEnded={handleEnded}
 					onNativePause={handleNativePause}
 					onNativePlay={handleNativePlay}
+					onNativePlaying={scrubPreview.hide}
+					onNativeSeeked={handleNativeSeeked}
 					onRequestFullscreen={requestFullscreen}
 					onSyncPlayhead={syncPlayheadWithNativeVideo}
 					playbackRate={playbackRate}
@@ -295,6 +358,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					previewSourceMimeType={source.type}
 					previewSurfaceRef={previewSurfaceRef}
 					previewUrl={previewUrl}
+					scrubCanvasRef={scrubPreview.canvasRef}
+					scrubFrameVisible={scrubPreview.visible}
 					videoRef={videoRef}
 				/>
 			</ResizablePanel>
@@ -315,10 +380,10 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					isPlaying={isPlaying}
 					muted={muted}
 					onPlaybackRateChange={setPreviewPlaybackRate}
-					onSeekByUs={seekByUs}
-					onStepFrame={stepFrame}
+					onSeekByUs={seekByUsWithScrubPreview}
+					onStepFrame={stepFrameWithScrubPreview}
 					onToggleMuted={toggleMuted}
-					onTogglePlayback={togglePlayback}
+					onTogglePlayback={togglePlaybackWithScrubPreview}
 					onToggleSelectionLoop={toggleSelectionLoop}
 					onVolumeChange={setPreviewVolume}
 					playbackRate={playbackRate}
@@ -331,7 +396,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 					asset={asset}
 					onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-					onPlayheadSeekRequested={seekToUs}
+					onPlayheadPreviewRequested={previewPlayheadWithScrub}
+					onPlayheadSeekRequested={seekToUsWithScrubPreview}
 					onSelectionEndCommitRequested={onSelectionEndRequested}
 					onSelectionRangeMoveRequested={onSelectionRangeMoveRequested}
 					onSelectionResetRequested={onSelectionResetRequested}
