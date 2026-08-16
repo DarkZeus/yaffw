@@ -191,13 +191,13 @@ export function EditorSessionShell({
 		return (
 			<section
 				aria-label="Editor workbench session"
-				className="grid min-h-[calc(100vh-5rem)]"
+				className="grid h-full min-h-[28rem]"
 			>
 				<section
 					aria-label="Workbench center region"
-					className="min-h-[28rem] overflow-hidden rounded-md border border-workbench-border bg-workbench-viewer p-3"
+					className="h-full min-h-[28rem] overflow-hidden bg-workbench-viewer"
 				>
-					<div aria-label="Workbench preview region" className="min-h-full">
+					<div aria-label="Workbench preview region" className="h-full">
 						<NonReadyImportSurface
 							localFileInputKey={localFileInputKey}
 							onLocalFileDropped={onLocalFileDropped}
@@ -538,26 +538,29 @@ function NonReadyImportSurface({
 	}
 
 	return (
-		<div className="grid min-h-full place-items-center rounded-md border border-workbench-border bg-workbench-viewer p-3 sm:p-6">
-			<div className="flex w-full max-w-2xl flex-col gap-4">
-				<header className="grid gap-1 text-center">
-					<h3 className="text-xl font-semibold tracking-tight">{copy.title}</h3>
-					<p className="text-sm leading-6 text-muted-foreground">
+		<div className="grid h-full min-h-full place-items-center bg-workbench-viewer px-3 py-8 sm:px-6 sm:py-10">
+			<div className="flex w-full max-w-2xl flex-col gap-5">
+				<header className="mx-auto grid max-w-xl gap-1.5 text-center">
+					<h3 className="text-[15px] font-semibold tracking-[-0.02em]">
+						{copy.title}
+					</h3>
+					<p className="text-xs leading-5 text-muted-foreground">
 						{copy.description}
 					</p>
 				</header>
 				<label
 					aria-disabled={!session.importEnabled}
+					aria-busy={isProcessing}
 					className={cn(
-						"relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-workbench-border-strong bg-workbench-inspector/55 p-8 text-center transition-[background-color,border-color,opacity,box-shadow,transform] duration-300 sm:p-12",
+						"relative grid min-h-60 cursor-pointer place-items-center overflow-hidden rounded border border-dashed border-workbench-border-strong bg-workbench-inspector/35 px-6 py-8 text-center transition-[background-color,border-color,box-shadow] duration-200 has-[:focus-visible]:border-workbench-focus has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-workbench-focus/25 sm:min-h-68 sm:px-10 sm:py-10",
 						dragState === "active" &&
-							"border-workbench-selected bg-workbench-selected/5 shadow-lg shadow-black/20",
+							"border-solid border-workbench-selected bg-workbench-selected/5 shadow-lg shadow-black/25",
 						dragState === "reject" &&
-							"border-destructive bg-destructive/10 shadow-lg shadow-destructive/10",
-						isProcessing && "cursor-not-allowed opacity-60",
+							"border-solid border-destructive bg-destructive/10 shadow-lg shadow-destructive/10",
+						isProcessing && "cursor-wait border-solid bg-workbench-disabled/25",
 						!isProcessing &&
 							dragState === "idle" &&
-							"hover:border-workbench-selected/70 hover:bg-workbench-hover/35",
+							"hover:border-workbench-selected/70 hover:bg-workbench-hover/25",
 					)}
 					data-testid="editor-next-drop-zone"
 					htmlFor="editor-next-local-file"
@@ -576,28 +579,27 @@ function NonReadyImportSurface({
 						onChange={onLocalFileSelected}
 						type="file"
 					/>
-					<div className="space-y-4">
-						<div className="flex justify-center">
-							<div
-								className={cn(
-									"rounded-full p-6 transition-[background-color,transform] duration-300",
-									dragState === "reject" && "bg-destructive/10",
-									dragState === "active" &&
-										"scale-110 bg-workbench-selected/10",
-									dragState === "idle" && "bg-workbench-hover",
-								)}
-							>
-								<ImportSurfaceIcon
-									dragState={dragState}
-									isProcessing={isProcessing}
-								/>
-							</div>
+					<div className="grid place-items-center gap-5">
+						<div
+							className={cn(
+								"grid size-9 place-items-center text-muted-foreground transition-[color,transform] duration-200",
+								dragState === "reject" && "text-destructive",
+								dragState === "active" &&
+									"scale-[1.04] text-workbench-selected",
+								isProcessing && "text-workbench-selected",
+							)}
+						>
+							<ImportSurfaceIcon
+								dragState={dragState}
+								isProcessing={isProcessing}
+							/>
 						</div>
 
-						<div className="space-y-2">
+						<div className="space-y-1.5">
 							<h4
+								aria-live="polite"
 								className={cn(
-									"text-xl font-semibold tracking-tight transition-colors duration-300",
+									"text-sm font-semibold tracking-[-0.01em] transition-colors duration-200",
 									dragState === "reject" && "text-destructive",
 									dragState === "active" && "text-workbench-selected",
 									isProcessing && "text-workbench-selected",
@@ -611,7 +613,7 @@ function NonReadyImportSurface({
 											? "Processing file..."
 											: "Drop your video or click to browse"}
 							</h4>
-							<p className="text-sm text-muted-foreground">
+							<p className="text-xs leading-5 text-muted-foreground">
 								{dragState === "reject"
 									? "Please select a valid video file"
 									: dragState === "active"
@@ -623,21 +625,15 @@ function NonReadyImportSurface({
 						</div>
 
 						{!isProcessing ? (
-							<div className="flex flex-wrap justify-center gap-2">
-								{supportedFormatLabels.map((format) => (
-									<Badge
-										className="border-workbench-border bg-workbench-hover/70 font-mono text-[10px] text-muted-foreground"
-										key={format}
-										variant="secondary"
-									>
-										{format}
-									</Badge>
-								))}
-							</div>
+							<p className="font-mono text-[9px] font-medium tracking-[0.08em] text-muted-foreground">
+								{supportedFormatLabels.join("  ·  ")}
+							</p>
 						) : null}
 					</div>
 				</label>
-				<SessionStatusLine session={session} />
+				<div className="px-0.5">
+					<SessionStatusLine session={session} />
+				</div>
 			</div>
 		</div>
 	);
@@ -651,20 +647,18 @@ function ImportSurfaceIcon({
 	isProcessing: boolean;
 }) {
 	if (dragState === "reject") {
-		return <AlertCircle className="size-12 text-destructive" />;
+		return <AlertCircle aria-hidden="true" className="size-6" />;
 	}
 
 	if (dragState === "active") {
-		return (
-			<FileVideo className="size-12 animate-bounce text-workbench-selected" />
-		);
+		return <FileVideo aria-hidden="true" className="size-6" />;
 	}
 
 	if (isProcessing) {
-		return <Loader2 className="size-12 animate-spin text-workbench-selected" />;
+		return <Loader2 aria-hidden="true" className="size-6 animate-spin" />;
 	}
 
-	return <Upload className="size-12 text-muted-foreground" />;
+	return <Upload aria-hidden="true" className="size-6" />;
 }
 
 function isRejectedDataTransfer(dataTransfer: DataTransfer): boolean {
@@ -766,7 +760,7 @@ function runtimeCheckRows(runtime: EditorSessionState["runtime"]) {
 function SessionStatusLine({ session }: { session: NonReadyEditorSession }) {
 	if (session.status === "loading") {
 		return (
-			<p className="text-sm text-muted-foreground">
+			<p className="text-xs leading-5 text-muted-foreground">
 				Preparing media asset draft {session.draft.label}.
 			</p>
 		);
@@ -793,14 +787,14 @@ function SessionStatusLine({ session }: { session: NonReadyEditorSession }) {
 
 	if (session.status === "closed") {
 		return (
-			<p className="text-sm text-muted-foreground">
+			<p className="text-xs leading-5 text-muted-foreground">
 				Session closed; reopen the route to start again.
 			</p>
 		);
 	}
 
 	return (
-		<p className="text-sm text-muted-foreground">
+		<p className="text-xs leading-5 text-muted-foreground">
 			Waiting for a media asset draft.
 		</p>
 	);
