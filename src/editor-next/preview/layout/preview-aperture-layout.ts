@@ -23,6 +23,7 @@ export type PreviewApertureStyleOptions = {
 
 export type PreviewApertureLayout = {
 	previewApertureStyle: CSSProperties;
+	previewDisplayAspectRatio: number;
 	previewSurfaceRef: RefObject<HTMLElement | null>;
 };
 
@@ -32,7 +33,7 @@ export function usePreviewApertureLayout(
 	const previewSurfaceRef = useRef<HTMLElement | null>(null);
 	const [previewSurfaceSize, setPreviewSurfaceSize] =
 		useState<PreviewApertureSurfaceSize | null>(null);
-	const previewApertureAspectRatio = getPreviewApertureAspectRatio(asset);
+	const previewDisplayAspectRatio = getPreviewDisplayAspectRatio(asset);
 
 	useLayoutEffect(() => {
 		const previewSurface = previewSurfaceRef.current;
@@ -71,26 +72,34 @@ export function usePreviewApertureLayout(
 	const previewApertureStyle = useMemo(
 		() =>
 			createPreviewApertureStyle({
-				aspectRatio: previewApertureAspectRatio,
+				aspectRatio: previewDisplayAspectRatio,
 				surfaceSize: previewSurfaceSize,
 			}),
-		[previewApertureAspectRatio, previewSurfaceSize],
+		[previewDisplayAspectRatio, previewSurfaceSize],
 	);
 
 	return {
 		previewApertureStyle,
+		previewDisplayAspectRatio,
 		previewSurfaceRef,
 	};
 }
 
-export function getPreviewApertureAspectRatio(
+export function getPreviewDisplayAspectRatio(
 	asset: Pick<ReadyMediaAsset, "tracks">,
 ): number {
 	const primaryVideo = asset.tracks.video[0];
-	const width = primaryVideo?.width ?? 16;
-	const height = primaryVideo?.height ?? 9;
+	const width = primaryVideo?.width;
+	const height = primaryVideo?.height;
 
-	if (width <= 0 || height <= 0) {
+	if (
+		typeof width !== "number" ||
+		!Number.isFinite(width) ||
+		width <= 0 ||
+		typeof height !== "number" ||
+		!Number.isFinite(height) ||
+		height <= 0
+	) {
 		return FALLBACK_PREVIEW_ASPECT_RATIO;
 	}
 

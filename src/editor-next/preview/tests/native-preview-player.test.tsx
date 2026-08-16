@@ -25,6 +25,7 @@ import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-pro
 import { AudioPanel } from "../../audio/panel/audio-panel";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
+	aspectRatio?: string;
 	children?: ReactNode;
 	className?: string;
 	crossOrigin?: boolean;
@@ -98,6 +99,7 @@ vi.mock("@vidstack/react", async () => {
 	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
 		function MockMediaPlayer(
 			{
+				aspectRatio,
 				children,
 				className,
 				crossOrigin,
@@ -115,6 +117,7 @@ vi.mock("@vidstack/react", async () => {
 				"div",
 				{
 					className,
+					"data-preview-aspect-ratio": aspectRatio,
 					"data-testid": "mock-vidstack-player",
 				},
 				React.createElement("video", {
@@ -373,6 +376,38 @@ describe("NativePreviewPlayer", () => {
 		unmount();
 
 		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
+	});
+
+	it("gives Vidstack the same validated display aspect ratio as the Preview aperture", () => {
+		const portraitAsset = {
+			...readyAsset,
+			tracks: {
+				...readyAsset.tracks,
+				video: [
+					{
+						height: 160,
+						id: "video-1",
+						kind: "video",
+						width: 90,
+					},
+				],
+			},
+		} satisfies ReadyMediaAsset;
+
+		renderPlayer({ asset: portraitAsset });
+
+		const aspectRatio = String(90 / 160);
+		expect(screen.getByLabelText("Preview aperture").style.aspectRatio).toBe(
+			aspectRatio,
+		);
+		expect(
+			screen
+				.getByTestId("mock-vidstack-player")
+				.getAttribute("data-preview-aspect-ratio"),
+		).toBe(aspectRatio);
+		expect(screen.getByLabelText("Preview for clip.mp4").style.transform).toBe(
+			"",
+		);
 	});
 
 	it("registers the preview object URL with the active Media asset cleanup scope", () => {

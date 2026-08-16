@@ -8,7 +8,7 @@ import type { ReadyMediaAsset } from "@/editor-core/model";
 
 import {
 	createPreviewApertureStyle,
-	getPreviewApertureAspectRatio,
+	getPreviewDisplayAspectRatio,
 	measurePreviewApertureSurface,
 	usePreviewApertureLayout,
 } from "../layout/preview-aperture-layout";
@@ -20,17 +20,45 @@ afterEach(() => {
 });
 
 describe("preview aperture layout", () => {
-	it("uses the primary video aspect ratio and falls back when dimensions are missing or invalid", () => {
+	it("uses validated primary-video display dimensions for rotated and ordinary media", () => {
+		const cases = [
+			{ height: 90, rotation: 0, width: 160 },
+			{ height: 160, rotation: 90, width: 90 },
+			{ height: 90, rotation: 180, width: 160 },
+			{ height: 160, rotation: 270, width: 90 },
+		] as const;
+
+		for (const fixture of cases) {
+			expect(
+				getPreviewDisplayAspectRatio(createReadyAsset(fixture)),
+				`${fixture.rotation} degree display ratio`,
+			).toBe(fixture.width / fixture.height);
+		}
+	});
+
+	it("uses a stable fallback when display dimensions are missing, invalid, or absent", () => {
+		for (const dimensions of [
+			{},
+			{ width: 1920 },
+			{ height: 1080 },
+			{ height: 0, width: 1920 },
+			{ height: 1080, width: 0 },
+			{ height: -1080, width: 1920 },
+			{ height: 1080, width: Number.NaN },
+			{ height: Number.POSITIVE_INFINITY, width: 1920 },
+		]) {
+			expect(getPreviewDisplayAspectRatio(createReadyAsset(dimensions))).toBe(
+				16 / 9,
+			);
+		}
+
 		expect(
-			getPreviewApertureAspectRatio(
-				createReadyAsset({ height: 1080, width: 1920 }),
-			),
-		).toBe(16 / 9);
-		expect(getPreviewApertureAspectRatio(createReadyAsset({}))).toBe(16 / 9);
-		expect(
-			getPreviewApertureAspectRatio(
-				createReadyAsset({ height: 0, width: 1920 }),
-			),
+			getPreviewDisplayAspectRatio({
+				tracks: {
+					audio: [],
+					video: [],
+				},
+			}),
 		).toBe(16 / 9);
 	});
 

@@ -280,6 +280,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - In the **Default workbench layout**, **Audio** starts as an inspector tab beside Media and Export rather than as an always-visible region.
 - When the active **Media asset** has no audio tracks, **Audio** remains available and shows an empty state rather than disappearing from the workbench.
 - Visible preview chrome should use **Preview** or omit the title when controls/readouts are sufficient; NLE monitor labels such as program viewer are avoided because YAFFW has one active **Media asset**, not source/program monitors.
+- The **Preview viewer panel** should size both its aperture and native player/provider from the primary video **Media track**'s validated display dimensions. Container rotation remains owned by the browser's native media pipeline rather than an additional Preview transform.
 - The **Selection** and **Waveform** context is a separate movable **Workbench panel**, even though the **Default workbench layout** places it near the preview and transport controls.
 - The initial movable **Workbench panels** are media asset context, **Preview viewer panel**, **Preview transport panel**, **Audio**, **Selection**/**Waveform** context, and export inspector.
 - A **Customizable workbench layout** is a browser-local UI preference that may persist across refreshes and media assets without persisting the active **Single-asset editing session**.

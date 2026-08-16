@@ -101,7 +101,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
 	const [previewUrl, setPreviewUrl] = useState("");
-	const { previewApertureStyle, previewSurfaceRef } =
+	const { previewApertureStyle, previewDisplayAspectRatio, previewSurfaceRef } =
 		usePreviewApertureLayout(asset);
 	audioMixRef.current = audioMix;
 	audioMonitoringStatusRef.current = audioMonitoringStatus;
@@ -355,6 +355,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					playbackRate={playbackRate}
 					playheadUs={playheadUs}
 					previewApertureStyle={previewApertureStyle}
+					previewDisplayAspectRatio={previewDisplayAspectRatio}
 					previewSourceMimeType={source.type}
 					previewSurfaceRef={previewSurfaceRef}
 					previewUrl={previewUrl}

@@ -2,6 +2,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { beforeEach, vi } from "vitest";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
+	aspectRatio?: string;
 	children?: ReactNode;
 	className?: string;
 	crossOrigin?: boolean;
@@ -13,6 +14,7 @@ vi.mock("@vidstack/react", async () => {
 	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
 		function MockMediaPlayer(
 			{
+				aspectRatio,
 				children,
 				className,
 				crossOrigin,
@@ -28,6 +30,7 @@ vi.mock("@vidstack/react", async () => {
 				"div",
 				{
 					className,
+					"data-preview-aspect-ratio": aspectRatio,
 					"data-testid": "mock-vidstack-player",
 				},
 				React.createElement("video", {

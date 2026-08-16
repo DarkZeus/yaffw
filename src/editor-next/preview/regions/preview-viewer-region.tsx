@@ -48,6 +48,7 @@ export type PreviewViewerRegionProps = {
 	playbackRate: number;
 	playheadUs: MediaTimeUs;
 	previewApertureStyle: CSSProperties;
+	previewDisplayAspectRatio: number;
 	previewSourceMimeType: string;
 	previewSurfaceRef: RefObject<HTMLElement | null>;
 	previewUrl: string;
@@ -72,6 +73,7 @@ export function PreviewViewerRegion({
 	playbackRate,
 	playheadUs,
 	previewApertureStyle,
+	previewDisplayAspectRatio,
 	previewSourceMimeType,
 	previewSurfaceRef,
 	previewUrl,
@@ -143,6 +145,7 @@ export function PreviewViewerRegion({
 					onSyncPlayhead={onSyncPlayhead}
 					playerSrc={playerSrc}
 					previewApertureStyle={previewApertureStyle}
+					previewDisplayAspectRatio={previewDisplayAspectRatio}
 					previewSurfaceRef={previewSurfaceRef}
 					scrubCanvasRef={scrubCanvasRef}
 					scrubFrameVisible={scrubFrameVisible}
@@ -165,6 +168,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead,
 	playerSrc,
 	previewApertureStyle,
+	previewDisplayAspectRatio,
 	previewSurfaceRef,
 	scrubCanvasRef,
 	scrubFrameVisible,
@@ -181,6 +185,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead: () => void;
 	playerSrc: PlayerSrc | undefined;
 	previewApertureStyle: PreviewViewerRegionProps["previewApertureStyle"];
+	previewDisplayAspectRatio: PreviewViewerRegionProps["previewDisplayAspectRatio"];
 	previewSurfaceRef: PreviewViewerRegionProps["previewSurfaceRef"];
 	scrubCanvasRef: PreviewViewerRegionProps["scrubCanvasRef"];
 	scrubFrameVisible: boolean;
@@ -199,6 +204,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 			>
 				<MediaPlayer
 					aria-label={`Preview for ${asset.label}`}
+					aspectRatio={String(previewDisplayAspectRatio)}
 					className="h-full w-full bg-black text-white"
 					crossOrigin
 					muted={mediaMuted}
