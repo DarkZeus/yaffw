@@ -863,6 +863,39 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:4000000");
 	});
 
+	it("clips scheduled audio at the selection end and clears the boundary for seeks past it", () => {
+		const engine = createPreviewAudioEngineSpy();
+		let transport: ReturnType<typeof useNativePreviewTransport> | undefined;
+		const onTransport = (
+			next: ReturnType<typeof useNativePreviewTransport>,
+		) => {
+			transport = next;
+		};
+		const { rerender } = render(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				onTransport={onTransport}
+				selection={{ startUs: 4_000_000, endUs: 8_000_000 }}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Toggle loop" }));
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(8);
+		act(() => transport?.seekToUs(9_000_000));
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(null);
+		act(() => transport?.seekToUs(5_000_000));
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(8);
+		rerender(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				onTransport={onTransport}
+				selection={{ startUs: 4_000_000, endUs: 7_000_000 }}
+			/>,
+		);
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(7);
+		fireEvent.click(screen.getByRole("button", { name: "Toggle loop" }));
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(null);
+	});
+
 	it("loops audio-master playback from the selection end using the audio clock", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
@@ -1121,6 +1154,7 @@ function createPreviewAudioEngineSpy({
 		play: vi.fn(),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 		setOutputGain: vi.fn(),
+		setPlaybackEnd: vi.fn(),
 		setPlaybackRate: vi.fn(),
 		setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 			currentTime = nextCurrentTimeSeconds;

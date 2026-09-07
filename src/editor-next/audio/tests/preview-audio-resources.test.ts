@@ -1,177 +1,125 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
-
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { preparePreviewAudioResources } from "../engine/preview-audio-resources";
 const mockMedia = vi.hoisted(() => ({
-	decodeTrack: vi.fn(),
 	inputs: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
 	tracks: [] as Array<Record<string, unknown>>,
 }));
-
-vi.mock("../../media-work/adapters/mediabunny-audio-buffer", () => ({
-	decodeMediabunnyAudioTrackRange: mockMedia.decodeTrack,
-}));
-
 vi.mock("mediabunny", () => ({
 	ALL_FORMATS: [],
 	BlobSource: class {},
 	Input: class {
 		dispose = vi.fn();
-
 		constructor() {
 			mockMedia.inputs.push(this);
 		}
-
 		async getAudioTracks() {
 			return mockMedia.tracks;
 		}
 	},
 }));
-
 beforeEach(() => {
-	vi.clearAllMocks();
 	mockMedia.inputs = [];
 	mockMedia.tracks = [createInputTrack()];
-	mockMedia.decodeTrack.mockResolvedValue(createAudioBuffer());
 });
-
-afterEach(() => {
-	vi.restoreAllMocks();
-});
-
 describe("preparePreviewAudioResources", () => {
-	it("prepares a directly decoded resource with the source timestamp", async () => {
-		const { preparePreviewAudioResources } = await import(
-			"../engine/preview-audio-resources"
-		);
-
-		const result = await preparePreviewAudioResources({
-			asset: readyAsset,
-			signal: new AbortController().signal,
-			source: new Blob(["video"], { type: "video/mp4" }),
-		});
-
-		expect(result.failures).toEqual([]);
-		expect(result.resources).toEqual([
-			expect.objectContaining({
-				audioBuffer: expect.any(Object),
-				startPositionSeconds: 0.75,
-				trackId: "audio-1",
-				trackIndex: 0,
-			}),
-		]);
-		expect(mockMedia.decodeTrack).toHaveBeenCalledWith(
-			expect.objectContaining({
-				endSeconds: 10,
-				format: { numberOfChannels: 2, sampleRate: 48_000 },
-				startSeconds: 0.75,
-			}),
-		);
-		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledOnce();
-	});
-
-	it("decodes tracks concurrently while preserving asset track order", async () => {
-		const firstDecode = createDeferred<AudioBuffer>();
-		const secondDecode = createDeferred<AudioBuffer>();
-		const firstAudioBuffer = createAudioBuffer();
-		const secondAudioBuffer = createAudioBuffer();
-		mockMedia.tracks = [
-			createInputTrack({ id: "audio-1" }),
-			createInputTrack({ id: "audio-2" }),
-		];
-		mockMedia.decodeTrack
-			.mockImplementationOnce(() => firstDecode.promise)
-			.mockImplementationOnce(() => secondDecode.promise);
-		const { preparePreviewAudioResources } = await import(
-			"../engine/preview-audio-resources"
-		);
-
-		const pending = preparePreviewAudioResources({
-			asset: twoTrackReadyAsset,
-			signal: new AbortController().signal,
-			source: new Blob(["video"], { type: "video/mp4" }),
-		});
-
-		await vi.waitFor(() =>
-			expect(mockMedia.decodeTrack).toHaveBeenCalledTimes(2),
-		);
-		secondDecode.resolve(secondAudioBuffer);
-		firstDecode.resolve(firstAudioBuffer);
-
-		await expect(pending).resolves.toEqual({
-			failures: [],
-			resources: [
-				expect.objectContaining({
-					audioBuffer: firstAudioBuffer,
-					trackId: "audio-1",
-					trackIndex: 0,
-				}),
-				expect.objectContaining({
-					audioBuffer: secondAudioBuffer,
-					trackId: "audio-2",
-					trackIndex: 1,
-				}),
-			],
-		});
-	});
-
-	it("isolates a track metadata failure and disposes the input", async () => {
-		mockMedia.tracks = [
-			createInputTrack({
-				canDecode: vi.fn(async () => {
-					throw new Error("Audio codec metadata is malformed.");
-				}),
-			}),
-		];
-		const { preparePreviewAudioResources } = await import(
-			"../engine/preview-audio-resources"
-		);
-
+	it("returns metadata without decoding and retains the one asset Input until disposal", async () => {
 		const result = await preparePreviewAudioResources({
 			asset: readyAsset,
 			signal: new AbortController().signal,
 			source: new Blob(["video"]),
 		});
-
-		expect(result.resources).toEqual([]);
-		expect(result.failures).toEqual([
-			expect.objectContaining({
-				reason: "Audio codec metadata is malformed.",
+		expect(result.resources).toEqual([
+			{
+				numberOfChannels: 2,
+				sampleRate: 48_000,
+				track: readyAsset.tracks.audio[0],
 				trackId: "audio-1",
-			}),
+				trackIndex: 0,
+			},
 		]);
+		expect(result.failures).toEqual([]);
+		expect(result.provider.durationSeconds).toBe(12);
+		expect(mockMedia.inputs).toHaveLength(1);
+		expect(mockMedia.inputs[0]?.dispose).not.toHaveBeenCalled();
+		await result.provider.dispose();
+		await result.provider.dispose();
 		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledOnce();
 	});
-
-	it("disposes Mediabunny immediately when preparation is cancelled", async () => {
-		const controller = new AbortController();
-		mockMedia.decodeTrack.mockImplementation(
-			({ signal }: { signal: AbortSignal }) =>
-				new Promise((_resolve, reject) => {
-					signal.addEventListener("abort", () => {
-						reject(new DOMException("cancelled", "AbortError"));
-					});
+	it("maps embedded track indices to domain IDs and preserves failed tracks for engine retry", async () => {
+		mockMedia.tracks = [
+			createInputTrack({ id: 42 }),
+			createInputTrack({ id: 88, canDecode: vi.fn(async () => false) }),
+		];
+		const result = await preparePreviewAudioResources({
+			asset: twoTrackReadyAsset,
+			signal: new AbortController().signal,
+			source: new Blob(),
+		});
+		expect(result.provider.trackIds).toEqual(["audio-1", "audio-2"]);
+		expect(result.resources.map((resource) => resource.trackId)).toEqual([
+			"audio-1",
+			"audio-2",
+		]);
+		expect(result.failures).toEqual([
+			expect.objectContaining({
+				trackId: "audio-2",
+				reason: "Track is not decodable in this browser.",
+			}),
+		]);
+		await result.provider.dispose();
+	});
+	it("isolates missing-track and metadata failures without discarding healthy metadata", async () => {
+		mockMedia.tracks = [
+			createInputTrack({
+				getSampleRate: vi.fn(async () => {
+					throw new Error("metadata failed");
 				}),
-		);
-		const { preparePreviewAudioResources } = await import(
-			"../engine/preview-audio-resources"
-		);
-
+			}),
+		];
+		const result = await preparePreviewAudioResources({
+			asset: twoTrackReadyAsset,
+			signal: new AbortController().signal,
+			source: new Blob(),
+		});
+		expect(result.resources).toHaveLength(2);
+		expect(result.failures.map((failure) => failure.reason)).toEqual([
+			"metadata failed",
+			"The analyzed audio track is no longer available.",
+		]);
+		await result.provider.dispose();
+	});
+	it("disposes exactly once when abort races metadata completion", async () => {
+		const pendingMetadata = createDeferred<number>();
+		mockMedia.tracks = [
+			createInputTrack({ getSampleRate: () => pendingMetadata.promise }),
+		];
+		const controller = new AbortController();
 		const pending = preparePreviewAudioResources({
 			asset: readyAsset,
 			signal: controller.signal,
-			source: new Blob(["video"]),
+			source: new Blob(),
 		});
-		await vi.waitFor(() =>
-			expect(mockMedia.decodeTrack).toHaveBeenCalledOnce(),
-		);
+		await vi.waitFor(() => expect(mockMedia.inputs).toHaveLength(1));
 		controller.abort();
-
+		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledOnce();
+		pendingMetadata.resolve(48_000);
 		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
-		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalled();
+		expect(mockMedia.inputs[0]?.dispose).toHaveBeenCalledOnce();
+	});
+	it("does not open an Input for an already aborted request", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		await expect(
+			preparePreviewAudioResources({
+				asset: readyAsset,
+				signal: controller.signal,
+				source: new Blob(),
+			}),
+		).rejects.toMatchObject({ name: "AbortError" });
+		expect(mockMedia.inputs).toHaveLength(0);
 	});
 });
-
 function createInputTrack(overrides: Record<string, unknown> = {}) {
 	return {
 		canDecode: vi.fn(async () => true),
@@ -182,15 +130,6 @@ function createInputTrack(overrides: Record<string, unknown> = {}) {
 		id: "audio-1",
 		...overrides,
 	};
-}
-
-function createAudioBuffer(): AudioBuffer {
-	return {
-		duration: 9.25,
-		length: 444_000,
-		numberOfChannels: 2,
-		sampleRate: 48_000,
-	} as AudioBuffer;
 }
 
 function createDeferred<T>() {

@@ -30,6 +30,24 @@ afterEach(() => {
 });
 
 describe("AudioPanel", () => {
+	it("explains the automatic Preview approximation only when selected", () => {
+		const audioMix = createDefaultAudioMix(readyAsset);
+		audioMix.tracks["audio-voice"].channelMode = "auto-one-sided-stereo";
+		renderAudioPanel({ asset: readyAsset, audioMix });
+		expect(
+			screen.getByText(/Auto-fix quiet side is approximate in Preview/)
+				.textContent,
+		).toContain(
+			"Export analyzes the full Selection, so stereo placement may differ.",
+		);
+		cleanup();
+		audioMix.tracks["audio-voice"].channelMode = "preserve";
+		renderAudioPanel({ asset: readyAsset, audioMix });
+		expect(
+			screen.queryByText(/Auto-fix quiet side is approximate in Preview/),
+		).toBeNull();
+	});
+
 	it("remains available with a clear empty state for video-only media assets", () => {
 		renderAudioPanel({ asset: videoOnlyAsset });
 

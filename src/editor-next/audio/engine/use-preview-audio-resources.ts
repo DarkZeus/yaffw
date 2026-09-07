@@ -1,64 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
+import { useEffect, useRef, useState } from "react";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type {
 	PreviewAudioResource,
 	PreviewAudioResourceFailure,
 } from "../types/preview-audio-resources.types";
+import type { MediaWindowProvider } from "./media-window-provider";
 import { preparePreviewAudioResources } from "./preview-audio-resources";
 
 export type PreviewAudioResourcesState =
+	| { status: "disabled" }
 	| {
-			status: "disabled";
-	  }
-	| {
+			status: "loading";
 			preparingTrackIds: ReadonlySet<string>;
 			resources: PreviewAudioResource[];
-			status: "loading";
 	  }
 	| {
-			failures: PreviewAudioResourceFailure[];
-			resources: PreviewAudioResource[];
 			status: "ready";
+			provider: MediaWindowProvider;
+			resources: PreviewAudioResource[];
+			failures: PreviewAudioResourceFailure[];
 	  }
 	| {
+			status: "failed";
 			failures: PreviewAudioResourceFailure[];
 			reason: string;
-			status: "failed";
 	  };
-
-export type PreviewAudioResourcesLifecycle = PreviewAudioResourcesState & {
-	retryTrack: (trackId: string) => void;
-};
-
+export type PreviewAudioResourcesLifecycle = PreviewAudioResourcesState;
 export type UsePreviewAudioResourcesOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	enabled: boolean;
 	source: Blob;
-};
-
-type PreviewAudioResourcePreparation = {
-	cancel: () => void;
-	finish: () => void;
-	isCancelled: () => boolean;
-};
-
-type PreviewAudioResourceOwnership = {
-	assetId: string | null;
-	failuresByTrackId: Map<string, PreviewAudioResourceFailure>;
-	preparation: PreviewAudioResourcePreparation | null;
-	requestVersion: number;
-	resourcesByTrackId: Map<string, PreviewAudioResource>;
-	source: Blob | null;
-};
-
-type PreviewAudioResourceRetryRequest = {
-	assetId: string;
-	requestId: number;
-	source: Blob;
-	trackId: string;
 };
 
 export function usePreviewAudioResources({
@@ -67,454 +40,76 @@ export function usePreviewAudioResources({
 	enabled,
 	source,
 }: UsePreviewAudioResourcesOptions): PreviewAudioResourcesLifecycle {
-	const ownershipRef = useRef<PreviewAudioResourceOwnership | null>(null);
-	const [retryRequest, setRetryRequest] =
-		useState<PreviewAudioResourceRetryRequest | null>(null);
+	const assetRef = useRef(asset);
+	assetRef.current = asset;
+	const assetId = asset.id;
 	const [state, setState] = useState<PreviewAudioResourcesState>({
 		status: "disabled",
 	});
-
-	if (!ownershipRef.current) {
-		ownershipRef.current = createPreviewAudioResourceOwnership();
-	}
-
-	const retryTrack = useCallback(
-		(trackId: string) => {
-			setRetryRequest((currentRequest) => ({
-				assetId: asset.id,
-				requestId: (currentRequest?.requestId ?? 0) + 1,
-				source,
-				trackId,
-			}));
-		},
-		[asset.id, source],
-	);
-
 	useEffect(() => {
-		return () => {
-			releasePreviewAudioResourceOwnership(ownershipRef.current);
-		};
-	}, []);
-
-	useEffect(() => {
-		const ownership = ownershipRef.current;
-
-		if (!ownership || !activeMediaAssetCleanupScope) {
-			return;
-		}
-
-		const cleanupRegistration = activeMediaAssetCleanupScope.registerCleanup(
-			() => {
-				releasePreviewAudioResourceOwnership(ownership);
-			},
-		);
-
-		return () => {
-			cleanupRegistration.dispose();
-		};
-	}, [activeMediaAssetCleanupScope]);
-
-	useEffect(() => {
-		const ownership = ownershipRef.current;
-
-		if (!enabled) {
-			releasePreviewAudioResourceOwnership(ownership);
-			setRetryRequest(null);
+		const asset = assetRef.current;
+		if (asset.id !== assetId) return;
+		if (!enabled || asset.tracks.audio.length === 0) {
 			setState({ status: "disabled" });
 			return;
 		}
-
-		if (!ownership) {
-			setState({
-				failures: [],
-				reason: "Preview audio resource ownership is unavailable.",
-				status: "failed",
-			});
-			return;
-		}
-
-		resetPreviewAudioResourceOwnershipForAsset(ownership, { asset, source });
-
-		const requestedRetryTrackId =
-			retryRequest?.assetId === asset.id && retryRequest.source === source
-				? retryRequest.trackId
-				: null;
-		const requestedRetryId = requestedRetryTrackId
-			? retryRequest?.requestId
-			: null;
-		const finishRetryRequest = () => {
-			if (requestedRetryId === null) {
-				return;
-			}
-
-			setRetryRequest((currentRequest) =>
-				currentRequest?.requestId === requestedRetryId ? null : currentRequest,
-			);
+		const controller = new AbortController();
+		let provider: MediaWindowProvider | null = null;
+		let released = false;
+		const release = () => {
+			if (released) return;
+			released = true;
+			controller.abort();
+			if (provider) releaseProvider(provider);
+			provider = null;
 		};
-		const trackIdsToPrepare = requestedRetryTrackId
-			? createRetryTrackIds({ asset, retryTrackId: requestedRetryTrackId })
-			: collectMissingTrackIds({ asset, ownership });
-		const cachedResources = collectOwnedResources({ asset, ownership });
-
-		if (trackIdsToPrepare.size === 0) {
-			finishRetryRequest();
-			setState({
-				failures: collectOwnedFailures({ asset, ownership }),
-				resources: cachedResources,
-				status: "ready",
-			});
-			return;
-		}
-
-		const abortController = new AbortController();
-		const preparation = beginPreviewAudioResourcePreparation({
-			abortController,
-			ownership,
-		});
-
+		const registration = activeMediaAssetCleanupScope?.registerCleanup(release);
 		setState({
-			preparingTrackIds: trackIdsToPrepare,
-			resources: cachedResources,
 			status: "loading",
+			preparingTrackIds: new Set(asset.tracks.audio.map((track) => track.id)),
+			resources: [],
 		});
-
 		void preparePreviewAudioResources({
 			asset,
-			signal: abortController.signal,
+			signal: controller.signal,
 			source,
-			trackIds: trackIdsToPrepare,
 		})
 			.then((result) => {
 				if (
-					preparation.isCancelled() ||
-					(activeMediaAssetCleanupScope !== undefined &&
-						!activeMediaAssetCleanupScope.isCurrent()) ||
-					!previewAudioResourceOwnershipMatches(ownership, { asset, source })
+					released ||
+					(activeMediaAssetCleanupScope &&
+						!activeMediaAssetCleanupScope.isCurrent())
 				) {
+					releaseProvider(result.provider);
 					return;
 				}
-
-				preparation.finish();
-				finishRetryRequest();
-				storeOwnedPreviewAudioResourceResult({
-					asset,
-					failures: result.failures,
-					ownership,
-					requestedTrackIds: trackIdsToPrepare,
-					resources: result.resources,
-				});
-				const resources = collectOwnedResources({ asset, ownership });
-				const failures = collectOwnedFailures({ asset, ownership });
-
-				if (resources.length > 0) {
-					setState({
-						failures,
-						resources,
-						status: "ready",
-					});
-					return;
-				}
-
-				setState({
-					failures,
-					reason:
-						failures[0]?.reason ?? "No audio preview tracks could be prepared.",
-					status: "failed",
-				});
+				provider = result.provider;
+				setState({ status: "ready", ...result });
 			})
 			.catch((error: unknown) => {
-				if (preparation.isCancelled() || isAbortError(error)) {
-					return;
-				}
-
-				preparation.finish();
-				finishRetryRequest();
-				storePreparationFailureForTracks({
-					asset,
-					ownership,
-					reason: errorToMessage(error),
-					trackIds: trackIdsToPrepare,
+				if (released) return;
+				const reason = error instanceof Error ? error.message : String(error);
+				setState({
+					status: "failed",
+					reason,
+					failures: asset.tracks.audio.map((track, trackIndex) => ({
+						reason,
+						track,
+						trackIndex,
+						trackId: track.id,
+					})),
 				});
-				const resources = collectOwnedResources({ asset, ownership });
-				const failures = collectOwnedFailures({ asset, ownership });
-
-				setState(
-					resources.length > 0
-						? {
-								failures,
-								resources,
-								status: "ready",
-							}
-						: {
-								failures,
-								reason: failures[0]?.reason ?? errorToMessage(error),
-								status: "failed",
-							},
-				);
 			});
-
-		return preparation.cancel;
-	}, [activeMediaAssetCleanupScope, asset, enabled, retryRequest, source]);
-
-	return useMemo(
-		() => ({
-			...state,
-			retryTrack,
-		}),
-		[state, retryTrack],
-	);
+		return () => {
+			registration?.dispose();
+			release();
+		};
+	}, [activeMediaAssetCleanupScope, assetId, enabled, source]);
+	return state;
 }
 
-function createPreviewAudioResourceOwnership(): PreviewAudioResourceOwnership {
-	return {
-		assetId: null,
-		failuresByTrackId: new Map(),
-		preparation: null,
-		requestVersion: 0,
-		resourcesByTrackId: new Map(),
-		source: null,
-	};
-}
-
-function resetPreviewAudioResourceOwnershipForAsset(
-	ownership: PreviewAudioResourceOwnership,
-	{
-		asset,
-		source,
-	}: {
-		asset: ReadyMediaAsset;
-		source: Blob;
-	},
-) {
-	if (previewAudioResourceOwnershipMatches(ownership, { asset, source })) {
-		return;
-	}
-
-	releasePreviewAudioResourceOwnership(ownership);
-	ownership.assetId = asset.id;
-	ownership.source = source;
-}
-
-function releasePreviewAudioResourceOwnership(
-	ownership: PreviewAudioResourceOwnership | null,
-) {
-	if (!ownership) {
-		return;
-	}
-
-	ownership.preparation?.cancel();
-	ownership.preparation = null;
-	ownership.requestVersion += 1;
-	ownership.failuresByTrackId.clear();
-	ownership.resourcesByTrackId.clear();
-	ownership.assetId = null;
-	ownership.source = null;
-}
-
-function beginPreviewAudioResourcePreparation({
-	abortController,
-	ownership,
-}: {
-	abortController: AbortController;
-	ownership: PreviewAudioResourceOwnership;
-}): PreviewAudioResourcePreparation {
-	ownership.preparation?.cancel();
-	const version = ownership.requestVersion + 1;
-	ownership.requestVersion = version;
-	let cancelled = false;
-	let finished = false;
-
-	const preparation: PreviewAudioResourcePreparation = {
-		cancel() {
-			if (cancelled || finished) {
-				return;
-			}
-
-			cancelled = true;
-			abortController.abort();
-
-			if (ownership.preparation === preparation) {
-				ownership.preparation = null;
-			}
-
-			if (ownership.requestVersion === version) {
-				ownership.requestVersion += 1;
-			}
-		},
-		finish() {
-			if (cancelled || finished) {
-				return;
-			}
-
-			finished = true;
-
-			if (ownership.preparation === preparation) {
-				ownership.preparation = null;
-			}
-		},
-		isCancelled() {
-			return (
-				cancelled ||
-				ownership.requestVersion !== version ||
-				ownership.preparation !== preparation
-			);
-		},
-	};
-
-	ownership.preparation = preparation;
-
-	return preparation;
-}
-
-function collectMissingTrackIds({
-	asset,
-	ownership,
-}: {
-	asset: ReadyMediaAsset;
-	ownership: PreviewAudioResourceOwnership;
-}) {
-	return new Set(
-		asset.tracks.audio
-			.filter(
-				(track) =>
-					!ownership.resourcesByTrackId.has(track.id) &&
-					!ownership.failuresByTrackId.has(track.id),
-			)
-			.map((track) => track.id),
-	);
-}
-
-function collectOwnedResources({
-	asset,
-	ownership,
-}: {
-	asset: ReadyMediaAsset;
-	ownership: PreviewAudioResourceOwnership;
-}) {
-	return asset.tracks.audio.flatMap((track) => {
-		const resource = ownership.resourcesByTrackId.get(track.id);
-
-		return resource ? [resource] : [];
+function releaseProvider(provider: MediaWindowProvider) {
+	void provider.dispose().catch((error: unknown) => {
+		console.error("Preview audio provider cleanup failed.", error);
 	});
-}
-
-function collectOwnedFailures({
-	asset,
-	ownership,
-}: {
-	asset: ReadyMediaAsset;
-	ownership: PreviewAudioResourceOwnership;
-}) {
-	return asset.tracks.audio.flatMap((track) => {
-		const failure = ownership.failuresByTrackId.get(track.id);
-
-		return failure ? [failure] : [];
-	});
-}
-
-function storeOwnedPreviewAudioResourceResult({
-	asset,
-	failures,
-	ownership,
-	requestedTrackIds,
-	resources,
-}: {
-	asset: ReadyMediaAsset;
-	failures: PreviewAudioResourceFailure[];
-	ownership: PreviewAudioResourceOwnership;
-	requestedTrackIds: ReadonlySet<string>;
-	resources: PreviewAudioResource[];
-}) {
-	const assetTrackIds = new Set(asset.tracks.audio.map((track) => track.id));
-
-	for (const trackId of requestedTrackIds) {
-		ownership.failuresByTrackId.delete(trackId);
-	}
-
-	for (const failure of failures) {
-		if (
-			requestedTrackIds.has(failure.trackId) &&
-			assetTrackIds.has(failure.trackId)
-		) {
-			ownership.failuresByTrackId.set(failure.trackId, failure);
-		}
-	}
-
-	for (const resource of resources) {
-		if (
-			!requestedTrackIds.has(resource.trackId) ||
-			!assetTrackIds.has(resource.trackId)
-		) {
-			continue;
-		}
-
-		ownership.failuresByTrackId.delete(resource.trackId);
-		ownership.resourcesByTrackId.set(resource.trackId, resource);
-	}
-}
-
-function storePreparationFailureForTracks({
-	asset,
-	ownership,
-	reason,
-	trackIds,
-}: {
-	asset: ReadyMediaAsset;
-	ownership: PreviewAudioResourceOwnership;
-	reason: string;
-	trackIds: ReadonlySet<string>;
-}) {
-	for (const [trackIndex, track] of asset.tracks.audio.entries()) {
-		if (!trackIds.has(track.id)) {
-			continue;
-		}
-
-		ownership.failuresByTrackId.set(track.id, {
-			reason,
-			track,
-			trackId: track.id,
-			trackIndex,
-		});
-	}
-}
-
-function previewAudioResourceOwnershipMatches(
-	ownership: PreviewAudioResourceOwnership,
-	{
-		asset,
-		source,
-	}: {
-		asset: ReadyMediaAsset;
-		source: Blob;
-	},
-) {
-	return ownership.assetId === asset.id && ownership.source === source;
-}
-
-function createRetryTrackIds({
-	asset,
-	retryTrackId,
-}: {
-	asset: ReadyMediaAsset;
-	retryTrackId: string;
-}) {
-	const trackIds = new Set<string>();
-
-	if (asset.tracks.audio.some((track) => track.id === retryTrackId)) {
-		trackIds.add(retryTrackId);
-	}
-
-	return trackIds;
-}
-
-function isAbortError(error: unknown) {
-	return error instanceof DOMException && error.name === "AbortError";
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

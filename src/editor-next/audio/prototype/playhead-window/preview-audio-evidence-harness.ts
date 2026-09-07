@@ -2,7 +2,8 @@ import {
 	type MediaWindowProvider,
 	type MediaWindowPullResult,
 	createMediaWindowProvider,
-} from "./media-window-provider";
+} from "../../engine/media-window-provider";
+import type { ScheduledWindowAudioContextLike } from "../../engine/scheduled-window-engine";
 import {
 	type PlayheadWindowPrototype,
 	type PlayheadWindowPrototypeMetrics,
@@ -15,7 +16,6 @@ import {
 	prepareFullTrackDirectBaseline,
 	prepareRemuxDecodeBridgeBaseline,
 } from "./preview-audio-baselines";
-import type { ScheduledWindowAudioContextLike } from "./scheduled-window-engine";
 
 export const PREVIEW_AUDIO_EVIDENCE_STRATEGIES = [
 	"playhead-window",
@@ -924,6 +924,7 @@ function instrumentProvider(
 ): MediaWindowProvider {
 	let disposed = false;
 	return {
+		getTrackMetadata: (trackId) => provider.getTrackMetadata(trackId),
 		async dispose() {
 			await provider.dispose();
 			if (!disposed) {

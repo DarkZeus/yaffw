@@ -58,9 +58,25 @@ Preview audio monitoring is a separate adapter concern. It prepares
 source-derived Preview audio resources, creates the Preview audio engine, and
 applies preview volume, preview mute, preview-only solo, Track volume, channel
 handling, and include/exclude decisions to what the user hears. Those preview
-resources are direct, timestamp-aligned `AudioBuffer` references owned by the
-adapter. The active Media asset cleanup scope aborts preparation, destroys the
-engine, and drops those references.
+resources are bounded, timestamp-aligned PCM windows. One asset-owned provider
+retains the input; the engine retains only a two-second horizon, replenishing
+below 1.5 seconds at a 50 ms cadence and scheduling chunks no longer than 200 ms
+against one context/media epoch. Every track must provide playable PCM, known
+silence, or explicit failure before initial playback.
+
+Pause stops sources and pulls while retaining the current bounded window.
+Seek, rate changes, and routing rebuilds invalidate prior generations. During
+re-priming, the established audio clock remains authoritative and holds its
+media time until playback resumes. Retry reopens only the failed track while
+healthy track generations remain reusable. Selection-loop sources are clipped
+at the exact Selection end before the transport seeks to the start. The
+accepted loop-wrap control budget is 100 ms, separate from continuous-playback
+underrun measurement.
+
+The active Media asset cleanup scope aborts preparation, destroys the engine,
+returns iterators, closes caller-owned samples, disposes the input, and drops
+all queued PCM references. See
+[production verification](./verification/production-preview-audio-window.md).
 
 ## Export boundary
 

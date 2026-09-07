@@ -13,7 +13,6 @@ import {
 	type PreviewAudioEngine,
 	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine as createDefaultPreviewAudioEngine,
-	setPreviewAudioEnginePlaybackRate,
 } from "./preview-audio-engine";
 import type { PreviewAudioResourcesState } from "./use-preview-audio-resources";
 
@@ -88,6 +87,8 @@ export function usePreviewAudioMonitoringLifecycle({
 
 	useEffect(() => {
 		const lifecycle = createPreviewAdapterLifecycle();
+		const abortController = new AbortController();
+		lifecycle.registerCleanup(() => abortController.abort());
 
 		if (
 			previewAudioResources.status !== "ready" ||
@@ -103,7 +104,10 @@ export function usePreviewAudioMonitoringLifecycle({
 		lifecycle.registerCleanup(() => setMonitoringStatus("idle"));
 
 		void createPreviewAudioEngine({
-			failures: previewAudioResources.failures,
+			provider: previewAudioResources.provider,
+			initialTimeSeconds: getPlayheadUs() / 1_000_000,
+			initialPlaybackRate: getPlaybackRate(),
+			signal: abortController.signal,
 			outputChannels: audioControlsRef.current.audioMix.outputChannels,
 			resources: previewAudioResources.resources,
 		})
@@ -120,10 +124,12 @@ export function usePreviewAudioMonitoringLifecycle({
 						previewAudioEngineRef.current = null;
 					}
 				});
-				previewAudioEngine.setTime(getPlayheadUs() / 1_000_000);
-				setPreviewAudioEnginePlaybackRate(
-					previewAudioEngine,
-					getPlaybackRate(),
+				lifecycle.registerCleanup(
+					previewAudioEngine.subscribe(() => {
+						if (!lifecycle.isDisposed()) {
+							setMonitoringStatus(previewAudioEngine.getStatus());
+						}
+					}),
 				);
 				applyPreviewAudioEngineMix({
 					...audioControlsRef.current,

@@ -70,6 +70,10 @@ export const AudioPanel = memo(function AudioPanel({
 	const audioMix = providedAudioMix ?? defaultAudioMix;
 	const audioTracks = asset.tracks.audio;
 	const livePreviewMetering = usePreviewMeteringDisplay();
+	const hasAutomaticChannelMode = audioTracks.some(
+		(track) =>
+			audioMix.tracks[track.id]?.channelMode === "auto-one-sided-stereo",
+	);
 
 	return (
 		<section
@@ -77,6 +81,14 @@ export const AudioPanel = memo(function AudioPanel({
 			className="flex min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:h-full xl:min-h-0 xl:rounded-none xl:border-0"
 		>
 			<div className="min-h-0 flex-1 overflow-auto overscroll-contain px-2 py-2">
+				{hasAutomaticChannelMode ? (
+					<p className="mb-3 text-xs leading-5 text-muted-foreground">
+						Auto-fix quiet side is approximate in Preview: it checks short
+						passages. Export analyzes the full Selection, so stereo placement
+						may differ. Choose an explicit channel mode for consistent
+						placement.
+					</p>
+				) : null}
 				{audioTracks.length === 0 ? (
 					<AudioEmptyState />
 				) : (

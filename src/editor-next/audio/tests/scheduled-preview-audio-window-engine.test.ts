@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	type ScheduledWindowAudioContextLike,
 	createScheduledWindowEngine,
-} from "../prototype/playhead-window/scheduled-window-engine";
+} from "../engine/scheduled-window-engine";
 
 describe("createScheduledWindowEngine", () => {
 	it("waits for every track outcome and schedules playable chunks from one AudioContext epoch", async () => {
@@ -164,6 +164,58 @@ describe("createScheduledWindowEngine", () => {
 		await engine.destroy();
 		expect(context.close).toHaveBeenCalledOnce();
 		expect(engine.getMetrics().cleanupCount).toBe(1);
+	});
+
+	it("preserves sample-rounded PCM tails across adjacent refill publications", async () => {
+		const context = createAudioContextSpy();
+		const engine = createScheduledWindowEngine({
+			createAudioContext: () => context,
+			durationSeconds: 30,
+			horizonSeconds: 2,
+			lowWaterSeconds: 1.5,
+			trackIds: ["audio-1"],
+		});
+		const publicationBoundary = 2.500011;
+		const sampleBoundary = Math.round(publicationBoundary * 48_000) / 48_000;
+		const previousChunk = chunk("audio-1", 2.4, sampleBoundary);
+		engine.beginGeneration({ generationId: 1, startSeconds: 0 });
+		engine.applyTrackStates({
+			generationId: 1,
+			tracks: [
+				playableTrack("audio-1", 0, publicationBoundary, [previousChunk]),
+			],
+		});
+		await engine.play();
+		const previousSource = context.createdSources[0];
+
+		context.currentTime = 1.05;
+		engine.applyTrackStates({
+			generationId: 1,
+			tracks: [
+				playableTrack("audio-1", publicationBoundary, 3.05, [
+					chunk("audio-1", sampleBoundary, 2.7),
+				]),
+			],
+		});
+
+		expect(previousSource?.stop).not.toHaveBeenCalled();
+		expect(previousSource?.buffer).toBe(previousChunk.audioBuffer);
+		expect(context.createdSources[1]?.start).toHaveBeenCalledWith(
+			sampleBoundary,
+			0,
+		);
+
+		// A replacement inside existing coverage must still stop the old source.
+		engine.applyTrackStates({
+			generationId: 1,
+			tracks: [
+				playableTrack("audio-1", 2.4, 2.5, [chunk("audio-1", 2.4, 2.5)]),
+			],
+		});
+		expect(previousSource?.stop).toHaveBeenCalledOnce();
+		expect(previousSource?.buffer).toBeNull();
+		expect(context.createdSources[1]?.stop).not.toHaveBeenCalled();
+		await engine.destroy();
 	});
 
 	it("clips scheduled chunks at the selection-loop boundary", async () => {

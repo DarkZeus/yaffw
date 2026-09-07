@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -17,6 +17,7 @@ import {
 } from "../engine/use-preview-audio-monitoring-lifecycle";
 import type { PreviewAudioResourcesState } from "../engine/use-preview-audio-resources";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
+import { createPreviewAudioProviderStub } from "./preview-audio-test-fixtures";
 
 const createPreviewAudioEngineMock = vi.fn<PreviewAudioEngineFactory>();
 const createdPreviewAudioEngines: PreviewAudioEngineSpy[] = [];
@@ -61,9 +62,11 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 				resources: [expect.objectContaining({ trackId: "audio-1" })],
 			}),
 		);
-		expect(createdPreviewAudioEngines[0]?.setTime).toHaveBeenCalledWith(5.25);
-		expect(createdPreviewAudioEngines[0]?.setPlaybackRate).toHaveBeenCalledWith(
-			1.5,
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				initialTimeSeconds: 5.25,
+				initialPlaybackRate: 1.5,
+			}),
 		);
 		expect(createdPreviewAudioEngines[0]?.setOutputGain).toHaveBeenCalledWith(
 			1,
@@ -71,6 +74,40 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(
 			createdPreviewAudioEngines[0]?.setTrackChannelMode,
 		).toHaveBeenCalledWith(0, "preserve");
+	});
+
+	it("subscribes to buffering and failure changes without recreating the engine", async () => {
+		const state = readyPreviewAudioResourcesState([
+			createPreviewAudioResource("audio-1"),
+		]);
+		const { unmount } = render(<PreviewAudioMonitoringProbe state={state} />);
+		await screen.findByText("ready", {
+			selector: 'output[aria-label="audio monitoring status"]',
+		});
+		const engine = createdPreviewAudioEngines[0];
+		if (!engine) throw new Error("Expected an engine");
+		const notify = engine.subscribe.mock.calls[0]?.[0];
+		if (!notify) throw new Error("Expected a status subscription");
+		act(() => {
+			engine.getStatus.mockReturnValue("preparing");
+			notify();
+		});
+		expect(screen.getByLabelText("audio monitoring status").textContent).toBe(
+			"preparing",
+		);
+		act(() => {
+			engine.getStatus.mockReturnValue("degraded");
+			notify();
+		});
+		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
+			"ready",
+		);
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledTimes(1);
+		unmount();
+		expect(engine.subscribe.mock.results[0]?.value).toHaveBeenCalledTimes(1);
+		expect(
+			createPreviewAudioEngineMock.mock.calls[0]?.[0].signal?.aborted,
+		).toBe(true);
 	});
 
 	it("destroys the previous engine when prepared resources change", async () => {
@@ -195,6 +232,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 			return previewAudioEngine;
 		});
 		const failedSourcesState = {
+			provider: createPreviewAudioProviderStub(),
 			failures: [
 				{
 					reason: "Desktop source failed",
@@ -220,11 +258,13 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 		expect(screen.getByLabelText("audio monitoring ready").textContent).toBe(
 			"ready",
 		);
-		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith({
-			failures: failedSourcesState.failures,
-			outputChannels: 2,
-			resources: [expect.objectContaining({ trackId: "audio-1" })],
-		});
+		expect(createPreviewAudioEngineMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				provider: failedSourcesState.provider,
+				outputChannels: 2,
+				resources: [expect.objectContaining({ trackId: "audio-1" })],
+			}),
+		);
 	});
 
 	it("destroys the engine on cleanup", async () => {
@@ -424,6 +464,9 @@ function readyPreviewAudioResourcesState(
 ): PreviewAudioResourcesState {
 	return {
 		failures: [],
+		provider: createPreviewAudioProviderStub(
+			resources.map((resource) => resource.trackId),
+		),
 		resources,
 		status: "ready",
 	};
@@ -485,8 +528,8 @@ function createAudioMix(
 
 function createPreviewAudioResource(trackId: string): PreviewAudioResource {
 	return {
-		audioBuffer: createAudioBufferStub(),
-		startPositionSeconds: 0,
+		numberOfChannels: 2,
+		sampleRate: 48_000,
 		track: {
 			id: trackId,
 			kind: "audio",
@@ -494,15 +537,6 @@ function createPreviewAudioResource(trackId: string): PreviewAudioResource {
 		trackId,
 		trackIndex: 0,
 	};
-}
-
-function createAudioBufferStub(): AudioBuffer {
-	return {
-		duration: 1,
-		length: 48_000,
-		numberOfChannels: 2,
-		sampleRate: 48_000,
-	} as AudioBuffer;
 }
 
 function lastTrackGain(
@@ -564,12 +598,16 @@ type PreviewAudioEngineSpy = ReturnType<typeof createPreviewAudioEngineSpy>;
 function createPreviewAudioEngineSpy({
 	status = "ready",
 }: {
-	status?: "degraded" | "ready";
+	status?: "degraded" | "ready" | "preparing" | "failed";
 } = {}) {
 	return {
 		destroy: vi.fn(),
 		getCurrentTime: vi.fn(() => 0),
 		getStatus: vi.fn(() => status),
+		getMetrics: vi.fn(),
+		retryTrack: vi.fn(async () => {}),
+		setPlaybackEnd: vi.fn(),
+		subscribe: vi.fn((_listener: () => void) => vi.fn()),
 		pause: vi.fn(),
 		play: vi.fn(),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),

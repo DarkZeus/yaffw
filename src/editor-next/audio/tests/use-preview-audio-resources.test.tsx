@@ -1,627 +1,200 @@
-/* @vitest-environment jsdom */
-
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	waitFor,
-} from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
-
-import {
-	type ActiveMediaAssetCleanupScope,
-	createActiveMediaAssetCleanupScopeController,
-} from "../../media-work/scopes/active-media-asset-cleanup-scope";
+/* @vitest-environment jsdom */
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createActiveMediaAssetCleanupScopeController } from "../../media-work/scopes/active-media-asset-cleanup-scope";
+import type { MediaWindowProvider } from "../engine/media-window-provider";
 import {
 	type PreviewAudioResourcesResult,
 	preparePreviewAudioResources,
 } from "../engine/preview-audio-resources";
 import {
-	type PreviewAudioResourcesState,
+	type UsePreviewAudioResourcesOptions,
 	usePreviewAudioResources,
 } from "../engine/use-preview-audio-resources";
-import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
-
-vi.mock("../engine/preview-audio-resources", async (importOriginal) => {
-	const actual =
-		await importOriginal<typeof import("../engine/preview-audio-resources")>();
-
-	return {
-		...actual,
-		preparePreviewAudioResources: vi.fn(),
-	};
-});
-
-const preparePreviewAudioResourcesMock = vi.mocked(
-	preparePreviewAudioResources,
-);
-type PrepareRequest = Parameters<typeof preparePreviewAudioResources>[0];
-
+vi.mock("../engine/preview-audio-resources", () => ({
+	preparePreviewAudioResources: vi.fn(),
+}));
+const prepare = vi.mocked(preparePreviewAudioResources);
 beforeEach(() => {
-	preparePreviewAudioResourcesMock.mockReset();
+	prepare.mockReset();
 });
-
-afterEach(() => {
-	cleanup();
-	vi.clearAllMocks();
-});
-
-describe("usePreviewAudioResources", () => {
-	it("prepares decision-agnostic audio tracks once and reuses them across owner rerenders", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		const { rerender } = render(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
-		});
-		expect(prepareRuns).toHaveLength(1);
-		expect(Array.from(prepareRuns[0].request.trackIds ?? [])).toEqual([
-			"audio-1",
-			"audio-2",
-		]);
-		expect(prepareRuns[0].request).not.toHaveProperty("audioMix");
-
-		prepareRuns[0].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[0].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-
-		rerender(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-		expect(prepareRuns).toHaveLength(1);
-
-		rerender(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-		expect(prepareRuns).toHaveLength(1);
-	});
-
-	it("prepares only a newly discovered track for the same Media asset source", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-		const expandedAsset = {
-			...readyAsset,
-			tracks: {
-				...readyAsset.tracks,
-				audio: [
-					...readyAsset.tracks.audio,
-					{
-						codec: "aac",
-						id: "audio-3",
-						kind: "audio",
-						label: "Music",
-					},
-				],
-			},
-		} satisfies ReadyMediaAsset;
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		const { rerender } = render(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(1);
-		});
-		prepareRuns[0].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[0].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-
-		rerender(<PreviewAudioResourcesProbe asset={expandedAsset} />);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
-			"audio-3",
-		]);
-		expect(readState()).toBe(
-			"loading|preparing:audio-3|resources:audio-1@1,audio-2@1",
-		);
-
-		prepareRuns[1].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[1].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1,audio-3@1");
-		});
-	});
-
-	it("keeps video-only media on the disabled path without preparing resources", () => {
-		const videoOnlyAsset = {
-			...readyAsset,
-			tracks: {
-				...readyAsset.tracks,
-				audio: [],
-			},
-		} satisfies ReadyMediaAsset;
-
-		render(
-			<PreviewAudioResourcesProbe asset={videoOnlyAsset} enabled={false} />,
-		);
-
-		expect(readState()).toBe("disabled");
-		expect(preparePreviewAudioResourcesMock).not.toHaveBeenCalled();
-	});
-
-	it("releases cached resources when the active Media asset cleanup scope is disposed", async () => {
-		const controller = createActiveMediaAssetCleanupScopeController();
-		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
-
-		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
-			createPreparedResourcesResult(request),
-		);
-
-		render(
-			<PreviewAudioResourcesProbe
-				activeMediaAssetCleanupScope={cleanupScope}
-			/>,
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-
-		cleanupScope.dispose();
-		cleanup();
-	});
-
-	it("aborts active preparation on cleanup and ignores a late result", async () => {
-		const controller = createActiveMediaAssetCleanupScopeController();
-		const cleanupScope = controller.replaceCurrentScope(readyAsset.id);
-		const deferred = createDeferred<PreviewAudioResourcesResult>();
-
-		preparePreviewAudioResourcesMock.mockImplementation(() => deferred.promise);
-
-		render(
-			<PreviewAudioResourcesProbe
-				activeMediaAssetCleanupScope={cleanupScope}
-			/>,
-		);
-
-		await waitFor(() => {
-			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-		});
-		const request = preparePreviewAudioResourcesMock.mock.calls[0]?.[0];
-
-		if (!request) {
-			throw new Error("Expected an active Preview audio resource request.");
-		}
-
-		cleanupScope.dispose();
-		expect(request.signal.aborted).toBe(true);
-
-		deferred.resolve({
-			failures: [],
-			resources: [
-				createPreviewResource({ trackId: "audio-1", trackIndex: 0 }),
-				createPreviewResource({ trackId: "audio-2", trackIndex: 1 }),
-			],
-		});
-
-		cleanup();
-	});
-
-	it("ignores stale prepared resources after media asset replacement", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-		const controller = createActiveMediaAssetCleanupScopeController();
-		const firstScope = controller.replaceCurrentScope(readyAsset.id);
-		const nextAsset = {
-			...readyAsset,
-			id: "asset-2",
-			label: "next.mp4",
-			provenance: {
-				...readyAsset.provenance,
-				fileName: "next.mp4",
-			},
-		} satisfies ReadyMediaAsset;
-		const nextSource = new File(["next"], "next.mp4", { type: "video/mp4" });
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		const { rerender } = render(
-			<PreviewAudioResourcesProbe activeMediaAssetCleanupScope={firstScope} />,
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
-		});
-
-		const nextScope = controller.replaceCurrentScope(nextAsset.id);
-		rerender(
-			<PreviewAudioResourcesProbe
-				activeMediaAssetCleanupScope={nextScope}
-				asset={nextAsset}
-				source={nextSource}
-			/>,
-		);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-
-		prepareRuns[0].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[0].request),
-		);
-
-		await Promise.resolve();
-		expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
-
-		prepareRuns[1].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[1].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-	});
-
-	it("retries only the failed requested track while preserving successful cached resources", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-		const failedTrack = readyAsset.tracks.audio[1];
-
-		if (!failedTrack) {
-			throw new Error("Expected Desktop audio track.");
-		}
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		render(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(readState()).toBe("loading|preparing:audio-1,audio-2|resources:");
-		});
-
-		prepareRuns[0].deferred.resolve({
-			failures: [
-				{
-					reason: "Desktop source failed",
-					track: failedTrack,
-					trackId: "audio-2",
-					trackIndex: 1,
-				},
-			],
-			resources: [createPreviewResource({ trackId: "audio-1", trackIndex: 0 })],
-		});
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1");
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
-			"audio-2",
-		]);
-		expect(readState()).toBe("loading|preparing:audio-2|resources:audio-1@1");
-
-		prepareRuns[1].deferred.resolve({
-			failures: [],
-			resources: [createPreviewResource({ trackId: "audio-2", trackIndex: 1 })],
-		});
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@1");
-		});
-	});
-
-	it("replaces only an explicitly retried track resource", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		render(<PreviewAudioResourcesProbe />);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(1);
-		});
-		prepareRuns[0].deferred.resolve(
-			createPreparedResourcesResult(prepareRuns[0].request),
-		);
-
-		await waitFor(() => {
-			expect(readState()).toContain("ready|resources:");
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-		expect(Array.from(prepareRuns[1].request.trackIds ?? [])).toEqual([
-			"audio-2",
-		]);
-		prepareRuns[1].deferred.resolve({
-			failures: [],
-			resources: [
-				createPreviewResource({
-					duration: 2,
-					trackId: "audio-2",
-					trackIndex: 1,
-				}),
-			],
-		});
-
-		await waitFor(() => {
-			expect(readState()).toBe("ready|resources:audio-1@1,audio-2@2");
-		});
-	});
-
-	it("keeps unrelated track failures visible while retrying one failed track", async () => {
-		const prepareRuns: Array<{
-			deferred: Deferred<PreviewAudioResourcesResult>;
-			request: PrepareRequest;
-		}> = [];
-		const asset = {
-			...readyAsset,
-			tracks: {
-				...readyAsset.tracks,
-				audio: [
-					...readyAsset.tracks.audio,
-					{
-						codec: "aac",
-						id: "audio-3",
-						kind: "audio",
-						label: "Music",
-					},
-				],
-			},
-		} satisfies ReadyMediaAsset;
-
-		preparePreviewAudioResourcesMock.mockImplementation((request) => {
-			const deferred = createDeferred<PreviewAudioResourcesResult>();
-			prepareRuns.push({ deferred, request });
-
-			return deferred.promise;
-		});
-
-		const { rerender } = render(<PreviewAudioResourcesProbe asset={asset} />);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(1);
-		});
-
-		prepareRuns[0].deferred.resolve({
-			failures: [
-				createPreviewFailure(asset, "audio-2"),
-				createPreviewFailure(asset, "audio-3"),
-			],
-			resources: [createPreviewResource({ trackId: "audio-1", trackIndex: 0 })],
-		});
-
-		await waitFor(() => {
-			expect(readFailures()).toBe("audio-2,audio-3");
-		});
-
-		fireEvent.click(screen.getByRole("button", { name: "Retry audio-2" }));
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-		prepareRuns[1].deferred.resolve({
-			failures: [],
-			resources: [createPreviewResource({ trackId: "audio-2", trackIndex: 1 })],
-		});
-
-		await waitFor(() => {
-			expect(readFailures()).toBe("audio-3");
-		});
-
-		rerender(<PreviewAudioResourcesProbe asset={{ ...asset }} />);
-
-		await waitFor(() => {
-			expect(prepareRuns).toHaveLength(2);
-		});
-	});
-});
-
-function PreviewAudioResourcesProbe({
-	activeMediaAssetCleanupScope,
-	asset = readyAsset,
-	enabled = true,
-	source: sourceBlob = source,
-}: {
-	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
-	asset?: ReadyMediaAsset;
-	enabled?: boolean;
-	source?: Blob;
-}) {
-	const state = usePreviewAudioResources({
-		activeMediaAssetCleanupScope,
-		asset,
-		enabled,
-		source: sourceBlob,
-	});
-
-	return (
-		<>
-			<output aria-label="audio preview state">{formatState(state)}</output>
-			<output aria-label="audio preview failures">
-				{state.status === "ready" || state.status === "failed"
-					? state.failures.map((failure) => failure.trackId).join(",")
-					: ""}
-			</output>
-			<button
-				onClick={() => {
-					state.retryTrack("audio-2");
-				}}
-				type="button"
-			>
-				Retry audio-2
-			</button>
-		</>
-	);
-}
-
-function formatState(state: PreviewAudioResourcesState) {
-	if (state.status === "loading") {
-		return [
-			"loading",
-			`preparing:${Array.from(state.preparingTrackIds).join(",")}`,
-			`resources:${state.resources.map(formatResource).join(",")}`,
-		].join("|");
-	}
-
-	if (state.status === "ready") {
-		return `ready|resources:${state.resources.map(formatResource).join(",")}`;
-	}
-
-	return state.status;
-}
-
-function readState() {
-	return screen.getByLabelText("audio preview state").textContent;
-}
-
-function readFailures() {
-	return screen.getByLabelText("audio preview failures").textContent;
-}
-
-function formatResource(resource: PreviewAudioResource) {
-	return `${resource.trackId}@${resource.audioBuffer.duration}`;
-}
-
-function createPreparedResourcesResult(
-	request: PrepareRequest,
-): PreviewAudioResourcesResult {
-	const trackIds =
-		request.trackIds ??
-		new Set(request.asset.tracks.audio.map((track) => track.id));
-
-	return {
-		failures: [],
-		resources: request.asset.tracks.audio
-			.filter((track) => trackIds.has(track.id))
-			.map((track, trackIndex) =>
-				createPreviewResource({
-					trackId: track.id,
-					trackIndex,
-				}),
-			),
-	};
-}
-
-function createPreviewResource({
-	duration = 1,
-	trackId,
-	trackIndex,
-}: {
-	duration?: number;
-	trackId: string;
-	trackIndex: number;
-}): PreviewAudioResource {
-	return {
-		audioBuffer: {
-			duration,
-			length: Math.round(duration * 48_000),
+afterEach(cleanup);
+function prepared(): PreviewAudioResourcesResult {
+	const provider: MediaWindowProvider = {
+		dispose: vi.fn(async () => {}),
+		durationSeconds: 12,
+		getTrackMetadata: () => ({
+			failureReason: null,
 			numberOfChannels: 2,
 			sampleRate: 48_000,
-		} as AudioBuffer,
-		startPositionSeconds: 0,
-		track: {
-			id: trackId,
-			kind: "audio",
-		},
-		trackId,
-		trackIndex,
+		}),
+		openGeneration: vi.fn(),
+		trackIds: readyAsset.tracks.audio.map((track) => track.id),
 	};
-}
-
-function createPreviewFailure(asset: ReadyMediaAsset, trackId: string) {
-	const trackIndex = asset.tracks.audio.findIndex(
-		(track) => track.id === trackId,
-	);
-	const track = asset.tracks.audio[trackIndex];
-
-	if (!track) {
-		throw new Error(`Expected ${trackId} in the test Media asset.`);
-	}
-
 	return {
-		reason: `${trackId} failed`,
-		track,
-		trackId,
-		trackIndex,
+		provider,
+		failures: [],
+		resources: readyAsset.tracks.audio.map((track, trackIndex) => ({
+			numberOfChannels: 2,
+			sampleRate: 48_000,
+			track,
+			trackIndex,
+			trackId: track.id,
+		})),
 	};
 }
-
-type Deferred<T> = {
-	promise: Promise<T>;
-	resolve: (value: T) => void;
-};
-
-function createDeferred<T>(): Deferred<T> {
-	let resolve: (value: T) => void = () => {};
-	const promise = new Promise<T>((promiseResolve) => {
-		resolve = promiseResolve;
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((resolvePromise) => {
+		resolve = resolvePromise;
+	});
+	return { promise, resolve };
+}
+const options = (): UsePreviewAudioResourcesOptions => ({
+	asset: readyAsset,
+	source,
+	enabled: true,
+});
+describe("usePreviewAudioResources", () => {
+	it("does not create preview audio ownership for a video-only asset", () => {
+		const hook = renderHook(() =>
+			usePreviewAudioResources({
+				...options(),
+				asset: { ...readyAsset, tracks: { ...readyAsset.tracks, audio: [] } },
+			}),
+		);
+		expect(hook.result.current.status).toBe("disabled");
+		expect(prepare).not.toHaveBeenCalled();
 	});
 
-	return {
-		promise,
-		resolve,
-	};
-}
-
+	it("owns one provider across equivalent asset rerenders and disposes once on unmount", async () => {
+		const result = prepared();
+		prepare.mockResolvedValue(result);
+		const hook = renderHook((props) => usePreviewAudioResources(props), {
+			initialProps: options(),
+		});
+		await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+		hook.rerender({ ...options(), asset: { ...readyAsset } });
+		expect(prepare).toHaveBeenCalledOnce();
+		expect(result.provider.openGeneration).not.toHaveBeenCalled();
+		expect(result.provider.dispose).not.toHaveBeenCalled();
+		hook.unmount();
+		expect(result.provider.dispose).toHaveBeenCalledOnce();
+	});
+	it("publishes failed metadata with the provider so the engine owns isolated retry", async () => {
+		const result = prepared();
+		result.failures = result.resources.map((resource) => ({
+			reason: "unsupported codec",
+			track: resource.track,
+			trackId: resource.trackId,
+			trackIndex: resource.trackIndex,
+		}));
+		prepare.mockResolvedValue(result);
+		const hook = renderHook(() => usePreviewAudioResources(options()));
+		await waitFor(() =>
+			expect(hook.result.current).toEqual({ status: "ready", ...result }),
+		);
+	});
+	it("releases the provider on disable and opens fresh ownership when re-enabled", async () => {
+		const first = prepared();
+		const second = prepared();
+		prepare.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+		const hook = renderHook((props) => usePreviewAudioResources(props), {
+			initialProps: options(),
+		});
+		await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+		hook.rerender({ ...options(), enabled: false });
+		expect(first.provider.dispose).toHaveBeenCalledOnce();
+		expect(hook.result.current.status).toBe("disabled");
+		hook.rerender(options());
+		await waitFor(() =>
+			expect(hook.result.current).toEqual({ status: "ready", ...second }),
+		);
+	});
+	it("disposes a late provider without publishing after replacement", async () => {
+		const first = deferred<PreviewAudioResourcesResult>();
+		const stale = prepared();
+		const second = prepared();
+		prepare.mockReturnValueOnce(first.promise).mockResolvedValueOnce(second);
+		const hook = renderHook((props) => usePreviewAudioResources(props), {
+			initialProps: options(),
+		});
+		const initialSignal = prepare.mock.calls[0][0].signal;
+		hook.rerender({
+			...options(),
+			asset: { ...readyAsset, id: "replacement" },
+		});
+		expect(initialSignal.aborted).toBe(true);
+		await waitFor(() =>
+			expect(hook.result.current).toEqual({ status: "ready", ...second }),
+		);
+		await act(async () => first.resolve(stale));
+		expect(stale.provider.dispose).toHaveBeenCalledOnce();
+		expect(hook.result.current).toEqual({ status: "ready", ...second });
+	});
+	it("aborts and disposes when the active asset cleanup scope closes", async () => {
+		const controller = createActiveMediaAssetCleanupScopeController();
+		const scope = controller.replaceCurrentScope(readyAsset.id);
+		const result = prepared();
+		prepare.mockResolvedValue(result);
+		const hook = renderHook(() =>
+			usePreviewAudioResources({
+				...options(),
+				activeMediaAssetCleanupScope: scope,
+			}),
+		);
+		await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+		act(() => controller.disposeCurrentScope());
+		expect(prepare.mock.calls[0][0].signal.aborted).toBe(true);
+		expect(result.provider.dispose).toHaveBeenCalledOnce();
+		hook.unmount();
+		expect(result.provider.dispose).toHaveBeenCalledOnce();
+	});
+	it("disposes a late provider after unmount", async () => {
+		const pending = deferred<PreviewAudioResourcesResult>();
+		const result = prepared();
+		prepare.mockReturnValue(pending.promise);
+		const hook = renderHook(() => usePreviewAudioResources(options()));
+		hook.unmount();
+		await act(async () => pending.resolve(result));
+		expect(result.provider.dispose).toHaveBeenCalledOnce();
+	});
+	it("reports source-open failures explicitly", async () => {
+		prepare.mockRejectedValue(new Error("source unavailable"));
+		const hook = renderHook(() => usePreviewAudioResources(options()));
+		await waitFor(() => expect(hook.result.current.status).toBe("failed"));
+		expect(hook.result.current).toEqual(
+			expect.objectContaining({
+				reason: "source unavailable",
+				failures: expect.arrayContaining([
+					expect.objectContaining({ trackId: "audio-1" }),
+				]),
+			}),
+		);
+	});
+	it("reports an asynchronous provider cleanup failure on release", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const result = prepared();
+			const failure = new Error("iterator cleanup failed");
+			vi.mocked(result.provider.dispose).mockRejectedValue(failure);
+			prepare.mockResolvedValue(result);
+			const hook = renderHook(() => usePreviewAudioResources(options()));
+			await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+			hook.unmount();
+			await waitFor(() =>
+				expect(log).toHaveBeenCalledWith(
+					"Preview audio provider cleanup failed.",
+					failure,
+				),
+			);
+			expect(result.provider.dispose).toHaveBeenCalledOnce();
+		} finally {
+			log.mockRestore();
+		}
+	});
+});
 const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
 
 const readyAsset = {

@@ -1,4 +1,5 @@
 /* @vitest-environment jsdom */
+import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 
 import {
 	cleanup,
@@ -526,15 +527,11 @@ function createPreparedPreviewAudioResources(
 ): PreviewAudioResourcesResult {
 	return {
 		failures: [],
+		provider: createPreviewAudioProviderStub(),
 		resources: [
 			{
-				audioBuffer: {
-					duration: 1,
-					length: 48_000,
-					numberOfChannels: 2,
-					sampleRate: 48_000,
-				} as AudioBuffer,
-				startPositionSeconds: 0,
+				numberOfChannels: 2,
+				sampleRate: 48_000,
 				track: {
 					codec: "aac",
 					id: "audio-1",

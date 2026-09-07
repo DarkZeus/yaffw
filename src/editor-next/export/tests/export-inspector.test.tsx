@@ -30,6 +30,39 @@ afterEach(() => {
 });
 
 describe("ExportInspectorPanel", () => {
+	it.each([true, false])(
+		"explains automatic placement only for included tracks (included=%s)",
+		(include) => {
+			const audioMix = createDefaultAudioMix(readyAsset);
+			const trackId = readyAsset.tracks.audio[0].id;
+			audioMix.tracks[trackId] = {
+				...audioMix.tracks[trackId],
+				include,
+				channelMode: "auto-one-sided-stereo",
+			};
+			render(
+				<ExportInspectorPanel
+					asset={readyAsset}
+					audioMix={audioMix}
+					exportState={{ status: "reviewing" }}
+					onCancelExport={() => undefined}
+					onDownloadGeneratedMedia={() => undefined}
+					onApplyOutputSettings={() => undefined}
+					onStartExport={() => undefined}
+					outputSettings={defaultOutputSettings}
+					runtime={supportedRuntime}
+					selection={fullSelection}
+				/>,
+			);
+			const note = within(screen.getByLabelText("Export review")).queryByText(
+				/Auto-fix quiet side analyzes the full Selection/,
+			);
+			expect(Boolean(note)).toBe(include);
+			if (include)
+				expect(note?.textContent).toContain("stereo placement may differ");
+		},
+	);
+
 	it("renders supported export review, requirements, and start action", () => {
 		const onStartExport = vi.fn();
 

@@ -2,13 +2,13 @@ import type {
 	MediaWindowGeneration,
 	MediaWindowProvider,
 	MediaWindowTrackState,
-} from "./media-window-provider";
+} from "../../engine/media-window-provider";
 import {
 	type ScheduledWindowAudioContextLike,
 	type ScheduledWindowEngine,
 	type ScheduledWindowEngineMetrics,
 	createScheduledWindowEngine,
-} from "./scheduled-window-engine";
+} from "../../engine/scheduled-window-engine";
 
 export type PlayheadWindowPrototypeAudioContextFactory =
 	() => ScheduledWindowAudioContextLike;

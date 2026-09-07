@@ -72,7 +72,7 @@ vi.mock("mediabunny", () => ({
 	},
 }));
 
-import { createMediaWindowProvider } from "../prototype/playhead-window/media-window-provider";
+import { createMediaWindowProvider } from "../engine/media-window-provider";
 
 beforeEach(() => {
 	mediaMock.inputs = [];
@@ -560,6 +560,204 @@ describe("createMediaWindowProvider", () => {
 		expect(retrySample.close).toHaveBeenCalledOnce();
 
 		await provider.dispose();
+	});
+	it.each(["capability", "metadata"])(
+		"re-reads failed %s on isolated retry while retaining the healthy iterator",
+		async (failure) => {
+			const healthy = createTrack({
+				id: "embedded-1",
+				packets: [createPacket(0, 0.4)],
+				iterators: [
+					createSampleIterator([
+						createAudioSample({
+							channels: [[1, 2, 3, 4]],
+							sampleRate: 10,
+							timestamp: 0,
+						}),
+					]),
+				],
+			});
+			const failed = createTrack({
+				id: "embedded-2",
+				packets: [createPacket(0, 0.2)],
+				iterators: [
+					createSampleIterator([
+						createAudioSample({
+							channels: [[5, 6]],
+							sampleRate: 10,
+							timestamp: 0,
+						}),
+					]),
+				],
+			});
+			if (failure === "capability")
+				failed.canDecode.mockResolvedValueOnce(false).mockResolvedValue(true);
+			else
+				failed.getSampleRate
+					.mockRejectedValueOnce(new Error("metadata failed"))
+					.mockResolvedValue(10);
+			mediaMock.tracks = [healthy, failed];
+			const provider = await createMediaWindowProvider({
+				source: new Blob(),
+				tracks: [{ id: "voice" }, { id: "desktop" }],
+			});
+			const generation = provider.openGeneration({
+				signal: new AbortController().signal,
+				startSeconds: 0,
+			});
+			const initial = await generation.pullThrough(0.2);
+			expect(initial.tracks.map((track) => track.kind)).toEqual([
+				"playable",
+				"failure",
+			]);
+			const retry = provider.openGeneration({
+				signal: new AbortController().signal,
+				startSeconds: 0,
+				trackIds: ["desktop"],
+				retryTrackIds: ["desktop"],
+			});
+			expect((await retry.pullThrough(0.2)).tracks[0]?.kind).toBe("playable");
+			expect(provider.getTrackMetadata("desktop")).toEqual({
+				failureReason: null,
+				numberOfChannels: 1,
+				sampleRate: 10,
+			});
+			expect((await generation.pullThrough(0.4)).tracks[0]?.trackId).toBe(
+				"voice",
+			);
+			expect(healthy.canDecode).toHaveBeenCalledOnce();
+			expect(failed.canDecode).toHaveBeenCalledTimes(2);
+			expect(healthy.sampleCalls).toHaveLength(1);
+			expect(mediaMock.inputs).toHaveLength(1);
+			await provider.dispose();
+		},
+	);
+
+	it("waits for the last replaced cursor's return before opening its replacement", async () => {
+		let finishReturn!: () => void;
+		const returnDone = new Promise<void>((resolve) => {
+			finishReturn = resolve;
+		});
+		const first = createSampleIterator([
+			createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0 }),
+		]);
+		first.return.mockImplementation(async () => {
+			await returnDone;
+			return { done: true, value: undefined };
+		});
+		const second = createSampleIterator([
+			createAudioSample({ channels: [[3, 4]], sampleRate: 10, timestamp: 0 }),
+		]);
+		mediaMock.tracks = [
+			createTrack({
+				iterators: [first, second],
+				packets: [createPacket(0, 0.2)],
+			}),
+		];
+		const provider = await createMediaWindowProvider({ source: new Blob() });
+		await provider
+			.openGeneration({ signal: new AbortController().signal, startSeconds: 0 })
+			.pullThrough(0.2);
+		const retry = provider.openGeneration({
+			signal: new AbortController().signal,
+			startSeconds: 0,
+		});
+		const result = retry.pullThrough(0.2);
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(first.return).toHaveBeenCalledOnce();
+		expect(second.next).not.toHaveBeenCalled();
+		finishReturn();
+		await result;
+		expect(second.next).toHaveBeenCalledOnce();
+		await provider.dispose();
+	});
+
+	it("awaits late sample closure before disposing Input, including concurrent dispose calls", async () => {
+		const pending = createPendingSampleIterator();
+		const sample = createAudioSample({
+			channels: [[1, 2]],
+			sampleRate: 10,
+			timestamp: 0,
+		});
+		mediaMock.tracks = [
+			createTrack({
+				iterators: [pending.iterator],
+				packets: [createPacket(0, 0.2)],
+			}),
+		];
+		const provider = await createMediaWindowProvider({ source: new Blob() });
+		const generation = provider.openGeneration({
+			signal: new AbortController().signal,
+			startSeconds: 0,
+		});
+		const result = generation.pullThrough(0.2);
+		const rejected = expect(result).rejects.toMatchObject({
+			name: "AbortError",
+		});
+		await vi.waitFor(() =>
+			expect(pending.iterator.next).toHaveBeenCalledOnce(),
+		);
+		const disposal = provider.dispose();
+		expect(provider.dispose()).toBe(disposal);
+		await Promise.resolve();
+		expect(mediaMock.inputs[0]?.dispose).not.toHaveBeenCalled();
+		pending.resolve({ done: false, value: sample });
+		await rejected;
+		await disposal;
+		expect(sample.close).toHaveBeenCalledOnce();
+		expect(pending.iterator.return).toHaveBeenCalledOnce();
+		expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
+	});
+
+	it("disposes Input even when one iterator cleanup rejects", async () => {
+		const iterator = createSampleIterator([
+			createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0 }),
+		]);
+		iterator.return.mockRejectedValue(new Error("iterator cleanup failed"));
+		mediaMock.tracks = [
+			createTrack({ iterators: [iterator], packets: [createPacket(0, 0.2)] }),
+		];
+		const provider = await createMediaWindowProvider({ source: new Blob() });
+		await provider
+			.openGeneration({ signal: new AbortController().signal, startSeconds: 0 })
+			.pullThrough(0.2);
+		await expect(provider.dispose()).rejects.toThrow(
+			"Audio generation cleanup failed.",
+		);
+		expect(iterator.return).toHaveBeenCalledOnce();
+		expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
+	});
+	it("reports abort-listener cleanup rejection while keeping explicit cancel awaitable", async () => {
+		const log = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			const iterator = createSampleIterator([
+				createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0 }),
+			]);
+			iterator.return.mockRejectedValue(new Error("iterator return failed"));
+			mediaMock.tracks = [
+				createTrack({ iterators: [iterator], packets: [createPacket(0, 0.2)] }),
+			];
+			const provider = await createMediaWindowProvider({ source: new Blob() });
+			const abort = new AbortController();
+			const generation = provider.openGeneration({
+				signal: abort.signal,
+				startSeconds: 0,
+			});
+			await generation.pullThrough(0.2);
+			abort.abort();
+			await expect(generation.cancel()).rejects.toThrow(
+				"Audio generation cleanup failed.",
+			);
+			expect(log).toHaveBeenCalledWith(
+				"Preview audio generation cleanup failed.",
+				expect.any(AggregateError),
+			);
+			await provider.dispose();
+			expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
+		} finally {
+			log.mockRestore();
+		}
 	});
 });
 

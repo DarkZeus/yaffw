@@ -87,6 +87,10 @@ export type CreateScheduledWindowEngineOptions = {
 	horizonSeconds: number;
 	lowWaterSeconds: number;
 	trackIds: readonly string[];
+	trackDestination?: (
+		trackId: string,
+		buffer: AudioBuffer,
+	) => ScheduledWindowAudioNodeLike;
 };
 
 type ScheduledSource = {
@@ -107,7 +111,7 @@ type TrackRuntime = {
 	coverageEndSeconds: number;
 	gain: number;
 	gainNode: ScheduledWindowGainNodeLike;
-	lastState: MediaWindowTrackState | null;
+	lastState: Pick<MediaWindowTrackState, "kind"> | null;
 	retainedChunks: RetainedChunk[];
 	trackId: string;
 };
@@ -122,6 +126,7 @@ export function createScheduledWindowEngine({
 	horizonSeconds,
 	lowWaterSeconds,
 	trackIds,
+	trackDestination,
 }: CreateScheduledWindowEngineOptions): ScheduledWindowEngine {
 	validateConfiguration({ durationSeconds, horizonSeconds, lowWaterSeconds });
 	const audioContext = createAudioContext();
@@ -129,7 +134,7 @@ export function createScheduledWindowEngine({
 		trackIds.map((trackId) => {
 			const gainNode = audioContext.createGain();
 			gainNode.gain.value = 1;
-			gainNode.connect(audioContext.destination);
+			if (!trackDestination) gainNode.connect(audioContext.destination);
 
 			return [
 				trackId,
@@ -170,6 +175,7 @@ export function createScheduledWindowEngine({
 	let playbackStartContextTimeSeconds = audioContext.currentTime;
 	let playbackStartMediaTimeSeconds = 0;
 	let playing = false;
+	let playIntent = 0;
 
 	function getCurrentTime() {
 		if (!playing) {
@@ -237,6 +243,7 @@ export function createScheduledWindowEngine({
 		}
 		scheduled.source.onended = null;
 		scheduled.source.disconnect?.();
+		scheduled.source.buffer = null;
 		if (scheduled.chunk.scheduledSource === scheduled) {
 			scheduled.chunk.scheduledSource = null;
 		}
@@ -301,7 +308,10 @@ export function createScheduledWindowEngine({
 				const source = audioContext.createBufferSource();
 				source.buffer = retained.chunk.audioBuffer;
 				source.playbackRate.value = playbackRate;
-				source.connect(track.gainNode);
+				source.connect(
+					trackDestination?.(track.trackId, retained.chunk.audioBuffer) ??
+						track.gainNode,
+				);
 				const offsetSeconds = Math.max(
 					0,
 					mediaTimeSeconds - retained.chunk.startSeconds,
@@ -376,6 +386,7 @@ export function createScheduledWindowEngine({
 		}
 
 		playing = false;
+		playIntent += 1;
 		clearRetainedChunks();
 		generationId = nextGenerationId;
 		currentTimeSeconds = clamp(startSeconds, 0, durationSeconds);
@@ -435,12 +446,20 @@ export function createScheduledWindowEngine({
 				continue;
 			}
 
-			removeOverlappingChunks(
-				track,
-				nextState.startSeconds,
-				nextState.endSeconds,
-			);
-			track.lastState = nextState;
+			// Adjacent publications append coverage. Their PCM edges are rounded to
+			// samples and can extend past the publication boundary; replacing that
+			// tiny overlap would discard the entire previously scheduled chunk.
+			if (
+				nextState.kind === "failure" ||
+				nextState.startSeconds < track.coverageEndSeconds
+			) {
+				removeOverlappingChunks(
+					track,
+					nextState.kind === "failure" ? 0 : nextState.startSeconds,
+					nextState.kind === "failure" ? durationSeconds : nextState.endSeconds,
+				);
+			}
+			track.lastState = { kind: nextState.kind };
 			track.coverageEndSeconds = Math.max(
 				track.coverageEndSeconds,
 				nextState.endSeconds,
@@ -502,7 +521,11 @@ export function createScheduledWindowEngine({
 			) {
 				gapStartSeconds = track.coverageEndSeconds;
 			}
-			if (playing && gapStartSeconds === null) {
+			if (
+				playing &&
+				mediaTimeSeconds < effectivePlaybackEndSeconds &&
+				gapStartSeconds === null
+			) {
 				const expectedChunk = track.retainedChunks.find(
 					(retained) =>
 						retained.chunk.startSeconds <=
@@ -592,11 +615,13 @@ export function createScheduledWindowEngine({
 		getStatus,
 		isPlaying: () => playing,
 		pause() {
+			playIntent += 1;
 			if (destroyed || !playing) {
 				return;
 			}
 
 			syncCurrentTime();
+			tick();
 			playing = false;
 			stopScheduledSources();
 		},
@@ -613,8 +638,9 @@ export function createScheduledWindowEngine({
 				throw new Error("Every required playhead audio track failed.");
 			}
 
+			const intent = ++playIntent;
 			await audioContext.resume?.();
-			if (destroyed || playing) {
+			if (destroyed || playing || intent !== playIntent) {
 				return;
 			}
 
@@ -644,7 +670,7 @@ export function createScheduledWindowEngine({
 			}
 		},
 		setPlaybackEnd(endSeconds: number | null) {
-			if (destroyed) {
+			if (destroyed || endSeconds === playbackEndSeconds) {
 				return;
 			}
 			if (

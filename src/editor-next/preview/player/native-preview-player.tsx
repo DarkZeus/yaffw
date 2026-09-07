@@ -132,10 +132,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		enabled: audioPreviewTransportSupported,
 		source,
 	});
-	const previewAudioResourcesRef = useRef(previewAudioResources);
-	previewAudioResourcesRef.current = previewAudioResources;
 	const handlePreviewMeteringRetry = useCallback((trackId: string) => {
-		previewAudioResourcesRef.current.retryTrack(trackId);
+		void previewAudioEngineRef.current?.retryTrack(trackId);
 	}, []);
 	retryPreviewMeteringTrackRef.current = handlePreviewMeteringRetry;
 	const audioPreviewPreparingTrackIds =
@@ -155,6 +153,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		audioMonitoringFailed: audioMonitoringStatus === "failed",
 		audioMonitoringReady:
 			audioMonitoringStatus === "ready" || audioMonitoringStatus === "degraded",
+		audioMonitoringEstablished:
+			audioMonitoringStatus === "preparing" &&
+			previewAudioEngineRef.current !== null,
 		previewAudioResources,
 		audioPreviewTransportSupported,
 	});

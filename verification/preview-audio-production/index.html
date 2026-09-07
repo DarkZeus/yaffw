@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Production Preview audio evidence</title>
+		<style>
+			:root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+			body { margin: 0; background: #101216; color: #e9edf3; }
+			main { width: min(1180px, calc(100% - 40px)); margin: 32px auto; }
+			h1 { font: 600 26px/1.2 system-ui, sans-serif; }
+			p { color: #aab3c0; line-height: 1.55; }
+			.controls { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; padding: 18px; border: 1px solid #303743; border-radius: 10px; }
+			label { display: grid; gap: 7px; }
+			input, button { font: inherit; }
+			input[type="text"] { width: 240px; padding: 8px; }
+			button { padding: 9px 14px; cursor: pointer; }
+			button:disabled { cursor: not-allowed; opacity: .45; }
+			pre { max-height: 70vh; overflow: auto; padding: 16px; border: 1px solid #303743; border-radius: 8px; background: #0c0e11; font-size: 12px; }
+			#status { min-height: 24px; color: #a9baff; }
+			#status.error { color: #ff9a9a; }
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>Issue #109 — Production Preview audio evidence</h1>
+			<p>Development-only entry using the production preparation, engine, routing, and meters.
+				Select the recorded 120-second two-track AAC fixture. Five fresh 30-second trials inject
+				250, 500, and 1,000 ms renderer stalls. Functional checks run separately.</p>
+			<section class="controls">
+				<label>Fixture <input id="fixture" type="file" accept="audio/*,video/*,.mp4" /></label>
+				<label>Revision <input id="revision" type="text" value="issue-109-working-tree" /></label>
+				<button id="run" type="button">Run 5 production trials</button>
+				<button id="functional" type="button">Run production functional checks</button>
+				<button id="gaps" type="button">Run offset/gap fixture checks</button>
+				<button id="download" type="button" disabled>Download JSON</button>
+			</section>
+			<p id="status" aria-live="polite">No evidence recorded.</p>
+			<pre id="json">No evidence recorded.</pre>
+		</main>
+		<script type="module" src="./main.ts"></script>
+	</body>
+</html>

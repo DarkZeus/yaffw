@@ -10,7 +10,7 @@ import {
 } from "mediabunny";
 
 const DEFAULT_BATCH_DURATION_SECONDS = 0.2;
-const MAX_BATCH_DURATION_SECONDS = 0.25;
+const MAX_BATCH_DURATION_SECONDS = 0.2;
 
 export type MediaWindowChunk = {
 	audioBuffer: AudioBuffer;
@@ -57,7 +57,14 @@ export type MediaWindowPullResult = {
 	tracks: readonly MediaWindowTrackState[];
 };
 
+export type MediaWindowTrackMetadata = {
+	failureReason: string | null;
+	numberOfChannels: number;
+	sampleRate: number;
+};
+
 export type OpenMediaWindowGenerationOptions = {
+	retryTrackIds?: ReadonlySet<string> | readonly string[];
 	signal: AbortSignal;
 	startSeconds: number;
 	trackIds?: ReadonlySet<string> | readonly string[];
@@ -72,6 +79,7 @@ export type MediaWindowGeneration = {
 };
 
 export type MediaWindowProvider = {
+	getTrackMetadata: (trackId: string) => MediaWindowTrackMetadata;
 	dispose: () => Promise<void>;
 	readonly durationSeconds: number;
 	openGeneration: (
@@ -82,6 +90,9 @@ export type MediaWindowProvider = {
 
 export type CreateMediaWindowProviderOptions = {
 	batchDurationSeconds?: number;
+	durationSeconds?: number;
+	signal?: AbortSignal;
+	tracks?: readonly { id: string; channels?: number; sampleRate?: number }[];
 	source: Blob;
 };
 
@@ -92,7 +103,8 @@ type TrackDescriptor = {
 		numberOfChannels: number;
 		sampleRate: number;
 	};
-	track: InputAudioTrack;
+	track: InputAudioTrack | null;
+	trackIndex: number;
 	trackEndSeconds: number;
 	trackId: string;
 };
@@ -111,29 +123,51 @@ type PcmSegment = {
 
 export async function createMediaWindowProvider({
 	batchDurationSeconds = DEFAULT_BATCH_DURATION_SECONDS,
+	durationSeconds,
+	signal,
 	source,
+	tracks: assetTracks,
 }: CreateMediaWindowProviderOptions): Promise<MediaWindowProvider> {
 	validateBatchDuration(batchDurationSeconds);
-
+	if (signal?.aborted) throw createAbortError();
 	const input = new Input({
 		formats: ALL_FORMATS,
 		source: new BlobSource(source),
 	});
-
+	let inputDisposed = false;
+	const disposeInput = () => {
+		if (inputDisposed) return;
+		inputDisposed = true;
+		input.dispose();
+	};
+	signal?.addEventListener("abort", disposeInput, { once: true });
 	try {
 		const tracks = await input.getAudioTracks();
+		const identities =
+			assetTracks ?? tracks.map((track) => ({ id: String(track.id) }));
 		const descriptors = await Promise.all(
-			tracks.map((track) => describeTrack(track)),
+			identities.map((identity, index) =>
+				describeTrack(
+					tracks[index] ?? null,
+					identity.id,
+					index,
+					assetTracks?.[index] ?? {},
+				),
+			),
 		);
-
+		if (signal?.aborted) throw createAbortError();
 		return new MediabunnyMediaWindowProvider(
 			input,
 			descriptors,
 			batchDurationSeconds,
+			durationSeconds,
+			disposeInput,
 		);
 	} catch (error) {
-		input.dispose();
+		disposeInput();
 		throw error;
+	} finally {
+		signal?.removeEventListener("abort", disposeInput);
 	}
 }
 
@@ -144,21 +178,35 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 	private readonly activeGenerations =
 		new Set<MediabunnyMediaWindowGeneration>();
 	private disposed = false;
+	private disposal: Promise<void> | null = null;
 	private generationSequence = 0;
 
 	constructor(
 		private readonly input: Input,
 		private readonly descriptors: readonly TrackDescriptor[],
 		private readonly batchDurationSeconds: number,
+		durationSeconds: number | undefined,
+		private readonly disposeInput: () => void,
 	) {
 		this.trackIds = descriptors.map((descriptor) => descriptor.trackId);
-		this.durationSeconds = descriptors.reduce(
-			(maximum, descriptor) => Math.max(maximum, descriptor.trackEndSeconds),
-			0,
+		this.durationSeconds =
+			durationSeconds ??
+			descriptors.reduce(
+				(maximum, descriptor) => Math.max(maximum, descriptor.trackEndSeconds),
+				0,
+			);
+	}
+
+	getTrackMetadata(trackId: string): MediaWindowTrackMetadata {
+		const descriptor = this.descriptors.find(
+			(track) => track.trackId === trackId,
 		);
+		if (!descriptor) throw new Error(`Unknown audio track: ${trackId}.`);
+		return { ...descriptor.format, failureReason: descriptor.failureReason };
 	}
 
 	openGeneration({
+		retryTrackIds,
 		signal,
 		startSeconds,
 		trackIds,
@@ -177,7 +225,39 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 			[...this.activeGenerations].map((generation) =>
 				generation.cancelTracks(selectedTrackIdSet),
 			),
-		).then(() => undefined);
+		).then(async () => {
+			if (this.disposed || signal.aborted) return;
+			const retries = new Set(retryTrackIds);
+			await Promise.all(
+				selectedDescriptors
+					.filter(
+						(descriptor) =>
+							retries.has(descriptor.trackId) && descriptor.failureReason,
+					)
+					.map(async (descriptor) => {
+						try {
+							const track =
+								descriptor.track ??
+								(await this.input.getAudioTracks())[descriptor.trackIndex] ??
+								null;
+							const updated = await describeTrack(
+								track,
+								descriptor.trackId,
+								descriptor.trackIndex,
+								{
+									channels: descriptor.format.numberOfChannels,
+									sampleRate: descriptor.format.sampleRate,
+								},
+							);
+							if (!this.disposed && !signal.aborted)
+								Object.assign(descriptor, updated);
+						} catch (error) {
+							if (!this.disposed && !signal.aborted)
+								descriptor.failureReason = errorToMessage(error);
+						}
+					}),
+			);
+		});
 		const generation = new MediabunnyMediaWindowGeneration({
 			batchDurationSeconds: this.batchDurationSeconds,
 			descriptors: selectedDescriptors,
@@ -194,22 +274,27 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 		return generation;
 	}
 
-	async dispose() {
-		if (this.disposed) {
-			return;
-		}
-
+	dispose(): Promise<void> {
+		if (this.disposal) return this.disposal;
 		this.disposed = true;
-		await Promise.all(
+		this.disposal = Promise.allSettled(
 			[...this.activeGenerations].map((generation) => generation.cancel()),
-		);
-		this.activeGenerations.clear();
-		this.input.dispose();
+		).then((results) => {
+			this.activeGenerations.clear();
+			this.disposeInput();
+			const errors = results.flatMap((result) =>
+				result.status === "rejected" ? [result.reason] : [],
+			);
+			if (errors.length)
+				throw new AggregateError(errors, "Audio generation cleanup failed.");
+		});
+		return this.disposal;
 	}
 }
 
 class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 	private readonly cursors = new Map<string, TrackWindowCursor>();
+	private readonly pendingCancellations = new Set<Promise<void>>();
 	private readonly onAbort: () => void;
 	private cancelPromise: Promise<void> | null = null;
 	private cancelled = false;
@@ -240,12 +325,12 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 			);
 		}
 		this.onAbort = () => {
-			void this.cancel();
+			void this.cancel().catch(reportGenerationCleanupFailure);
 		};
 		options.signal.addEventListener("abort", this.onAbort, { once: true });
 
 		if (options.signal.aborted) {
-			void this.cancel();
+			void this.cancel().catch(reportGenerationCleanupFailure);
 		}
 	}
 
@@ -307,10 +392,11 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 
 		this.cancelled = true;
 		this.options.signal.removeEventListener("abort", this.onAbort);
-		this.options.onCancel();
-		this.cancelPromise = Promise.all(
-			[...this.cursors.values()].map((cursor) => cursor.cancel()),
-		).then(() => undefined);
+		this.cancelPromise = settleCleanup([
+			...this.pendingCancellations,
+			...[...this.cursors.values()].map((cursor) => cursor.cancel()),
+			this.pullQueue,
+		]).finally(() => this.options.onCancel());
 		this.cursors.clear();
 
 		return this.cancelPromise;
@@ -318,6 +404,7 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 
 	async cancelTracks(trackIds: ReadonlySet<string>) {
 		if (this.cancelled) {
+			await this.cancelPromise;
 			return;
 		}
 
@@ -329,15 +416,20 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 			}
 
 			this.cursors.delete(trackId);
-			cancellations.push(cursor.cancel());
+			const cancellation = cursor.cancel();
+			this.pendingCancellations.add(cancellation);
+			void cancellation.then(
+				() => this.pendingCancellations.delete(cancellation),
+				() => this.pendingCancellations.delete(cancellation),
+			);
+			cancellations.push(cancellation);
 		}
 
 		if (this.cursors.size === 0) {
-			await this.cancel();
-			return;
+			cancellations.push(this.cancel());
 		}
 
-		await Promise.all(cancellations);
+		await settleCleanup(cancellations);
 	}
 
 	private isCancelled() {
@@ -360,7 +452,10 @@ class TrackWindowCursor {
 	private packetCursor: EncodedPacket | null = null;
 	private packetCursorInitialized = false;
 	private readonly packetRanges: PacketRange[] = [];
-	private readonly packetSink: EncodedPacketSink;
+	private packetSink: EncodedPacketSink | null = null;
+	private cancelPromise: Promise<void> | null = null;
+	private initialized = false;
+	private activePull: Promise<MediaWindowTrackState | null> | null = null;
 	private readonly pcmSegments: PcmSegment[] = [];
 	private projectedGapSeconds = 0;
 	private projectedThroughGapEndSeconds = Number.NEGATIVE_INFINITY;
@@ -373,10 +468,23 @@ class TrackWindowCursor {
 	) {
 		this.decodedThroughSeconds = generationStartSeconds;
 		this.failureReason = descriptor.failureReason;
-		this.packetSink = new EncodedPacketSink(descriptor.track);
 	}
 
-	async pull({
+	pull(options: {
+		endSeconds: number;
+		isGenerationCancelled: () => boolean;
+		startSeconds: number;
+	}): Promise<MediaWindowTrackState | null> {
+		const promise = this.pullWindow(options);
+		this.activePull = promise;
+		const releasePull = () => {
+			if (this.activePull === promise) this.activePull = null;
+		};
+		void promise.then(releasePull, releasePull);
+		return promise;
+	}
+
+	private async pullWindow({
 		endSeconds,
 		isGenerationCancelled,
 		startSeconds,
@@ -388,11 +496,18 @@ class TrackWindowCursor {
 		if (this.cancelled) {
 			return null;
 		}
+		if (!this.initialized) {
+			this.initialized = true;
+			this.failureReason = this.descriptor.failureReason;
+		}
 		if (this.failureReason) {
 			return this.createFailure(startSeconds, endSeconds);
 		}
 
 		try {
+			if (!this.descriptor.track)
+				throw new Error("The analyzed audio track is no longer available.");
+			this.packetSink ??= new EncodedPacketSink(this.descriptor.track);
 			await this.scanPacketsThrough(endSeconds, isGenerationCancelled);
 			this.throwIfUnavailable(isGenerationCancelled);
 			const occupiedRanges = intersectRanges(
@@ -428,6 +543,8 @@ class TrackWindowCursor {
 			if (chunks.length === 0) {
 				this.failureReason =
 					"The audio track decoded no presentable samples for an encoded window.";
+				await this.releaseIterator();
+				this.pcmSegments.length = 0;
 				this.prunePacketRanges(endSeconds);
 				return this.createFailure(startSeconds, endSeconds);
 			}
@@ -450,17 +567,29 @@ class TrackWindowCursor {
 			}
 
 			this.failureReason = errorToMessage(error);
+			await this.releaseIterator();
+			this.pcmSegments.length = 0;
 			return this.createFailure(startSeconds, endSeconds);
 		}
 	}
 
-	async cancel() {
-		if (this.cancelled) {
-			return;
-		}
-
+	cancel(): Promise<void> {
+		if (this.cancelPromise) return this.cancelPromise;
 		this.cancelled = true;
 		this.pcmSegments.length = 0;
+		this.packetRanges.length = 0;
+		this.packetCursor = null;
+		this.cancelPromise = settleCleanup([
+			this.releaseIterator(),
+			this.activePull?.then(
+				() => undefined,
+				() => undefined,
+			) ?? Promise.resolve(),
+		]);
+		return this.cancelPromise;
+	}
+
+	private async releaseIterator() {
 		const iterator = this.iterator;
 		this.iterator = null;
 		this.iteratorEnded = true;
@@ -472,13 +601,13 @@ class TrackWindowCursor {
 		isGenerationCancelled: () => boolean,
 	) {
 		const options = { metadataOnly: true } as const;
+		const packetSink = this.packetSink;
+		if (!packetSink) throw new Error("Audio packet reader is unavailable.");
 
 		if (!this.packetCursorInitialized) {
 			this.packetCursor =
-				(await this.packetSink.getPacket(
-					this.generationStartSeconds,
-					options,
-				)) ?? (await this.packetSink.getFirstPacket(options));
+				(await packetSink.getPacket(this.generationStartSeconds, options)) ??
+				(await packetSink.getFirstPacket(options));
 			this.packetCursorInitialized = true;
 		}
 
@@ -496,7 +625,7 @@ class TrackWindowCursor {
 				});
 			}
 
-			this.packetCursor = await this.packetSink.getNextPacket(packet, options);
+			this.packetCursor = await packetSink.getNextPacket(packet, options);
 		}
 
 		this.packetRanges.sort(
@@ -508,7 +637,7 @@ class TrackWindowCursor {
 		requiredEndSeconds: number,
 		isGenerationCancelled: () => boolean,
 	) {
-		if (!this.iterator && !this.iteratorEnded) {
+		if (!this.iterator && !this.iteratorEnded && this.descriptor.track) {
 			this.iterator = new AudioSampleSink(this.descriptor.track).samples(
 				this.generationStartSeconds,
 				this.descriptor.trackEndSeconds,
@@ -933,10 +1062,15 @@ function findPacketGaps(
 	return gaps;
 }
 
-async function describeTrack(track: InputAudioTrack): Promise<TrackDescriptor> {
-	const trackId = String(track.id);
-
+async function describeTrack(
+	track: InputAudioTrack | null,
+	trackId: string,
+	trackIndex: number,
+	fallback: { channels?: number; sampleRate?: number },
+): Promise<TrackDescriptor> {
 	try {
+		if (!track)
+			throw new Error("The analyzed audio track is no longer available.");
 		const [
 			canDecode,
 			firstTimestampSeconds,
@@ -951,6 +1085,12 @@ async function describeTrack(track: InputAudioTrack): Promise<TrackDescriptor> {
 			track.computeDuration(),
 		]);
 		validateTrackFormat(numberOfChannels, sampleRate);
+		if (
+			!Number.isFinite(firstTimestampSeconds) ||
+			!Number.isFinite(trackEndSeconds) ||
+			trackEndSeconds <= Math.max(0, firstTimestampSeconds)
+		)
+			throw new Error("Track has no presentable audio range.");
 
 		return {
 			failureReason: canDecode
@@ -961,15 +1101,20 @@ async function describeTrack(track: InputAudioTrack): Promise<TrackDescriptor> {
 			track,
 			trackEndSeconds,
 			trackId,
+			trackIndex,
 		};
 	} catch (error) {
 		return {
 			failureReason: errorToMessage(error),
 			firstTimestampSeconds: 0,
-			format: { numberOfChannels: 1, sampleRate: 48_000 },
+			format: {
+				numberOfChannels: fallback.channels || 1,
+				sampleRate: fallback.sampleRate || 48_000,
+			},
 			track,
 			trackEndSeconds: 0,
 			trackId,
+			trackIndex,
 		};
 	}
 }
@@ -1042,4 +1187,19 @@ function isAbortError(error: unknown) {
 
 function errorToMessage(error: unknown) {
 	return error instanceof Error ? error.message : String(error);
+}
+
+async function settleCleanup(
+	promises: readonly Promise<void>[],
+): Promise<void> {
+	const results = await Promise.allSettled(promises);
+	const errors = results.flatMap((result) =>
+		result.status === "rejected" ? [result.reason] : [],
+	);
+	if (errors.length)
+		throw new AggregateError(errors, "Audio generation cleanup failed.");
+}
+
+function reportGenerationCleanupFailure(error: unknown) {
+	console.error("Preview audio generation cleanup failed.", error);
 }

@@ -10,12 +10,14 @@ export type PreviewClockMode =
 export function resolvePreviewClockMode({
 	asset,
 	audioMonitoringFailed = false,
+	audioMonitoringEstablished = false,
 	audioMonitoringReady,
 	previewAudioResources,
 	audioPreviewTransportSupported,
 }: {
 	asset: ReadyMediaAsset;
 	audioMonitoringFailed?: boolean;
+	audioMonitoringEstablished?: boolean;
 	audioMonitoringReady: boolean;
 	previewAudioResources: PreviewAudioResourcesState;
 	audioPreviewTransportSupported: boolean;
@@ -35,7 +37,7 @@ export function resolvePreviewClockMode({
 	if (
 		previewAudioResources.status === "ready" &&
 		previewAudioResources.resources.length > 0 &&
-		audioMonitoringReady
+		(audioMonitoringReady || audioMonitoringEstablished)
 	) {
 		return "audio-master";
 	}

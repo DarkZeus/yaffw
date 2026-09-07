@@ -82,6 +82,13 @@ export function ExportInspectorPanel({
 		>
 			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
 				<ExportReviewSection
+					hasAutomaticChannelMode={asset.tracks.audio.some((track) => {
+						const decision = audioMix.tracks[track.id];
+						return (
+							decision?.include &&
+							decision.channelMode === "auto-one-sided-stereo"
+						);
+					})}
 					outputAudio={outputAudio}
 					outputResolution={outputResolution}
 					review={review}
@@ -114,6 +121,7 @@ export function ExportInspectorPanel({
 
 function ExportReviewSection({
 	audioQuality,
+	hasAutomaticChannelMode,
 	outputAudio,
 	outputResolution,
 	review,
@@ -121,6 +129,7 @@ function ExportReviewSection({
 	videoQuality,
 }: {
 	audioQuality: string;
+	hasAutomaticChannelMode: boolean;
 	outputAudio: ResolvedOutputAudioProfile;
 	outputResolution: ResolvedOutputResolution;
 	review: ExportCapabilityReview;
@@ -166,6 +175,13 @@ function ExportReviewSection({
 					</>
 				) : null}
 			</div>
+
+			{hasAutomaticChannelMode ? (
+				<p className="mt-3 text-xs leading-5 text-muted-foreground">
+					Auto-fix quiet side analyzes the full Selection for export. Preview
+					checks short passages, so stereo placement may differ.
+				</p>
+			) : null}
 
 			{review.supported ? null : (
 				<p className="mt-2 rounded bg-destructive/5 px-3 py-2 text-xs leading-5 text-muted-foreground">

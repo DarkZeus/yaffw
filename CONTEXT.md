@@ -172,6 +172,14 @@ _Avoid_: preview volume, gain
 A preview-only way to temporarily hear a subset of audio tracks without changing generated media.
 _Avoid_: audio mix decision, exported solo
 
+**Preview audio resource**:
+An adapter-owned source provider and audio track metadata used to prepare bounded Preview audio windows.
+_Avoid_: full-track buffer, remux Blob, waveform data
+
+**Preview audio window**:
+A bounded media-time interval whose audio tracks are represented by playable PCM chunks, known silence, or explicit failure.
+_Avoid_: full-track decode, exported segment, waveform lane
+
 **Preview audio engine**:
 The preview-owned audio transport that prepares source audio tracks, applies preview-relevant audio decisions, and owns audio-master preview time.
 _Avoid_: multitrack adapter, audio meter, native video audio
@@ -347,6 +355,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - An **Audio mix decision** is an **Editing decision** for one **Media track**.
 - Audio-capable **Media tracks** are included in the mix by default so preview playback and generated media preserve all audible source context unless the user changes an **Audio mix decision**.
 - **Audio mix decisions** should affect both preview playback and generated media; what the user hears in preview should match what the export contains unless **Export review** explicitly says otherwise.
+- Auto-fix quiet side is approximate in Preview: each bounded PCM chunk is classified independently, while export analyzes the full **Selection**. **Audio** and **Export review** explain that stereo placement may differ for alternating one-sided passages. Explicit channel modes provide consistent placement without whole-track Preview analysis.
 - **Audio** may duplicate include/exclude and preview solo controls from **Waveform lanes**, but include/exclude should be labeled as output contribution rather than preview mute.
 - **Audio mix decisions** include whether an audio track is included in the generated mix and the **Track volume** used for that mix.
 - V1 export produces at most one **Generated audio mix**; preserving separate generated audio tracks is a future advanced export behavior.
@@ -416,14 +425,16 @@ _Avoid_: first-slice requirement, automatic fallback
 - The **Preview audio engine** should completely replace the hidden `wavesurfer-multitrack` preview transport rather than run beside it as a long-term alternate path; WaveSurfer may still be used for visual **Waveform lanes** because they are selection context, not preview audio transport.
 - `wavesurfer-multitrack` should be removed once no preview transport code imports it; `wavesurfer.js` may remain only for visual waveform rendering.
 - Implementation names for the replacement should use **Preview audio engine** language rather than `multitrack` package language, while preserving support for multiple embedded audio **Media tracks**.
-- A **Preview audio engine** may expose each embedded audio **Media track** through adapter-owned preview audio resources derived from the source media; direct full-track `AudioBuffer` references must be released with the active **Media asset** by aborting preparation, destroying the engine, and dropping retained references.
-- The first **Preview audio engine** implementation uses timestamp-aligned full-track decoded `AudioBuffer` resources for simplicity, while preserving **Preview audio resource** as the domain term so chunked resources can replace them later. It should not retain intermediate remux/WAV Blobs or object URLs.
+- A **Preview audio engine** exposes every embedded audio **Media track** through adapter-owned **Preview audio resources**. One provider owns the active asset input; the engine owns bounded PCM, playback generations, and scheduled sources. Cleanup aborts work, returns iterators, closes samples, stops and disconnects nodes, disposes the input, and releases PCM.
+- The **Preview audio engine** retains a two-second media-time PCM horizon, replenishes below 1.5 seconds every 50 ms, and schedules chunks no longer than 200 ms from one shared Web Audio epoch. It never prepares full-track PCM or retains intermediate remux/WAV Blobs or object URLs.
+- **Preview audio windows** preserve source offsets and timestamp gaps. Initial audio readiness requires playable PCM, known silence, or explicit failure for every track and does not depend on **Waveform lane** generation.
+- Pause stops sources and replenishment while retaining the current bounded **Preview audio window**. Seek, playback-rate changes, routing rebuilds, and loop wrapping invalidate affected generations; buffering an established engine retains audio clock authority. Selection-loop sources stop at the exact Selection end before the transport seeks back.
 - A **Preview audio engine** should apply channel handling during playback routing rather than baking channel fixes into prepared **Preview audio resources**, so **Audio mix decisions** can change without regenerating those resources.
 - **Track volume**, include/exclude, preview solo, and preview mute should be applied by the **Preview audio engine** graph at playback time rather than baked into prepared **Preview audio resources**.
-- Preview audio resource preparation should eagerly prepare every audio **Media track** for consistent mix-capable preview, even when some tracks are currently excluded by **Audio mix decisions**; independent track preparations should run concurrently, while preserving deterministic asset-track ordering in the prepared result.
+- **Preview audio window** preparation primes every audio **Media track** concurrently for consistent mix-capable preview, even when some tracks are excluded by **Audio mix decisions**. Track identity and order remain those of the active asset.
 - Preview and export may share audio graph-building or mix-plan logic so both consume the same **Audio mix decisions**; preview renders through a live audio context, while export renders the equivalent mix offline before handing audio to the media output pipeline.
 - While preview audio resources are being prepared, video may be visually previewable but audio monitoring controls should remain unavailable and native video audio should not be used as a temporary substitute.
-- If preview audio resource preparation fails for a **Media track**, the **Preview audio engine** may continue in an explicit degraded state; audio monitoring should not silently omit that track, and the failed track should expose a retry action that regenerates only that track's preview audio resource.
+- If preview audio resource preparation fails for a **Media track**, the **Preview audio engine** may continue in an explicit degraded state; audio monitoring should not silently omit that track, and the failed track should expose a retry action that opens a fresh window generation only for that failed track while healthy generations remain reusable.
 - When a **Preview audio engine** is active, the native video element should be muted so all audible preview output comes from the engine.
 - When a **Preview audio engine** is active, the engine's audio clock is authoritative, including in explicit degraded preview states; if native video playback drifts from the shared **Playhead**, video should be corrected toward the engine time.
 - **Playback speed** applies to the whole preview; when a **Preview audio engine** is active, the engine and synchronized video renderer should use the same speed value and preserve sync, while pitch preservation is not required for the first implementation.

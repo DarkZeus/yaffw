@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
 	MediaWindowProvider,
 	MediaWindowPullResult,
-} from "../prototype/playhead-window/media-window-provider";
+} from "../engine/media-window-provider";
 import {
 	type PlayheadWindowPrototypeAudioContextFactory,
 	createPlayheadWindowPrototype,
@@ -269,6 +269,11 @@ function createProviderSpy({
 } = {}) {
 	let generationId = 0;
 	const provider = {
+		getTrackMetadata: () => ({
+			numberOfChannels: 2,
+			sampleRate: 48000,
+			failureReason: null,
+		}),
 		dispose: vi.fn(async () => {}),
 		durationSeconds,
 		generations: [] as Array<{

@@ -162,10 +162,21 @@ export function useNativePreviewTransport({
 			}
 
 			if (audioMasterClockActive) {
+				previewAudioEngineRef.current?.setPlaybackEnd(
+					selectionLoopEnabled && nextPlayheadUs < selection.endUs
+						? selection.endUs / 1_000_000
+						: null,
+				);
 				previewAudioEngineRef.current?.setTime(nextTimeSeconds);
 			}
 		},
-		[audioMasterClockActive, previewAudioEngineRef, videoRef],
+		[
+			audioMasterClockActive,
+			previewAudioEngineRef,
+			selection.endUs,
+			selectionLoopEnabled,
+			videoRef,
+		],
 	);
 
 	const updateSelectionLoopEntryFromPlayhead = useCallback(
@@ -318,6 +329,12 @@ export function useNativePreviewTransport({
 					return;
 				}
 
+				previewAudioEngineRef.current?.setPlaybackEnd(
+					selectionLoopEnabled &&
+						playbackStartSeconds < selection.endUs / 1_000_000
+						? selection.endUs / 1_000_000
+						: null,
+				);
 				previewAudioEngineRef.current?.setTime(playbackStartSeconds);
 				await previewAudioEngineRef.current?.play();
 
@@ -367,6 +384,8 @@ export function useNativePreviewTransport({
 		isPlaying,
 		previewAudioEngineRef,
 		previewClockMode,
+		selection.endUs,
+		selectionLoopEnabled,
 		videoRef,
 	]);
 
@@ -606,7 +625,19 @@ export function useNativePreviewTransport({
 		selectionLoopEnteredRef.current =
 			selectionLoopEnabled &&
 			isMediaTimeInsideSelection(playheadRef.current, selection);
-	}, [selection, selectionLoopEnabled]);
+		if (audioMasterClockActive) {
+			previewAudioEngineRef.current?.setPlaybackEnd(
+				selectionLoopEnabled && playheadRef.current < selection.endUs
+					? selection.endUs / 1_000_000
+					: null,
+			);
+		}
+	}, [
+		audioMasterClockActive,
+		previewAudioEngineRef,
+		selection,
+		selectionLoopEnabled,
+	]);
 
 	useEffect(() => {
 		if (!isPlaying) {

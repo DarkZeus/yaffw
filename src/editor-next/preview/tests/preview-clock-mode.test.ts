@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
@@ -54,6 +55,18 @@ describe("resolvePreviewClockMode", () => {
 		).toBe("audio-master-pending");
 	});
 
+	it("retains the established audio clock while a seek or rate change primes a new window", () => {
+		expect(
+			resolvePreviewClockMode({
+				asset: readyAssetWithAudio,
+				audioMonitoringReady: false,
+				audioMonitoringEstablished: true,
+				previewAudioResources: readyPreviewAudioResourcesState(),
+				audioPreviewTransportSupported: true,
+			}),
+		).toBe("audio-master");
+	});
+
 	it("uses explicit native-video fallback when audio preview preparation fails", () => {
 		expect(
 			resolvePreviewClockMode({
@@ -107,15 +120,11 @@ describe("resolvePreviewClockMode", () => {
 function readyPreviewAudioResourcesState(): PreviewAudioResourcesState {
 	return {
 		failures: [],
+		provider: createPreviewAudioProviderStub(),
 		resources: [
 			{
-				audioBuffer: {
-					duration: 1,
-					length: 48_000,
-					numberOfChannels: 2,
-					sampleRate: 48_000,
-				} as AudioBuffer,
-				startPositionSeconds: 0,
+				numberOfChannels: 2,
+				sampleRate: 48_000,
 				track: {
 					id: "audio-1",
 					kind: "audio",

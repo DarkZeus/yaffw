@@ -1,4 +1,5 @@
 /* @vitest-environment jsdom */
+import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 
 import {
 	act,
@@ -41,6 +42,8 @@ const adapterMockState = vi.hoisted(() => ({
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
 		getStatus: ReturnType<typeof vi.fn>;
+		retryTrack: ReturnType<typeof vi.fn>;
+		subscribe: ReturnType<typeof vi.fn>;
 		readMeterSnapshot: ReturnType<typeof vi.fn>;
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
@@ -307,6 +310,10 @@ beforeEach(() => {
 			destroy: vi.fn(),
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
 			getStatus: vi.fn(() => "ready"),
+			getMetrics: vi.fn(),
+			retryTrack: vi.fn(async () => {}),
+			setPlaybackEnd: vi.fn(),
+			subscribe: vi.fn(() => vi.fn()),
 			pause: vi.fn(),
 			play: vi.fn(),
 			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
@@ -847,7 +854,7 @@ describe("NativePreviewPlayer", () => {
 		);
 	});
 
-	it("publishes a retry handler that re-prepares only a failed audio track", async () => {
+	it("retries a failed track through the existing engine without recreating asset resources", async () => {
 		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
 
 		if (!desktopTrack) {
@@ -857,12 +864,10 @@ describe("NativePreviewPlayer", () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
 		preparePreviewAudioResourcesMock
 			.mockImplementationOnce(async (request) => {
-				const prepared = createPreparedPreviewAudioResourcesForRequest({
-					...request,
-					trackIds: new Set(["audio-1"]),
-				});
+				const prepared = createPreparedPreviewAudioResourcesForRequest(request);
 
 				return {
+					provider: prepared.provider,
 					failures: [
 						{
 							reason: "Desktop source failed",
@@ -911,11 +916,12 @@ describe("NativePreviewPlayer", () => {
 		);
 
 		await waitFor(() => {
-			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(2);
+			expect(
+				adapterMockState.previewAudioEngines[0]?.retryTrack,
+			).toHaveBeenCalledWith("audio-2");
 		});
-		const retryRequest = preparePreviewAudioResourcesMock.mock.calls[1]?.[0];
-
-		expect(Array.from(retryRequest?.trackIds ?? [])).toEqual(["audio-2"]);
+		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
+		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
 	});
 
 	it("keeps sync fixture preview aligned after audio mix changes", async () => {
@@ -1652,12 +1658,11 @@ function createTestDomRect({
 function createPreparedPreviewAudioResourcesForRequest(
 	request: PreparePreviewAudioResourcesRequest,
 ): PreviewAudioResourcesResult {
-	const requestedTrackIds = request.trackIds
-		? Array.from(request.trackIds)
-		: request.asset.tracks.audio.map((track) => track.id);
+	const requestedTrackIds = request.asset.tracks.audio.map((track) => track.id);
 
 	return {
 		failures: [],
+		provider: createPreviewAudioProviderStub(),
 		resources: requestedTrackIds.map((trackId, resourceIndex) => {
 			const track = request.asset.tracks.audio.find(
 				(candidateTrack) => candidateTrack.id === trackId,
@@ -1667,13 +1672,8 @@ function createPreparedPreviewAudioResourcesForRequest(
 			}
 
 			return {
-				audioBuffer: {
-					duration: 1,
-					length: 48_000,
-					numberOfChannels: 2,
-					sampleRate: 48_000,
-				} as AudioBuffer,
-				startPositionSeconds: 0,
+				numberOfChannels: 2,
+				sampleRate: 48_000,
 				track,
 				trackId,
 				trackIndex: resourceIndex,
