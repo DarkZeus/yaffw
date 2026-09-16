@@ -19,3 +19,5 @@ When a **Media asset** has multiple audio tracks, YAFFW should not rely on the b
 - When **Output settings** use **Preserve source** for audio codec, the **Generated audio mix** uses the codec of the first included source audio track, subject to selected-container compatibility.
 - Preserving separate generated audio tracks is a future advanced export behavior, not the default.
 - Implementation should start with the editor core/session decision model, then wire preview audio mixing, then wire export audio mixing, so preview and export consume the same **Audio mix decisions**.
+
+- **Output settings** may explicitly select **No audio**. Export omits every audio track and skips audio processing while preserving session audio mix decisions and audio quality for later use. This choice is saved in Export presets and does not mute preview.

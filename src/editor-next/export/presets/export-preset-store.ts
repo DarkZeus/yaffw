@@ -163,7 +163,8 @@ function isOutputSettings(value: unknown): value is OutputSettings {
 		isRecord(value) &&
 		isContainerSetting(value.container) &&
 		isCodecSetting(value.videoCodec) &&
-		isCodecSetting(value.audioCodec) &&
+		(isCodecSetting(value.audioCodec) ||
+			(isRecord(value.audioCodec) && value.audioCodec.kind === "no-audio")) &&
 		isResolutionSetting(value.resolution) &&
 		isQualitySetting(value.videoQuality) &&
 		isQualitySetting(value.audioQuality)

@@ -463,6 +463,18 @@ describe("browserDefaultExportRunner cleanup", () => {
 		});
 	});
 
+	it("omits audio without changing included mix decisions when No audio is selected", async () => {
+		const outputSettings = {
+			...createDefaultOutputSettings(),
+			audioCodec: { kind: "no-audio" as const },
+		};
+		await browserDefaultExportRunner.run(
+			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
+		);
+		expect(browserAudioMixMock.renderBrowserAudioMix).not.toHaveBeenCalled();
+		expect(mediabunnyMock.outputs[0].addAudioTrack).not.toHaveBeenCalled();
+	});
+
 	it("keeps an all-excluded Audio mix as a valid video-only export", async () => {
 		const result = await browserDefaultExportRunner.run(
 			createExportRequest({

@@ -1,4 +1,4 @@
-import { BadgeCheck, Download, Gauge, PlayCircle, Square } from "lucide-react";
+import { BadgeCheck, Check, Download, Square } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -78,27 +78,26 @@ export function ExportInspectorPanel({
 	return (
 		<section
 			aria-label="Export inspector"
-			className="flex min-w-0 flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector shadow-sm xl:min-h-full xl:rounded-none xl:border-0 xl:shadow-none"
+			className="flex min-w-0 flex-col px-4 pb-6 md:px-1"
 		>
-			<div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
+			<div className="flex min-h-0 flex-1 flex-col gap-6">
 				<ExportReviewSection
 					hasAutomaticChannelMode={asset.tracks.audio.some((track) => {
 						const decision = audioMix.tracks[track.id];
 						return (
+							outputSettings.audioCodec.kind !== "no-audio" &&
 							decision?.include &&
 							decision.channelMode === "auto-one-sided-stereo"
 						);
 					})}
-					outputAudio={outputAudio}
 					outputResolution={outputResolution}
 					review={review}
-					runtime={runtime}
 					videoQuality={formatOutputQualitySetting(outputSettings.videoQuality)}
-					audioQuality={formatOutputQualitySetting(outputSettings.audioQuality)}
-				/>
-				<RuntimeChecksSection
-					profileSupported={review.supported}
-					runtime={runtime}
+					audioQuality={
+						outputSettings.audioCodec.kind === "no-audio"
+							? "No audio"
+							: formatOutputQualitySetting(outputSettings.audioQuality)
+					}
 				/>
 				<OutputSettingsPanel
 					asset={asset}
@@ -114,6 +113,24 @@ export function ExportInspectorPanel({
 					onStartExport={onStartExport}
 					reviewSupported={review.supported}
 				/>
+				<details className="text-xs text-muted-foreground">
+					<summary className="cursor-pointer py-2 font-medium text-foreground focus-visible:outline-2 focus-visible:outline-workbench-focus">
+						Export details
+					</summary>
+					<div className="mt-3 space-y-4">
+						<InspectorLine
+							label="Audio mix"
+							value={formatGeneratedAudioMix(outputAudio)}
+						/>
+						{review.supported ? (
+							<InspectorLine label="Method" value={review.method.label} />
+						) : null}
+						<RuntimeChecksSection
+							profileSupported={review.supported}
+							runtime={runtime}
+						/>
+					</div>
+				</details>
 			</div>
 		</section>
 	);
@@ -122,28 +139,23 @@ export function ExportInspectorPanel({
 function ExportReviewSection({
 	audioQuality,
 	hasAutomaticChannelMode,
-	outputAudio,
 	outputResolution,
 	review,
-	runtime,
 	videoQuality,
 }: {
 	audioQuality: string;
 	hasAutomaticChannelMode: boolean;
-	outputAudio: ResolvedOutputAudioProfile;
 	outputResolution: ResolvedOutputResolution;
 	review: ExportCapabilityReview;
-	runtime: RuntimeSupport;
 	videoQuality: string;
 }) {
 	return (
-		<section
-			aria-label="Export review"
-			className="overflow-visible rounded border border-workbench-selected/35 bg-workbench-hover/45 p-2.5"
-		>
-			<div className="mb-2 flex items-start justify-between gap-3">
+		<section aria-label="Export review" className="min-w-0 overflow-visible">
+			<div className="mb-4 flex items-start justify-between gap-3">
 				<div className="min-w-0">
-					<h3 className="text-sm font-semibold text-foreground">Output</h3>
+					<h3 className="text-lg font-medium tracking-tight text-foreground">
+						Output
+					</h3>
 				</div>
 				<Badge
 					className="shrink-0"
@@ -152,34 +164,25 @@ function ExportReviewSection({
 					{review.supported ? "Ready" : "Blocked"}
 				</Badge>
 			</div>
-			<div className="space-y-2">
-				<InspectorLine label="Format" value={review.plannedOutput.label} />
+			<p className="mb-5 text-sm leading-6 text-foreground">
+				<span className="mb-1 block text-xs text-muted-foreground">Format</span>
+				{review.plannedOutput.label}
+			</p>
+			<div className="space-y-3">
 				<InspectorLine
 					label="Resolution"
 					value={formatOutputResolution(outputResolution)}
 				/>
 				<InspectorLine label="Video quality" value={videoQuality} />
 				<InspectorLine label="Audio quality" value={audioQuality} />
-				<InspectorLine
-					label="Generated audio mix"
-					value={formatGeneratedAudioMix(outputAudio)}
-				/>
 				{review.supported ? (
-					<>
-						<InspectorLine label="Export" value={review.method.label} />
-						<InspectorLine label="Range" value={review.precision.label} />
-						<InspectorLine
-							label="Runtime"
-							value={formatRuntimeSummary(runtime)}
-						/>
-					</>
+					<InspectorLine label="Range" value={review.precision.label} />
 				) : null}
 			</div>
 
 			{hasAutomaticChannelMode ? (
 				<p className="mt-3 text-xs leading-5 text-muted-foreground">
-					Auto-fix quiet side analyzes the full Selection for export. Preview
-					checks short passages, so stereo placement may differ.
+					Auto-fix quiet side may place stereo differently than preview.
 				</p>
 			) : null}
 
@@ -207,23 +210,19 @@ function RuntimeChecksSection({
 		runtime.capabilities.fileApi;
 
 	return (
-		<section
-			aria-label="Export requirements"
-			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
-		>
-			<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-				<Gauge aria-hidden="true" className="size-4 text-workbench-progress" />
+		<section aria-label="Export requirements" className="min-w-0">
+			<div className="mb-3 text-xs font-medium text-foreground">
 				Requirements
 			</div>
-			<ul className="flex flex-col gap-2 text-[11px] text-muted-foreground">
+			<ul className="flex flex-col gap-3 text-xs text-muted-foreground">
 				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">Documented output profile</span>
+					<span className="min-w-0">Documented output profile</span>
 					<CompactStatusBadge tone={profileSupported ? "ready" : "blocked"}>
 						{profileSupported ? "Supported" : "Blocked"}
 					</CompactStatusBadge>
 				</li>
 				<li className="flex min-w-0 items-center justify-between gap-3">
-					<span className="min-w-0 truncate">Browser APIs</span>
+					<span className="min-w-0">Browser APIs</span>
 					<CompactStatusBadge tone={browserApisReady ? "ready" : "blocked"}>
 						{browserApisReady ? "Ready" : "Missing"}
 					</CompactStatusBadge>
@@ -261,7 +260,7 @@ function ExportJobSection({
 					{exportState.job.cancelSupported ? (
 						<ExportActionShell>
 							<Button
-								className="h-8 w-full"
+								className="h-10 w-full"
 								onClick={onCancelExport}
 								type="button"
 								variant="outline"
@@ -286,9 +285,7 @@ function ExportJobSection({
 		case "cancelled":
 			return (
 				<>
-					<div className="rounded border border-workbench-border bg-workbench-lane p-3 text-sm text-muted-foreground">
-						Export cancelled.
-					</div>
+					<div className="text-sm text-muted-foreground">Export cancelled.</div>
 					<StartExportAction
 						disabled={!reviewSupported}
 						onStartExport={onStartExport}
@@ -307,7 +304,7 @@ function ExportJobSection({
 
 function RunningExportStatus({ job }: { job: ExportJob }) {
 	return (
-		<div className="grid min-w-0 gap-2 rounded border border-workbench-border bg-workbench-lane p-3">
+		<div className="grid min-w-0 gap-3">
 			<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
 				<span className="font-medium">
 					{formatExportProgressPhase(job.progress.phase)}
@@ -365,9 +362,9 @@ function GeneratedMediaStatus({
 	return (
 		<div
 			aria-label="Generated media status"
-			className="grid min-w-0 auto-rows-max gap-3 overflow-visible rounded border border-workbench-border bg-workbench-lane p-3 text-sm"
+			className="grid min-w-0 auto-rows-max gap-3 overflow-visible text-sm"
 		>
-			<div className="flex min-w-0 items-center gap-2">
+			<div className="flex min-w-0 flex-wrap items-center gap-2">
 				<BadgeCheck
 					aria-hidden="true"
 					className="size-4 text-workbench-progress"
@@ -378,7 +375,7 @@ function GeneratedMediaStatus({
 				</Badge>
 			</div>
 			<Button
-				className="w-full"
+				className="h-10 w-full"
 				onClick={() => onDownloadGeneratedMedia(exportState.generatedMedia)}
 				size="sm"
 				type="button"
@@ -388,7 +385,7 @@ function GeneratedMediaStatus({
 			</Button>
 			<p
 				aria-label="Generated media filename"
-				className="block max-w-full min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 font-mono text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+				className="block max-w-full min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 tabular-nums text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
 			>
 				{exportState.generatedMedia.fileName}
 			</p>
@@ -414,12 +411,11 @@ function StartExportAction({
 	return (
 		<ExportActionShell>
 			<Button
-				className="h-8 w-full bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
+				className="h-11 w-full bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
 				disabled={disabled}
 				onClick={onStartExport}
 				type="button"
 			>
-				<PlayCircle data-icon="inline-start" />
 				Start export
 			</Button>
 		</ExportActionShell>
@@ -428,10 +424,7 @@ function StartExportAction({
 
 function ExportActionShell({ children }: { children: ReactNode }) {
 	return (
-		<section
-			aria-label="Export action"
-			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
-		>
+		<section aria-label="Export action" className="min-w-0">
 			{children}
 		</section>
 	);
@@ -445,9 +438,9 @@ function InspectorLine({
 	value: string;
 }) {
 	return (
-		<div className="flex items-start justify-between gap-3 text-[11px]">
+		<div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-start gap-4 text-xs leading-5">
 			<span className="text-muted-foreground">{label}</span>
-			<span className="min-w-0 break-words text-right font-medium text-foreground">
+			<span className="min-w-0 break-words text-left font-medium text-foreground">
 				{value}
 			</span>
 		</div>
@@ -463,12 +456,15 @@ function CompactStatusBadge({
 }) {
 	return (
 		<span
-			className={`rounded px-2 py-0.5 font-medium ${
+			className={`inline-flex shrink-0 items-center gap-1.5 font-medium ${
 				tone === "ready"
-					? "bg-workbench-hover text-workbench-selected"
+					? "text-workbench-selected"
 					: "bg-destructive/15 text-destructive"
 			}`}
 		>
+			{tone === "ready" ? (
+				<Check aria-hidden="true" className="size-3" />
+			) : null}
 			{children}
 		</span>
 	);
@@ -484,8 +480,8 @@ function formatGeneratedAudioMix(profile: ResolvedOutputAudioProfile): string {
 	}
 
 	const sourceTrackLabel =
-		profile.includedTrackCount === 1 ? "source track" : "source tracks";
-	return `${profile.includedTrackCount} included ${sourceTrackLabel} to one ${profile.audioCodec.toUpperCase()} audio track`;
+		profile.includedTrackCount === 1 ? "track" : "tracks";
+	return `${profile.includedTrackCount} ${sourceTrackLabel} → 1 ${profile.audioCodec.toUpperCase()} mix`;
 }
 
 function formatOutputResolution(resolution: ResolvedOutputResolution): string {
@@ -531,8 +527,4 @@ function formatExportProgressPhase(phase: ExportProgress["phase"]): string {
 		case "preparing":
 			return "Preparing";
 	}
-}
-
-function formatRuntimeSummary(runtime: RuntimeSupport): string {
-	return runtime.supported ? "WebCodecs ready" : "Runtime blocked";
 }

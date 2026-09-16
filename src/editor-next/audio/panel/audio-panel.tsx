@@ -195,7 +195,7 @@ function AudioTrackStrip({
 			</div>
 			<div className="grid min-h-0 min-w-0 grid-cols-[2.25rem_4.25rem] justify-center gap-2">
 				<label className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] justify-items-center gap-1 rounded-sm border border-workbench-border bg-workbench-viewer px-1 py-2">
-					<span className="font-mono text-[10px] text-workbench-progress">
+					<span className="tabular-nums text-[10px] text-workbench-progress">
 						{volumePercent}%
 					</span>
 					<span className="sr-only">{label} track volume</span>
@@ -437,7 +437,7 @@ function MeterStatusBadge({ statusLabel }: { statusLabel: string }) {
 	}
 
 	return (
-		<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-normal text-muted-foreground">
+		<span className="rounded-sm border border-workbench-border bg-workbench-viewer px-1.5 py-0.5 text-[10px] font-medium tracking-normal text-muted-foreground">
 			{statusLabel}
 		</span>
 	);

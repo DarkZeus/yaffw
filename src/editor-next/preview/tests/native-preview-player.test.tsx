@@ -59,7 +59,6 @@ const scrubPreviewMockState = vi.hoisted(() => ({
 	providers: [] as Array<{
 		dispose: ReturnType<typeof vi.fn>;
 		onFrame: (frame: {
-			accuracy: "exact" | "keyframe";
 			actualTimestampUs: number;
 			canvas: HTMLCanvasElement;
 			requestId: number;
@@ -74,7 +73,6 @@ const scrubPreviewMockState = vi.hoisted(() => ({
 vi.mock("../scrub/mediabunny-scrub-frame-provider", () => ({
 	createMediabunnyScrubFrameProvider: (options: {
 		onFrame: (frame: {
-			accuracy: "exact" | "keyframe";
 			actualTimestampUs: number;
 			canvas: HTMLCanvasElement;
 			requestId: number;
@@ -457,10 +455,10 @@ describe("NativePreviewPlayer", () => {
 			expect(previewLayout.getAttribute("data-panel-group-direction")).toBe(
 				"vertical",
 			);
-			expect(previewLayout.className).toContain("xl:h-full");
+			expect(previewLayout.className).toContain("cinema-layout");
 			expect(
 				screen.getByLabelText("Resize selection region").className,
-			).toContain("bg-workbench-border-strong");
+			).toContain("cinema-selection-resizer");
 
 			const centerRegion = screen.getByLabelText("Workbench center region");
 			const nativePreview = within(centerRegion).getByLabelText(
@@ -486,18 +484,15 @@ describe("NativePreviewPlayer", () => {
 				"Preview playback settings",
 			);
 
-			expect(centerRegion.className).toContain("bg-workbench-viewer");
 			expect(nativePreview.className).toContain("h-full");
 			expect(nativePreview.className).toContain("min-h-0");
 			expect(nativePreview.className).not.toContain("min-h-full");
-			expect(viewerHeader.className).toContain("border-workbench-border");
 			expect(viewerHeader.textContent).not.toContain("clip.mp4");
 			expect(within(viewerHeader).queryByText("Program viewer")).toBeNull();
 			expect(
 				within(viewerHeader).getByText("1x").parentElement?.className,
 			).toContain("whitespace-nowrap");
-			expect(viewerSurface.className).toContain("bg-workbench-viewer");
-			expect(aperture.className).toContain("border-workbench-border-strong");
+			expect(aperture.className).toContain("isolate");
 			expect(aperture.className).toContain("max-h-full");
 			expect(aperture.className).not.toContain("max-w-5xl");
 			expect(aperture.style.aspectRatio).toBe(String(16 / 9));
@@ -511,10 +506,11 @@ describe("NativePreviewPlayer", () => {
 			expect(
 				within(aperture).getByLabelText("Preview for clip.mp4").className,
 			).not.toContain("object-cover");
-			expect(transportRegion.className).toContain("bg-workbench-transport");
 			expect(transportRegion.className).not.toContain("xl:row-start-2");
 			expect(transportRegion.className).not.toContain("xl:col-span-2");
-			expect(transportControls.className).toContain("grid");
+			expect(transportControls.className).toContain(
+				"cinema-transport-controls",
+			);
 			expect(primaryControls.className).toContain("justify-start");
 			expect(
 				within(primaryControls)
@@ -630,7 +626,7 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
-	it("keeps a decoded scrub frame visible while native video synchronizes on playback", async () => {
+	it("retains the displayed scrub frame through a pending seek and native playback handoff", async () => {
 		const context = {
 			clearRect: vi.fn(),
 			drawImage: vi.fn(),
@@ -657,7 +653,6 @@ describe("NativePreviewPlayer", () => {
 
 			act(() => {
 				provider?.onFrame({
-					accuracy: "exact",
 					actualTimestampUs: 10_000_000,
 					canvas: decodedCanvas,
 					requestId: 1,
@@ -671,9 +666,43 @@ describe("NativePreviewPlayer", () => {
 				expect(overlay.className).not.toContain("hidden");
 			});
 			expect(context.drawImage).toHaveBeenCalled();
+			context.drawImage.mockClear();
+			context.clearRect.mockClear();
+
+			fireEvent.click(
+				screen.getByRole("button", { name: "Seek backward 1 second" }),
+			);
+			expect(provider?.requestFrame).toHaveBeenLastCalledWith(9_000_000, {
+				priority: "final",
+			});
+			expect(video.currentTime).toBe(0);
+			expect(overlay.className).toContain("block");
+			expect(context.drawImage).not.toHaveBeenCalled();
+			expect(context.clearRect).not.toHaveBeenCalled();
+
+			const nextCanvas = document.createElement("canvas");
+			nextCanvas.width = 640;
+			nextCanvas.height = 360;
+			act(() => {
+				provider?.onFrame({
+					actualTimestampUs: 9_000_000,
+					canvas: nextCanvas,
+					requestId: 2,
+					requestedAtMs: 0,
+					timestampUs: 9_000_000,
+				});
+			});
+			expect(context.drawImage).toHaveBeenLastCalledWith(
+				nextCanvas,
+				0,
+				0,
+				640,
+				360,
+			);
+			expect(overlay.className).toContain("block");
 
 			fireEvent.click(screen.getByRole("button", { name: "Play" }));
-			expect(video.currentTime).toBe(10);
+			expect(video.currentTime).toBe(9);
 			expect(overlay.className).toContain("block");
 
 			fireEvent.playing(video);

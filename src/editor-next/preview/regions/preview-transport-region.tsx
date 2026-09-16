@@ -11,7 +11,7 @@ import {
 	VolumeX,
 } from "lucide-react";
 import type { ChangeEvent, ReactNode } from "react";
-import { memo } from "react";
+import { memo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { MediaTimeUs } from "@/editor-core/model";
@@ -47,6 +47,8 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 	selectionLoopEnabled,
 	volume,
 }: PreviewTransportRegionProps) {
+	const [speedPointerFocus, setSpeedPointerFocus] = useState(false);
+
 	function updatePlaybackRate(event: ChangeEvent<HTMLSelectElement>) {
 		onPlaybackRateChange(Number.parseFloat(event.currentTarget.value));
 	}
@@ -56,13 +58,10 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 	}
 
 	return (
-		<section
-			aria-label="Workbench transport region"
-			className="min-h-10 rounded-md border border-workbench-border bg-workbench-transport xl:min-h-0 xl:overflow-hidden xl:rounded-none xl:border-x-0"
-		>
+		<section aria-label="Workbench transport region">
 			<div
 				aria-label="Preview transport controls"
-				className="grid min-h-10 min-w-0 grid-cols-1 items-center gap-2 px-3 py-1 text-[11px] text-muted-foreground md:grid-cols-[auto_minmax(0,1fr)] xl:h-full xl:min-h-0 xl:overflow-hidden xl:py-0"
+				className="cinema-transport-controls"
 			>
 				<div
 					aria-label="Primary preview controls"
@@ -70,7 +69,7 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 				>
 					<Button
 						aria-label={isPlaying ? "Pause" : "Play"}
-						className="size-8 rounded border-workbench-progress/40 bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
+						className="cinema-play-button"
 						onClick={() => {
 							void onTogglePlayback();
 						}}
@@ -150,8 +149,12 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 						<span className="sr-only">Playback speed</span>
 						<select
 							aria-label="Playback speed"
-							className="h-7 rounded border border-input bg-workbench px-2 text-xs shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+							className="h-7 rounded border-0 bg-workbench-hover px-2 text-xs shadow-none outline-none"
+							data-pointer-focus={speedPointerFocus}
+							onBlur={() => setSpeedPointerFocus(false)}
 							onChange={updatePlaybackRate}
+							onKeyDown={() => setSpeedPointerFocus(false)}
+							onPointerDown={() => setSpeedPointerFocus(true)}
 							value={String(playbackRate)}
 						>
 							{playbackSpeeds.map((speed) => (
@@ -164,7 +167,7 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 
 					<Button
 						aria-label={muted ? "Unmute preview audio" : "Mute preview audio"}
-						className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+						className="cinema-transport-button"
 						onClick={onToggleMuted}
 						size="icon"
 						type="button"
@@ -194,7 +197,7 @@ function PreviewIconButton({
 	return (
 		<Button
 			aria-label={label}
-			className="size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+			className="cinema-transport-button"
 			onClick={onClick}
 			size="icon"
 			type="button"
@@ -220,11 +223,7 @@ function PreviewToggleButton({
 		<Button
 			aria-label={label}
 			aria-pressed={pressed}
-			className={
-				pressed
-					? "size-8 rounded border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
-					: "size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-			}
+			className="cinema-transport-button cinema-toggle-button"
 			onClick={onClick}
 			size="icon"
 			title={label}

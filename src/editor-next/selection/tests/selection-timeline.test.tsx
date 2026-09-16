@@ -111,8 +111,7 @@ describe("SelectionTimeline", () => {
 		fireEvent.click(followButton);
 
 		expect(followButton.getAttribute("aria-pressed")).toBe("true");
-		expect(followButton.className).toContain("bg-workbench-progress/15");
-		expect(followButton.className).toContain("text-workbench-progress");
+		expect(followButton.className).toContain("cinema-toggle-button");
 		expect(followButton.className).not.toContain("bg-workbench-selected");
 		await waitFor(() => {
 			expect(scrollTo).toHaveBeenCalledWith({

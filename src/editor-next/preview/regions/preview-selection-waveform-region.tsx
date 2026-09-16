@@ -46,7 +46,7 @@ export function PreviewSelectionWaveformRegion({
 	return (
 		<section
 			aria-label="Workbench selection region"
-			className="min-h-[22rem] overflow-x-hidden overscroll-contain xl:min-h-0 xl:overflow-y-auto xl:border-t xl:border-workbench-border-strong xl:bg-workbench-timeline"
+			className="h-full min-h-0 overflow-auto"
 		>
 			<SelectionTimeline
 				audioMix={audioMix}

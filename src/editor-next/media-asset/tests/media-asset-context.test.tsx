@@ -33,14 +33,10 @@ describe("MediaAssetContextPanel", () => {
 		);
 
 		const mediaAssetContext = screen.getByLabelText("Media asset context");
-		expect(mediaAssetContext.className).toContain("overflow-x-hidden");
-		expect(mediaAssetContext.className).toContain("rounded-md");
-		expect(mediaAssetContext.className).toContain("bg-workbench-inspector");
 
 		const loadedMediaAsset =
 			within(mediaAssetContext).getByLabelText("Loaded media asset");
 		expect(within(loadedMediaAsset).getByText("picked.mp4")).toBeTruthy();
-		expect(loadedMediaAsset.className).toContain("rounded");
 
 		expect(within(mediaAssetContext).getByText("Source")).toBeTruthy();
 		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();

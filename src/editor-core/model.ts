@@ -145,7 +145,7 @@ export type OutputQualitySetting =
 	  };
 
 export type OutputSettings = {
-	audioCodec: OutputCodecSetting;
+	audioCodec: OutputCodecSetting | { kind: "no-audio" };
 	audioQuality: OutputQualitySetting;
 	container: OutputContainerSetting;
 	resolution: OutputResolutionSetting;
@@ -227,8 +227,8 @@ function areOutputContainerSettingsEqual(
 }
 
 function areOutputCodecSettingsEqual(
-	left: OutputSettings["videoCodec"],
-	right: OutputSettings["videoCodec"],
+	left: OutputSettings["audioCodec"],
+	right: OutputSettings["audioCodec"],
 ): boolean {
 	if (left.kind !== right.kind) {
 		return false;

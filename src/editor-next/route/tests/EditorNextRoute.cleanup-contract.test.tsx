@@ -257,10 +257,11 @@ describe("EditorNextRoute cleanup contract", () => {
 		});
 
 		openMediaTab();
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+			expect(screen.getByText("Open a video")).toBeTruthy();
 		});
 
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
@@ -342,6 +343,7 @@ describe("EditorNextRoute cleanup contract", () => {
 			expect(waveformRuns).toHaveLength(1);
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {

@@ -9,7 +9,6 @@ const EXACT_SETTLE_DELAY_MS = 120;
 const EXACT_PREFETCH_PACKET_COUNT = 24;
 
 export type ScrubFrame = {
-	accuracy: "exact" | "keyframe";
 	actualTimestampUs: MediaTimeUs;
 	canvas: HTMLCanvasElement | OffscreenCanvas;
 	requestId: number;
@@ -41,14 +40,13 @@ export type ScrubFrameProviderRequest = {
 
 type PendingScrubFrameRequest = {
 	id: number;
-	phase: "exact" | "keyframe-then-exact" | "keyframe";
+	phase: "cached" | "exact";
 	requestedAtMs: number;
 	timestampSeconds: number;
 	timestampUs: MediaTimeUs;
 };
 
 type FrameWaiter = {
-	accuracy: ScrubFrame["accuracy"];
 	actualTimestampUs: MediaTimeUs;
 	promise: Promise<boolean>;
 	request: PendingScrubFrameRequest;
@@ -122,7 +120,6 @@ export function createMediabunnyScrubFrameProvider({
 			for (const waiter of waiters) {
 				const rendered = emitDecodedFrame(
 					waiter.request,
-					waiter.accuracy,
 					waiter.actualTimestampUs,
 				);
 				waiter.resolved = true;
@@ -135,7 +132,6 @@ export function createMediabunnyScrubFrameProvider({
 
 	function emitDecodedFrame(
 		request: PendingScrubFrameRequest,
-		accuracy: ScrubFrame["accuracy"],
 		actualTimestampUs: MediaTimeUs,
 	) {
 		if (request.id !== latestRequestId || disposed) {
@@ -148,7 +144,6 @@ export function createMediabunnyScrubFrameProvider({
 		}
 
 		onFrame({
-			accuracy,
 			actualTimestampUs,
 			canvas,
 			requestId: request.id,
@@ -161,14 +156,12 @@ export function createMediabunnyScrubFrameProvider({
 	function createFrameWaiter(
 		actualTimestampUs: MediaTimeUs,
 		request: PendingScrubFrameRequest,
-		accuracy: ScrubFrame["accuracy"],
 	): FrameWaiter {
 		let resolvePromise: (rendered: boolean) => void = () => undefined;
 		const promise = new Promise<boolean>((resolve) => {
 			resolvePromise = resolve;
 		});
 		const waiter: FrameWaiter = {
-			accuracy,
 			actualTimestampUs,
 			promise,
 			request,
@@ -261,34 +254,6 @@ export function createMediabunnyScrubFrameProvider({
 		reseedDecoder();
 	}
 
-	async function showKeyframe(request: PendingScrubFrameRequest) {
-		const keyPacket = await resolveKeyPacket(request.timestampSeconds);
-		if (!keyPacket || request.id !== latestRequestId || disposed) {
-			return;
-		}
-
-		const actualTimestampUs = keyPacket.microsecondTimestamp;
-		if (emitDecodedFrame(request, "keyframe", actualTimestampUs)) {
-			return;
-		}
-
-		await seedAtKeyPacket(keyPacket);
-		if (!iterator || request.id !== latestRequestId || disposed) {
-			return;
-		}
-		const keyframeWaiter = createFrameWaiter(
-			actualTimestampUs,
-			request,
-			"keyframe",
-		);
-		const first = await iterator.next();
-		if (first.done || !first.value) {
-			removeFrameWaiter(keyframeWaiter);
-			return;
-		}
-		await decodePacket(first.value);
-	}
-
 	async function showCachedExact(request: PendingScrubFrameRequest) {
 		if (!packetSink || request.id !== latestRequestId || disposed) {
 			return false;
@@ -297,7 +262,7 @@ export function createMediabunnyScrubFrameProvider({
 			metadataOnly: true,
 		});
 		return targetPacket
-			? emitDecodedFrame(request, "exact", targetPacket.microsecondTimestamp)
+			? emitDecodedFrame(request, targetPacket.microsecondTimestamp)
 			: false;
 	}
 
@@ -313,7 +278,7 @@ export function createMediabunnyScrubFrameProvider({
 		}
 
 		const actualTimestampUs = targetPacket.microsecondTimestamp;
-		if (emitDecodedFrame(request, "exact", actualTimestampUs)) {
+		if (emitDecodedFrame(request, actualTimestampUs)) {
 			return;
 		}
 
@@ -333,7 +298,7 @@ export function createMediabunnyScrubFrameProvider({
 		if (!iterator || request.id !== latestRequestId || disposed) {
 			return;
 		}
-		const targetWaiter = createFrameWaiter(actualTimestampUs, request, "exact");
+		const targetWaiter = createFrameWaiter(actualTimestampUs, request);
 
 		let passedTarget = false;
 		let packetsAfterTarget = 0;
@@ -421,15 +386,10 @@ export function createMediabunnyScrubFrameProvider({
 				if (!request) {
 					break;
 				}
-				if (request.phase === "keyframe") {
-					if (!(await showCachedExact(request))) {
-						await showKeyframe(request);
-					}
-				} else if (request.phase === "keyframe-then-exact") {
-					if (!(await showCachedExact(request))) {
-						await showKeyframe(request);
-						await showExact(request);
-					}
+				if (request.phase === "cached") {
+					// Retain the displayed image on a miss; decoding keyframes is
+					// preparation for the exact target, never a presentation fallback.
+					await showCachedExact(request);
 				} else {
 					await showExact(request);
 				}
@@ -494,7 +454,7 @@ export function createMediabunnyScrubFrameProvider({
 			const priority = options?.priority ?? "final";
 			const request: PendingScrubFrameRequest = {
 				id: latestRequestId,
-				phase: priority === "interactive" ? "keyframe" : "keyframe-then-exact",
+				phase: priority === "interactive" ? "cached" : "exact",
 				requestedAtMs: previewNowMs(),
 				timestampSeconds: Math.max(0, timestampUs / 1_000_000),
 				timestampUs,

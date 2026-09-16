@@ -198,7 +198,7 @@ describe("Mediabunny scrub frame provider", () => {
 		provider.dispose();
 	});
 
-	it("shows a preview-resolution keyframe during interaction and resolves the exact frame after settling", async () => {
+	it("presents only the exact frame after interaction settles", async () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
@@ -206,57 +206,54 @@ describe("Mediabunny scrub frame provider", () => {
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
-		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 1);
+		await flushMicrotasks();
 
+		vi.advanceTimersByTime(119);
+		await flushMicrotasks();
+		expect(onFrame).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(1);
+		await flushMicrotasksUntil(() =>
+			onFrame.mock.calls.some(
+				([frame]) => frame.actualTimestampUs === 8_000_000,
+			),
+		);
 		expect(onFrame).toHaveBeenLastCalledWith(
 			expect.objectContaining({
-				accuracy: "keyframe",
-				actualTimestampUs: 0,
-				requestId: 1,
+				actualTimestampUs: 8_000_000,
 				timestampUs: 8_000_000,
 			}),
 		);
+		expect(onFrame).toHaveBeenCalledTimes(1);
 		expect(onFrame.mock.calls[0]?.[0].canvas).toMatchObject({
 			height: 720,
 			width: 1280,
 		});
 
-		vi.advanceTimersByTime(119);
-		await flushMicrotasks();
-		expect(onFrame).toHaveBeenCalledTimes(1);
-
-		vi.advanceTimersByTime(1);
-		await flushMicrotasksUntil(() =>
-			onFrame.mock.calls.some(([frame]) => frame.accuracy === "exact"),
-		);
-		expect(onFrame).toHaveBeenLastCalledWith(
-			expect.objectContaining({
-				accuracy: "exact",
-				actualTimestampUs: 8_000_000,
-				timestampUs: 8_000_000,
-			}),
-		);
-
 		provider.dispose();
 	});
 
-	it("starts exact resolution immediately for a committed target", async () => {
+	it("presents only the exact frame immediately for a committed target", async () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
+		provider.warm();
+		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "final" });
-		await waitForCondition(() =>
-			onFrame.mock.calls.some(([frame]) => frame.accuracy === "exact"),
+		await flushMicrotasksUntil(() =>
+			onFrame.mock.calls.some(
+				([frame]) => frame.actualTimestampUs === 8_000_000,
+			),
 		);
 
-		expect(onFrame.mock.calls.map(([frame]) => frame.accuracy)).toEqual([
-			"keyframe",
-			"exact",
-		]);
+		expect(
+			onFrame.mock.calls.map(([frame]) => frame.actualTimestampUs),
+		).toEqual([8_000_000]);
 		provider.dispose();
 	});
 
-	it("reuses a decoded keyframe for repeated targets in the same GOP", async () => {
+	it("resets the settling delay and presents only the latest interactive target", async () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
@@ -264,42 +261,69 @@ describe("Mediabunny scrub frame provider", () => {
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
-		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 1);
+		await flushMicrotasks();
+		vi.advanceTimersByTime(100);
 		provider.requestFrame(9_000_000, { priority: "interactive" });
-		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 2);
+		await flushMicrotasks();
+		vi.advanceTimersByTime(119);
+		await flushMicrotasks();
+		expect(onFrame).not.toHaveBeenCalled();
+		vi.advanceTimersByTime(1);
+		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 1);
 
 		expect(
 			mediabunnyMock.decodedTimestampsUs.filter((value) => value === 0),
 		).toHaveLength(1);
-		expect(onFrame.mock.calls[1]?.[0]).toMatchObject({
-			accuracy: "keyframe",
-			actualTimestampUs: 0,
+		expect(onFrame.mock.calls[0]?.[0]).toMatchObject({
+			actualTimestampUs: 9_000_000,
 			requestId: 2,
 			timestampUs: 9_000_000,
 		});
 		provider.dispose();
 	});
 
-	it("shows a cached exact frame without replacing it with its keyframe", async () => {
+	it("shows a cached exact frame without waiting for interaction to settle", async () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 
 		provider.requestFrame(8_000_000, { priority: "final" });
 		await waitForCondition(() =>
-			onFrame.mock.calls.some(([frame]) => frame.accuracy === "exact"),
+			onFrame.mock.calls.some(
+				([frame]) => frame.actualTimestampUs === 8_000_000,
+			),
 		);
 		onFrame.mockClear();
+		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
-		await waitForCondition(() => onFrame.mock.calls.length === 1);
+		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 1);
 
 		expect(onFrame).toHaveBeenCalledWith(
 			expect.objectContaining({
-				accuracy: "exact",
 				actualTimestampUs: 8_000_000,
 				requestId: 2,
 			}),
 		);
+		provider.dispose();
+	});
+
+	it("commits the final target without waiting for or replaying an interactive seek", async () => {
+		const onFrame = vi.fn();
+		const provider = createProvider(onFrame);
+		provider.warm();
+		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		vi.useFakeTimers();
+
+		provider.requestFrame(8_000_000, { priority: "interactive" });
+		await flushMicrotasks();
+		vi.advanceTimersByTime(100);
+		provider.requestFrame(9_000_000, { priority: "final" });
+		await flushMicrotasksUntil(() => onFrame.mock.calls.length === 1);
+		await vi.advanceTimersByTimeAsync(120);
+
+		expect(
+			onFrame.mock.calls.map(([frame]) => frame.actualTimestampUs),
+		).toEqual([9_000_000]);
 		provider.dispose();
 	});
 

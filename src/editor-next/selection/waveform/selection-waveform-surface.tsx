@@ -13,9 +13,9 @@ import type {
 import { createWavesurferPeaksFromSamples } from "./selection-waveform-surface.peaks";
 
 const WAVEFORM_HEIGHT_PX = 48;
-const WAVEFORM_COLOR_FALLBACK = "#57bab6";
-const WAVEFORM_GUIDE_COLOR_FALLBACK = "#64748b";
-const SELECTION_REGION_COLOR = "rgba(87, 186, 182, 0.22)";
+const WAVEFORM_COLOR_FALLBACK = "oklch(0.728857 0.092883 191.748299)";
+const WAVEFORM_GUIDE_COLOR_FALLBACK = "oklch(0.554391 0.040717 257.416619)";
+const SELECTION_REGION_COLOR = "oklch(0.728857 0.092883 191.748299 / 0.22)";
 const SELECTION_REGION_ID = "editor-selection-region";
 
 export type WaveformSurfaceProps = {

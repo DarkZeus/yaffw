@@ -1,14 +1,9 @@
+import { type ChangeEvent, useMemo, useRef } from "react";
 import {
-	type ChangeEvent,
-	type DragEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+	WorkbenchInspectorTabs,
+	useWorkbenchInspector,
+} from "../../workbench/frame/workbench-inspector";
 
-import type { MediaTimeUs } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
 import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
@@ -41,18 +36,7 @@ export function EditorNextRouteComposition({
 	runtime: RuntimeSupport;
 }) {
 	const stableCommands = useStableEditorCommands(commands);
-	const activeAssetId = session.status === "ready" ? session.asset.id : null;
-	const [previewPlayheadUs, setPreviewPlayheadUs] = useState<MediaTimeUs>(0);
-	const handlePreviewPlayheadChange = useCallback((playheadUs: MediaTimeUs) => {
-		setPreviewPlayheadUs((currentPlayheadUs) =>
-			currentPlayheadUs === playheadUs ? currentPlayheadUs : playheadUs,
-		);
-	}, []);
-	useEffect(() => {
-		setPreviewPlayheadUs((currentPlayheadUs) =>
-			activeAssetId === null || currentPlayheadUs !== 0 ? 0 : currentPlayheadUs,
-		);
-	}, [activeAssetId]);
+	const inspector = useWorkbenchInspector();
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
 		const file = event.currentTarget.files?.[0];
@@ -65,45 +49,75 @@ export function EditorNextRouteComposition({
 		void stableCommands.importLocalFile(file);
 	}
 
-	function handleLocalFileDropped(event: DragEvent<HTMLElement>) {
-		event.preventDefault();
-
-		const file = event.dataTransfer.files[0];
-
-		if (!file) {
-			return;
-		}
-
+	function handleLocalFileDropped(file: File) {
 		void stableCommands.importLocalFile(file);
 	}
 
-	const readyMediaAssetContext =
-		session.status === "ready" ? (
-			<MediaAssetContextPanel
-				asset={session.asset}
-				closeFileDisabled={!canCloseEditorSession(session)}
-				onCloseFileRequested={stableCommands.requestCloseFile}
-				selection={session.selection}
-			/>
-		) : null;
 	const selectionEditingDisabled =
 		session.status === "ready" && session.export.status === "running";
-	const readyAudioPanel =
-		session.status === "ready" ? (
-			<AudioPanel
-				asset={session.asset}
-				audioEditingDisabled={selectionEditingDisabled}
-				audioMix={session.audioMix}
-				onAudioTrackChannelModeChange={stableCommands.setAudioTrackChannelMode}
-				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
-				onAudioTrackVolumePercentChange={
-					stableCommands.setAudioTrackVolumePercent
-				}
+	const readyInspector = useMemo(() => {
+		const readyMediaAssetContext =
+			session.status === "ready" ? (
+				<MediaAssetContextPanel
+					asset={session.asset}
+					closeFileDisabled={!canCloseEditorSession(session)}
+					onCloseFileRequested={stableCommands.requestCloseFile}
+					selection={session.selection}
+				/>
+			) : null;
+		const readyAudioPanel =
+			session.status === "ready" ? (
+				<AudioPanel
+					asset={session.asset}
+					audioEditingDisabled={selectionEditingDisabled}
+					audioMix={session.audioMix}
+					onAudioTrackChannelModeChange={
+						stableCommands.setAudioTrackChannelMode
+					}
+					onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
+					onAudioTrackVolumePercentChange={
+						stableCommands.setAudioTrackVolumePercent
+					}
+				/>
+			) : null;
+		const readyExportInspector =
+			session.status === "ready" ? (
+				<ExportInspectorPanel
+					asset={session.asset}
+					audioMix={session.audioMix}
+					exportState={session.export}
+					onCancelExport={stableCommands.cancelDefaultExport}
+					onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}
+					onApplyOutputSettings={stableCommands.applyOutputSettings}
+					onStartExport={() => {
+						void stableCommands.startDefaultExport();
+					}}
+					outputSettings={session.outputSettings}
+					runtime={session.runtime}
+					selection={session.selection}
+				/>
+			) : null;
+
+		return session.status === "ready" ? (
+			<WorkbenchInspectorTabs
+				activeTab={inspector.activeTab}
+				onTabChange={inspector.selectTab}
+				audioPanel={readyAudioPanel}
+				exportInspector={readyExportInspector}
+				mediaAssetContext={readyMediaAssetContext}
 			/>
 		) : null;
+	}, [
+		session,
+		stableCommands,
+		selectionEditingDisabled,
+		inspector.activeTab,
+		inspector.selectTab,
+	]);
 	const readyPreviewPlayer =
 		session.status === "ready" && previewSource ? (
 			<NativePreviewPlayer
+				inspector={readyInspector}
 				activeMediaAssetCleanupScope={activeMediaAssetCleanupScope ?? undefined}
 				asset={session.asset}
 				audioMix={session.audioMix}
@@ -113,54 +127,23 @@ export function EditorNextRouteComposition({
 				onSelectionReplaceRequested={stableCommands.setSelectionRange}
 				onSelectionResetRequested={stableCommands.resetSelection}
 				onSelectionStartRequested={stableCommands.setSelectionStartFromPlayhead}
-				onPreviewPlayheadChange={handlePreviewPlayheadChange}
 				selection={session.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				shortcutsDisabled={selectionEditingDisabled}
 				source={previewSource}
 			/>
 		) : null;
-	const readyExportInspector =
-		session.status === "ready" ? (
-			<ExportInspectorPanel
-				asset={session.asset}
-				audioMix={session.audioMix}
-				exportState={session.export}
-				onCancelExport={stableCommands.cancelDefaultExport}
-				onDownloadGeneratedMedia={stableCommands.downloadGeneratedMedia}
-				onApplyOutputSettings={stableCommands.applyOutputSettings}
-				onStartExport={() => {
-					void stableCommands.startDefaultExport();
-				}}
-				outputSettings={session.outputSettings}
-				runtime={session.runtime}
-				selection={session.selection}
-			/>
-		) : null;
 
 	const editorWorkbench = (
 		<EditorWorkbenchFrame
 			activeAsset={session.status === "ready" ? session.asset : null}
-			previewStatus={
-				session.status === "ready"
-					? {
-							playheadUs: previewPlayheadUs,
-							selectionDurationUs:
-								session.selection.endUs - session.selection.startUs,
-						}
-					: null
-			}
 			runtime={runtime}
-			status={session.status}
 		>
 			{session.status === "unsupported-runtime" ? (
 				<UnsupportedRuntimeState session={session} />
 			) : (
 				<EditorSessionShell
-					audioPanel={readyAudioPanel}
-					exportInspector={readyExportInspector}
 					localFileInputKey={localFileInputKey}
-					mediaAssetContext={readyMediaAssetContext}
 					onLocalFileDropped={handleLocalFileDropped}
 					onLocalFileSelected={handleLocalFileSelected}
 					previewPlayer={readyPreviewPlayer}

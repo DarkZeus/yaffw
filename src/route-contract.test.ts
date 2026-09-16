@@ -145,7 +145,9 @@ describe("app route contract", () => {
 
 		expect(await screen.findAllByText("YAFFW")).not.toHaveLength(0);
 		expect(screen.getByRole("link", { name: "Editor" })).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Bulk download" })).toBeTruthy();
+		expect(screen.getAllByRole("link", { name: "Bulk download" })).toHaveLength(
+			1,
+		);
 		expect(screen.queryByRole("link", { name: "Editor Next" })).toBeNull();
 		expect(screen.queryByRole("link", { name: "Legacy Editor" })).toBeNull();
 		expect(screen.queryByText("Yet Another FFMPEG wrapper")).toBeNull();

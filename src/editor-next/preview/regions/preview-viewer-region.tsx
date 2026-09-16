@@ -89,15 +89,15 @@ export function PreviewViewerRegion({
 	return (
 		<section
 			aria-label="Workbench center region"
-			className="min-h-[24rem] overflow-hidden rounded-md border border-workbench-border-strong bg-workbench-viewer xl:h-full xl:min-h-0 xl:rounded-none xl:border-y-0"
+			className="h-full min-h-0 overflow-hidden"
 		>
 			<section
 				aria-label="Native preview player"
-				className="flex h-full min-h-0 flex-col bg-workbench-viewer"
+				className="flex h-full min-h-0 flex-col"
 			>
 				<div
 					aria-label="Preview viewer header"
-					className="flex h-8 shrink-0 items-center justify-between gap-3 border-b border-workbench-border bg-workbench px-3 text-[11px]"
+					className="flex h-[38px] shrink-0 items-center justify-between gap-3 px-4 text-[11px]"
 				>
 					<div className="flex shrink-0 items-center gap-2 whitespace-nowrap text-muted-foreground">
 						<CircleDot
@@ -109,14 +109,14 @@ export function PreviewViewerRegion({
 							}`}
 						/>
 						<span className="sr-only">Preview</span>
-						<span className="font-mono text-muted-foreground/70">
+						<span className="tabular-nums text-muted-foreground">
 							{playbackRate}x
 						</span>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
 						<span
 							aria-label="Preview playhead time"
-							className="font-mono text-[11px] leading-none"
+							className="tabular-nums text-[11px] leading-none"
 						>
 							{formatMediaTime(playheadUs)}
 						</span>
@@ -194,12 +194,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	return (
 		<section
 			aria-label="Preview viewer surface"
-			className="grid min-h-0 flex-1 place-items-center overflow-hidden bg-workbench-viewer p-3 xl:p-4"
+			className="cinema-viewer-surface"
 			ref={previewSurfaceRef}
 		>
 			<section
 				aria-label="Preview aperture"
-				className="relative max-h-full w-full overflow-hidden border border-workbench-border-strong bg-black shadow-2xl"
+				className="relative isolate max-h-full w-full overflow-hidden bg-black"
 				style={previewApertureStyle}
 			>
 				<MediaPlayer

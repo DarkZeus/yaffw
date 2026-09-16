@@ -1,14 +1,9 @@
 import {
 	Captions,
-	Check,
-	Expand,
 	Film,
-	Gauge,
 	Monitor,
 	Music2,
-	RotateCcw,
 	Settings,
-	Shrink,
 	Sparkles,
 	Zap,
 } from "lucide-react";
@@ -25,7 +20,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -62,7 +56,7 @@ type OutputSettingsPanelProps = {
 
 const BITS_PER_MEGABIT = 1_000_000;
 const outputSettingsCategoryTabClassName =
-	"relative isolate justify-start gap-2 overflow-hidden px-3 data-[state=active]:border-workbench-border-strong data-[state=active]:bg-workbench-hover data-[state=active]:font-semibold data-[state=active]:shadow-sm data-[state=active]:before:absolute data-[state=active]:before:inset-y-1 data-[state=active]:before:left-0 data-[state=active]:before:w-0.5 data-[state=active]:before:rounded-r-full data-[state=active]:before:bg-workbench-selected";
+	"relative h-11 flex-none justify-start rounded-none border-0 bg-transparent px-0 font-medium text-muted-foreground shadow-none hover:text-foreground disabled:opacity-40 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent data-[state=active]:after:bg-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-workbench-focus focus-visible:ring-0";
 
 // Keep this deferred AI roadmap in the modal until these controls are fully implemented.
 const AI_UPSCALING_MODELS = [
@@ -191,11 +185,13 @@ export function OutputSettingsPanel({
 	function changeAudioCodec(codec: string) {
 		const nextDraft = cloneOutputSettings(activeDraft);
 		nextDraft.audioCodec =
-			codec === "default-output-profile"
-				? { kind: "default-output-profile" }
-				: codec === "preserve-source"
-					? { kind: "preserve-source" }
-					: { codec, kind: "documented-codec" };
+			codec === "no-audio"
+				? { kind: "no-audio" }
+				: codec === "default-output-profile"
+					? { kind: "default-output-profile" }
+					: codec === "preserve-source"
+						? { kind: "preserve-source" }
+						: { codec, kind: "documented-codec" };
 
 		setReconciledDraft(nextDraft);
 	}
@@ -327,7 +323,10 @@ export function OutputSettingsPanel({
 	});
 	const resolvedAudioQuality = resolveOutputQuality({
 		mediaKind: "audio",
-		setting: activeDraft.audioQuality,
+		setting:
+			activeDraft.audioCodec.kind === "no-audio"
+				? { kind: "preserve-source" }
+				: activeDraft.audioQuality,
 	});
 	const resolvedDraft = resolveOutputVideoProfile({
 		asset,
@@ -367,56 +366,23 @@ export function OutputSettingsPanel({
 	}
 
 	return (
-		<section
-			aria-label="Output settings panel"
-			className="rounded border border-workbench-border bg-workbench-lane p-2.5"
-		>
-			<div className="flex items-start justify-between gap-3">
-				<div className="min-w-0">
-					<div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-						<Settings
-							aria-hidden="true"
-							className="size-4 text-workbench-progress"
-						/>
-						<span className="min-w-0 truncate">Output settings</span>
-					</div>
-					<p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-						{formatOutputProfileSummary(outputSettings)}
-					</p>
-				</div>
-				<Badge className="shrink-0" variant="outline">
-					{exportRunning ? "Locked" : "Applied"}
-				</Badge>
-			</div>
-			<div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
-				<OutputSettingsFact
-					label="Resolution"
-					value={formatResolutionSetting(outputSettings.resolution)}
-				/>
-				<OutputSettingsFact
-					label="Video quality"
-					value={formatOutputQualitySetting(outputSettings.videoQuality)}
-				/>
-				<OutputSettingsFact
-					label="Video codec"
-					value={formatCodecSetting(outputSettings.videoCodec, "video")}
-				/>
-				<OutputSettingsFact
-					label="Audio codec"
-					value={formatCodecSetting(outputSettings.audioCodec, "audio")}
-				/>
-			</div>
+		<section aria-label="Output settings panel" className="min-w-0">
 			<Button
-				className="mt-2 h-8 w-full"
+				className="h-10 w-full justify-between"
 				disabled={exportRunning}
 				onClick={openResolvedOutputSettings}
 				size="sm"
 				type="button"
 				variant="outline"
 			>
-				<Settings data-icon="inline-start" />
 				Output settings
+				<Settings data-icon="inline-end" />
 			</Button>
+			{exportRunning ? (
+				<p className="mt-2 text-xs text-muted-foreground">
+					<span>Locked</span> while export is running.
+				</p>
+			) : null}
 			<Dialog
 				open={open}
 				onOpenChange={(nextOpen) => {
@@ -428,46 +394,41 @@ export function OutputSettingsPanel({
 					closeModal();
 				}}
 			>
-				<DialogContent className="quality-settings-dialog flex h-[min(44rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-2xl shadow-black/80 sm:max-w-[64rem]">
-					<DialogHeader className="border-b border-workbench-border px-5 py-4">
-						<DialogTitle className="flex min-w-0 items-center gap-2 text-base">
-							<Settings aria-hidden="true" className="size-4" />
+				<DialogContent className="quality-settings-dialog flex h-[min(36rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-none sm:max-w-[48rem]">
+					<DialogHeader className="shrink-0 text-left px-6 pt-6 pb-4">
+						<DialogTitle className="min-w-0 text-xl font-medium tracking-tight">
 							<span className="min-w-0 truncate">Output settings</span>
 						</DialogTitle>
 						<DialogDescription>
-							Changing output settings may re-encode video and can change output
-							size, quality, and processing time.
+							Settings may affect quality, file size, and export time.
 						</DialogDescription>
 					</DialogHeader>
 					<Tabs
-						className="grid min-h-0 flex-1 grid-cols-[10rem_minmax(0,1fr)_16rem] gap-0"
+						className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-[auto_minmax(0,1fr)] md:overflow-hidden"
 						defaultValue="general"
-						orientation="vertical"
+						orientation="horizontal"
 					>
-						<div className="border-r border-workbench-border bg-workbench-hover/15 p-2.5">
-							<p className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-								Categories
-							</p>
-							<TabsList className="flex h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
+						<div className="sticky top-0 z-10 shrink-0 bg-workbench-inspector px-6 pb-4 md:col-span-2">
+							<TabsList
+								aria-label="Output settings categories"
+								className="flex h-auto w-fit max-w-full flex-wrap items-stretch justify-start gap-x-6 gap-y-1 rounded-none bg-transparent p-0"
+							>
 								<TabsTrigger
 									className={outputSettingsCategoryTabClassName}
 									value="general"
 								>
-									<Film aria-hidden="true" className="size-3.5" />
 									General
 								</TabsTrigger>
 								<TabsTrigger
 									className={outputSettingsCategoryTabClassName}
 									value="video"
 								>
-									<Monitor aria-hidden="true" className="size-3.5" />
 									Video
 								</TabsTrigger>
 								<TabsTrigger
 									className={outputSettingsCategoryTabClassName}
 									value="audio"
 								>
-									<Music2 aria-hidden="true" className="size-3.5" />
 									Audio
 								</TabsTrigger>
 								<TabsTrigger
@@ -475,7 +436,6 @@ export function OutputSettingsPanel({
 									disabled
 									value="ai"
 								>
-									<Sparkles aria-hidden="true" className="size-3.5" />
 									AI
 								</TabsTrigger>
 								<TabsTrigger
@@ -483,13 +443,12 @@ export function OutputSettingsPanel({
 									disabled
 									value="subtitles"
 								>
-									<Captions aria-hidden="true" className="size-3.5" />
 									Subtitles
 								</TabsTrigger>
 							</TabsList>
 						</div>
-						<ScrollArea className="min-h-0">
-							<div className="px-6 py-5">
+						<div className="min-w-0 shrink-0 md:min-h-0 md:overflow-y-auto">
+							<div className="px-6 py-2">
 								<TabsContent className="m-0" value="general">
 									<OutputSettingsTabSection
 										description="Default profile and generated-media summary"
@@ -510,20 +469,6 @@ export function OutputSettingsPanel({
 												</option>
 											))}
 										</OutputSettingsChoice>
-										<OutputSettingsFactGrid>
-											<OutputSettingsFact
-												label="Profile"
-												value={formatOutputProfileSummary(activeDraft)}
-											/>
-											<OutputSettingsFact
-												label="Source"
-												value={sourceDimensions}
-											/>
-											<OutputSettingsFact
-												label="Tracks"
-												value={`${asset.tracks.video.length} video / ${asset.tracks.audio.length} audio`}
-											/>
-										</OutputSettingsFactGrid>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
@@ -580,22 +525,6 @@ export function OutputSettingsPanel({
 												</option>
 											))}
 										</OutputSettingsChoice>
-										<OutputSettingsFactGrid>
-											<OutputSettingsFact
-												label="Resolution"
-												value={formatResolutionSetting(activeDraft.resolution)}
-											/>
-											<OutputSettingsFact
-												label="Video quality"
-												value={formatOutputQualitySetting(
-													activeDraft.videoQuality,
-												)}
-											/>
-											<OutputSettingsFact
-												label="Source"
-												value={sourceDimensions}
-											/>
-										</OutputSettingsFactGrid>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedDraft={resolvedDraft}
@@ -617,6 +546,7 @@ export function OutputSettingsPanel({
 											onChange={changeAudioCodec}
 											value={codecSettingValue(activeDraft.audioCodec)}
 										>
+											<option value="no-audio">No audio</option>
 											<option value="preserve-source">Preserve source</option>
 											{activeDraft.container.kind ===
 											"default-output-profile" ? (
@@ -636,36 +566,9 @@ export function OutputSettingsPanel({
 												changeCustomBitrate("audio", bitrateBps)
 											}
 											onChange={(value) => changeQuality("audio", value)}
+											disabled={activeDraft.audioCodec.kind === "no-audio"}
 											setting={activeDraft.audioQuality}
 										/>
-										<OutputSettingsFactGrid>
-											<OutputSettingsFact
-												label="Audio codec"
-												value={formatCodecSetting(
-													activeDraft.audioCodec,
-													"audio",
-												)}
-											/>
-											<OutputSettingsFact
-												label="Audio quality"
-												value={formatOutputQualitySetting(
-													activeDraft.audioQuality,
-												)}
-											/>
-											<OutputSettingsFact
-												label="Included source tracks"
-												value={`${resolvedAudio.kind === "resolved" ? resolvedAudio.includedTrackCount : 0}`}
-											/>
-											<OutputSettingsFact
-												label="Generated mix"
-												value={
-													resolvedAudio.kind === "resolved" &&
-													resolvedAudio.includedTrackCount === 0
-														? "No audio track"
-														: "One audio track"
-												}
-											/>
-										</OutputSettingsFactGrid>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
 											resolvedAudio={resolvedAudio}
@@ -686,7 +589,7 @@ export function OutputSettingsPanel({
 									/>
 								</TabsContent>
 							</div>
-						</ScrollArea>
+						</div>
 						<OutputSettingsPlan
 							audioProfile={resolvedAudio}
 							outputSettings={activeDraft}
@@ -696,8 +599,8 @@ export function OutputSettingsPanel({
 							videoProfile={resolvedDraft}
 						/>
 					</Tabs>
-					<DialogFooter className="block border-t border-workbench-border px-3 py-3">
-						<div className="grid grid-cols-[10rem_minmax(0,1fr)_auto] items-center gap-3">
+					<DialogFooter className="block shrink-0 border-t border-workbench-border px-6 py-4">
+						<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
 							<ExportPresetControls
 								draft={activeDraft}
 								draftIsValid={draftIsValid}
@@ -708,6 +611,7 @@ export function OutputSettingsPanel({
 							/>
 							<div>
 								<Button
+									className="h-10"
 									onClick={() => {
 										setAutomaticReplacementMessage(null);
 										if (openingSnapshotRef.current !== null) {
@@ -717,21 +621,24 @@ export function OutputSettingsPanel({
 									type="button"
 									variant="ghost"
 								>
-									<RotateCcw data-icon="inline-start" />
 									Reset
 								</Button>
 							</div>
-							<div className="flex items-center justify-end gap-2">
-								<Button onClick={closeModal} type="button" variant="outline">
+							<div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+								<Button
+									className="h-10"
+									onClick={closeModal}
+									type="button"
+									variant="outline"
+								>
 									Cancel
 								</Button>
 								<Button
-									className="bg-workbench-selected text-workbench-selected-foreground hover:bg-workbench-selected/90"
+									className="h-10 bg-primary px-5 text-primary-foreground hover:bg-primary/90"
 									disabled={exportRunning || !draftIsValid}
 									onClick={applyResolvedDraft}
 									type="button"
 								>
-									<Check data-icon="inline-start" />
 									Apply
 								</Button>
 							</div>
@@ -798,68 +705,32 @@ function OutputSettingsPlan({
 	return (
 		<aside
 			aria-label="Output plan"
-			className="min-h-0 overflow-y-auto border-l border-workbench-border bg-workbench-hover/10 p-4"
+			className="min-w-0 shrink-0 px-6 py-5 md:min-h-0 md:overflow-y-auto md:border-l md:border-workbench-border md:py-2"
 		>
-			<div className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-				<Gauge aria-hidden="true" className="size-3.5" />
-				Output plan
-			</div>
-			<figure
+			<h3 className="mb-4 text-sm font-medium">Output plan</h3>
+			<p
+				className="mb-4 text-xs leading-5 text-muted-foreground"
 				aria-label={`Output frame proportions, ${resolutionLabel}`}
-				className="mb-5 rounded border border-workbench-border bg-workbench-viewer/55 p-3"
 			>
-				<figcaption className="flex items-center justify-between gap-3 text-[9px] font-semibold uppercase tracking-[0.13em] text-muted-foreground">
-					<span>Output frame</span>
-					<span className="font-mono tracking-normal text-workbench-selected">
-						{aspectRatioLabel}
-					</span>
-				</figcaption>
-				<div className="relative mt-2 aspect-video overflow-hidden rounded border border-workbench-border-strong bg-workbench-viewer">
-					<div className="absolute inset-x-3 top-1/2 border-t border-dashed border-workbench-border" />
-					<div className="absolute inset-y-3 left-1/2 border-l border-dashed border-workbench-border" />
-					{scaleDirection === "downscale" ? (
-						<span
-							aria-label="Target resolution is smaller than source"
-							className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-workbench-border-strong bg-workbench-inspector/90 text-workbench-selected"
-							role="img"
-						>
-							<Shrink aria-hidden="true" className="size-5" />
-						</span>
-					) : null}
-					{scaleDirection === "upscale" ? (
-						<span
-							aria-label="Target resolution is larger than source"
-							className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-workbench-border-strong bg-workbench-inspector/90 text-workbench-selected"
-							role="img"
-						>
-							<Expand aria-hidden="true" className="size-5" />
-						</span>
-					) : null}
-					<span className="absolute bottom-2 right-2 rounded bg-black/65 px-1.5 py-0.5 font-mono text-[9px] text-white/80">
-						{resolutionLabel}
-					</span>
-				</div>
-				<p className="mt-2 text-[9px] leading-4 text-muted-foreground">
-					{scaleDescription}
-				</p>
-			</figure>
-			<dl className="flex flex-col gap-3">
+				{aspectRatioLabel} · {scaleDescription}
+			</p>
+			<dl className="grid grid-cols-2 gap-4 md:grid-cols-1 md:gap-3">
 				<OutputPlanFact label="Format" value={profileLabel} />
 				<OutputPlanFact label="Size" value={resolutionLabel} />
 				<OutputPlanFact
 					label="Video quality"
 					value={formatOutputQualitySetting(outputSettings.videoQuality)}
 				/>
-				<OutputPlanFact label="Generated audio mix" value={audioLabel} />
+				<OutputPlanFact label="Audio mix" value={audioLabel} />
 				<OutputPlanFact
 					label="Audio quality"
-					value={formatOutputQualitySetting(outputSettings.audioQuality)}
+					value={
+						outputSettings.audioCodec.kind === "no-audio"
+							? "No audio"
+							: formatOutputQualitySetting(outputSettings.audioQuality)
+					}
 				/>
 			</dl>
-			<p className="mt-5 rounded border border-workbench-border bg-workbench-hover/25 p-3 text-[11px] leading-5 text-muted-foreground">
-				Changing Output settings may re-encode video. Selected-range precision
-				remains conservative until the Export job proves otherwise.
-			</p>
 		</aside>
 	);
 }
@@ -917,26 +788,9 @@ function resolveOutputScaleDirection(
 
 function OutputPlanFact({ label, value }: { label: string; value: string }) {
 	return (
-		<div>
-			<dt className="text-[9px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
-				{label}
-			</dt>
-			<dd className="mt-1 text-xs leading-5 text-foreground">{value}</dd>
-		</div>
-	);
-}
-
-function OutputSettingsFact({
-	label,
-	value,
-}: {
-	label: string;
-	value: string;
-}) {
-	return (
-		<div className="min-w-0 rounded border border-workbench-border bg-workbench-hover/35 px-2 py-1.5">
-			<div className="truncate text-muted-foreground">{label}</div>
-			<div className="truncate font-medium text-foreground">{value}</div>
+		<div className="grid gap-1">
+			<dt className="text-xs text-muted-foreground">{label}</dt>
+			<dd className="text-xs leading-4 text-foreground">{value}</dd>
 		</div>
 	);
 }
@@ -957,7 +811,7 @@ function OutputSettingsChoice({
 			<span>{label}</span>
 			<select
 				aria-label={label}
-				className="h-9 w-full rounded border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+				className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-transparent focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
 				onChange={(event) => onChange(event.currentTarget.value)}
 				value={value}
 			>
@@ -968,6 +822,7 @@ function OutputSettingsChoice({
 }
 
 function OutputQualityChoice({
+	disabled = false,
 	label,
 	onBitrateChange,
 	onChange,
@@ -977,9 +832,13 @@ function OutputQualityChoice({
 	onBitrateChange: (bitrateBps: number) => void;
 	onChange: (value: string) => void;
 	setting: OutputQualitySetting;
+	disabled?: boolean;
 }) {
 	return (
-		<div className="grid gap-1.5 text-xs font-medium text-foreground">
+		<fieldset
+			disabled={disabled}
+			className="grid min-w-0 gap-1.5 text-xs font-medium text-foreground disabled:text-muted-foreground"
+		>
 			<OutputSettingsChoice
 				label={label}
 				onChange={onChange}
@@ -998,7 +857,7 @@ function OutputQualityChoice({
 					<span>Custom {label.toLowerCase()} bitrate (Mbps)</span>
 					<input
 						aria-label={`Custom ${label.toLowerCase()} bitrate in Mbps`}
-						className="h-9 w-full rounded border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+						className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-transparent focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
 						min="0.000001"
 						onChange={(event) => {
 							const bitrateMbps = event.currentTarget.valueAsNumber;
@@ -1018,7 +877,7 @@ function OutputQualityChoice({
 					/>
 				</label>
 			) : null}
-		</div>
+		</fieldset>
 	);
 }
 
@@ -1076,14 +935,8 @@ function OutputSettingsValidationMessage({
 	);
 }
 
-function OutputSettingsFactGrid({ children }: { children: ReactNode }) {
-	return <div className="grid grid-cols-2 gap-2 text-[11px]">{children}</div>;
-}
-
 function OutputSettingsTabSection({
 	children,
-	description,
-	icon,
 	title,
 }: {
 	children: ReactNode;
@@ -1092,16 +945,7 @@ function OutputSettingsTabSection({
 	title: string;
 }) {
 	return (
-		<section className="flex flex-col gap-3">
-			<div className="flex items-start gap-2">
-				<div className="mt-0.5 text-workbench-progress">{icon}</div>
-				<div className="min-w-0">
-					<h3 className="text-sm font-semibold">{title}</h3>
-					<p className="mt-1 text-xs leading-5 text-muted-foreground">
-						{description}
-					</p>
-				</div>
-			</div>
+		<section aria-label={title} className="flex flex-col gap-5">
 			{children}
 		</section>
 	);
@@ -1221,18 +1065,6 @@ function OutputSettingsRoadmapFact({
 	);
 }
 
-function formatOutputProfileSummary(outputSettings: OutputSettings): string {
-	if (
-		outputSettings.container.kind === "default-output-profile" &&
-		outputSettings.videoCodec.kind === "default-output-profile" &&
-		outputSettings.audioCodec.kind === "default-output-profile"
-	) {
-		return "MP4 / H.264 video / AAC audio";
-	}
-
-	return `${formatContainerSetting(outputSettings.container)} / ${formatCodecSetting(outputSettings.videoCodec, "video")} / ${formatCodecSetting(outputSettings.audioCodec, "audio")}`;
-}
-
 function containerForSetting(setting: OutputSettings["container"]) {
 	const id =
 		setting.kind === "default-output-profile"
@@ -1249,7 +1081,7 @@ function containerSettingValue(setting: OutputSettings["container"]): string {
 		: setting.container;
 }
 
-function codecSettingValue(setting: OutputSettings["videoCodec"]): string {
+function codecSettingValue(setting: OutputSettings["audioCodec"]): string {
 	if (setting.kind === "documented-codec") {
 		return setting.codec;
 	}
@@ -1271,41 +1103,6 @@ function formatCodecName(codec: string | undefined): string {
 	}
 
 	return normalized.toUpperCase();
-}
-
-function formatContainerSetting(setting: OutputSettings["container"]): string {
-	if (setting.kind === "documented-container") {
-		return setting.container.toUpperCase();
-	}
-
-	return "Default output profile";
-}
-
-function formatCodecSetting(
-	setting: OutputSettings["videoCodec"],
-	kind: "audio" | "video",
-): string {
-	if (setting.kind === "documented-codec") {
-		return setting.codec.toUpperCase();
-	}
-
-	if (setting.kind === "preserve-source") {
-		return "Preserve source";
-	}
-
-	return kind === "video"
-		? DEFAULT_OUTPUT_PROFILE.videoCodec.toUpperCase()
-		: DEFAULT_OUTPUT_PROFILE.audioCodec.toUpperCase();
-}
-
-function formatResolutionSetting(
-	setting: OutputSettings["resolution"],
-): string {
-	if (setting.kind === "target-dimensions") {
-		return `${setting.width}x${setting.height}`;
-	}
-
-	return "Preserve source";
 }
 
 function resolutionSettingValue(setting: OutputSettings["resolution"]): string {

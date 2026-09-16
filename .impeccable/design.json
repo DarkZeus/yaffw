@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T18:09:21Z",
+  "title": "Design System: YAFFW",
+  "extensions": {
+    "colorMeta": {
+      "rail-black": {
+        "role": "neutral",
+        "displayName": "Rail Black",
+        "canonical": "oklch(0.118 0.011 90)",
+        "tonalRamp": ["oklch(0.15 0.011 90)", "oklch(0.25 0.011 90)", "oklch(0.35 0.011 90)", "oklch(0.45 0.011 90)", "oklch(0.55 0.011 90)", "oklch(0.65 0.011 90)", "oklch(0.80 0.011 90)", "oklch(0.95 0.011 90)"]
+      },
+      "viewer-black": {
+        "role": "neutral",
+        "displayName": "Viewer Black",
+        "canonical": "oklch(0.09 0.006 96)",
+        "tonalRamp": ["oklch(0.15 0.006 96)", "oklch(0.25 0.006 96)", "oklch(0.35 0.006 96)", "oklch(0.45 0.006 96)", "oklch(0.55 0.006 96)", "oklch(0.65 0.006 96)", "oklch(0.80 0.006 96)", "oklch(0.95 0.006 96)"]
+      },
+      "timeline-black": {
+        "role": "neutral",
+        "displayName": "Timeline Black",
+        "canonical": "oklch(0.135 0.015 86)",
+        "tonalRamp": ["oklch(0.15 0.015 86)", "oklch(0.25 0.015 86)", "oklch(0.35 0.015 86)", "oklch(0.45 0.015 86)", "oklch(0.55 0.015 86)", "oklch(0.65 0.015 86)", "oklch(0.80 0.015 86)", "oklch(0.95 0.015 86)"]
+      },
+      "workbench-black": {
+        "role": "neutral",
+        "displayName": "Workbench Black",
+        "canonical": "oklch(0.145 0.012 84)",
+        "tonalRamp": ["oklch(0.15 0.012 84)", "oklch(0.25 0.012 84)", "oklch(0.35 0.012 84)", "oklch(0.45 0.012 84)", "oklch(0.55 0.012 84)", "oklch(0.65 0.012 84)", "oklch(0.80 0.012 84)", "oklch(0.95 0.012 84)"]
+      },
+      "lane-black": {
+        "role": "neutral",
+        "displayName": "Lane Black",
+        "canonical": "oklch(0.16 0.016 92)",
+        "tonalRamp": ["oklch(0.15 0.016 92)", "oklch(0.25 0.016 92)", "oklch(0.35 0.016 92)", "oklch(0.45 0.016 92)", "oklch(0.55 0.016 92)", "oklch(0.65 0.016 92)", "oklch(0.80 0.016 92)", "oklch(0.95 0.016 92)"]
+      },
+      "inspector-black": {
+        "role": "neutral",
+        "displayName": "Inspector Black",
+        "canonical": "oklch(0.175 0.016 82)",
+        "tonalRamp": ["oklch(0.15 0.016 82)", "oklch(0.25 0.016 82)", "oklch(0.35 0.016 82)", "oklch(0.45 0.016 82)", "oklch(0.55 0.016 82)", "oklch(0.65 0.016 82)", "oklch(0.80 0.016 82)", "oklch(0.95 0.016 82)"]
+      },
+      "transport-black": {
+        "role": "neutral",
+        "displayName": "Transport Black",
+        "canonical": "oklch(0.19 0.018 86)",
+        "tonalRamp": ["oklch(0.15 0.018 86)", "oklch(0.25 0.018 86)", "oklch(0.35 0.018 86)", "oklch(0.45 0.018 86)", "oklch(0.55 0.018 86)", "oklch(0.65 0.018 86)", "oklch(0.80 0.018 86)", "oklch(0.95 0.018 86)"]
+      },
+      "hover-black": {
+        "role": "neutral",
+        "displayName": "Hover Black",
+        "canonical": "oklch(0.235 0.021 86)",
+        "tonalRamp": ["oklch(0.15 0.021 86)", "oklch(0.25 0.021 86)", "oklch(0.35 0.021 86)", "oklch(0.45 0.021 86)", "oklch(0.55 0.021 86)", "oklch(0.65 0.021 86)", "oklch(0.80 0.021 86)", "oklch(0.95 0.021 86)"]
+      },
+      "structural-border": {
+        "role": "neutral",
+        "displayName": "Structural Border",
+        "canonical": "oklch(0.285 0.018 86)",
+        "tonalRamp": ["oklch(0.15 0.018 86)", "oklch(0.25 0.018 86)", "oklch(0.35 0.018 86)", "oklch(0.45 0.018 86)", "oklch(0.55 0.018 86)", "oklch(0.65 0.018 86)", "oklch(0.80 0.018 86)", "oklch(0.95 0.018 86)"]
+      },
+      "strong-border": {
+        "role": "neutral",
+        "displayName": "Strong Border",
+        "canonical": "oklch(0.37 0.02 82)",
+        "tonalRamp": ["oklch(0.15 0.02 82)", "oklch(0.25 0.02 82)", "oklch(0.35 0.02 82)", "oklch(0.45 0.02 82)", "oklch(0.55 0.02 82)", "oklch(0.65 0.02 82)", "oklch(0.80 0.02 82)", "oklch(0.95 0.02 82)"]
+      },
+      "warm-foreground": {
+        "role": "neutral",
+        "displayName": "Warm Foreground",
+        "canonical": "oklch(0.935 0.022 88)",
+        "tonalRamp": ["oklch(0.15 0.022 88)", "oklch(0.25 0.022 88)", "oklch(0.35 0.022 88)", "oklch(0.45 0.022 88)", "oklch(0.55 0.022 88)", "oklch(0.65 0.022 88)", "oklch(0.80 0.022 88)", "oklch(0.95 0.022 88)"]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Muted Foreground",
+        "canonical": "oklch(0.66 0.028 88)",
+        "tonalRamp": ["oklch(0.15 0.028 88)", "oklch(0.25 0.028 88)", "oklch(0.35 0.028 88)", "oklch(0.45 0.028 88)", "oklch(0.55 0.028 88)", "oklch(0.65 0.028 88)", "oklch(0.80 0.028 88)", "oklch(0.95 0.028 88)"]
+      },
+      "selected-ink": {
+        "role": "neutral",
+        "displayName": "Selected Ink",
+        "canonical": "oklch(0.13 0.014 86)",
+        "tonalRamp": ["oklch(0.15 0.014 86)", "oklch(0.25 0.014 86)", "oklch(0.35 0.014 86)", "oklch(0.45 0.014 86)", "oklch(0.55 0.014 86)", "oklch(0.65 0.014 86)", "oklch(0.80 0.014 86)", "oklch(0.95 0.014 86)"]
+      },
+      "splice-gold": {
+        "role": "primary",
+        "displayName": "Splice Gold",
+        "canonical": "oklch(0.76 0.145 76)",
+        "tonalRamp": ["oklch(0.15 0.145 76)", "oklch(0.25 0.145 76)", "oklch(0.35 0.145 76)", "oklch(0.45 0.145 76)", "oklch(0.55 0.145 76)", "oklch(0.65 0.145 76)", "oklch(0.80 0.145 76)", "oklch(0.95 0.145 76)"]
+      },
+      "signal-teal": {
+        "role": "secondary",
+        "displayName": "Signal Teal",
+        "canonical": "oklch(0.72 0.13 178)",
+        "tonalRamp": ["oklch(0.15 0.13 178)", "oklch(0.25 0.13 178)", "oklch(0.35 0.13 178)", "oklch(0.45 0.13 178)", "oklch(0.55 0.13 178)", "oklch(0.65 0.13 178)", "oklch(0.80 0.13 178)", "oklch(0.95 0.13 178)"]
+      },
+      "playhead-red": {
+        "role": "tertiary",
+        "displayName": "Playhead Red",
+        "canonical": "oklch(0.64 0.2 29)",
+        "tonalRamp": ["oklch(0.15 0.2 29)", "oklch(0.25 0.2 29)", "oklch(0.35 0.2 29)", "oklch(0.45 0.2 29)", "oklch(0.55 0.2 29)", "oklch(0.65 0.2 29)", "oklch(0.80 0.2 29)", "oklch(0.95 0.2 29)"]
+      },
+      "destructive-red": {
+        "role": "tertiary",
+        "displayName": "Destructive Red",
+        "canonical": "oklch(0.57 0.19 28)",
+        "tonalRamp": ["oklch(0.15 0.19 28)", "oklch(0.25 0.19 28)", "oklch(0.35 0.19 28)", "oklch(0.45 0.19 28)", "oklch(0.55 0.19 28)", "oklch(0.65 0.19 28)", "oklch(0.80 0.19 28)", "oklch(0.95 0.19 28)"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Empty-state and blocking-state headings." },
+      "body": { "displayName": "Body", "purpose": "Standard controls, descriptions, and working text." },
+      "title": { "displayName": "Title", "purpose": "Panel identity and compact section titles." },
+      "label": { "displayName": "Label", "purpose": "Inspector tabs, transport facts, and dense controls." },
+      "micro": { "displayName": "Micro Metadata", "purpose": "Short non-interactive codec, channel, and format metadata." },
+      "timecode": { "displayName": "Timecode", "purpose": "Media-time, frame, Selection, and measured signal readouts." }
+    },
+    "shadows": [
+      { "name": "control-low", "value": "0 1px 2px rgb(0 0 0 / 0.05)", "purpose": "Restrained edge under buttons and fields." },
+      { "name": "media-aperture", "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)", "purpose": "Loaded media frame inside the viewer." },
+      { "name": "overlay-high", "value": "0 25px 50px -12px rgb(0 0 0 / 0.8)", "purpose": "Blocking dialogs and overlays only." },
+      { "name": "selection-start", "value": "4px 0 8px color-mix(in oklch, var(--workbench-selected) 55%, transparent)", "purpose": "Directional emphasis for the Selection start boundary." },
+      { "name": "selection-end", "value": "-4px 0 8px color-mix(in oklch, var(--workbench-selected) 55%, transparent)", "purpose": "Directional emphasis for the Selection end boundary." }
+    ],
+    "motion": [
+      { "name": "playhead-live", "value": "100ms linear", "purpose": "Live playhead position updates." },
+      { "name": "selection-commit", "value": "200ms ease-out", "purpose": "Committed Selection geometry updates." },
+      { "name": "sidebar-resize", "value": "200ms linear", "purpose": "App sidebar width and placement changes." },
+      { "name": "reduced-motion", "value": "0.01ms linear", "purpose": "Global reduced-motion override for transitions and animations." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Transport Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The 32px Signal Teal preview action used for Play and Pause.",
+      "html": "<button class=\"ds-transport-primary\" aria-label=\"Play\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8 5v14l11-7z\" fill=\"currentColor\"/></svg></button>",
+      "css": ".ds-transport-primary { width: 32px; height: 32px; display: inline-grid; place-items: center; padding: 0; border: 1px solid color-mix(in oklch, var(--workbench-progress) 40%, transparent); border-radius: 4px; background: var(--workbench-progress); color: var(--workbench-selected-foreground); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); transition: background-color 150ms, border-color 150ms, box-shadow 150ms; } .ds-transport-primary svg { width: 16px; height: 16px; } .ds-transport-primary:hover { background: color-mix(in oklch, var(--workbench-progress) 90%, black); } .ds-transport-primary:focus-visible { outline: none; border-color: var(--workbench-focus); box-shadow: 0 0 0 3px color-mix(in oklch, var(--workbench-focus) 35%, transparent); }"
+    },
+    {
+      "name": "Outline Control Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Compact bordered action for reset, navigation, and secondary transport commands.",
+      "html": "<button class=\"ds-button-outline\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>Reset</span></button>",
+      "css": ".ds-button-outline { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--workbench-border); border-radius: 4px; background: var(--workbench-viewer); color: var(--workbench-foreground); font: 500 12px/16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms; } .ds-button-outline svg { width: 14px; height: 14px; } .ds-button-outline:hover { border-color: var(--workbench-border-strong); background: var(--workbench-hover); } .ds-button-outline:focus-visible { outline: none; border-color: var(--workbench-focus); box-shadow: 0 0 0 3px color-mix(in oklch, var(--workbench-focus) 35%, transparent); }"
+    },
+    {
+      "name": "Compact Input",
+      "kind": "input",
+      "refersTo": "input-compact",
+      "description": "The standard 32px workbench text field with a strong structural edge.",
+      "html": "<label class=\"ds-field\"><span>Preset name</span><input class=\"ds-input\" value=\"Web delivery\" /></label>",
+      "css": ".ds-field { display: grid; gap: 6px; color: var(--workbench-foreground); font: 500 11px/16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-input { width: 220px; height: 32px; padding: 4px 12px; border: 1px solid var(--workbench-border-strong); border-radius: 6px; background: var(--workbench); color: var(--workbench-foreground); font: 400 14px/20px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); transition: border-color 150ms, box-shadow 150ms; } .ds-input:hover { border-color: var(--workbench-focus); } .ds-input:focus-visible { outline: none; border-color: var(--workbench-focus); box-shadow: 0 0 0 3px color-mix(in oklch, var(--workbench-focus) 35%, transparent); }"
+    },
+    {
+      "name": "Inspector Tabs",
+      "kind": "nav",
+      "refersTo": "inspector-tab-active",
+      "description": "Square, border-separated workbench navigation with one quiet active state.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Workbench inspector tabs\"><button class=\"ds-tab\">Media</button><button class=\"ds-tab ds-tab-active\" aria-current=\"page\">Audio</button><button class=\"ds-tab\">Export</button></nav>",
+      "css": ".ds-tabs { height: 32px; display: flex; align-items: stretch; border-bottom: 1px solid var(--workbench-border); background: var(--workbench); } .ds-tab { height: 32px; padding: 4px 8px; border: 0; border-right: 1px solid var(--workbench-border); border-radius: 0; background: transparent; color: var(--muted-foreground); font: 500 11px/16.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background-color 150ms, color 150ms; } .ds-tab:hover, .ds-tab-active { background: color-mix(in oklch, var(--workbench-hover) 100%, transparent); color: var(--workbench-foreground); } .ds-tab:focus-visible { outline: 2px solid var(--workbench-focus); outline-offset: -2px; }"
+    },
+    {
+      "name": "Runtime Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Compact capability status combining icon, border, and text.",
+      "html": "<span class=\"ds-status-chip\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 3 5 6v5c0 4.6 3 8.1 7 10 4-1.9 7-5.4 7-10V6l-7-3Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"m9 12 2 2 4-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></svg>WebCodecs</span>",
+      "css": ".ds-status-chip { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--workbench-border); border-radius: 4px; background: var(--workbench-inspector); color: var(--workbench-foreground); font: 500 12px/16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-status-chip svg { width: 14px; height: 14px; color: var(--workbench-progress); } .ds-status-chip:hover { border-color: var(--workbench-border-strong); } .ds-status-chip:focus-visible { outline: 2px solid var(--workbench-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Selection Panel Header",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Signature Selection chrome pairing system-sans identity with a monospaced duration.",
+      "html": "<section class=\"ds-selection-panel\"><header class=\"ds-selection-header\"><div class=\"ds-selection-title\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 12h2l2-6 4 12 3-9 3 6h4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg><strong>Selection</strong><code>00:00:02.000</code></div><button>Reset</button></header><div class=\"ds-selection-ruler\"><span>00:00:00.000</span><span>00:00:01.000</span><span>00:00:02.000</span><i></i></div></section>",
+      "css": ".ds-selection-panel { width: 520px; overflow: hidden; border: 1px solid var(--workbench-border); border-radius: 6px; background: var(--workbench-timeline); color: var(--workbench-foreground); } .ds-selection-header { height: 38px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--workbench-border); } .ds-selection-title { display: flex; align-items: center; gap: 8px; font: 600 14px/20px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-selection-title svg { width: 16px; height: 16px; color: var(--workbench-progress); } .ds-selection-title code { color: var(--muted-foreground); font: 400 11px/16.5px ui-monospace, SFMono-Regular, Menlo, monospace; } .ds-selection-header button { height: 28px; padding: 0 8px; border: 1px solid var(--workbench-border); border-radius: 4px; background: var(--workbench-viewer); color: var(--workbench-foreground); } .ds-selection-header button:hover { background: var(--workbench-hover); } .ds-selection-header button:focus-visible { outline: 2px solid var(--workbench-focus); outline-offset: 1px; } .ds-selection-ruler { position: relative; height: 48px; display: flex; align-items: end; justify-content: space-between; padding: 0 10px 6px; background: var(--workbench-ruler); color: var(--muted-foreground); font: 400 11px/16.5px ui-monospace, SFMono-Regular, Menlo, monospace; } .ds-selection-ruler i { position: absolute; top: 0; bottom: 0; left: 52%; width: 2px; background: var(--workbench-playhead); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Cutting Room",
+    "overview": "YAFFW feels like a purpose-built cutting room: dark enough for media to command attention, compact enough to keep every control within working reach, and exact enough that time, capability, and output state remain legible at a glance. Its voice is utilitarian, technical, and no-nonsense; decoration yields to instrument-like feedback.\n\nThe system is dense without becoming noisy. Warm-black tonal layers and fine borders organize the workbench, while three accents have strict jobs: Splice Gold marks Selection and active editing intent, Signal Teal reports progress and healthy signal, and Playhead Red locates the current media-time position. Glossy consumer-creator styling and floating dashboard-card layouts are explicit anti-references.",
+    "keyCharacteristics": [
+      "Warm-black, viewport-height editor environment.",
+      "Compact system typography with monospaced media-time readouts.",
+      "Flat, structurally layered panels separated by borders and tonal shifts.",
+      "Sparse semantic accents with stable, task-specific meaning.",
+      "Instrument-like controls with visible hover, focus, pressed, disabled, and failure states."
+    ],
+    "rules": [
+      { "name": "The Three Signals Rule", "body": "Splice Gold means editing intent, Signal Teal means signal or progress, and Playhead Red means current media-time position. Do not swap their roles for variety.", "section": "colors" },
+      { "name": "The Media Owns Saturation Rule", "body": "Interface color stays controlled so the loaded video, thumbnails, and waveforms remain the most saturated material on screen.", "section": "colors" },
+      { "name": "The Instrument Readout Rule", "body": "Use monospace for media-time, frame, codec, channel, and measured signal values; use system sans for actions and explanations.", "section": "typography" },
+      { "name": "The Functional Floor Rule", "body": "Interactive and content-bearing text stays at 11px or larger. The 10px micro role is limited to short, non-interactive metadata with strong contrast.", "section": "typography" },
+      { "name": "The Structural Layering Rule", "body": "Use tone and borders for permanent hierarchy; use strong shadows only when content truly overlays or projects from its plane.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve the warm-black tonal sequence from Viewer Black through Transport Black when adding workbench regions.",
+      "Do keep accent semantics stable: Splice Gold for editing intent, Signal Teal for signal/progress, and Playhead Red for current position.",
+      "Do use borders, alignment, and density to communicate hierarchy before adding shadow or ornament.",
+      "Do use monospace for media-time and measured technical values, with system sans for actions and explanations.",
+      "Do keep control states explicit through label, icon, border, fill, and focus treatment."
+    ],
+    "donts": [
+      "Don't turn the workbench into a glossy consumer-creator interface with gradients, oversized rounded cards, or decorative glow.",
+      "Don't build floating dashboard-card layouts inside the editor frame.",
+      "Don't reuse semantic accents decoratively or swap their meanings between surfaces.",
+      "Don't let permanent panels float with strong shadows; reserve elevation for overlays and the media aperture.",
+      "Don't compress interactive labels below 11px or use micro text for primary actions.",
+      "Don't imitate a multi-asset nonlinear editor with bins, composition timelines, or gratuitous chrome."
+    ]
+  }
+}

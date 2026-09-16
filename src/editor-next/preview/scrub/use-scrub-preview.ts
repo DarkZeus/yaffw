@@ -69,9 +69,7 @@ export function useScrubPreview({
 					return;
 				}
 
-				if (frame.accuracy === "exact") {
-					cache.set(frame.timestampUs, frame.canvas);
-				}
+				cache.set(frame.timestampUs, frame.canvas);
 				if (frame.requestId <= nativeSettledThroughRequestIdRef.current) {
 					return;
 				}

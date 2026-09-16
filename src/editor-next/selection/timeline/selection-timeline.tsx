@@ -696,16 +696,16 @@ export function SelectionTimeline({
 	return (
 		<section
 			aria-label="Selection timeline"
-			className="grid min-h-full grid-rows-[38px_minmax(0,1fr)] gap-0 overflow-hidden rounded-md border bg-workbench-timeline xl:rounded-none xl:border-0"
+			className="grid h-full min-h-full grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden bg-workbench-timeline"
 		>
-			<div className="flex min-w-0 items-center justify-between border-b border-workbench-border px-3">
+			<div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-workbench-border px-3 py-2">
 				<div className="flex min-w-0 items-center gap-2 text-sm font-semibold">
 					<AudioWaveform
 						aria-hidden="true"
 						className="size-4 text-workbench-progress"
 					/>
 					<span className="truncate">Selection</span>
-					<span className="hidden font-mono text-[11px] font-normal text-muted-foreground sm:inline">
+					<span className="hidden tabular-nums text-[11px] font-normal text-muted-foreground sm:inline">
 						{formatMediaTime(visibleSelection.endUs - visibleSelection.startUs)}
 					</span>
 				</div>
@@ -722,7 +722,7 @@ export function SelectionTimeline({
 				/>
 			</div>
 
-			<div className="min-h-0 overflow-hidden p-4">
+			<div className="min-h-0 overflow-hidden px-0 py-3 sm:p-4">
 				<div
 					className="h-full min-h-0 overflow-x-auto rounded border border-workbench-border bg-workbench-timeline text-workbench-timeline-foreground"
 					data-testid="selection-timeline-scroll"
@@ -762,7 +762,7 @@ export function SelectionTimeline({
 									>
 										<div className="absolute bottom-5 left-0 h-4 w-px bg-workbench-border-strong" />
 										<span
-											className={`absolute bottom-1 whitespace-nowrap font-mono text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
+											className={`absolute ${marker.placement === "start" ? "bottom-6 sm:bottom-1" : "bottom-1"} ${marker.placement === "middle" ? "hidden sm:block" : ""} whitespace-nowrap tabular-nums text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
 										>
 											{formatMediaTime(marker.timeUs)}
 										</span>
@@ -816,7 +816,7 @@ export function SelectionTimeline({
 							</div>
 
 							<div
-								className="absolute inset-y-0 z-30"
+								className="pointer-events-none absolute inset-y-0 z-30"
 								style={{
 									left: `${TIMELINE_LANE_HEADER_WIDTH_PX}px`,
 									right: 0,
@@ -835,7 +835,7 @@ export function SelectionTimeline({
 										/>
 										<button
 											aria-label="Move selection range"
-											className={`absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+											className={`pointer-events-auto absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
@@ -851,7 +851,7 @@ export function SelectionTimeline({
 										/>
 										<button
 											aria-label="Selection start handle"
-											className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											className={`pointer-events-auto absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
@@ -869,7 +869,7 @@ export function SelectionTimeline({
 										</button>
 										<button
 											aria-label="Selection end handle"
-											className={`absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											className={`pointer-events-auto absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
@@ -889,7 +889,7 @@ export function SelectionTimeline({
 								)}
 								<button
 									aria-label="Playhead handle"
-									className={`absolute -top-2 bottom-0 z-30 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
+									className={`pointer-events-auto absolute -top-2 bottom-0 z-30 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
 									onMouseDown={(event) => {
 										if (shouldUseMouseFallback()) {
 											beginPlayheadDrag(event);
@@ -933,7 +933,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 	zoom: number;
 }) {
 	return (
-		<div className="flex shrink-0 items-center gap-2">
+		<div className="flex flex-wrap items-center gap-2">
 			<Button
 				aria-label="Reset selection"
 				className="h-7 rounded border-workbench-border bg-workbench-viewer px-2 text-xs text-foreground hover:bg-workbench-hover"
@@ -948,7 +948,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			</Button>
 			<Button
 				aria-label="Zoom out timeline"
-				className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
+				className="inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
 				disabled={zoom <= MINIMUM_TIMELINE_ZOOM}
 				onClick={onZoomOut}
 				size="icon"
@@ -957,7 +957,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			>
 				<ZoomOut data-icon="inline-start" />
 			</Button>
-			<label className="hidden min-w-28 items-center gap-2 text-xs font-medium text-muted-foreground sm:flex">
+			<label className="flex min-w-0 w-24 sm:w-28 items-center gap-2 text-xs font-medium text-muted-foreground">
 				<span>Zoom</span>
 				<input
 					aria-label="Timeline zoom"
@@ -976,7 +976,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			</label>
 			<Button
 				aria-label="Zoom in timeline"
-				className="hidden size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:inline-flex"
+				className="inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
 				disabled={zoom >= MAXIMUM_TIMELINE_ZOOM}
 				onClick={onZoomIn}
 				size="icon"
@@ -988,11 +988,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			<Button
 				aria-label="Keep playhead centered"
 				aria-pressed={playheadFollowEnabled}
-				className={`hidden size-7 rounded sm:inline-flex ${
-					playheadFollowEnabled
-						? "border-workbench-progress/50 bg-workbench-progress/15 text-workbench-progress hover:bg-workbench-progress/20 hover:text-workbench-progress"
-						: "border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-				}`}
+				className="cinema-toggle-button inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
 				onClick={onFollowToggle}
 				size="icon"
 				title="Keep playhead centered"
@@ -1213,12 +1209,12 @@ const VideoThumbnailStrip = memo(function VideoThumbnailStrip({
 											draggable={false}
 											src={slot.frame.url}
 										/>
-										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 font-mono text-[10px] leading-none text-workbench-selected-foreground">
+										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 tabular-nums text-[10px] leading-none text-workbench-selected-foreground">
 											{formatVideoThumbnailTime(slot.timestampUs)}
 										</span>
 									</>
 								) : (
-									<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent)] opacity-45" />
+									<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,oklch(1_0_none_/_0.08),transparent)] opacity-45" />
 								)}
 							</div>
 						))}
@@ -1242,7 +1238,7 @@ function VideoThumbnailStripStatus({
 }) {
 	if (state.status === "ready") {
 		return (
-			<span className="rounded border border-workbench-border-strong px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+			<span className="rounded border border-workbench-border-strong px-1.5 py-0.5 tabular-nums text-[11px] text-muted-foreground">
 				{frameCount} frames
 			</span>
 		);
@@ -1250,7 +1246,7 @@ function VideoThumbnailStripStatus({
 
 	if (state.status === "loading") {
 		return (
-			<span className="rounded border border-workbench-progress/45 bg-workbench-progress/15 px-1.5 py-0.5 font-mono text-[11px] text-workbench-progress">
+			<span className="rounded border border-workbench-progress/45 bg-workbench-progress/15 px-1.5 py-0.5 tabular-nums text-[11px] text-workbench-progress">
 				{frameCount > 0
 					? `${frameCount}/${expectedFrameCount} frames`
 					: "Loading frames"}
@@ -1260,7 +1256,7 @@ function VideoThumbnailStripStatus({
 
 	return (
 		<span
-			className="rounded border border-destructive/45 bg-destructive/15 px-1.5 py-0.5 font-mono text-[11px] text-destructive"
+			className="rounded border border-destructive/45 bg-destructive/15 px-1.5 py-0.5 tabular-nums text-[11px] text-destructive"
 			title={state.reason}
 		>
 			Frames unavailable
@@ -1331,10 +1327,10 @@ function VideoThumbnailStripPlaceholder({
 					key={key}
 				>
 					<div className="absolute inset-x-0 top-0 h-1 bg-workbench-border-strong/70" />
-					<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)] opacity-45" />
+					<div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,oklch(1_0_none_/_0.06),transparent)] opacity-45" />
 				</div>
 			))}
-			<span className="absolute inset-0 grid place-items-center bg-black/20 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+			<span className="absolute inset-0 grid place-items-center bg-black/20 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">
 				{state.status === "loading" ? "Loading frames" : "Frames unavailable"}
 			</span>
 		</div>

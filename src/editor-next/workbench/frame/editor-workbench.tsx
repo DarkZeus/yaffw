@@ -1,42 +1,26 @@
 import {
 	AlertCircle,
 	AlertTriangle,
-	AudioLines,
-	Brackets,
 	FileVideo,
 	Loader2,
-	PackageCheck,
 	Scissors,
-	ShieldCheck,
 	Upload,
 } from "lucide-react";
-import { useState } from "react";
-import type { ChangeEvent, DragEvent, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 import { cn } from "@/lib/utils";
-import { formatMediaTime } from "../../media-time/format/media-time-presentation";
 
 export type EditorWorkbenchFrameProps = {
 	activeAsset: ReadyMediaAsset | null;
 	children: ReactNode;
-	previewStatus?: {
-		playheadUs: MediaTimeUs;
-		selectionDurationUs: MediaTimeUs;
-	} | null;
 	runtime: RuntimeSupport;
-	status: EditorSessionState["status"];
 };
 
 export type UnsupportedRuntimeStateProps = {
@@ -44,11 +28,8 @@ export type UnsupportedRuntimeStateProps = {
 };
 
 export type EditorSessionShellProps = {
-	audioPanel: ReactNode;
-	exportInspector: ReactNode;
 	localFileInputKey: number;
-	mediaAssetContext: ReactNode;
-	onLocalFileDropped: (event: DragEvent<HTMLElement>) => void;
+	onLocalFileDropped: (file: File) => void;
 	onLocalFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
 	previewPlayer: ReactNode;
 	session: Exclude<EditorSessionState, { status: "unsupported-runtime" }>;
@@ -73,70 +54,29 @@ const supportedVideoAcceptAttribute = [
 	"video/*",
 	...supportedVideoExtensions,
 ].join(",");
-const workbenchInspectorTabValues = ["media", "audio", "export"] as const;
-const defaultWorkbenchInspectorTabValue = "media";
-const workbenchInspectorTabStorageKey = "editor-next-workbench-inspector-tab";
-
-type WorkbenchInspectorTabValue = (typeof workbenchInspectorTabValues)[number];
-
 export function EditorWorkbenchFrame({
 	activeAsset,
 	children,
-	previewStatus,
 	runtime,
-	status,
 }: EditorWorkbenchFrameProps) {
 	return (
-		<main className="workbench dark h-screen min-h-screen overflow-hidden bg-workbench text-foreground">
-			<div className="grid h-full min-h-0 grid-rows-[2.625rem_minmax(0,1fr)] overflow-hidden">
-				<header
-					aria-label="Editor workbench top bar"
-					className="grid min-w-0 grid-cols-[minmax(12rem,auto)_minmax(0,1fr)_auto] items-center gap-3 border-b border-workbench-border-strong bg-workbench px-2.5"
-				>
-					<div className="flex min-w-0 items-center gap-2">
-						<div className="flex size-7 shrink-0 items-center justify-center rounded border border-workbench-border-strong bg-workbench-viewer text-workbench-selected">
-							<Scissors aria-hidden="true" className="size-4" />
-						</div>
-						<div className="min-w-0">
-							<h1 className="truncate text-xs font-semibold uppercase tracking-normal">
-								YAFFW
-							</h1>
-							<p className="truncate text-[10px] uppercase leading-none tracking-[0.18em] text-muted-foreground">
-								Editor workbench
-							</p>
-						</div>
-					</div>
-					<TopBarMediaAssetSummary
-						activeAsset={activeAsset}
-						previewStatus={previewStatus}
-					/>
-					<div className="flex min-w-0 items-center justify-end gap-2">
-						<div className="flex h-7 min-w-0 items-center gap-1.5 rounded border border-workbench-border bg-workbench-inspector px-2 text-xs">
-							{runtime.supported ? (
-								<ShieldCheck
-									aria-hidden="true"
-									className="size-3.5 shrink-0 text-workbench-progress"
-								/>
-							) : (
-								<AlertTriangle
-									aria-hidden="true"
-									className="size-3.5 shrink-0 text-destructive"
-								/>
-							)}
-							<span className="truncate font-medium">
-								{runtime.supported ? "WebCodecs" : "Runtime blocked"}
-							</span>
-						</div>
+		<main className="workbench dark cinema-workbench">
+			{!activeAsset && (
+				<header aria-label="Editor workbench top bar" className="cinema-header">
+					<div className="cinema-brand">
+						<Scissors aria-hidden="true" className="cinema-mark" />
+						<h1>YAFFW</h1>
 					</div>
 				</header>
-				<div
-					className={`min-h-0 min-w-0 overflow-auto overscroll-contain bg-workbench p-3 md:p-4 ${
-						status === "ready" ? "xl:overflow-hidden xl:p-0" : ""
-					}`}
-				>
-					{children}
-				</div>
+			)}
+			<div className="cinema-stage" data-editing={activeAsset !== null}>
+				{children}
 			</div>
+			{!runtime.supported && (
+				<footer className="cinema-footer">
+					<span>Runtime blocked</span>
+				</footer>
+			)}
 		</main>
 	);
 }
@@ -178,10 +118,7 @@ export function UnsupportedRuntimeState({
 }
 
 export function EditorSessionShell({
-	audioPanel,
-	exportInspector,
 	localFileInputKey,
-	mediaAssetContext,
 	onLocalFileDropped,
 	onLocalFileSelected,
 	previewPlayer,
@@ -211,246 +148,9 @@ export function EditorSessionShell({
 	}
 
 	return (
-		<section
-			aria-label="Editor workbench session"
-			className="min-h-[calc(100vh-5rem)] xl:h-full xl:min-h-0 xl:overflow-hidden"
-		>
-			<ResizablePanelGroup
-				aria-label="Ready workbench layout"
-				autoSaveId="editor-next-ready-workbench"
-				className="min-h-[calc(100vh-5rem)] min-w-0 flex-col gap-3 xl:h-full xl:min-h-0 xl:flex-row xl:gap-0 xl:overflow-hidden"
-				direction="horizontal"
-			>
-				<ResizablePanel
-					className="min-w-0 xl:min-h-0"
-					defaultSize={24}
-					id="editor-next-inspector-pane"
-					maxSize={42}
-					minSize={18}
-					order={1}
-				>
-					<WorkbenchInspectorTabs
-						audioPanel={audioPanel}
-						exportInspector={exportInspector}
-						mediaAssetContext={mediaAssetContext}
-					/>
-				</ResizablePanel>
-
-				<ResizableHandle
-					aria-label="Resize inspector panel"
-					className="hidden bg-workbench-border-strong xl:flex"
-				/>
-
-				<ResizablePanel
-					className="min-w-0 xl:min-h-0"
-					defaultSize={76}
-					id="editor-next-preview-pane"
-					minSize={50}
-					order={2}
-				>
-					{previewPlayer}
-				</ResizablePanel>
-			</ResizablePanelGroup>
+		<section aria-label="Editor workbench session" className="cinema-session">
+			{previewPlayer}
 		</section>
-	);
-}
-
-function WorkbenchInspectorTabs({
-	audioPanel,
-	exportInspector,
-	mediaAssetContext,
-}: Pick<
-	EditorSessionShellProps,
-	"audioPanel" | "exportInspector" | "mediaAssetContext"
->) {
-	const [activeTab, setActiveTab] = useState<WorkbenchInspectorTabValue>(
-		readStoredWorkbenchInspectorTabValue,
-	);
-
-	function handleTabChange(nextTab: string) {
-		if (!isWorkbenchInspectorTabValue(nextTab)) {
-			return;
-		}
-
-		setActiveTab(nextTab);
-		writeStoredWorkbenchInspectorTabValue(nextTab);
-	}
-
-	return (
-		<aside
-			aria-label="Workbench inspector region"
-			className="flex min-w-0 flex-col overflow-visible overscroll-contain xl:h-full xl:min-h-0 xl:overflow-hidden xl:bg-workbench-inspector xl:[contain:layout_paint]"
-		>
-			<Tabs
-				className="flex min-h-0 flex-1 flex-col gap-0 xl:h-full"
-				onValueChange={handleTabChange}
-				value={activeTab}
-			>
-				<div className="flex h-8 min-w-0 shrink-0 items-center justify-between border-b border-workbench-border bg-workbench">
-					<TabsList
-						aria-label="Workbench inspector tabs"
-						className="flex h-full min-w-0 items-stretch justify-start rounded-none bg-transparent p-0"
-					>
-						<WorkbenchInspectorTabTrigger value="media">
-							<FileVideo data-icon="inline-start" />
-							<span>Media</span>
-						</WorkbenchInspectorTabTrigger>
-						<WorkbenchInspectorTabTrigger value="audio">
-							<AudioLines data-icon="inline-start" />
-							<span>Audio</span>
-						</WorkbenchInspectorTabTrigger>
-						<WorkbenchInspectorTabTrigger value="export">
-							<PackageCheck data-icon="inline-start" />
-							<span>Export</span>
-						</WorkbenchInspectorTabTrigger>
-					</TabsList>
-				</div>
-				<TabsContent
-					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-					value="media"
-				>
-					{mediaAssetContext}
-				</TabsContent>
-				<TabsContent
-					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-					value="audio"
-				>
-					{audioPanel}
-				</TabsContent>
-				<TabsContent
-					className="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
-					value="export"
-				>
-					{exportInspector}
-				</TabsContent>
-			</Tabs>
-		</aside>
-	);
-}
-
-function readStoredWorkbenchInspectorTabValue(): WorkbenchInspectorTabValue {
-	if (typeof window === "undefined") {
-		return defaultWorkbenchInspectorTabValue;
-	}
-
-	try {
-		const storedValue = window.localStorage.getItem(
-			workbenchInspectorTabStorageKey,
-		);
-
-		return isWorkbenchInspectorTabValue(storedValue)
-			? storedValue
-			: defaultWorkbenchInspectorTabValue;
-	} catch {
-		return defaultWorkbenchInspectorTabValue;
-	}
-}
-
-function writeStoredWorkbenchInspectorTabValue(
-	value: WorkbenchInspectorTabValue,
-) {
-	if (typeof window === "undefined") {
-		return;
-	}
-
-	try {
-		window.localStorage.setItem(workbenchInspectorTabStorageKey, value);
-	} catch {
-		// Ignore storage failures so tab navigation remains usable.
-	}
-}
-
-function isWorkbenchInspectorTabValue(
-	value: unknown,
-): value is WorkbenchInspectorTabValue {
-	return (
-		typeof value === "string" &&
-		workbenchInspectorTabValues.includes(value as WorkbenchInspectorTabValue)
-	);
-}
-
-function WorkbenchInspectorTabTrigger({
-	children,
-	value,
-}: {
-	children: ReactNode;
-	value: string;
-}) {
-	return (
-		<TabsTrigger
-			className="h-full min-w-0 touch-none rounded-none border-y-0 border-l-0 border-r border-workbench-border bg-workbench px-2 text-[11px] font-medium text-muted-foreground shadow-none hover:bg-workbench-hover hover:text-foreground data-[state=active]:bg-workbench-hover data-[state=active]:text-foreground data-[state=active]:shadow-none [&_svg]:size-3.5 [&_svg]:text-workbench-selected [&_svg]:opacity-70 data-[state=active]:[&_svg]:opacity-100"
-			value={value}
-		>
-			{children}
-		</TabsTrigger>
-	);
-}
-
-function TopBarMediaAssetSummary({
-	activeAsset,
-	previewStatus,
-}: Pick<EditorWorkbenchFrameProps, "activeAsset" | "previewStatus">) {
-	if (!activeAsset) {
-		return (
-			<div
-				aria-label="Top bar media asset summary"
-				className="hidden min-w-0 md:block"
-			/>
-		);
-	}
-
-	const primaryVideo = activeAsset.tracks.video[0];
-	const resolution =
-		primaryVideo?.width && primaryVideo.height
-			? `${primaryVideo.width} x ${primaryVideo.height}`
-			: "Resolution unknown";
-	const playheadUs = previewStatus?.playheadUs ?? 0;
-	const selectionDurationUs =
-		previewStatus?.selectionDurationUs ?? activeAsset.durationUs;
-
-	return (
-		<div
-			aria-label="Top bar media asset summary"
-			className="hidden min-w-0 items-center justify-center gap-2 overflow-hidden font-mono text-[11px] text-muted-foreground lg:flex"
-		>
-			<dl
-				aria-label="Top bar media-time readouts"
-				className="flex min-w-0 items-center gap-2"
-			>
-				<dt className="sr-only">Playhead</dt>
-				<dd className="whitespace-nowrap text-foreground">
-					{formatMediaTime(playheadUs)}
-				</dd>
-				<span aria-hidden="true" className="text-workbench-border-strong">
-					/
-				</span>
-				<dt className="sr-only">Duration</dt>
-				<dd className="whitespace-nowrap">
-					{formatMediaTime(activeAsset.durationUs)}
-				</dd>
-				<span aria-hidden="true" className="text-workbench-border-strong">
-					|
-				</span>
-				<dt className="sr-only">Selection duration</dt>
-				<dd className="flex items-center gap-1.5 whitespace-nowrap text-foreground">
-					<Brackets
-						aria-hidden="true"
-						className="size-3.5 shrink-0 text-workbench-selected"
-					/>
-					{formatMediaTime(selectionDurationUs)}
-				</dd>
-			</dl>
-			<span aria-hidden="true" className="text-workbench-border-strong">
-				|
-			</span>
-			<span className="whitespace-nowrap">{resolution}</span>
-			<span aria-hidden="true" className="text-workbench-border-strong">
-				|
-			</span>
-			<span className="whitespace-nowrap">
-				{formatTopBarFrameTiming(activeAsset)}
-			</span>
-		</div>
 	);
 }
 
@@ -470,93 +170,83 @@ function NonReadyImportSurface({
 	const [dragState, setDragState] = useState<"idle" | "active" | "reject">(
 		"idle",
 	);
-	const [, setDragDepth] = useState(0);
-
-	function resetDragState() {
-		setDragDepth(0);
-		setDragState("idle");
-	}
-
-	function handleDragEnter(event: DragEvent<HTMLLabelElement>) {
-		event.preventDefault();
-
-		if (!session.importEnabled) {
-			return;
+	useEffect(() => {
+		let dragDepth = 0;
+		function resetDragState() {
+			dragDepth = 0;
+			setDragState("idle");
 		}
-
-		setDragDepth((currentDepth) => currentDepth + 1);
-		setDragState(
-			isRejectedDataTransfer(event.dataTransfer) ? "reject" : "active",
-		);
-	}
-
-	function handleDragOver(event: DragEvent<HTMLLabelElement>) {
-		event.preventDefault();
-
-		if (!session.importEnabled) {
-			event.dataTransfer.dropEffect = "none";
-			return;
+		function handleDragEnter(event: DragEvent) {
+			if (!isFileTransfer(event.dataTransfer)) return;
+			event.preventDefault();
+			if (!session.importEnabled) return;
+			dragDepth += 1;
+			setDragState(
+				isRejectedDataTransfer(event.dataTransfer) ? "reject" : "active",
+			);
 		}
-
-		const rejected = isRejectedDataTransfer(event.dataTransfer);
-		event.dataTransfer.dropEffect = rejected ? "none" : "copy";
-		setDragState(rejected ? "reject" : "active");
-	}
-
-	function handleDragLeave(event: DragEvent<HTMLLabelElement>) {
-		event.preventDefault();
-
-		if (!session.importEnabled) {
-			return;
+		function handleDragOver(event: DragEvent) {
+			if (!isFileTransfer(event.dataTransfer)) return;
+			event.preventDefault();
+			const rejected = isRejectedDataTransfer(event.dataTransfer);
+			event.dataTransfer.dropEffect =
+				!session.importEnabled || rejected ? "none" : "copy";
+			if (session.importEnabled) setDragState(rejected ? "reject" : "active");
 		}
-
-		setDragDepth((currentDepth) => {
-			const nextDepth = Math.max(0, currentDepth - 1);
-			if (nextDepth === 0) {
-				setDragState("idle");
+		function handleDragLeave() {
+			dragDepth = Math.max(0, dragDepth - 1);
+			if (dragDepth === 0) setDragState("idle");
+		}
+		function handleDrop(event: DragEvent) {
+			if (!isFileTransfer(event.dataTransfer)) return;
+			event.preventDefault();
+			resetDragState();
+			const file = event.dataTransfer.files[0];
+			if (session.importEnabled && file && isSupportedVideoFile(file)) {
+				onLocalFileDropped(file);
 			}
-			return nextDepth;
-		});
-	}
-
-	function handleDrop(event: DragEvent<HTMLLabelElement>) {
-		event.preventDefault();
-
-		if (!session.importEnabled) {
-			resetDragState();
-			return;
-		}
-
-		const file = event.dataTransfer.files[0];
-		if (!file || !isSupportedVideoFile(file)) {
-			resetDragState();
-			return;
 		}
 
 		resetDragState();
-		onLocalFileDropped(event);
-	}
+		// Listen only while the import surface is mounted, including the page chrome.
+		window.addEventListener("dragenter", handleDragEnter, true);
+		window.addEventListener("dragover", handleDragOver, true);
+		window.addEventListener("dragleave", handleDragLeave, true);
+		window.addEventListener("drop", handleDrop, true);
+		window.addEventListener("dragend", resetDragState);
+		window.addEventListener("blur", resetDragState);
+		return () => {
+			window.removeEventListener("dragenter", handleDragEnter, true);
+			window.removeEventListener("dragover", handleDragOver, true);
+			window.removeEventListener("dragleave", handleDragLeave, true);
+			window.removeEventListener("drop", handleDrop, true);
+			window.removeEventListener("dragend", resetDragState);
+			window.removeEventListener("blur", resetDragState);
+		};
+	}, [session.importEnabled, onLocalFileDropped]);
 
 	return (
-		<div className="grid h-full min-h-full place-items-center bg-workbench-viewer px-3 py-8 sm:px-6 sm:py-10">
-			<div className="flex w-full max-w-2xl flex-col gap-5">
-				<header className="mx-auto grid max-w-xl gap-1.5 text-center">
-					<h3 className="text-[15px] font-semibold tracking-[-0.02em]">
+		<div className="cinema-import">
+			<div className="flex w-full max-w-xl flex-col gap-8">
+				<header className="grid max-w-xl gap-4 text-left">
+					<h3 className="text-3xl font-medium tracking-[-0.03em] sm:text-4xl">
 						{copy.title}
 					</h3>
-					<p className="text-xs leading-5 text-muted-foreground">
-						{copy.description}
-					</p>
+					{copy.description && (
+						<p className="text-xs leading-5 text-muted-foreground">
+							{copy.description}
+						</p>
+					)}
 				</header>
 				<label
 					aria-disabled={!session.importEnabled}
 					aria-busy={isProcessing}
 					className={cn(
-						"relative grid min-h-60 cursor-pointer place-items-center overflow-hidden rounded border border-dashed border-workbench-border-strong bg-workbench-inspector/35 px-6 py-8 text-center transition-[background-color,border-color,box-shadow] duration-200 has-[:focus-visible]:border-workbench-focus has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-workbench-focus/25 sm:min-h-68 sm:px-10 sm:py-10",
+						"relative grid min-h-48 cursor-pointer overflow-hidden rounded-md border border-dashed border-workbench-border-strong bg-workbench-hover px-6 py-8 text-left transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-workbench-focus",
 						dragState === "active" &&
-							"border-solid border-workbench-selected bg-workbench-selected/5 shadow-lg shadow-black/25",
+							"border-solid border-workbench-selected bg-workbench-selected/5",
 						dragState === "reject" &&
-							"border-solid border-destructive bg-destructive/10 shadow-lg shadow-destructive/10",
+							"border-solid border-destructive bg-destructive/10",
 						isProcessing && "cursor-wait border-solid bg-workbench-disabled/25",
 						!isProcessing &&
 							dragState === "idle" &&
@@ -564,10 +254,6 @@ function NonReadyImportSurface({
 					)}
 					data-testid="editor-next-drop-zone"
 					htmlFor="editor-next-local-file"
-					onDragEnter={handleDragEnter}
-					onDragLeave={handleDragLeave}
-					onDragOver={handleDragOver}
-					onDrop={handleDrop}
 				>
 					<Input
 						accept={supportedVideoAcceptAttribute}
@@ -579,7 +265,7 @@ function NonReadyImportSurface({
 						onChange={onLocalFileSelected}
 						type="file"
 					/>
-					<div className="grid place-items-center gap-5">
+					<div className="grid justify-items-start gap-4">
 						<div
 							className={cn(
 								"grid size-9 place-items-center text-muted-foreground transition-[color,transform] duration-200",
@@ -608,32 +294,30 @@ function NonReadyImportSurface({
 								{dragState === "reject"
 									? "Invalid file type"
 									: dragState === "active"
-										? "Drop your video here!"
+										? "Release to open"
 										: isProcessing
-											? "Processing file..."
+											? "Opening video…"
 											: "Drop your video or click to browse"}
 							</h4>
-							<p className="text-xs leading-5 text-muted-foreground">
-								{dragState === "reject"
-									? "Please select a valid video file"
-									: dragState === "active"
-										? "Release to upload"
-										: isProcessing
-											? "Please wait..."
-											: "Upload from your device"}
-							</p>
+							{dragState === "reject" && (
+								<p className="text-xs leading-5 text-muted-foreground">
+									Choose a video file.
+								</p>
+							)}
 						</div>
 
 						{!isProcessing ? (
-							<p className="font-mono text-[9px] font-medium tracking-[0.08em] text-muted-foreground">
+							<p className="tabular-nums text-[9px] font-medium tracking-[0.08em] text-muted-foreground">
 								{supportedFormatLabels.join("  ·  ")}
 							</p>
 						) : null}
 					</div>
 				</label>
-				<div className="px-0.5">
-					<SessionStatusLine session={session} />
-				</div>
+				{(session.status === "loading" || session.status === "failure") && (
+					<div className="px-0.5">
+						<SessionStatusLine session={session} />
+					</div>
+				)}
 			</div>
 		</div>
 	);
@@ -661,6 +345,19 @@ function ImportSurfaceIcon({
 	return <Upload aria-hidden="true" className="size-6" />;
 }
 
+function isFileTransfer(
+	dataTransfer: DataTransfer | null,
+): dataTransfer is DataTransfer {
+	return (
+		!!dataTransfer &&
+		(Array.from(dataTransfer.types ?? []).includes("Files") ||
+			Array.from(dataTransfer.items ?? []).some(
+				(item) => item.kind === "file",
+			) ||
+			dataTransfer.files?.length > 0)
+	);
+}
+
 function isRejectedDataTransfer(dataTransfer: DataTransfer): boolean {
 	const fileItems = Array.from(dataTransfer.items).filter(
 		(item) => item.kind === "file",
@@ -686,27 +383,23 @@ function workbenchNonReadyStateCopy(session: NonReadyEditorSession) {
 	switch (session.status) {
 		case "closed":
 			return {
-				description:
-					"The previous session was closed. Reopen the route to start another editing session.",
-				title: "Session closed",
+				description: "Reload the page to open another video.",
+				title: "Video closed",
 			};
 		case "empty":
 			return {
-				description:
-					"Choose or drop one local media file to create a media asset draft.",
-				title: "No media asset loaded",
+				description: null,
+				title: "Open a video",
 			};
 		case "failure":
 			return {
-				description:
-					"Choose another local media file after reviewing the analysis details below.",
-				title: "Media asset analysis failed",
+				description: "Try another video.",
+				title: "Couldn’t open video",
 			};
 		case "loading":
 			return {
-				description:
-					"Analysis is running; import controls stay disabled until the asset is ready.",
-				title: "Analyzing media asset draft",
+				description: null,
+				title: "Opening video",
 			};
 	}
 }
@@ -761,7 +454,7 @@ function SessionStatusLine({ session }: { session: NonReadyEditorSession }) {
 	if (session.status === "loading") {
 		return (
 			<p className="text-xs leading-5 text-muted-foreground">
-				Preparing media asset draft {session.draft.label}.
+				{session.draft.label}
 			</p>
 		);
 	}
@@ -785,29 +478,5 @@ function SessionStatusLine({ session }: { session: NonReadyEditorSession }) {
 		);
 	}
 
-	if (session.status === "closed") {
-		return (
-			<p className="text-xs leading-5 text-muted-foreground">
-				Session closed; reopen the route to start again.
-			</p>
-		);
-	}
-
-	return (
-		<p className="text-xs leading-5 text-muted-foreground">
-			Waiting for a media asset draft.
-		</p>
-	);
-}
-
-function formatTopBarFrameTiming({
-	frameTiming,
-}: NonNullable<EditorWorkbenchFrameProps["activeAsset"]>): string {
-	const fps = Number.isInteger(frameTiming.fps)
-		? String(frameTiming.fps)
-		: frameTiming.fps.toFixed(2);
-
-	return frameTiming.source === "estimated"
-		? `${fps} fps estimated`
-		: `${fps} fps`;
+	return null;
 }

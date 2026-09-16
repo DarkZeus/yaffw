@@ -275,7 +275,10 @@ export function resolveOutputAudioProfile({
 		includedTrackIds.has(id),
 	);
 	const sourceCodec = normalizeAudioCodec(includedTracks[0]?.codec);
-	if (includedTracks.length === 0) {
+	if (
+		outputSettings.audioCodec.kind === "no-audio" ||
+		includedTracks.length === 0
+	) {
 		return {
 			audioCodec: undefined,
 			container,
@@ -382,7 +385,7 @@ export function resolveOutputPlan({
 		mediaKind: "audio",
 		setting: outputSettings.audioQuality,
 	});
-	if (audioQuality.kind === "invalid") {
+	if (audio.audioCodec && audioQuality.kind === "invalid") {
 		return audioQuality;
 	}
 

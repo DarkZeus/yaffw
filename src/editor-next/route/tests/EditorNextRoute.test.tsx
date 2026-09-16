@@ -48,7 +48,7 @@ describe("EditorNextRoute", () => {
 	it("renders the empty local import shell when the runtime is supported", () => {
 		render(<EditorNextRoute />);
 
-		expect(screen.getByText("No media asset loaded")).toBeTruthy();
+		expect(screen.getByText("Open a video")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(screen.queryByRole("alert")).toBeNull();
 	});
@@ -58,7 +58,7 @@ describe("EditorNextRoute", () => {
 
 		render(<EditorNextRoute />);
 
-		expect(screen.getByText("No media asset loaded")).toBeTruthy();
+		expect(screen.getByText("Open a video")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(
 			screen.queryByLabelText("Preview for stalker-patch-1.5-teaser.mp4"),
@@ -103,11 +103,9 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("Analyzing media asset draft")).toBeTruthy();
+			expect(screen.getByText("Opening video")).toBeTruthy();
 		});
-		expect(
-			screen.getByText("Preparing media asset draft loading.mp4."),
-		).toBeTruthy();
+		expect(screen.getByText("loading.mp4")).toBeTruthy();
 		expect(
 			(screen.getByLabelText("Local media file") as HTMLInputElement).disabled,
 		).toBe(true);
@@ -140,6 +138,7 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("picked.mp4").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local media file")).toBeNull();
+		openMediaTab();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
 
 		openExportTab();
@@ -330,11 +329,8 @@ describe("EditorNextRoute", () => {
 		);
 		expect(screen.getByLabelText("Resize inspector panel")).toBeTruthy();
 		expect(screen.getByLabelText("Resize selection region")).toBeTruthy();
-		expect(centerRegion.className).toContain("xl:h-full");
-		expect(centerRegion.className).toContain("xl:rounded-none");
-		expect(transportRegion.className).toContain("xl:rounded-none");
-		expect(selectionRegion.className).toContain("xl:min-h-0");
-		expect(selectionRegion.className).toContain("xl:border-t");
+		expect(centerRegion.className).toContain("h-full");
+		expect(selectionRegion.className).toContain("min-h-0");
 		expect(
 			within(selectionRegion).getByLabelText("Selection timeline"),
 		).toBeTruthy();
@@ -367,8 +363,8 @@ describe("EditorNextRoute", () => {
 			within(transportControls).queryByLabelText("Preview media-time readouts"),
 		).toBeNull();
 		expect(
-			screen.getByLabelText("Top bar media-time readouts").textContent,
-		).toContain("00:00:12.000");
+			screen.getByLabelText("Preview playhead time").textContent,
+		).toContain("00:00:00.000");
 		expect(
 			within(centerRegion).getByRole("button", {
 				name: "Open fullscreen preview",
@@ -383,7 +379,7 @@ describe("EditorNextRoute", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByLabelText("Top bar media-time readouts").textContent,
+				screen.getByLabelText("Preview playhead time").textContent,
 			).toContain("00:00:10.000");
 		});
 		openExportTab();
@@ -412,14 +408,12 @@ describe("EditorNextRoute", () => {
 		});
 
 		const selectionRegion = screen.getByLabelText("Workbench selection region");
-		expect(selectionRegion.className).toContain("overflow-x-hidden");
-		expect(selectionRegion.className).toContain("xl:overflow-y-auto");
-		expect(selectionRegion.className).toContain("overscroll-contain");
+		expect(selectionRegion.className).toContain("overflow-auto");
 		const selectionTimeline =
 			within(selectionRegion).getByLabelText("Selection timeline");
 		expect(selectionTimeline.className).toContain("min-h-full");
 		expect(selectionTimeline.className).toContain(
-			"grid-rows-[38px_minmax(0,1fr)]",
+			"grid-rows-[auto_minmax(0,1fr)]",
 		);
 		expect(
 			within(selectionRegion).getByTestId("selection-timeline-scroll")
@@ -565,6 +559,7 @@ describe("EditorNextRoute", () => {
 			).toBeTruthy();
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		expect(confirmClose).toHaveBeenCalledTimes(1);
@@ -619,10 +614,11 @@ describe("EditorNextRoute", () => {
 		});
 
 		openMediaTab();
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+			expect(screen.getByText("Open a video")).toBeTruthy();
 		});
 
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
@@ -680,6 +676,7 @@ describe("EditorNextRoute", () => {
 				.getAttribute("src"),
 		).toBe("blob:first-preview");
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
@@ -743,8 +740,9 @@ describe("EditorNextRoute", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Close file" })).toBeTruthy();
+			expect(screen.getByRole("tab", { name: "Export" })).toBeTruthy();
 		});
+		openMediaTab();
 
 		expect(
 			(screen.getByRole("button", { name: "Close file" }) as HTMLButtonElement)
@@ -800,10 +798,11 @@ describe("EditorNextRoute", () => {
 			expect(dispatchBeforeUnload()).toBe(true);
 		});
 
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+			expect(screen.getByText("Open a video")).toBeTruthy();
 		});
 
 		expect(dispatchBeforeUnload()).toBe(false);
@@ -838,7 +837,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+		expect(screen.getByText("Open a video")).toBeTruthy();
 		expect(screen.queryByText("Ready media asset")).toBeNull();
 		expect(screen.queryByLabelText("Preview for remount.mp4")).toBeNull();
 	});
@@ -947,11 +946,11 @@ describe("EditorNextRoute", () => {
 		await waitFor(() => {
 			expect(screen.getAllByText("00:00:00.000").length).toBeGreaterThan(0);
 		});
-		expect(screen.getByText("Playhead")).toBeTruthy();
+		expect(screen.getByLabelText("Preview playhead time")).toBeTruthy();
 		expect(screen.getAllByText("00:00:06.000").length).toBeGreaterThan(0);
 	});
 
-	it("imports a local file from drag and drop into the ready editor state", async () => {
+	it("imports a local file dropped on the page header into the ready editor state", async () => {
 		render(
 			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-dropped"}
@@ -964,7 +963,7 @@ describe("EditorNextRoute", () => {
 			/>,
 		);
 
-		fireEvent.drop(screen.getByTestId("editor-next-drop-zone"), {
+		fireEvent.drop(screen.getByLabelText("Editor workbench top bar"), {
 			dataTransfer: {
 				files: [new File(["video"], "dropped.webm", { type: "video/webm" })],
 			},
@@ -976,6 +975,7 @@ describe("EditorNextRoute", () => {
 
 		expect(screen.getAllByText("dropped.webm").length).toBeGreaterThan(0);
 		expect(screen.queryByLabelText("Local media file")).toBeNull();
+		openMediaTab();
 		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
 	});
 
@@ -1003,7 +1003,7 @@ describe("EditorNextRoute", () => {
 			expect(screen.getByRole("alert").textContent).toContain("Audio-only");
 		});
 
-		expect(screen.getByText("Media asset analysis failed")).toBeTruthy();
+		expect(screen.getByText("Couldn’t open video")).toBeTruthy();
 		expect(screen.getByText("Technical details")).toBeTruthy();
 	});
 });

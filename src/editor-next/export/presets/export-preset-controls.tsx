@@ -185,7 +185,7 @@ export function ExportPresetControls({
 			<Button
 				aria-expanded={panelOpen}
 				aria-haspopup="dialog"
-				className="w-full justify-start"
+				className="h-10 w-full justify-start"
 				disabled={exportRunning}
 				onClick={() => setPanelOpen((current) => !current)}
 				size="sm"
@@ -201,15 +201,14 @@ export function ExportPresetControls({
 			{panelOpen ? (
 				<section
 					aria-label="Export presets"
-					className="absolute bottom-11 left-0 z-20 grid w-[min(28rem,calc(100vw-2rem))] gap-2.5 rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-2xl"
+					className="absolute bottom-11 left-0 z-20 grid w-[min(28rem,calc(100vw-5rem))] max-h-[calc(100dvh-14rem)] overflow-y-auto gap-2.5 rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-none"
 				>
 					<div>
 						<div className="text-xs font-semibold text-foreground">
 							Export presets
 						</div>
 						<p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-							Save browser-local settings or load them into this draft. Apply is
-							still required.
+							Saved in this browser. Apply to use loaded settings.
 						</p>
 					</div>
 					<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">

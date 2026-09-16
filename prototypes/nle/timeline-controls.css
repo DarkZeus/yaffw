@@ -1,0 +1,214 @@
+.timeline-only .timeline-panel {
+	overflow: visible;
+}
+.sequence-toolbar {
+	position: relative;
+	z-index: 30;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+	/* The panel divider already contributes 6px above this row. */
+	min-height: 46px;
+	padding: 0 24px 6px;
+	border-bottom: 1px solid var(--workbench-border);
+}
+.sequence-toolbar button,
+.timeline-footer button {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--workbench-foreground);
+	height: 34px;
+}
+.timeline-tool-group {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+.timeline-view {
+	margin-left: auto;
+}
+.nle .sequence-toolbar input {
+	width: 64px;
+	accent-color: var(--workbench-foreground);
+}
+.control-popover {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	width: 210px;
+	max-width: calc(100vw - 24px);
+	padding: 6px;
+	border: 1px solid var(--workbench-border-strong);
+	border-radius: 6px;
+	background: var(--workbench);
+	color: var(--workbench-foreground);
+	box-shadow: 0 8px 24px oklch(0 0 none / 0.333333);
+}
+.control-popover:popover-open {
+	display: flex;
+	flex-direction: column;
+}
+.control-popover button {
+	justify-content: flex-start;
+	width: 100%;
+	font-size: 12px;
+	font-weight: 400;
+	border-radius: 4px;
+}
+.control-popover button:hover {
+	background: var(--workbench-hover);
+}
+.control-popover button:disabled {
+	color: var(--muted-foreground);
+	opacity: 0.4;
+}
+.control-popover button:focus-visible {
+	outline: 2px solid var(--workbench-focus);
+	outline-offset: -2px;
+}
+.control-popover button[aria-pressed="true"] {
+	background: var(--workbench-hover);
+}
+.control-popover dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 8px 12px;
+	padding: 8px;
+	font-size: 11px;
+}
+.control-popover dd {
+	margin: 0;
+	color: var(--muted-foreground);
+}
+.timeline-only .track-row[data-density="standard"] .clip-filmstrip {
+	inset: 4px auto 4px 4px;
+	width: 42px;
+	background-size: cover;
+	background-repeat: no-repeat;
+	background-position: center;
+	border-radius: 2px;
+	z-index: 1;
+}
+.timeline-only .track-row[data-density="standard"] .kind-video .clip-label {
+	height: 100%;
+	padding-left: 54px;
+	align-items: center;
+}
+/* Reserve the label line height so revealing it cannot recenter the icon. */
+.timeline-only .marker-rail button {
+	height: 14px;
+}
+.timeline-only .marker-rail button span {
+	display: none;
+}
+.timeline-only .marker-rail button:is(:hover, :focus-visible) {
+	z-index: 2;
+	background: var(--workbench);
+	padding-right: 6px;
+}
+.timeline-only .marker-rail button:is(:hover, :focus-visible) span {
+	display: inline;
+}
+.timeline-only .timeline-footer {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 4px 16px;
+	flex: none;
+	min-height: 40px;
+}
+.timeline-footer output {
+	flex: 1;
+	font-size: 11px;
+	color: var(--muted-foreground);
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+@media (max-width: 760px) {
+	.sequence-toolbar {
+		flex-wrap: wrap;
+		padding: 6px 12px;
+		gap: 4px;
+	}
+	.sequence-toolbar button {
+		padding-inline: 8px;
+	}
+	.timeline-view {
+		margin-left: 0;
+	}
+}
+
+/* The chooser keeps the original button footprint; each choice occupies half. */
+.nle .add-track-control {
+	width: 112px;
+	flex: 0 0 112px;
+	height: 34px;
+}
+.nle .add-track-control > button {
+	width: 100%;
+	height: 100%;
+	padding: 0;
+}
+.add-track-choices {
+	border: 0;
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	width: 100%;
+	height: 100%;
+	border-radius: 5px;
+	background: var(--workbench-hover);
+}
+.nle .add-track-choices button {
+	width: 100%;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border-radius: 0;
+	justify-content: center;
+}
+.nle .add-track-choices button:first-child {
+	border-radius: 5px 0 0 5px;
+	border-right: 1px solid var(--workbench-border-strong);
+}
+.nle .add-track-choices button:last-child {
+	border-radius: 0 5px 5px 0;
+}
+.nle .add-track-choices button:hover {
+	background: var(--workbench-hover);
+}
+
+.sequence-toolbar .sequence-name,
+.sequence-toolbar .sequence-name-input {
+	width: 120px;
+	min-width: 0;
+	flex: 0 0 120px;
+	height: 34px;
+	padding: 0 12px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--workbench-foreground);
+	font-size: 12px;
+	text-align: left;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.sequence-toolbar .sequence-name-input {
+	background: var(--workbench-hover);
+}
+
+.sequence-identity-control {
+	display: flex;
+	align-items: center;
+	flex: none;
+}
+.sequence-identity-control .timeline-disclosure > button {
+	width: 24px;
+	padding: 0;
+}

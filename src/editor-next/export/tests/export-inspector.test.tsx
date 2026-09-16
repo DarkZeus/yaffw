@@ -55,11 +55,11 @@ describe("ExportInspectorPanel", () => {
 				/>,
 			);
 			const note = within(screen.getByLabelText("Export review")).queryByText(
-				/Auto-fix quiet side analyzes the full Selection/,
+				/Auto-fix quiet side may place stereo/,
 			);
 			expect(Boolean(note)).toBe(include);
 			if (include)
-				expect(note?.textContent).toContain("stereo placement may differ");
+				expect(note?.textContent).toContain("differently than preview");
 		},
 	);
 
@@ -82,12 +82,17 @@ describe("ExportInspectorPanel", () => {
 		);
 
 		const exportInspector = screen.getByLabelText("Export inspector");
-		expect(exportInspector.className).toContain("bg-workbench-inspector");
 		expect(screen.getByLabelText("Export review").className).toContain(
 			"overflow-visible",
 		);
 		expect(within(exportInspector).getByText("Output")).toBeTruthy();
 		expect(within(exportInspector).queryByText("Current settings")).toBeNull();
+		const details = within(exportInspector)
+			.getByText("Export details")
+			.closest("details");
+		expect(details?.open).toBe(false);
+		fireEvent.click(within(exportInspector).getByText("Export details"));
+		expect(details?.open).toBe(true);
 		expect(within(exportInspector).getByText("Requirements")).toBeTruthy();
 		expect(
 			within(exportInspector).getByText("Documented output profile"),
@@ -107,7 +112,7 @@ describe("ExportInspectorPanel", () => {
 			within(exportReview).getByText("MP4 / H.264 video / AAC audio"),
 		).toBeTruthy();
 		expect(
-			within(exportInspector).getAllByText("Export").length,
+			within(exportInspector).getAllByText("Method").length,
 		).toBeGreaterThan(0);
 		expect(within(exportInspector).getByText("Whole file export")).toBeTruthy();
 		expect(within(exportInspector).getByText("Range")).toBeTruthy();
@@ -149,7 +154,7 @@ describe("ExportInspectorPanel", () => {
 			name: "General",
 		});
 		expect(generalTab.className).toContain(
-			"data-[state=active]:before:bg-workbench-selected",
+			"data-[state=active]:text-foreground",
 		);
 		expect(
 			within(outputSettingsDialog).getByRole("tab", { name: "Video" }),
@@ -181,7 +186,7 @@ describe("ExportInspectorPanel", () => {
 		).toBe(true);
 		expect(
 			within(outputSettingsDialog).getByText(
-				"Changing output settings may re-encode video and can change output size, quality, and processing time.",
+				"Settings may affect quality, file size, and export time.",
 			),
 		).toBeTruthy();
 		expect(
@@ -189,13 +194,10 @@ describe("ExportInspectorPanel", () => {
 		).toBeNull();
 		const outputPlan =
 			within(outputSettingsDialog).getByLabelText("Output plan");
-		expect(within(outputPlan).getByText("Output frame")).toBeTruthy();
 		expect(
-			within(outputPlan).getByRole("figure", {
-				name: "Output frame proportions, 1920x1080",
-			}),
+			within(outputPlan).getByLabelText("Output frame proportions, 1920x1080"),
 		).toBeTruthy();
-		expect(within(outputPlan).getByText("Same as source")).toBeTruthy();
+		expect(within(outputPlan).getByText(/Same as source/)).toBeTruthy();
 		expect(
 			within(outputPlan).queryByRole("img", {
 				name: "Target resolution is smaller than source",
@@ -428,7 +430,7 @@ describe("ExportInspectorPanel", () => {
 			within(audioCodecSelect)
 				.getAllByRole("option")
 				.map((option) => option.textContent),
-		).toEqual(["Preserve source", "OPUS", "VORBIS"]);
+		).toEqual(["No audio", "Preserve source", "OPUS", "VORBIS"]);
 
 		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
 		expect(onApplyOutputSettings).toHaveBeenCalledWith({
@@ -478,12 +480,7 @@ describe("ExportInspectorPanel", () => {
 		]);
 
 		fireEvent.change(resolutionSelect, { target: { value: "1280x720" } });
-		expect(
-			within(dialog).getByRole("img", {
-				name: "Target resolution is smaller than source",
-			}),
-		).toBeTruthy();
-		expect(within(dialog).getByText("Downscale from 1920x1080")).toBeTruthy();
+		expect(within(dialog).getByText(/Downscale from 1920x1080/)).toBeTruthy();
 		fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
 
 		expect(onApplyOutputSettings).toHaveBeenCalledWith({

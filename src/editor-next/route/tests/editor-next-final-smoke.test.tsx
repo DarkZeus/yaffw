@@ -111,6 +111,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 			expect(dispatchBeforeUnload()).toBe(true);
 		});
 		expect(screen.getByLabelText("Selection timeline")).toBeTruthy();
+		openMediaTab();
 		expect(screen.getAllByText("Start").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("End").length).toBeGreaterThan(0);
 		expect(
@@ -190,10 +191,11 @@ describe("editor-next final first-slice smoke coverage", () => {
 		});
 
 		openMediaTab();
+		openMediaTab();
 		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+			expect(screen.getByText("Open a video")).toBeTruthy();
 		});
 		expect(dispatchBeforeUnload()).toBe(false);
 		expect(URL.revokeObjectURL).toHaveBeenCalledWith(
@@ -226,6 +228,7 @@ describe("editor-next final first-slice smoke coverage", () => {
 		expect(
 			screen.getByText("No audio tracks available for waveform lanes."),
 		).toBeTruthy();
+		openMediaTab();
 		expect(screen.getByText("No audio tracks")).toBeTruthy();
 		expect(screen.queryByText("none")).toBeNull();
 

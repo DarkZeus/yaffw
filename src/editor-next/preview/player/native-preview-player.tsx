@@ -1,11 +1,13 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-
 import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
-} from "@/components/ui/resizable";
+	type ReactNode,
+	memo,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
@@ -25,6 +27,7 @@ import {
 import { usePreviewAudioResources } from "../../audio/engine/use-preview-audio-resources";
 import { usePreviewMeteringSource } from "../../audio/meters/preview-metering-provider";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
+import { EditorWorkbenchLayout } from "../../workbench/frame/editor-workbench-layout";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { PreviewSelectionWaveformRegion } from "../regions/preview-selection-waveform-region";
@@ -39,6 +42,7 @@ const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 export type NativePreviewPlayerProps = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
+	inspector?: ReactNode;
 	audioMix?: AudioMix;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
@@ -56,6 +60,7 @@ export type NativePreviewPlayerProps = {
 export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	activeMediaAssetCleanupScope,
 	asset,
+	inspector,
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackIncludedChange,
 	onPreviewPlayheadChange,
@@ -325,19 +330,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			typeof document.documentElement.requestFullscreen === "function");
 
 	return (
-		<ResizablePanelGroup
-			aria-label="Preview and selection layout"
-			autoSaveId="editor-next-preview-layout"
-			className="min-h-[46rem] min-w-0 xl:h-full xl:min-h-0 xl:overflow-hidden"
-			direction="vertical"
-		>
-			<ResizablePanel
-				className="min-h-0 min-w-0"
-				defaultSize={62}
-				id="editor-next-viewer-pane"
-				minSize={35}
-				order={1}
-			>
+		<EditorWorkbenchLayout
+			inspector={inspector}
+			viewer={
 				<PreviewViewerRegion
 					asset={asset}
 					canFullscreen={canFullscreen}
@@ -364,20 +359,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					scrubFrameVisible={scrubPreview.visible}
 					videoRef={videoRef}
 				/>
-			</ResizablePanel>
-
-			<ResizableHandle
-				aria-label="Resize selection region"
-				className="bg-workbench-border-strong"
-			/>
-
-			<ResizablePanel
-				className="grid min-h-0 min-w-0 grid-rows-[2.75rem_minmax(0,1fr)] overflow-hidden"
-				defaultSize={38}
-				id="editor-next-selection-pane"
-				minSize={24}
-				order={2}
-			>
+			}
+			transport={
 				<PreviewTransportRegion
 					isPlaying={isPlaying}
 					muted={muted}
@@ -392,7 +375,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					selectionLoopEnabled={selectionLoopEnabled}
 					volume={volume}
 				/>
-
+			}
+			selection={
 				<PreviewSelectionWaveformRegion
 					audioMix={audioMix}
 					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
@@ -411,7 +395,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					selectionEditingDisabled={selectionEditingDisabled}
 					source={source}
 				/>
-			</ResizablePanel>
-		</ResizablePanelGroup>
+			}
+		/>
 	);
 });

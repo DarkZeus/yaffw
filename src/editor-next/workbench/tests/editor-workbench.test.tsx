@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -19,9 +20,15 @@ import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 import {
 	EditorSessionShell,
+	type EditorSessionShellProps,
 	EditorWorkbenchFrame,
 	UnsupportedRuntimeState,
 } from "../frame/editor-workbench";
+import { EditorWorkbenchLayout } from "../frame/editor-workbench-layout";
+import {
+	WorkbenchInspectorTabs,
+	useWorkbenchInspector,
+} from "../frame/workbench-inspector";
 
 afterEach(() => {
 	cleanup();
@@ -30,38 +37,18 @@ afterEach(() => {
 });
 
 describe("Editor workbench", () => {
-	it("renders the workbench top bar, active asset summary, and content without a redundant rail", () => {
-		render(
-			<EditorWorkbenchFrame
-				activeAsset={readyAsset}
-				previewStatus={{
-					playheadUs: 1_500_000,
-					selectionDurationUs: 2_500_000,
-				}}
-				runtime={supportedRuntime}
-				status="ready"
-			>
+	it("omits the header while editing and restores the logo for import", () => {
+		const view = render(
+			<EditorWorkbenchFrame activeAsset={readyAsset} runtime={supportedRuntime}>
 				<div>Workbench child</div>
 			</EditorWorkbenchFrame>,
 		);
 
-		expect(screen.getByText("YAFFW")).toBeTruthy();
-		expect(screen.getByText("Editor workbench")).toBeTruthy();
-		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
-		expect(screen.getByText("WebCodecs")).toBeTruthy();
-
-		const topBarAssetSummary = screen.getByLabelText(
-			"Top bar media asset summary",
-		);
-		const topBarMediaTimeReadouts = within(topBarAssetSummary).getByLabelText(
-			"Top bar media-time readouts",
-		);
-		expect(topBarAssetSummary.textContent).not.toContain("recording.mp4");
-		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:01.500");
-		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:12.000");
-		expect(topBarMediaTimeReadouts.textContent).toContain("00:00:02.500");
-		expect(topBarAssetSummary.textContent).toContain("1920 x 1080");
-		expect(topBarAssetSummary.textContent).toContain("30 fps");
+		expect(screen.queryByLabelText("Editor workbench top bar")).toBeNull();
+		expect(screen.queryByText("YAFFW")).toBeNull();
+		expect(screen.queryByText("recording.mp4")).toBeNull();
+		expect(screen.queryByLabelText("Top bar media asset summary")).toBeNull();
+		expect(screen.queryByText("Your media stays on this device")).toBeNull();
 
 		const workbenchChild = screen.getByText("Workbench child");
 		expect(workbenchChild).toBeTruthy();
@@ -72,6 +59,13 @@ describe("Editor workbench", () => {
 		expect(
 			screen.queryByRole("navigation", { name: "Editor workbench rail" }),
 		).toBeNull();
+		view.rerender(
+			<EditorWorkbenchFrame activeAsset={null} runtime={supportedRuntime}>
+				<div>Import surface</div>
+			</EditorWorkbenchFrame>,
+		);
+		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "YAFFW" })).toBeTruthy();
 	});
 
 	it("renders unsupported runtime state before exposing local import", () => {
@@ -87,11 +81,7 @@ describe("Editor workbench", () => {
 		}
 
 		render(
-			<EditorWorkbenchFrame
-				activeAsset={null}
-				runtime={unsupportedRuntime}
-				status="unsupported-runtime"
-			>
+			<EditorWorkbenchFrame activeAsset={null} runtime={unsupportedRuntime}>
 				<UnsupportedRuntimeState
 					session={{
 						importEnabled: false,
@@ -113,15 +103,12 @@ describe("Editor workbench", () => {
 	});
 
 	it("renders non-ready import shell and forwards file events", () => {
-		const handleLocalFileDropped = vi.fn((event) => event.preventDefault());
+		const handleLocalFileDropped = vi.fn();
 		const handleLocalFileSelected = vi.fn();
 
 		render(
 			<EditorSessionShell
-				audioPanel={null}
-				exportInspector={null}
 				localFileInputKey={0}
-				mediaAssetContext={null}
 				onLocalFileDropped={handleLocalFileDropped}
 				onLocalFileSelected={handleLocalFileSelected}
 				previewPlayer={null}
@@ -135,8 +122,7 @@ describe("Editor workbench", () => {
 
 		expect(screen.getByLabelText("Editor workbench session")).toBeTruthy();
 		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
-		expect(screen.getByText("No media asset loaded")).toBeTruthy();
-		expect(screen.getByText("Waiting for a media asset draft.")).toBeTruthy();
+		expect(screen.getByText("Open a video")).toBeTruthy();
 		expect(screen.getByLabelText("Local media file")).toBeTruthy();
 		expect(screen.getByTestId("editor-next-drop-zone")).toBeTruthy();
 		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
@@ -160,13 +146,94 @@ describe("Editor workbench", () => {
 		expect(handleLocalFileDropped).toHaveBeenCalledTimes(1);
 	});
 
+	it("shows existing drag feedback across the page without flickering between children", () => {
+		const onDrop = vi.fn();
+		renderImportSurface(onDrop);
+		const transfer = {
+			types: ["Files"],
+			items: [{ kind: "file", type: "video/mp4" }],
+			files: [],
+			dropEffect: "none",
+		};
+		fireEvent.dragEnter(document.body, { dataTransfer: transfer });
+		expect(screen.getByText("Release to open")).toBeTruthy();
+		fireEvent.dragEnter(screen.getByText("Open a video"), {
+			dataTransfer: transfer,
+		});
+		fireEvent.dragLeave(document.body, { dataTransfer: transfer });
+		expect(screen.getByText("Release to open")).toBeTruthy();
+		expect(fireEvent.dragOver(document.body, { dataTransfer: transfer })).toBe(
+			false,
+		);
+		expect(transfer.dropEffect).toBe("copy");
+		fireEvent.dragLeave(screen.getByText("Open a video"), {
+			dataTransfer: transfer,
+		});
+		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
+		fireEvent.dragEnter(document.body, { dataTransfer: transfer });
+		fireEvent.blur(window);
+		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
+		const file = new File(["video"], "anywhere.mp4", { type: "video/mp4" });
+		fireEvent.drop(document.body, {
+			dataTransfer: { ...transfer, files: [file] },
+		});
+		expect(onDrop).toHaveBeenCalledExactlyOnceWith(file);
+	});
+
+	it("rejects non-video files but leaves text drags alone", () => {
+		const onDrop = vi.fn();
+		renderImportSurface(onDrop);
+		const textTransfer = {
+			types: ["text/plain"],
+			items: [{ kind: "string", type: "text/plain" }],
+			files: [],
+		};
+		expect(
+			fireEvent.dragOver(document.body, { dataTransfer: textTransfer }),
+		).toBe(true);
+		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
+		const invalidTransfer = {
+			types: ["Files"],
+			items: [{ kind: "file", type: "image/png" }],
+			files: [new File(["image"], "image.png", { type: "image/png" })],
+			dropEffect: "copy",
+		};
+		fireEvent.dragEnter(document.body, { dataTransfer: invalidTransfer });
+		expect(screen.getByText("Invalid file type")).toBeTruthy();
+		fireEvent.dragOver(document.body, { dataTransfer: invalidTransfer });
+		expect(invalidTransfer.dropEffect).toBe("none");
+		fireEvent.drop(document.body, { dataTransfer: invalidTransfer });
+		expect(onDrop).not.toHaveBeenCalled();
+		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
+	});
+
+	it("blocks drops while loading and removes page listeners when the import surface unmounts", () => {
+		const onDrop = vi.fn();
+		const view = renderImportSurface(onDrop, loadingSession);
+		const transfer = {
+			types: ["Files"],
+			items: [{ kind: "file", type: "video/mp4" }],
+			files: [new File(["video"], "test.mp4", { type: "video/mp4" })],
+			dropEffect: "copy",
+		};
+		fireEvent.dragEnter(document.body, { dataTransfer: transfer });
+		fireEvent.dragOver(document.body, { dataTransfer: transfer });
+		expect(transfer.dropEffect).toBe("none");
+		expect(fireEvent.drop(document.body, { dataTransfer: transfer })).toBe(
+			false,
+		);
+		expect(onDrop).not.toHaveBeenCalled();
+		view.unmount();
+		expect(fireEvent.drop(document.body, { dataTransfer: transfer })).toBe(
+			true,
+		);
+		expect(onDrop).not.toHaveBeenCalled();
+	});
+
 	it("renders loading state with disabled import controls", () => {
 		render(
 			<EditorSessionShell
-				audioPanel={null}
-				exportInspector={null}
 				localFileInputKey={0}
-				mediaAssetContext={null}
 				onLocalFileDropped={() => undefined}
 				onLocalFileSelected={() => undefined}
 				previewPlayer={null}
@@ -174,101 +241,62 @@ describe("Editor workbench", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Analyzing media asset draft")).toBeTruthy();
-		expect(
-			screen.getByText("Preparing media asset draft loading.mp4."),
-		).toBeTruthy();
+		expect(screen.getByText("Opening video")).toBeTruthy();
+		expect(screen.getByText("loading.mp4")).toBeTruthy();
 		expect(
 			(screen.getByLabelText("Local media file") as HTMLInputElement).disabled,
 		).toBe(true);
 	});
 
-	it("places ready-state media and export slots in one left tabbed inspector region", () => {
-		render(
-			<EditorSessionShell
-				audioPanel={
-					<section aria-label="Audio panel">Audio panel slot</section>
-				}
-				exportInspector={
-					<section aria-label="Export inspector">Export inspector slot</section>
-				}
-				localFileInputKey={0}
-				mediaAssetContext={
-					<section aria-label="Media asset context">Media asset slot</section>
-				}
-				onLocalFileDropped={() => undefined}
-				onLocalFileSelected={() => undefined}
-				previewPlayer={
-					<section aria-label="Preview slot">Preview slot</section>
-				}
-				session={readySession}
-			/>,
-		);
-
-		const readyWorkbench = screen.getByLabelText("Editor workbench session");
-		expect(readyWorkbench.className).toContain("xl:h-full");
-		expect(readyWorkbench.className).toContain("xl:overflow-hidden");
-
-		const readyLayout = within(readyWorkbench).getByLabelText(
-			"Ready workbench layout",
-		);
-		expect(readyLayout.getAttribute("data-panel-group-direction")).toBe(
-			"horizontal",
-		);
-		expect(readyLayout.className).toContain("xl:flex-row");
-		expect(readyLayout.className).toContain("xl:gap-0");
-		expect(readyLayout.className).toContain("xl:overflow-hidden");
+	it("keeps the right inspector visible and changes tabs without remounting the preview", () => {
+		render(<ReadyWorkbench />);
+		const preview = screen.getByLabelText("Preview slot");
+		expect(screen.getByLabelText("Workbench inspector region")).toBeTruthy();
+		expect(screen.getByLabelText("Resize inspector panel")).toBeTruthy();
 		expect(
-			within(readyWorkbench).getByLabelText("Resize inspector panel").className,
-		).toContain("xl:flex");
+			screen.queryByRole("button", { name: "Toggle inspector" }),
+		).toBeNull();
+		expect(screen.getByLabelText("Media asset context")).toBeTruthy();
+		activateTab(screen.getByRole("tab", { name: "Audio" }));
+		expect(screen.getByLabelText("Audio panel")).toBeTruthy();
+		activateTab(screen.getByRole("tab", { name: "Export" }));
+		expect(screen.getByLabelText("Export inspector")).toBeTruthy();
+		expect(screen.getByLabelText("Preview slot")).toBe(preview);
+		expect(screen.getByLabelText("Selection slot")).toBeTruthy();
+	});
 
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
+	it("does not refocus tabs after pointer actions", () => {
+		const frames = new Map<number, FrameRequestCallback>();
+		let nextFrame = 0;
+		vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+			frames.set(++nextFrame, callback);
+			return nextFrame;
+		});
+		vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+			frames.delete(id);
+		});
+		const focus = vi.spyOn(HTMLElement.prototype, "focus");
+		function flushFrames() {
+			act(() => {
+				const pending = [...frames.values()];
+				frames.clear();
+				for (const callback of pending) callback(0);
+			});
+		}
+		render(<ReadyWorkbench />);
+		focus.mockClear();
+		flushFrames();
+		expect(focus).not.toHaveBeenCalled();
 
-		const inspectorRegion = screen.getByLabelText("Workbench inspector region");
-		expect(inspectorRegion.className).toContain("xl:h-full");
-		expect(inspectorRegion.className).toContain("xl:overflow-hidden");
-		expect(inspectorRegion.className).toContain("overscroll-contain");
-		expect(inspectorRegion.className).toContain("xl:[contain:layout_paint]");
-		expect(
-			within(inspectorRegion).getByRole("tablist", {
-				name: "Workbench inspector tabs",
-			}),
-		).toBeTruthy();
-		expect(
-			within(inspectorRegion).getByRole("tablist", {
-				name: "Workbench inspector tabs",
-			}).className,
-		).toContain("bg-transparent");
-		expect(
-			within(inspectorRegion).getByRole("tab", { name: "Media" }).className,
-		).toContain("border-r");
-		expect(
-			within(inspectorRegion).getByRole("tab", { name: "Media" }).className,
-		).toContain("rounded-none");
-		expect(
-			within(inspectorRegion).getByRole("tab", { name: "Audio" }),
-		).toBeTruthy();
-		expect(
-			within(inspectorRegion)
-				.getByRole("tab", { name: "Media" })
-				.getAttribute("aria-selected"),
-		).toBe("true");
-		expect(
-			within(inspectorRegion).getByLabelText("Media asset context"),
-		).toBeTruthy();
+		activateTab(screen.getByRole("tab", { name: "Audio" }));
+		focus.mockClear();
+		flushFrames();
+		expect(focus).not.toHaveBeenCalled();
 
-		activateTab(within(inspectorRegion).getByRole("tab", { name: "Audio" }));
-
-		expect(within(inspectorRegion).getByLabelText("Audio panel")).toBeTruthy();
-
-		activateTab(within(inspectorRegion).getByRole("tab", { name: "Export" }));
-
-		expect(
-			within(inspectorRegion).getByLabelText("Export inspector"),
-		).toBeTruthy();
-
-		expect(screen.getByLabelText("Preview slot")).toBeTruthy();
-		expect(screen.queryByLabelText("Local media file")).toBeNull();
+		activateTab(screen.getByRole("tab", { name: "Export" }));
+		focus.mockClear();
+		flushFrames();
+		expect(focus).not.toHaveBeenCalled();
 	});
 
 	it("restores the last opened ready inspector tab", () => {
@@ -383,21 +411,65 @@ function activateTab(tab: HTMLElement) {
 	fireEvent.click(tab);
 }
 
+function ReadyWorkbench() {
+	const inspector = useWorkbenchInspector();
+	return (
+		<EditorWorkbenchFrame activeAsset={readyAsset} runtime={supportedRuntime}>
+			<EditorSessionShell
+				localFileInputKey={0}
+				onLocalFileDropped={() => undefined}
+				onLocalFileSelected={() => undefined}
+				session={readySession}
+				previewPlayer={
+					<EditorWorkbenchLayout
+						viewer={<section aria-label="Preview slot">Preview slot</section>}
+						transport={<div>Transport</div>}
+						selection={<section aria-label="Selection slot">Selection</section>}
+						inspector={
+							<WorkbenchInspectorTabs
+								activeTab={inspector.activeTab}
+								onTabChange={inspector.selectTab}
+								audioPanel={
+									<section aria-label="Audio panel">Audio panel slot</section>
+								}
+								exportInspector={
+									<section aria-label="Export inspector">
+										Export inspector slot
+									</section>
+								}
+								mediaAssetContext={
+									<section aria-label="Media asset context">
+										Media asset slot
+									</section>
+								}
+							/>
+						}
+					/>
+				}
+			/>
+		</EditorWorkbenchFrame>
+	);
+}
 function renderReadyEditorSessionShell() {
+	const view = render(<ReadyWorkbench />);
+	return view;
+}
+
+function renderImportSurface(
+	onLocalFileDropped: (file: File) => void,
+	session: EditorSessionShellProps["session"] = {
+		status: "empty",
+		importEnabled: true,
+		runtime: supportedRuntime,
+	},
+) {
 	return render(
 		<EditorSessionShell
-			audioPanel={<section aria-label="Audio panel">Audio panel slot</section>}
-			exportInspector={
-				<section aria-label="Export inspector">Export inspector slot</section>
-			}
 			localFileInputKey={0}
-			mediaAssetContext={
-				<section aria-label="Media asset context">Media asset slot</section>
-			}
-			onLocalFileDropped={() => undefined}
+			onLocalFileDropped={onLocalFileDropped}
 			onLocalFileSelected={() => undefined}
-			previewPlayer={<section aria-label="Preview slot">Preview slot</section>}
-			session={readySession}
+			previewPlayer={null}
+			session={session}
 		/>,
 	);
 }

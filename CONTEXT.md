@@ -256,14 +256,15 @@ _Avoid_: first-slice requirement, automatic fallback
 
 - YAFFW edits one active **Media asset** at a time.
 - Editor-next may use an **Editor workbench** UI inspired by professional media editors, but the product model remains a **Single-asset editing session**, not a multi-asset project or composition.
-- The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector panel is shown only after a **Ready media asset** exists.
-- The **Default workbench layout** should favor an Edit-page-style arrangement: central preview, prominent selection/waveform surface, and inspector-style panels for asset facts, export review, and delivery.
+- The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector is available only after a **Ready media asset** exists and remains visible throughout editing.
+- The **Default workbench layout** uses the Cinema arrangement: a large central preview, a full-width lower selection/waveform surface, and a persistent right inspector for asset facts, audio, export review, and delivery.
+- The Export inspector tab is the entry point for **Export review**; the Cinema header appears only before a video is loaded. During editing, the viewer and inspector start at the top of the workbench; source identity remains in the Media tab. On narrow screens, preview, transport, selection, then the inspector stack vertically. The last-tab choice remains a UI preference, not **Editing decisions**.
 - In the **Default workbench layout**, the inspector tab group should answer what media asset is loaded and what generated media will be produced, while the center should answer what selection is being chosen.
 - In the **Default workbench layout**, the Media tab should present compact source, media-track, and **Selection** context for the active **Media asset**; the **Audio** tab should present audio track strips and preview meters; the Export tab should keep runtime checks, export capability, **Export review**, and **Generated media** status together.
 - In the ready state, the **Editor workbench** should fit the viewport-height editor composition; overflow belongs inside workbench panels or the selection/waveform surface rather than in an outer page scroll.
-- The ready-state desktop **Default workbench layout** should use the resolved proportions: compact left inspector tab group, central preview, slim transport strip, and a lower selection/waveform surface around two-fifths of the viewport height.
-- The coded first slice of the **Default workbench layout** lets users resize the boundary between the left inspector tab group and preview area, and the boundary between the preview viewer and lower transport/selection area; resizing changes working room, not **Editing decisions**.
-- Surrounding **Editor workbench** chrome should use the scoped `.workbench` design tokens that carry the resolved prototype palette and border treatment.
+- The ready-state desktop **Default workbench layout** should use the resolved proportions: a large preview with a slim transport strip beneath it, a persistent right inspector tab group, and a full-width lower selection/waveform surface using about one-third of the available editing area.
+- The coded first slice of the **Default workbench layout** lets users resize the boundary between the preview area and the right inspector tab group, and the boundary between the upper preview/transport area and the lower selection area; resizing changes working room, not **Editing decisions**.
+- Surrounding **Editor workbench** chrome should use the scoped `.workbench` design tokens that carry the Cinema palette: neutral near-black surfaces, restrained white text and controls, a gold brand mark and selection, and distinct semantic playhead, meter, focus, and error colors.
 - The long-run **Editor workbench** should use a balanced Edit-page split: preview remains the visual anchor, while the selection and waveform surface gets enough height to support serious media-time inspection.
 - The **Selection** and **Waveform** interaction surface is a mature editor component; workbench visual-parity changes should preserve its established behavior and visual treatment while placing it in the lower workbench region.
 - Visible chrome for the lower workbench panel should use **Selection** as the panel identity; **Waveform** labels should be reserved for audio waveform context inside that panel.
@@ -272,7 +273,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - A **Customizable workbench layout** stays inside the **Editor workbench** frame; panels should not float outside the workbench, tear off into separate windows, or target external-monitor workflows.
 - A **Customizable workbench layout** may move any workbench panel to any in-frame region; panel identity and content carry meaning rather than the panel's side of the screen.
 - A **Customizable workbench layout** arranges **Workbench panels** in **Dock targets** and tab groups inside the **Editor workbench** frame.
-- The **Default workbench layout** exposes four initial **Dock targets**: left inspector tab group, preview viewer region, transport strip region, and selection/waveform region.
+- The **Default workbench layout** exposes four initial **Dock targets**: right inspector tab group, preview viewer region, transport strip region, and selection/waveform region.
 - A **Workbench panel** may be hidden behind an inactive tab; hidden does not mean removed from the layout or unavailable to the user.
 - A **Panel tab group** carries the visible identity of its active **Workbench panel**; the panel body should start with useful section content rather than repeating the tab or region label.
 - A visible **Workbench panel** header should carry controls, changing state, or critical readouts; headers that only name a region should be removed from visible chrome or kept as accessibility labels only.
@@ -533,3 +534,5 @@ _Avoid_: first-slice requirement, automatic fallback
 - "slot" was used to mean a valid panel landing place. Resolved: use **Dock target** for user-facing layout mechanics.
 - "media asset inspector" was used informally for the current **Media asset** context panel. Resolved: keep **Media asset** context language unless the product deliberately renames that panel.
 - "quality choices modal" came from the legacy FFmpeg-oriented UI. Resolved: use **Output settings modal** for the v1 browser-local settings UI, while **Export review** remains the pre-export summary.
+
+- **Output settings** may explicitly select **No audio**. Export omits every audio track and skips audio processing while preserving session audio mix decisions and audio quality for later use. This choice is saved in Export presets and does not mute preview.

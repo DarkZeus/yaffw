@@ -28,17 +28,28 @@ vi.mock("../../preview/player/native-preview-player", async () => {
 	return {
 		NativePreviewPlayer: React.memo(function MockNativePreviewPlayer(props: {
 			asset: { label: string };
+			inspector?: import("react").ReactNode;
 			onPreviewPlayheadChange?: (playheadUs: number) => void;
 		}) {
 			previewRenderStats.nativePreviewRenderCount += 1;
+			const [playheadUs, setPlayheadUs] = React.useState(0);
 
 			return React.createElement(
 				"section",
 				{ "aria-label": `Preview for ${props.asset.label}` },
+				props.inspector,
+				React.createElement(
+					"output",
+					{ "aria-label": "Preview playhead" },
+					playheadUs,
+				),
 				React.createElement(
 					"button",
 					{
-						onClick: () => props.onPreviewPlayheadChange?.(1_000_000),
+						onClick: () => {
+							setPlayheadUs(1_000_000);
+							props.onPreviewPlayheadChange?.(1_000_000);
+						},
 						type: "button",
 					},
 					"Report preview playhead",
@@ -84,7 +95,7 @@ afterEach(() => {
 });
 
 describe("EditorNextRoute preview render isolation", () => {
-	it("does not re-render preview or Audio panel children for top-bar playhead updates", async () => {
+	it("keeps playhead updates inside the preview without re-rendering the Audio panel", async () => {
 		render(
 			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-preview-render-isolation"}
@@ -124,13 +135,13 @@ describe("EditorNextRoute preview render isolation", () => {
 		);
 
 		await waitFor(() => {
-			expect(
-				screen.getByLabelText("Top bar media-time readouts").textContent,
-			).toContain("00:00:01.000");
+			expect(screen.getByLabelText("Preview playhead").textContent).toContain(
+				"1000000",
+			);
 		});
 
 		expect(previewRenderStats.nativePreviewRenderCount).toBe(
-			nativePreviewRenderCount,
+			nativePreviewRenderCount + 1,
 		);
 		expect(previewRenderStats.audioPanelRenderCount).toBe(
 			audioPanelRenderCount,

@@ -49,16 +49,10 @@ export function MediaAssetContextPanel({
 	);
 
 	return (
-		<section
-			aria-label="Media asset context"
-			className="flex min-w-0 max-w-full flex-col overflow-hidden overflow-x-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:h-full xl:min-h-0 xl:rounded-none xl:border-0"
-		>
-			<div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
+		<section aria-label="Media asset context" className="min-w-0">
+			<div className="min-h-0">
 				<SectionLabel>Source</SectionLabel>
-				<div
-					aria-label="Loaded media asset"
-					className="mb-3 space-y-1 rounded border border-workbench-border bg-workbench-lane p-2"
-				>
+				<div aria-label="Loaded media asset" className="mb-6 space-y-3">
 					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
 						<div className="truncate text-sm font-medium text-foreground">
 							{asset.label}
@@ -76,7 +70,7 @@ export function MediaAssetContextPanel({
 							<X data-icon="inline-start" />
 						</Button>
 					</div>
-					<div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+					<div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
 						<CompactMetric label="Size" value={sourceFileSize} />
 						<CompactMetric
 							label="Duration"
@@ -91,7 +85,7 @@ export function MediaAssetContextPanel({
 				</div>
 
 				<SectionLabel>Tracks</SectionLabel>
-				<div className="mb-3 space-y-1.5">
+				<div className="mb-6 space-y-1.5">
 					{asset.tracks.video.map((track, trackIndex) => (
 						<CompactTrackRow
 							icon={<Film />}
@@ -118,7 +112,7 @@ export function MediaAssetContextPanel({
 				</div>
 
 				<SectionLabel>Selection</SectionLabel>
-				<div className="grid grid-cols-2 gap-2 text-[11px]">
+				<div className="grid grid-cols-2 gap-2 text-xs">
 					<CompactTimeBox
 						label="Start"
 						value={formatMediaTime(selection.startUs)}
@@ -251,7 +245,7 @@ function selectionAnalysisFacts(
 
 function SectionLabel({ children }: { children: ReactNode }) {
 	return (
-		<div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+		<div className="mb-3 text-xs font-medium text-muted-foreground">
 			{children}
 		</div>
 	);
@@ -260,10 +254,10 @@ function SectionLabel({ children }: { children: ReactNode }) {
 function CompactMetric({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="min-w-0">
-			<div className="truncate leading-tight text-muted-foreground/75">
+			<div className="truncate leading-tight text-muted-foreground">
 				{label}
 			</div>
-			<div className="truncate font-mono leading-tight text-foreground">
+			<div className="truncate tabular-nums leading-tight text-foreground">
 				{value}
 			</div>
 		</div>
@@ -280,7 +274,7 @@ function CompactTrackRow({
 	meta: string;
 }) {
 	return (
-		<div className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded border border-workbench-border bg-workbench-lane px-2 py-1.5">
+		<div className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2 py-1.5">
 			<div className="text-muted-foreground">
 				{cloneElement(icon, {
 					"aria-hidden": true,
@@ -291,7 +285,7 @@ function CompactTrackRow({
 				<div className="truncate text-xs font-medium leading-tight text-foreground">
 					{label}
 				</div>
-				<div className="truncate text-[10px] leading-tight text-muted-foreground">
+				<div className="truncate text-xs leading-tight text-muted-foreground">
 					{meta}
 				</div>
 			</div>
@@ -301,11 +295,11 @@ function CompactTrackRow({
 
 function CompactTimeBox({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded border border-workbench-border bg-workbench-lane p-1.5">
-			<div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-				{label}
+		<div className=" p-1.5">
+			<div className="text-xs text-muted-foreground">{label}</div>
+			<div className="truncate tabular-nums text-xs text-foreground">
+				{value}
 			</div>
-			<div className="truncate font-mono text-xs text-foreground">{value}</div>
 		</div>
 	);
 }
@@ -318,11 +312,8 @@ function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
 	}
 
 	return (
-		<details
-			aria-label="Media analysis"
-			className="group mt-3 rounded border border-workbench-border bg-workbench-lane/65 pb-1"
-		>
-			<summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-t px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:bg-workbench-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workbench-selected marker:hidden [&::-webkit-details-marker]:hidden">
+		<details aria-label="Media analysis" className="group mt-3 /65 pb-1">
+			<summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-t px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-workbench-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workbench-selected marker:hidden [&::-webkit-details-marker]:hidden">
 				<span>Analysis</span>
 				<ChevronRight
 					aria-hidden="true"
@@ -332,20 +323,20 @@ function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
 			<div className="space-y-2 px-2 pb-2">
 				{visibleGroups.map((group) => (
 					<section aria-label={group.title} key={group.title}>
-						<h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+						<h3 className="mb-3 text-xs font-medium text-muted-foreground">
 							{group.title}
 						</h3>
-						<dl className="grid gap-1 text-[10px] leading-4">
+						<dl className="grid gap-1 text-xs leading-4">
 							{group.facts.map((fact) => (
 								<div
 									className="grid min-w-0 grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-2"
 									key={`${group.title}-${fact.label}`}
 								>
-									<dt className="min-w-0 truncate text-muted-foreground/80">
+									<dt className="min-w-0 truncate text-muted-foreground">
 										{fact.label}
 									</dt>
 									<dd
-										className="min-w-0 break-words text-right font-mono text-foreground [overflow-wrap:anywhere]"
+										className="min-w-0 break-words tabular-nums text-right text-foreground [overflow-wrap:anywhere]"
 										title={fact.value}
 									>
 										{fact.value}

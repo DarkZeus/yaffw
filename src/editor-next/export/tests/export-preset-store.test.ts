@@ -17,6 +17,19 @@ afterEach(() => {
 });
 
 describe("Export preset store", () => {
+	it("round-trips No audio while preserving audio quality", () => {
+		const outputSettings = createDefaultOutputSettings();
+		outputSettings.audioCodec = { kind: "no-audio" };
+		saveExportPreset({
+			name: "Silent video",
+			outputSettings,
+			storage: window.localStorage,
+		});
+		expect(
+			readExportPresetDocument(window.localStorage).userPresets[0]
+				.outputSettings,
+		).toEqual(outputSettings);
+	});
 	it("persists versioned user-created presets with symbolic Preserve source settings", () => {
 		const outputSettings = createDefaultOutputSettings();
 		outputSettings.videoCodec = { kind: "preserve-source" };
