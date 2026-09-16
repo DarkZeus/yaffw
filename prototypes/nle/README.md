@@ -23,7 +23,7 @@ npx vitest run --config prototypes/nle/vite.config.ts
 npx vite build --config prototypes/nle/vite.config.ts
 ```
 
-Twenty-three tests cover sequence renaming/export, inline track renaming, cancellation, blank-name rejection, rename undo/redo, bottom-edge handle availability (including newly added tracks), keyboard steps and limits, drag cancellation/completion, and sequence movement, locks, linked splitting, insert/overwrite remainders, source limits, and ripple behavior. The isolated Vite config includes the production styling pipeline but omits production router generation and upload cleanup. Output stays in ignored `dist/`.
+Twenty-two tests cover sequence renaming/export, inline track renaming, cancellation, blank-name rejection, rename undo/redo, keyboard steps and limits, drag cancellation/completion, and sequence movement, locks, linked splitting, insert/overwrite remainders, source limits, and ripple behavior. The isolated Vite config includes the production styling pipeline but omits production router generation. Output stays in ignored `dist/`.
 
 ## Timeline controls
 

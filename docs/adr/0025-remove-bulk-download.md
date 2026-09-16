@@ -1,5 +1,7 @@
 # Remove bulk download
 
+**Status:** Legacy server and unused shared UI preservation superseded by [ADR-0026](./0026-remove-unused-repository-scaffolding.md).
+
 The product now focuses on browser-local, single-asset editing. Remove standalone bulk download from the repository instead of continuing to preserve its legacy acquisition stack. This supersedes ADR-0007 and the bulk-download preservation and sidebar requirements in ADR-0020.
 
 **Consequences**

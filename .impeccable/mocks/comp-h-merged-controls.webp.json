@@ -1,4 +1,0 @@
-{
-  "prompt": "Merge YAFFW's separate transport and timeline-header rows into one compact 40–44px control strip. Put previous/play/next and current/total timecode together at left with a modest gap; put selected-range duration, zoom and Reset in a tight right-aligned group. The timeline ruler begins immediately below. Preserve the narrow useful Media/Range information rail beside preview only, small 11–13px typography, large preview, full-width timeline, integrated audio gutter, unlabeled teal range handles, dark graphite surfaces and crisp separators. No dead horizontal space, duplicate rows, metadata shelf, WebCodecs, passive status, nested cards, gradients, or glow.\n",
-  "createdAt": "2026-08-11T17:00:35.798Z"
-}

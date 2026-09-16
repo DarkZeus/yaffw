@@ -255,6 +255,7 @@ _Avoid_: first-slice requirement, automatic fallback
 ## Relationships
 
 - YAFFW edits one active **Media asset** at a time.
+- The deployed editor is browser-only; the unused legacy upload/file-serving server is removed. The standalone NLE prototype remains an isolated exploration, not the product editing model.
 - Standalone bulk download, URL-acquisition UI and its server endpoints are removed. The editor has no app navigation sidebar; future URL import must produce **Media asset drafts** through an **Import adapter**.
 - Editor-next may use an **Editor workbench** UI inspired by professional media editors, but the product model remains a **Single-asset editing session**, not a multi-asset project or composition.
 - The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector is available only after a **Ready media asset** exists and remains visible throughout editing.

@@ -1,4 +1,0 @@
-{
-  "prompt": "Revise YAFFW composition D based on annotated feedback. Keep the sidebar-free full-width structure, but collapse Media/Audio/Export and active metadata into one 38–42px inline toolbar. Make transport a slim 40–44px bar containing only playback and timecode. Remove audio controls from transport and integrate the speaker, 0.0 dB volume fader, stereo L/R meters, and dB scale into a compact gutter immediately before the waveform lanes, within the waveform's existing vertical band. Give recovered height to Preview and Selection. Preserve the large preview, clear teal in/out handles, thumbnail strip, stereo waveform, thin red playhead, dark graphite palette, flat matte surfaces, 1px separators, and 4px controls. No sidebar, tall metadata shelf, nested cards, bento/dashboard feel, gradients, glow, or invented NLE features.\n",
-  "createdAt": "2026-08-11T16:42:28.473Z"
-}

@@ -31,6 +31,10 @@ The product is no longer an FFmpeg-wrapper UI. Browser-local editor processing i
   metadata and explicit delivery.
 - Export failure and cancellation recovery that keeps the active media asset and Selection retryable.
 
+## NLE Prototype
+
+The standalone [NLE editor prototype](./prototypes/nle/README.md) is preserved for timeline exploration. Run it with `pnpm exec vite --config prototypes/nle/vite.config.ts`. It has its own media, tests, and build configuration and is not part of the deployed app.
+
 ## Export Correctness
 
 The current export truth is documented in [docs/export-correctness-browser-baseline.md](./docs/export-correctness-browser-baseline.md).
@@ -53,11 +57,10 @@ Completed PRDs and issue implementation plans should stay in GitHub issue histor
 ## Tech Stack
 
 - React 19 and TypeScript.
-- TanStack Router and TanStack Query.
+- TanStack Router.
 - Tailwind CSS and shadcn-style Radix components.
 - Mediabunny and WebCodecs for browser media analysis/export.
 - Web Audio for preview audio scheduling and metering; WaveSurfer for waveform rendering.
-- Hono server routes for retained legacy upload and file-serving utilities.
 - Vitest for tests.
 
 ## Development
@@ -76,13 +79,7 @@ Run the Vite frontend on port 3000:
 pnpm dev
 ```
 
-The browser-local editor does not require the Hono server. When working on the retained legacy upload and file-serving routes, run it separately on port 3001:
-
-```bash
-pnpm server:watch
-```
-
-Legacy upload metadata inspection requires `ffprobe` on `PATH`; it is not installed by `pnpm install`.
+The editor runs entirely in the browser; no upload server or FFmpeg installation is required.
 
 Verify the editor-next TypeScript boundary:
 
@@ -106,7 +103,7 @@ The build produces `dist` and runs the editor-next TypeScript check. Preview the
 
 ## Deployment
 
-The Cloudflare deployment serves the built frontend as static assets. [wrangler.jsonc](./wrangler.jsonc) points to `dist` and enables single-page application fallback for client-side routes. It does not deploy the legacy Hono server or its upload/file-serving APIs.
+The Cloudflare deployment serves the built frontend as static assets. [wrangler.jsonc](./wrangler.jsonc) points to `dist` and enables single-page application fallback for client-side routes.
 
 The configured build and deploy commands are:
 

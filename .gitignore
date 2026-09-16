@@ -587,3 +587,6 @@ Icon?
 *.lnk
 
 .examples/
+
+# Generated design exploration artifacts
+.impeccable/

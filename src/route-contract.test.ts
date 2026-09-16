@@ -1,6 +1,5 @@
 /* @vitest-environment jsdom */
 
-import { QueryClient } from "@tanstack/react-query";
 import {
 	RouterProvider,
 	createMemoryHistory,
@@ -64,14 +63,7 @@ describe("app route contract", () => {
 });
 
 function renderAppAt(path: string) {
-	const queryClient = new QueryClient({
-		defaultOptions: {
-			mutations: { retry: false },
-			queries: { retry: false },
-		},
-	});
 	const router = createRouter({
-		context: { queryClient },
 		defaultPreload: false,
 		history: createMemoryHistory({ initialEntries: [path] }),
 		routeTree,

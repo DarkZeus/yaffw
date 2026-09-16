@@ -3,9 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeTrack } from "./model";
-import { SequenceTimeline } from "./sequence-timeline";
 import { TrackResizeHandle } from "./track-resize-handle";
-import { useEditor } from "./use-editor";
 
 afterEach(() => {
 	cleanup();
@@ -19,17 +17,6 @@ function ResizableTrack() {
 			height={height}
 			onHeightChange={setHeight}
 		/>
-	);
-}
-function Timeline() {
-	const editor = useEditor();
-	return (
-		<>
-			<button type="button" onClick={() => editor.addTrack("audio")}>
-				Add audio
-			</button>
-			<SequenceTimeline editor={editor} toolbar={null} />
-		</>
 	);
 }
 describe("bottom track resizing", () => {
