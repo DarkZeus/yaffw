@@ -10,6 +10,7 @@ import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
 import {
 	type PreviewAudioEngine,
+	type PreviewAudioPlaybackState,
 	setPreviewAudioEnginePlaybackRate,
 } from "../../audio/engine/preview-audio-engine";
 import type { PreviewClockMode } from "./preview-clock-mode";
@@ -21,6 +22,7 @@ const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 50_000;
 
 export type PreviewMediaTransportHandle = {
 	currentTime: number;
+	readonly seeking?: boolean;
 	muted: boolean;
 	pause: () => Promise<void> | void;
 	play: () => Promise<void>;
@@ -64,7 +66,14 @@ export function useNativePreviewTransport({
 	const playbackRateRef = useRef(1);
 	const playbackStartRequestIdRef = useRef(0);
 	const playbackStartPendingRef = useRef(false);
-	const previewAudioEnginePlaybackStartedRef = useRef(false);
+	const playbackRequestedRef = useRef(false);
+	const [playbackRequested, setPlaybackRequestedState] = useState(false);
+	const [audioPlaybackState, setAudioPlaybackState] =
+		useState<PreviewAudioPlaybackState>("paused");
+	const setPlaybackRequested = useCallback((requested: boolean) => {
+		playbackRequestedRef.current = requested;
+		setPlaybackRequestedState(requested);
+	}, []);
 	const previewScrubActiveRef = useRef(false);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const playheadStateCommitTimestampRef = useRef<number | null>(null);
@@ -77,6 +86,11 @@ export function useNativePreviewTransport({
 	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
 	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
 	const [volume, setVolume] = useState(1);
+	const selectionLoopConfigRef = useRef({
+		selection,
+		enabled: selectionLoopEnabled,
+	});
+	selectionLoopConfigRef.current = { selection, enabled: selectionLoopEnabled };
 
 	const getPlaybackRate = useCallback(() => playbackRateRef.current, []);
 	const getPlayheadUs = useCallback(() => playheadRef.current, []);
@@ -94,13 +108,17 @@ export function useNativePreviewTransport({
 		pendingVideoFollowerSeekSecondsRef.current = null;
 		playbackStartRequestIdRef.current += 1;
 		playbackStartPendingRef.current = false;
-		previewAudioEnginePlaybackStartedRef.current = false;
+		setPlaybackRequested(false);
 		previewScrubActiveRef.current = false;
 		selectionLoopEnteredRef.current = false;
 		setPlayheadUsState(0);
 		setIsPlaying(false);
 		setSelectionLoopEnabled(false);
-	}, [source]);
+		return () => {
+			playbackStartRequestIdRef.current += 1;
+			playbackRequestedRef.current = false;
+		};
+	}, [source, setPlaybackRequested]);
 
 	const commitPlayheadState = useCallback(
 		(nextPlayheadUs: MediaTimeUs, options: PlayheadCommitOptions) => {
@@ -223,10 +241,10 @@ export function useNativePreviewTransport({
 				playbackStartRequestIdRef.current += 1;
 				playbackStartPendingRef.current = false;
 				previewAudioEngineRef.current?.pause();
-				if (nativePlaybackShouldPause) {
+				if (nativePlaybackShouldPause && !audioMasterClockActive) {
 					videoRef.current?.pause();
 				}
-				previewAudioEnginePlaybackStartedRef.current = false;
+				setPlaybackRequested(false);
 				previewScrubActiveRef.current = true;
 				setIsPlaying(false);
 			}
@@ -237,6 +255,8 @@ export function useNativePreviewTransport({
 			setPlayheadUs(clampedPlayheadUs);
 		},
 		[
+			audioMasterClockActive,
+			setPlaybackRequested,
 			durationUs,
 			isPlaying,
 			previewAudioEngineRef,
@@ -258,136 +278,101 @@ export function useNativePreviewTransport({
 			playbackStartRequestIdRef.current += 1;
 			playbackStartPendingRef.current = false;
 			previewAudioEngineRef.current?.pause();
-			videoRef.current?.pause();
-			previewAudioEnginePlaybackStartedRef.current = false;
+			if (!audioMasterClockActive) videoRef.current?.pause();
+			setPlaybackRequested(false);
 			setIsPlaying(false);
 			seekByUs(direction * frameDurationUs);
 		},
-		[frameDurationUs, previewAudioEngineRef, seekByUs, videoRef],
+		[
+			audioMasterClockActive,
+			frameDurationUs,
+			previewAudioEngineRef,
+			seekByUs,
+			setPlaybackRequested,
+			videoRef,
+		],
+	);
+
+	const startPlayback = useCallback(
+		async (recover = false) => {
+			const video = videoRef.current;
+			if (!video || previewClockMode === "audio-master-pending") return;
+			const engine = previewAudioEngineRef.current;
+			if (audioMasterClockActive && engine?.getPlaybackState() === "closed")
+				return;
+			const requestId = ++playbackStartRequestIdRef.current;
+			playbackStartPendingRef.current = true;
+			setPlaybackRequested(true);
+			try {
+				if (audioMasterClockActive && engine) {
+					video.muted = true;
+					if (!recover) {
+						const start = resolveAudioMasterPlaybackStartSeconds({
+							durationUs,
+							pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
+							playheadUs: playheadRef.current,
+							video,
+						});
+						engine.setPlaybackEnd(
+							selectionLoopEnabled && start < selection.endUs / 1_000_000
+								? selection.endUs / 1_000_000
+								: null,
+						);
+						void engine.setTime(start);
+					}
+					previewScrubActiveRef.current = false;
+					// Call in the user gesture; the engine owns resume and bounded preparation.
+					await engine.play();
+					return;
+				}
+				if (previewScrubActiveRef.current)
+					setVideoFollowerTime(video, playheadRef.current);
+				previewScrubActiveRef.current = false;
+				await video.play();
+				if (requestId === playbackStartRequestIdRef.current) setIsPlaying(true);
+			} catch {
+				if (requestId !== playbackStartRequestIdRef.current) return;
+				engine?.pause();
+				video.pause();
+				setPlaybackRequested(false);
+				setIsPlaying(false);
+			} finally {
+				if (requestId === playbackStartRequestIdRef.current)
+					playbackStartPendingRef.current = false;
+			}
+		},
+		[
+			audioMasterClockActive,
+			durationUs,
+			previewAudioEngineRef,
+			previewClockMode,
+			selection.endUs,
+			selectionLoopEnabled,
+			setPlaybackRequested,
+			videoRef,
+		],
 	);
 
 	const togglePlayback = useCallback(async () => {
-		const video = videoRef.current;
-
-		if (!video) {
-			return;
-		}
-		const pendingScrubSeekSeconds = previewScrubActiveRef.current
-			? playheadRef.current / 1_000_000
-			: null;
-		previewScrubActiveRef.current = false;
-
-		if (isPlaying) {
+		if (playbackRequestedRef.current || isPlaying) {
 			playbackStartRequestIdRef.current += 1;
 			playbackStartPendingRef.current = false;
+			setPlaybackRequested(false);
 			previewAudioEngineRef.current?.pause();
-			video.pause();
-			previewAudioEnginePlaybackStartedRef.current = false;
+			if (!audioMasterClockActive) videoRef.current?.pause();
 			setIsPlaying(false);
 			return;
 		}
-
-		if (previewClockMode === "audio-master-pending") {
-			return;
-		}
-
-		if (playbackStartPendingRef.current) {
-			return;
-		}
-
-		playbackStartRequestIdRef.current += 1;
-		const playbackStartRequestId = playbackStartRequestIdRef.current;
-		playbackStartPendingRef.current = true;
-
-		function playbackStartIsCurrent() {
-			return playbackStartRequestIdRef.current === playbackStartRequestId;
-		}
-
-		try {
-			if (audioMasterClockActive) {
-				const playbackStartSeconds = resolveAudioMasterPlaybackStartSeconds({
-					durationUs,
-					pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
-					playheadUs: playheadRef.current,
-					video,
-				});
-				const pendingSeekSeconds = pendingVideoFollowerSeekSecondsRef.current;
-
-				video.muted = true;
-				if (pendingSeekSeconds !== null) {
-					const playbackStartUs = secondsToMicroseconds(playbackStartSeconds);
-					pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
-						video,
-						playbackStartUs,
-					)
-						? playbackStartSeconds
-						: pendingSeekSeconds;
-				}
-				await video.play();
-
-				if (!playbackStartIsCurrent()) {
-					return;
-				}
-
-				previewAudioEngineRef.current?.setPlaybackEnd(
-					selectionLoopEnabled &&
-						playbackStartSeconds < selection.endUs / 1_000_000
-						? selection.endUs / 1_000_000
-						: null,
-				);
-				previewAudioEngineRef.current?.setTime(playbackStartSeconds);
-				await previewAudioEngineRef.current?.play();
-
-				if (!playbackStartIsCurrent()) {
-					previewAudioEngineRef.current?.pause();
-					previewAudioEnginePlaybackStartedRef.current = false;
-					return;
-				}
-
-				previewAudioEnginePlaybackStartedRef.current = true;
-				setIsPlaying(true);
-				return;
-			}
-
-			if (pendingScrubSeekSeconds !== null) {
-				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
-					video,
-					secondsToMicroseconds(pendingScrubSeekSeconds),
-				)
-					? pendingScrubSeekSeconds
-					: null;
-			}
-
-			await video.play();
-
-			if (!playbackStartIsCurrent()) {
-				return;
-			}
-
-			setIsPlaying(true);
-		} catch {
-			if (!playbackStartIsCurrent()) {
-				return;
-			}
-
-			previewAudioEngineRef.current?.pause();
-			previewAudioEnginePlaybackStartedRef.current = false;
-			setIsPlaying(false);
-		} finally {
-			if (playbackStartIsCurrent()) {
-				playbackStartPendingRef.current = false;
-			}
-		}
+		await startPlayback();
 	}, [
 		audioMasterClockActive,
-		durationUs,
 		isPlaying,
 		previewAudioEngineRef,
-		previewClockMode,
-		selection.endUs,
-		selectionLoopEnabled,
+		setPlaybackRequested,
+		startPlayback,
 		videoRef,
 	]);
+	const recoverAudio = useCallback(() => startPlayback(true), [startPlayback]);
 
 	const setPreviewPlaybackRate = useCallback(
 		(nextPlaybackRate: number) => {
@@ -442,34 +427,85 @@ export function useNativePreviewTransport({
 	}, [muted, nativeVideoClockActive, videoRef]);
 
 	useEffect(() => {
-		if (!audioMasterClockActive || !isPlaying) {
-			previewAudioEnginePlaybackStartedRef.current = false;
-			return;
-		}
-
-		if (previewAudioEnginePlaybackStartedRef.current) {
-			return;
-		}
-
+		const engine = previewAudioEngineRef.current;
 		const video = videoRef.current;
-		if (video) {
-			video.muted = true;
-		}
-		previewAudioEngineRef.current?.setTime(playheadRef.current / 1_000_000);
-		previewAudioEngineRef.current?.play();
-		previewAudioEnginePlaybackStartedRef.current = true;
-	}, [audioMasterClockActive, isPlaying, previewAudioEngineRef, videoRef]);
-
-	useEffect(() => {
-		if (previewClockMode !== "audio-master-pending" || !isPlaying) {
+		if (!source || !audioMasterClockActive || !engine || !video) {
+			setAudioPlaybackState("paused");
 			return;
 		}
-
-		previewAudioEngineRef.current?.pause();
-		videoRef.current?.pause();
-		previewAudioEnginePlaybackStartedRef.current = false;
-		setIsPlaying(false);
-	}, [isPlaying, previewAudioEngineRef, previewClockMode, videoRef]);
+		let disposed = false;
+		let followerRequest = 0;
+		let following = false;
+		function syncAudioPlayback() {
+			if (disposed || !engine || !video) return;
+			const state = engine.getPlaybackState();
+			setAudioPlaybackState(state);
+			if (state !== "playing") {
+				followerRequest++;
+				if (following || state !== "paused") video.pause();
+				following = false;
+				setIsPlaying(false);
+				if (state === "closed") setPlaybackRequested(false);
+				if (state !== "paused" && !previewScrubActiveRef.current) {
+					const time = secondsToMicroseconds(engine.getCurrentTime());
+					const loop = selectionLoopConfigRef.current;
+					if (
+						loop.enabled &&
+						hasPlaybackEnteredSelection({
+							previousPlayheadUs: playheadRef.current,
+							currentPlayheadUs: time,
+							selection: loop.selection,
+						})
+					)
+						selectionLoopEnteredRef.current = true;
+					setVideoFollowerTime(video, time);
+					setPlayheadUs(time);
+				}
+				return;
+			}
+			if (!playbackRequestedRef.current || following) return;
+			following = true;
+			const request = ++followerRequest;
+			video.muted = true;
+			setVideoFollowerTime(
+				video,
+				secondsToMicroseconds(engine.getCurrentTime()),
+			);
+			void video
+				.play()
+				.then(() => {
+					if (disposed) return;
+					if (request !== followerRequest) {
+						if (!following) video.pause();
+						return;
+					}
+					setIsPlaying(true);
+				})
+				.catch(() => {
+					if (disposed || request !== followerRequest) return;
+					engine.pause();
+					setPlaybackRequested(false);
+					setIsPlaying(false);
+				});
+		}
+		const unsubscribe = engine.subscribe(syncAudioPlayback);
+		syncAudioPlayback();
+		return () => {
+			disposed = true;
+			following = false;
+			followerRequest++;
+			unsubscribe();
+			engine.pause();
+			video.pause();
+		};
+	}, [
+		audioMasterClockActive,
+		previewAudioEngineRef,
+		setPlaybackRequested,
+		setPlayheadUs,
+		source,
+		videoRef,
+	]);
 
 	const toggleSelectionLoop = useCallback(() => {
 		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
@@ -496,7 +532,12 @@ export function useNativePreviewTransport({
 
 			const previousPlayheadUs = playheadRef.current;
 
-			if (audioMasterClockActive && !isPlaying) {
+			if (
+				audioMasterClockActive &&
+				!isPlaying &&
+				!playbackRequestedRef.current &&
+				audioPlaybackState !== "closed"
+			) {
 				const pendingVideoFollowerSeekSeconds =
 					pendingVideoFollowerSeekSecondsRef.current;
 				const nextPlayheadUs =
@@ -592,9 +633,10 @@ export function useNativePreviewTransport({
 			}
 
 			if (audioMasterClockActive && nativePlayheadUs >= durationUs) {
+				// Media end supersedes any still-pending follower seek from a loop.
+				pendingVideoFollowerSeekSecondsRef.current = durationUs / 1_000_000;
 				previewAudioEngineRef.current?.pause();
-				video.pause();
-				previewAudioEnginePlaybackStartedRef.current = false;
+				setPlaybackRequested(false);
 				setVideoFollowerTime(video, durationUs);
 				setPlayheadUs(durationUs);
 				setIsPlaying(false);
@@ -607,6 +649,8 @@ export function useNativePreviewTransport({
 			});
 		},
 		[
+			audioPlaybackState,
+			setPlaybackRequested,
 			audioMasterClockActive,
 			durationUs,
 			frameDurationUs,
@@ -690,17 +734,18 @@ export function useNativePreviewTransport({
 			setPlayheadUs(selection.startUs);
 			setIsPlaying(true);
 			void video.play().catch(() => {
-				previewAudioEnginePlaybackStartedRef.current = false;
+				setPlaybackRequested(false);
 				setIsPlaying(false);
 			});
 			return;
 		}
 
 		previewAudioEngineRef.current?.pause();
-		previewAudioEnginePlaybackStartedRef.current = false;
+		setPlaybackRequested(false);
 		setIsPlaying(false);
 		setPlayheadUs(durationUs);
 	}, [
+		setPlaybackRequested,
 		durationUs,
 		previewAudioEngineRef,
 		nativeVideoClockActive,
@@ -718,17 +763,25 @@ export function useNativePreviewTransport({
 		}
 
 		previewAudioEngineRef.current?.pause();
-		previewAudioEnginePlaybackStartedRef.current = false;
+		setPlaybackRequested(false);
 		setIsPlaying(false);
-	}, [previewAudioEngineRef, nativeVideoClockActive]);
+	}, [previewAudioEngineRef, nativeVideoClockActive, setPlaybackRequested]);
 
 	const handleNativePlay = useCallback(() => {
 		if (!nativeVideoClockActive) {
+			if (previewAudioEngineRef.current?.getPlaybackState() !== "playing")
+				videoRef.current?.pause();
 			return;
 		}
 
+		setPlaybackRequested(true);
 		setIsPlaying(true);
-	}, [nativeVideoClockActive]);
+	}, [
+		nativeVideoClockActive,
+		previewAudioEngineRef,
+		setPlaybackRequested,
+		videoRef,
+	]);
 
 	return {
 		getPlaybackRate,
@@ -737,6 +790,9 @@ export function useNativePreviewTransport({
 		handleNativePause,
 		handleNativePlay,
 		isPlaying,
+		playbackRequested,
+		audioPlaybackState,
+		recoverAudio,
 		muted,
 		playbackRate,
 		previewClockMode,

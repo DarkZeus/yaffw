@@ -3,6 +3,12 @@ import type {
 	MediaWindowProvider,
 	MediaWindowTrackState,
 } from "./media-window-provider";
+import {
+	type PreviewAudioContextLifecycleSource,
+	type PreviewAudioContextState,
+	createPreviewAudioContextLifecycle,
+} from "./preview-audio-context-lifecycle";
+import type { PreviewAudioPlaybackState } from "./preview-audio-engine";
 import type { ScheduledWindowEngine } from "./scheduled-window-engine";
 
 const HORIZON_SECONDS = 2;
@@ -20,6 +26,7 @@ export function createPreviewAudioWindowController(
 	provider: MediaWindowProvider,
 	engine: ScheduledWindowEngine,
 	initialPlaybackRate = 1,
+	audioContext: PreviewAudioContextLifecycleSource = {},
 ) {
 	let destroyed = false;
 	let version = 0;
@@ -32,6 +39,16 @@ export function createPreviewAudioWindowController(
 	let lookahead: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let playbackRate = initialPlaybackRate;
+	let playbackState: PreviewAudioPlaybackState =
+		audioContext.state === "closed" ? "closed" : "paused";
+	let recoveryRequest = 0;
+	let playRequest = 0;
+	let interruptionObserved =
+		audioContext.state === "suspended" || audioContext.state === "interrupted";
+	const contextLifecycle = createPreviewAudioContextLifecycle(
+		audioContext,
+		contextStateChanged,
+	);
 	const metrics = {
 		generationsOpened: 0,
 		generationsCancelled: 0,
@@ -41,6 +58,55 @@ export function createPreviewAudioWindowController(
 	};
 	function notify() {
 		for (const listener of listeners) listener();
+	}
+	function setPlaybackState(state: PreviewAudioPlaybackState) {
+		if (playbackState === state) return;
+		playbackState = state;
+		notify();
+	}
+	function contextStateChanged(state: PreviewAudioContextState) {
+		if (destroyed) return;
+		if (state === "running") {
+			interruptionObserved = false;
+			if (desiredPlaying) void prepare(engine.getCurrentTime());
+			return;
+		}
+		// Some browsers alternate suspended/interrupted while resume is pending.
+		// Treat both reports as one interruption, rather than a retry trigger.
+		if (state !== "closed" && interruptionObserved) return;
+		interruptionObserved = true;
+		engine.pause();
+		invalidate();
+		contextLifecycle.cancelResume();
+		recoveryRequest++;
+		if (state === "closed") {
+			desiredPlaying = false;
+			setPlaybackState("closed");
+		} else if (desiredPlaying) {
+			setPlaybackState("interrupted");
+			// Exactly one attempt per observed interruption; rejected/pending attempts
+			// expose explicit Play recovery instead of polling the browser.
+			void requestContextResume().then((running) => {
+				if (running && !active && desiredPlaying && !destroyed)
+					void prepare(engine.getCurrentTime());
+			});
+		} else setPlaybackState("paused");
+	}
+	async function requestContextResume() {
+		const request = ++recoveryRequest;
+		if (contextLifecycle.getState() === "closed") {
+			setPlaybackState("closed");
+			return false;
+		}
+		if (!contextLifecycle.isRunning()) setPlaybackState("recovery-required");
+		const running = await contextLifecycle.resume();
+		if (destroyed || request !== recoveryRequest || !desiredPlaying)
+			return false;
+		if (!running) {
+			setPlaybackState("recovery-required");
+			return false;
+		}
+		return true;
 	}
 	function stopTimer() {
 		if (timer !== null) {
@@ -144,11 +210,15 @@ export function createPreviewAudioWindowController(
 	}
 	async function resume() {
 		if (destroyed || !desiredPlaying) return;
+		if (!contextLifecycle.isRunning()) return;
 		await engine.play();
-		if (!destroyed && desiredPlaying && engine.isPlaying() && timer === null)
-			timer = setInterval(() => {
-				void tick();
-			}, PULL_INTERVAL_MS);
+		if (!destroyed && desiredPlaying && engine.isPlaying()) {
+			setPlaybackState("playing");
+			if (timer === null)
+				timer = setInterval(() => {
+					void tick();
+				}, PULL_INTERVAL_MS);
+		}
 	}
 	function prepare(timeSeconds: number) {
 		if (destroyed) return Promise.resolve();
@@ -161,6 +231,8 @@ export function createPreviewAudioWindowController(
 		);
 		engine.pause();
 		invalidate();
+		if (desiredPlaying && contextLifecycle.isRunning())
+			setPlaybackState("buffering");
 		failures.clear();
 		const owned = open(startSeconds);
 		active = owned;
@@ -191,6 +263,7 @@ export function createPreviewAudioWindowController(
 	}
 	return {
 		prepare,
+		getPlaybackState: () => playbackState,
 		getFailures: () => failures as ReadonlyMap<string, string>,
 		subscribe(listener: () => void) {
 			listeners.add(listener);
@@ -207,29 +280,48 @@ export function createPreviewAudioWindowController(
 			if (destroyed) return;
 			destroyed = true;
 			desiredPlaying = false;
+			playRequest++;
+			recoveryRequest++;
+			contextLifecycle.destroy();
 			stopTimer();
 			engine.pause();
 			invalidate();
 			listeners.clear();
+			playbackState = "closed";
 			failures.clear();
 			void engine.destroy();
 			metrics.cleanupCount++;
 		},
 		pause() {
 			desiredPlaying = false;
+			playRequest++;
+			recoveryRequest++;
+			contextLifecycle.cancelResume();
 			stopTimer();
 			engine.pause();
+			if (playbackState !== "closed") setPlaybackState("paused");
 		},
 		async play() {
-			if (destroyed) return;
+			if (destroyed || playbackState === "closed") return;
+			if (engine.isPlaying() && contextLifecycle.isRunning()) return;
+			const request = ++playRequest;
 			desiredPlaying = true;
+			if (contextLifecycle.isRunning()) setPlaybackState("buffering");
+			if (!(await requestContextResume()) || request !== playRequest) return;
+			if (!active) prepare(engine.getCurrentTime());
 			// A seek can replace the awaited preparation while a play command is pending.
 			let pending: Promise<void>;
 			do {
 				pending = readiness;
 				await pending;
-			} while (pending !== readiness && !destroyed && desiredPlaying);
-			if (!destroyed && desiredPlaying) await resume();
+			} while (
+				pending !== readiness &&
+				!destroyed &&
+				desiredPlaying &&
+				request === playRequest
+			);
+			if (!destroyed && desiredPlaying && request === playRequest)
+				await resume();
 		},
 		setTime(timeSeconds: number) {
 			// The transport synchronizes its playhead before Play. A paused window at

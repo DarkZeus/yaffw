@@ -73,6 +73,15 @@ at the exact Selection end before the transport seeks to the start. The
 accepted loop-wrap control budget is 100 ms, separate from continuous-playback
 underrun measurement.
 
+AudioContext suspension/interruption retains audio-master authority while sources
+and pulls stop. Playback availability is separate from decoded-track readiness.
+Recovery uses latest playback intent, seek, and speed; explicit Resume audio can
+supersede a blocked browser resume. Pause and teardown cancel pending recovery,
+and closed contexts cannot resume. The muted video follower stops during
+unavailability/preparation and restarts through its native provider only when
+audio is playing. Selection entry survives interruption so recovery at the end
+wraps once or stops at media end. See [interruption verification](./verification/preview-audio-interruptions.md).
+
 The active Media asset cleanup scope aborts preparation, destroys the engine,
 returns iterators, closes caller-owned samples, disposes the input, and drops
 all queued PCM references. See

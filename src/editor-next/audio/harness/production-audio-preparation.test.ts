@@ -30,6 +30,7 @@ it("applies the production default audio mix before exposing a ready trial engin
 		},
 	);
 	const engine: PreviewAudioEngine = {
+		getPlaybackState: () => "paused",
 		destroy: vi.fn(),
 		subscribe: vi.fn(),
 		getMetrics: vi.fn(),

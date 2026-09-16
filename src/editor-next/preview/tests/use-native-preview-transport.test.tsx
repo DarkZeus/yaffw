@@ -16,6 +16,7 @@ import type { Selection } from "@/editor-core/model";
 import type {
 	PreviewAudioEngine,
 	PreviewAudioEngineMeterSnapshot,
+	PreviewAudioPlaybackState,
 } from "../../audio/engine/preview-audio-engine";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
 
@@ -41,6 +42,149 @@ afterEach(() => {
 });
 
 describe("useNativePreviewTransport", () => {
+	it("ignores keyboard Play when the audio context is closed", async () => {
+		const engine = createPreviewAudioEngineSpy();
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		act(() => engine.setPlaybackState("closed"));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		expect(readState()).toContain("requested:false");
+		expect(engine.play).not.toHaveBeenCalled();
+		expect(engine.setTime).not.toHaveBeenCalled();
+	});
+
+	it("clears recovery UI on explicit native fallback", async () => {
+		const engine = createPreviewAudioEngineSpy();
+		const view = render(
+			<NativePreviewTransportProbe previewAudioEngine={engine} />,
+		);
+		act(() => engine.setPlaybackState("recovery-required"));
+		expect(readState()).toContain("audio:recovery-required");
+		view.rerender(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				previewClockMode="native-video"
+			/>,
+		);
+		expect(readState()).toContain("audio:paused");
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+	});
+
+	it("stops native Play events while interrupted instead of starting an independent clock", () => {
+		const engine = createPreviewAudioEngineSpy();
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		act(() => engine.setPlaybackState("recovery-required"));
+		pause.mockClear();
+		fireEvent.play(screen.getByLabelText("Preview video"));
+		expect(pause).toHaveBeenCalledOnce();
+		expect(readState()).toContain("playing:false");
+		expect(readState()).toContain("mode:audio-master");
+	});
+
+	it("holds the muted follower during interruption, retains intent, and follows recovery", async () => {
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.setCurrentTimeSeconds(1);
+		act(() => engine.setPlaybackState("interrupted"));
+		expect(readState()).toContain("playing:false");
+		expect(readState()).toContain("requested:true");
+		expect(readState()).toContain("mode:audio-master");
+		expect(screen.getByLabelText("Preview video")).toHaveProperty(
+			"muted",
+			true,
+		);
+		expect(pause).toHaveBeenCalled();
+		fireEvent.click(screen.getByText("Seek to sync event"));
+		fireEvent.click(screen.getByText("Set speed"));
+		expect(engine.setTime).toHaveBeenLastCalledWith(2);
+		expect(engine.setPlaybackRate).toHaveBeenLastCalledWith(1.5);
+		act(() => engine.setPlaybackState("playing"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		expect(screen.getByLabelText("Preview video")).toHaveProperty(
+			"currentTime",
+			2,
+		);
+	});
+
+	it("pause cancels interruption intent and a pending follower play cannot restart video", async () => {
+		const engine = createPreviewAudioEngineSpy();
+		const started = createDeferred<void>();
+		play.mockReturnValueOnce(started.promise);
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		act(() => engine.setPlaybackState("recovery-required"));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		expect(readState()).toContain("requested:false");
+		expect(engine.pause).toHaveBeenCalled();
+		await act(async () => started.resolve());
+		expect(readState()).toContain("playing:false");
+		act(() => engine.setPlaybackState("paused"));
+		expect(play).toHaveBeenCalledTimes(1);
+	});
+
+	it("retries audio explicitly without replacing the latest interrupted seek", async () => {
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		act(() => engine.setPlaybackState("recovery-required"));
+		fireEvent.click(screen.getByText("Seek to sync event"));
+		engine.setTime.mockClear();
+		fireEvent.click(screen.getByText("Recover audio"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		expect(engine.setTime).not.toHaveBeenCalled();
+		expect(engine.play).toHaveBeenCalledTimes(2);
+	});
+
+	it("an old follower completion cannot pause a newer session sharing its video handle", async () => {
+		const engine = createPreviewAudioEngineSpy();
+		const oldPlay = createDeferred<void>();
+		play.mockReturnValueOnce(oldPlay.promise);
+		const view = render(
+			<NativePreviewTransportProbe previewAudioEngine={engine} />,
+		);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		view.rerender(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				source={new Blob(["replacement"])}
+			/>,
+		);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		pause.mockClear();
+		await act(async () => oldPlay.resolve());
+		expect(pause).not.toHaveBeenCalled();
+		expect(readState()).toContain("playing:true");
+	});
+
+	it("unsubscribes and pauses the captured asset when replaced during a pending start", async () => {
+		const engine = createPreviewAudioEngineSpy();
+		const started = createDeferred<void>();
+		play.mockReturnValueOnce(started.promise);
+		const view = render(
+			<NativePreviewTransportProbe previewAudioEngine={engine} />,
+		);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+		view.unmount();
+		expect(engine.pause).toHaveBeenCalled();
+		const calls = play.mock.calls.length;
+		await act(async () => {
+			started.resolve();
+			engine.setPlaybackState("playing");
+		});
+		expect(play).toHaveBeenCalledTimes(calls);
+	});
+
 	it("drives native preview commands through the video and previewAudioEngine refs", async () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 
@@ -119,7 +263,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playhead:2000000");
 	});
 
-	it("waits for native video playback before starting the audio-master clock", async () => {
+	it("starts audio in the gesture and starts its muted follower only when audio is playing", async () => {
 		const playStarted = createDeferred<void>();
 		const previewAudioEngine = createPreviewAudioEngineSpy();
 		play.mockReturnValueOnce(playStarted.promise);
@@ -137,8 +281,8 @@ describe("useNativePreviewTransport", () => {
 			"muted",
 			true,
 		);
-		expect(previewAudioEngine.setTime).not.toHaveBeenCalled();
-		expect(previewAudioEngine.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(0);
+		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 		expect(readState()).toContain("playing:false");
 
 		await act(async () => {
@@ -151,7 +295,7 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playing:true");
 	});
 
-	it("does not advance the audio clock or seek the video follower while resumed native playback is still pending", async () => {
+	it("does not repeatedly seek the video follower while resumed native playback is still pending", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
 		const previewAudioEngine = createPreviewAudioEngineSpy({
@@ -188,7 +332,7 @@ describe("useNativePreviewTransport", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
 
 		expect(readState()).toContain("playing:false");
-		expect(previewAudioEngine.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.play).toHaveBeenCalledTimes(1);
 		expect(requestAnimationFrame).toHaveBeenCalledTimes(
 			animationFrameRequestsBeforeResume,
 		);
@@ -899,6 +1043,85 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playing:false");
 	});
 
+	it("media end supersedes an unsettled follower seek from a previous loop", async () => {
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		let transport: ReturnType<typeof useNativePreviewTransport>;
+		render(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				onTransport={(value) => {
+					transport = value;
+				}}
+			/>,
+		);
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		video.currentTime = 5;
+		act(() => transport.seekToUs(0));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		act(() => {
+			video.currentTime = 11.9;
+			engine.setCurrentTimeSeconds(12);
+			transport.syncPlayheadWithNativeVideo();
+		});
+		fireEvent.timeUpdate(video);
+		expect(video.currentTime).toBe(12);
+		expect(readState()).toContain("playhead:12000000");
+		expect(readState()).toContain("requested:false");
+	});
+
+	it.each([false, true])(
+		"recovers near the end with Selection looping=%s",
+		async (loop) => {
+			const { frameCallbacks } = stubPreviewAnimationFrames();
+			const engine = createPreviewAudioEngineSpy({
+				setTimeUpdatesCurrentTime: true,
+			});
+			let transport: ReturnType<typeof useNativePreviewTransport>;
+			render(
+				<NativePreviewTransportProbe
+					previewAudioEngine={engine}
+					onTransport={(value) => {
+						transport = value;
+					}}
+					selection={{ startUs: 4_000_000, endUs: 12_000_000 }}
+				/>,
+			);
+			if (loop) fireEvent.click(screen.getByText("Toggle loop"));
+			fireEvent.click(screen.getByText("Toggle playback"));
+			await waitFor(() => expect(readState()).toContain("playing:true"));
+			act(() => {
+				engine.setCurrentTimeSeconds(11.9);
+				engine.setPlaybackState("interrupted");
+			});
+			expect(readState()).toContain("playing:false");
+			act(() => engine.setPlaybackState("buffering"));
+			act(() => engine.setPlaybackState("playing"));
+			await waitFor(() => expect(readState()).toContain("playing:true"));
+			act(() => {
+				engine.setCurrentTimeSeconds(12);
+				transport.syncPlayheadWithNativeVideo();
+			});
+			if (loop) {
+				expect(engine.setTime).toHaveBeenLastCalledWith(4);
+				expect(readState()).toContain("requested:true");
+				act(() => engine.setPlaybackState("buffering"));
+				act(() => engine.setPlaybackState("playing"));
+				await waitFor(() => expect(readState()).toContain("playing:true"));
+				engine.setTime.mockClear();
+				act(() => transport.syncPlayheadWithNativeVideo());
+				expect(engine.setTime).not.toHaveBeenCalled();
+			} else {
+				expect(readState()).toContain("requested:false");
+				expect(readState()).toContain("playing:false");
+				expect(engine.getCurrentTime()).toBe(12);
+			}
+			expect(frameCallbacks.length).toBeGreaterThan(0);
+		},
+	);
+
 	it("resets playhead and selection loop when the source changes", async () => {
 		const nextSource = new File(["next"], "next.mp4", { type: "video/mp4" });
 		const view = render(<NativePreviewTransportProbe />);
@@ -969,6 +1192,8 @@ function NativePreviewTransportProbe({
 			<output aria-label="transport state">
 				{[
 					`playing:${transport.isPlaying}`,
+					`requested:${transport.playbackRequested}`,
+					`audio:${transport.audioPlaybackState}`,
 					`muted:${transport.muted}`,
 					`mode:${transport.previewClockMode}`,
 					`rate:${transport.playbackRate}`,
@@ -979,6 +1204,9 @@ function NativePreviewTransportProbe({
 			</output>
 			<button onClick={() => void transport.togglePlayback()} type="button">
 				Toggle playback
+			</button>
+			<button onClick={() => void transport.recoverAudio()} type="button">
+				Recover audio
 			</button>
 			<button onClick={() => transport.seekByUs(10_000_000)} type="button">
 				Seek forward
@@ -1028,11 +1256,24 @@ function createPreviewAudioEngineSpy({
 	setTimeUpdatesCurrentTime?: boolean;
 } = {}) {
 	let currentTime = currentTimeSeconds;
-
+	let state: PreviewAudioPlaybackState = "paused";
+	const listeners = new Set<() => void>();
+	const setPlaybackState = (next: PreviewAudioPlaybackState) => {
+		state = next;
+		for (const listener of listeners) listener();
+	};
 	return {
+		getPlaybackState: () => state,
+		setPlaybackState,
+		subscribe: (listener: () => void) => {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
 		getCurrentTime: vi.fn(() => currentTime),
-		pause: vi.fn(),
-		play: vi.fn(),
+		pause: vi.fn(() => setPlaybackState("paused")),
+		play: vi.fn(async () => setPlaybackState("playing")),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 		setOutputGain: vi.fn(),
 		setPlaybackEnd: vi.fn(),

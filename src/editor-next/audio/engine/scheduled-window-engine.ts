@@ -2,6 +2,7 @@ import type {
 	MediaWindowChunk,
 	MediaWindowTrackState,
 } from "./media-window-provider";
+import type { PreviewAudioContextLifecycleSource } from "./preview-audio-context-lifecycle";
 
 export type ScheduledWindowAudioNodeLike = {
 	connect: (destination: ScheduledWindowAudioNodeLike) => unknown;
@@ -21,14 +22,15 @@ export type ScheduledWindowBufferSourceNodeLike =
 		stop: () => void;
 	};
 
-export type ScheduledWindowAudioContextLike = {
-	close?: () => Promise<void> | void;
-	createBufferSource: () => ScheduledWindowBufferSourceNodeLike;
-	createGain: () => ScheduledWindowGainNodeLike;
-	currentTime: number;
-	destination: ScheduledWindowAudioNodeLike;
-	resume?: () => Promise<void> | void;
-};
+export type ScheduledWindowAudioContextLike =
+	PreviewAudioContextLifecycleSource & {
+		close?: () => Promise<void> | void;
+		createBufferSource: () => ScheduledWindowBufferSourceNodeLike;
+		createGain: () => ScheduledWindowGainNodeLike;
+		currentTime: number;
+		destination: ScheduledWindowAudioNodeLike;
+		resume?: () => Promise<void> | void;
+	};
 
 export type ScheduledWindowEngineStatus =
 	| "degraded"
@@ -83,6 +85,8 @@ export type ScheduledWindowEngine = {
 
 export type CreateScheduledWindowEngineOptions = {
 	createAudioContext?: () => ScheduledWindowAudioContextLike;
+	/** The production controller owns browser context recovery and playback intent. */
+	contextLifecycleManaged?: boolean;
 	durationSeconds: number;
 	horizonSeconds: number;
 	lowWaterSeconds: number;
@@ -122,6 +126,7 @@ const TIME_EPSILON_SECONDS = 1e-6;
 
 export function createScheduledWindowEngine({
 	createAudioContext = createDefaultAudioContext,
+	contextLifecycleManaged = false,
 	durationSeconds,
 	horizonSeconds,
 	lowWaterSeconds,
@@ -603,7 +608,7 @@ export function createScheduledWindowEngine({
 			for (const track of tracks.values()) {
 				track.gainNode.disconnect?.();
 			}
-			await audioContext.close?.();
+			if (audioContext.state !== "closed") await audioContext.close?.();
 			metrics.cleanupCount += 1;
 		},
 		getCurrentTime,
@@ -626,7 +631,7 @@ export function createScheduledWindowEngine({
 			stopScheduledSources();
 		},
 		async play() {
-			if (destroyed || playing) {
+			if (destroyed || playing || audioContext.state === "closed") {
 				return;
 			}
 
@@ -639,8 +644,13 @@ export function createScheduledWindowEngine({
 			}
 
 			const intent = ++playIntent;
-			await audioContext.resume?.();
-			if (destroyed || playing || intent !== playIntent) {
+			if (!contextLifecycleManaged) await audioContext.resume?.();
+			if (
+				destroyed ||
+				playing ||
+				intent !== playIntent ||
+				(audioContext.state !== undefined && audioContext.state !== "running")
+			) {
 				return;
 			}
 

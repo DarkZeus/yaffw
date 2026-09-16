@@ -10,6 +10,7 @@ import type {
 
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import type { MediaWindowProvider } from "./media-window-provider";
+import type { PreviewAudioContextLifecycleSource } from "./preview-audio-context-lifecycle";
 import { createPreviewAudioGraph } from "./preview-audio-graph";
 import { createPreviewAudioWindowController } from "./preview-audio-window-controller";
 import type { PreviewGainParam } from "./preview-gain-transition";
@@ -28,6 +29,7 @@ export type PreviewAudioEngine = {
 	setPlaybackEnd: (endSeconds: number | null) => void;
 	getCurrentTime: () => number;
 	getStatus: () => PreviewAudioEngineStatus;
+	getPlaybackState: () => PreviewAudioPlaybackState;
 	pause: () => void;
 	play: () => Promise<void>;
 	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot;
@@ -43,6 +45,15 @@ export type PreviewAudioEngine = {
 };
 
 export type PreviewAudioEngineStatus = ScheduledWindowEngineStatus;
+
+/** Playback availability is separate from decoded-track readiness and clock authority. */
+export type PreviewAudioPlaybackState =
+	| "paused"
+	| "playing"
+	| "buffering"
+	| "interrupted"
+	| "recovery-required"
+	| "closed";
 
 export type PreviewAudioEngineMeterChannel = {
 	label: string;
@@ -78,7 +89,7 @@ export type PreviewAudioEngineMeterSnapshot = {
 	trackStates: Record<string, PreviewAudioEngineTrackMeterState>;
 };
 
-export type PreviewAudioContextLike = {
+export type PreviewAudioContextLike = PreviewAudioContextLifecycleSource & {
 	close?: () => Promise<void> | void;
 	createAnalyser: () => PreviewAudioAnalyserNodeLike;
 	createBufferSource: () => PreviewAudioBufferSourceNodeLike;
@@ -164,6 +175,7 @@ export async function createPreviewAudioEngine({
 		);
 		scheduler = createScheduledWindowEngine({
 			createAudioContext: () => audioContext,
+			contextLifecycleManaged: true,
 			durationSeconds: provider.durationSeconds,
 			horizonSeconds: 2,
 			lowWaterSeconds: 1.5,
@@ -172,7 +184,7 @@ export async function createPreviewAudioEngine({
 		});
 	} catch (error) {
 		ownedGraph?.destroy();
-		await audioContext.close?.();
+		if (audioContext.state !== "closed") await audioContext.close?.();
 		throw error;
 	}
 	const graph = ownedGraph;
@@ -180,6 +192,7 @@ export async function createPreviewAudioEngine({
 		provider,
 		scheduler,
 		initialPlaybackRate,
+		audioContext,
 	);
 	let destroyed = false;
 	const unsubscribeGainLifecycle = controller.subscribe(() => {
@@ -210,6 +223,7 @@ export async function createPreviewAudioEngine({
 		destroy,
 		getCurrentTime: scheduler.getCurrentTime,
 		getStatus: scheduler.getStatus,
+		getPlaybackState: controller.getPlaybackState,
 		subscribe: controller.subscribe,
 		getMetrics: controller.getMetrics,
 		pause() {

@@ -7,6 +7,7 @@ import type {
 	MediaWindowTrackState,
 	OpenMediaWindowGenerationOptions,
 } from "../engine/media-window-provider";
+import type { PreviewAudioContextState } from "../engine/preview-audio-context-lifecycle";
 import {
 	type PreviewAudioEngine,
 	type PreviewAudioEngineMeterSnapshot,
@@ -38,6 +39,267 @@ async function setup(
 	});
 	engines.push(engine);
 	return { engine, context, provider };
+}
+
+describe("Preview audio context interruptions", () => {
+	it("keeps duplicate Play idempotent while running", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		const created = context.createdSources.length;
+		await Promise.all([engine.play(), engine.play()]);
+		expect(engine.getPlaybackState()).toBe("playing");
+		expect(context.createdSources).toHaveLength(created);
+		expect(engine.getMetrics().activeTimers).toBe(1);
+	});
+
+	it("invokes gesture resume synchronously and does not retry alternating unavailable reports", async () => {
+		const context = createLifecycleContext();
+		context.state = "suspended";
+		context.resume.mockRejectedValue(new Error("Gesture required"));
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		const play = engine.play();
+		expect(context.resume).toHaveBeenCalledTimes(1);
+		await play;
+		expect(engine.getPlaybackState()).toBe("recovery-required");
+		context.changeState("interrupted");
+		await flushMicrotasks();
+		const attempts = context.resume.mock.calls.length;
+		context.changeState("suspended");
+		context.changeState("interrupted");
+		await flushMicrotasks();
+		expect(context.resume).toHaveBeenCalledTimes(attempts);
+		expect(context.createdSources).toHaveLength(0);
+	});
+
+	it("keeps pause authoritative while recovery's replacement window is decoding", async () => {
+		const context = createLifecycleContext();
+		const late = deferred<MediaWindowTrackState[]>();
+		let recovering = false;
+		const provider = createProvider((options, end) =>
+			recovering
+				? late.promise
+				: states(options.startSeconds, end, ["audio-1", "audio-2"]),
+		);
+		const { engine } = await setup(provider, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		context.currentTime = 0.5;
+		context.resume.mockRejectedValue(new Error("Gesture required"));
+		context.changeState("suspended");
+		await flushMicrotasks();
+		recovering = true;
+		context.changeState("running");
+		expect(engine.getPlaybackState()).toBe("buffering");
+		engine.pause();
+		const created = context.createdSources.length;
+		late.resolve(states(0.5, 2.5, ["audio-1", "audio-2"]));
+		await flushMicrotasks();
+		expect(engine.getPlaybackState()).toBe("paused");
+		expect(context.createdSources).toHaveLength(created);
+		expect(engine.getCurrentTime()).toBe(0.5);
+	});
+
+	it("freezes audio time, stops sources and pulls, and recovers a fresh bounded window on running", async () => {
+		vi.useFakeTimers();
+		const context = createLifecycleContext();
+		const { engine, provider } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		context.currentTime = 0.7;
+		context.resume.mockRejectedValue(new Error("Gesture required"));
+		context.changeState("interrupted");
+		await flushMicrotasks();
+		expect(engine.getPlaybackState()).toBe("recovery-required");
+		expect(engine.getStatus()).toBe("ready");
+		expect(engine.getCurrentTime()).toBeCloseTo(0.7);
+		expect(
+			context.createdSources.every(
+				(source) => source.stop.mock.calls.length === 1,
+			),
+		).toBe(true);
+		const pulls = provider.pulls.length;
+		context.currentTime = 50;
+		await vi.advanceTimersByTimeAsync(5_000);
+		expect(provider.pulls).toHaveLength(pulls);
+		expect(engine.getCurrentTime()).toBeCloseTo(0.7);
+		expect(context.resume).toHaveBeenCalledTimes(1);
+		context.changeState("running");
+		await flushMicrotasks();
+		expect(engine.getPlaybackState()).toBe("playing");
+		expect(provider.openGeneration).toHaveBeenLastCalledWith(
+			expect.objectContaining({ startSeconds: 0.7 }),
+		);
+		context.currentTime = 50.2;
+		expect(engine.getCurrentTime()).toBeCloseTo(0.9);
+		expect(engine.getMetrics().activeTimers).toBe(1);
+	});
+
+	it("allows a gesture retry to supersede a resume that never settles, applying the latest seek and rate", async () => {
+		const context = createLifecycleContext();
+		const { engine, provider } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		const pending = deferred<void>();
+		context.resume.mockImplementation(() => pending.promise);
+		context.changeState("suspended");
+		expect(engine.getPlaybackState()).toBe("recovery-required");
+		await engine.setTime(7);
+		await engine.setPlaybackRate(2);
+		context.resume.mockImplementation(async () =>
+			context.changeState("running"),
+		);
+		await engine.play();
+		expect(engine.getPlaybackState()).toBe("playing");
+		expect(provider.openGeneration).toHaveBeenLastCalledWith(
+			expect.objectContaining({ startSeconds: 7 }),
+		);
+		expect(context.createdSources.at(-1)?.playbackRate.value).toBe(2);
+		const created = context.createdSources.length;
+		pending.resolve();
+		await flushMicrotasks();
+		expect(context.createdSources).toHaveLength(created);
+		context.currentTime = 0.5;
+		expect(engine.getCurrentTime()).toBe(8);
+	});
+
+	it("cancels deferred recovery on pause without allowing a later running event to restart playback", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		const pending = deferred<void>();
+		context.resume.mockImplementation(() => pending.promise);
+		context.changeState("suspended");
+		engine.pause();
+		expect(engine.getPlaybackState()).toBe("paused");
+		context.changeState("running");
+		pending.resolve();
+		await flushMicrotasks();
+		expect(engine.getPlaybackState()).toBe("paused");
+		expect(engine.getMetrics().activeTimers).toBe(0);
+		expect(
+			context.createdSources.every(
+				(source) => source.stop.mock.calls.length === 1,
+			),
+		).toBe(true);
+	});
+
+	it("publishes a closed context terminal state and never attempts to resume it", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		const observed: string[] = [];
+		engine.subscribe(() => observed.push(engine.getPlaybackState()));
+		await engine.play();
+		context.changeState("closed");
+		await engine.play();
+		await engine.setTime(4);
+		engine.pause();
+		expect(engine.getPlaybackState()).toBe("closed");
+		expect(engine.getStatus()).toBe("ready");
+		expect(context.resume).not.toHaveBeenCalled();
+		expect(observed).toContain("closed");
+		expect(engine.getMetrics().activeTimers).toBe(0);
+	});
+
+	it("disposes externally closed contexts without closing them a second time", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		context.changeState("closed");
+		context.close.mockImplementation(() =>
+			Promise.reject(new DOMException("Already closed", "InvalidStateError")),
+		);
+		engine.destroy();
+		await flushMicrotasks();
+		expect(context.close).not.toHaveBeenCalled();
+		expect(context.listeners.size).toBe(0);
+		expect(engine.getPlaybackState()).toBe("closed");
+		expect(engine.getMetrics().engine.cleanupCount).toBe(1);
+		expect(engine.getMetrics().engine.retainedPcmBytes).toBe(0);
+	});
+
+	it("reports disposed playback as closed even if disposal began while playing", async () => {
+		const { engine } = await setup();
+		await engine.play();
+		engine.destroy();
+		expect(engine.getPlaybackState()).toBe("closed");
+		await engine.play();
+		expect(engine.getPlaybackState()).toBe("closed");
+	});
+
+	it("removes listeners and invalidates pending recovery on asset disposal", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		const pending = deferred<void>();
+		context.resume.mockImplementation(() => pending.promise);
+		context.changeState("suspended");
+		const created = context.createdSources.length;
+		engine.destroy();
+		expect(context.listeners.size).toBe(0);
+		context.changeState("running");
+		pending.resolve();
+		await flushMicrotasks();
+		expect(context.createdSources).toHaveLength(created);
+		expect(context.close).toHaveBeenCalledTimes(1);
+		expect(engine.getMetrics().engine.retainedPcmBytes).toBe(0);
+		expect(engine.getMetrics().activeTimers).toBe(0);
+	});
+
+	it("recovers using suspended reporting when the browser has no interrupted state", async () => {
+		const context = createLifecycleContext();
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await engine.play();
+		context.resume.mockImplementation(async () =>
+			context.changeState("running"),
+		);
+		context.changeState("suspended");
+		await flushMicrotasks();
+		expect(context.resume).toHaveBeenCalledTimes(1);
+		expect(engine.getPlaybackState()).toBe("playing");
+	});
+});
+
+async function flushMicrotasks() {
+	for (let index = 0; index < 15; index++) await Promise.resolve();
+}
+
+function createLifecycleContext() {
+	const listeners = new Set<() => void>();
+	const context = {
+		...createAudioContextSpy(),
+		state: "running" as PreviewAudioContextState,
+		resume: vi.fn<() => Promise<void>>(async () => {}),
+		listeners,
+		addEventListener: vi.fn((_type: "statechange", listener: () => void) => {
+			listeners.add(listener);
+		}),
+		removeEventListener: vi.fn((_type: "statechange", listener: () => void) => {
+			listeners.delete(listener);
+		}),
+		changeState(state: PreviewAudioContextState) {
+			context.state = state;
+			for (const listener of listeners) listener();
+		},
+	};
+	return context;
 }
 describe("bounded production Preview audio engine", () => {
 	it("smooths only playing output changes and settles automation before paused resume or routing rebuild", async () => {

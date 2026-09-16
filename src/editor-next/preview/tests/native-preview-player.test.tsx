@@ -124,7 +124,20 @@ vi.mock("@vidstack/react", async () => {
 					...props,
 					className: "h-full w-full bg-black object-contain",
 					crossOrigin: crossOrigin ? "" : undefined,
-					ref,
+					ref: (video: HTMLVideoElement | null) => {
+						if (video) {
+							Object.defineProperty(video, "provider", {
+								configurable: true,
+								value: { play: () => video.play(), pause: () => video.pause() },
+							});
+							Object.defineProperty(video, "state", {
+								configurable: true,
+								get: () => ({ seeking: video.seeking }),
+							});
+						}
+						if (typeof ref === "function") ref(video);
+						else if (ref) ref.current = video;
+					},
 					src: normalizeMockPlayerSrc(src),
 				}),
 				children as ReactNode,
@@ -303,16 +316,28 @@ beforeEach(() => {
 	adapterMockState.previewAudioEngineCreate.mockReset();
 	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
 		let currentTimeSeconds = 0;
+		let playbackState = "paused";
+		const listeners = new Set<() => void>();
+		const setPlaybackState = (state: string) => {
+			playbackState = state;
+			for (const listener of listeners) listener();
+		};
 		const previewAudioEngine = {
 			destroy: vi.fn(),
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
 			getStatus: vi.fn(() => "ready"),
+			getPlaybackState: vi.fn(() => playbackState),
 			getMetrics: vi.fn(),
 			retryTrack: vi.fn(async () => {}),
 			setPlaybackEnd: vi.fn(),
-			subscribe: vi.fn(() => vi.fn()),
-			pause: vi.fn(),
-			play: vi.fn(),
+			subscribe: vi.fn((listener: () => void) => {
+				listeners.add(listener);
+				return () => {
+					listeners.delete(listener);
+				};
+			}),
+			pause: vi.fn(() => setPlaybackState("paused")),
+			play: vi.fn(async () => setPlaybackState("playing")),
 			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
 			setPlaybackRate: vi.fn(),
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {

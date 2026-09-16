@@ -604,6 +604,7 @@ function createPreviewAudioEngineSpy({
 		destroy: vi.fn(),
 		getCurrentTime: vi.fn(() => 0),
 		getStatus: vi.fn(() => status),
+		getPlaybackState: vi.fn(() => "paused" as const),
 		getMetrics: vi.fn(),
 		retryTrack: vi.fn(async () => {}),
 		setPlaybackEnd: vi.fn(),

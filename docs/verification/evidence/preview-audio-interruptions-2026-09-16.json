@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-09-16T17:25:35.296Z",
+  "browser": "151.0.7922.71",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+  "url": "http://127.0.0.1:3000/",
+  "checks": [
+    "Real AudioContext.suspend freezes muted video; rejected resume exposes action without retry loop",
+    "Recovery action applies latest interrupted seek and Playback speed",
+    "Pause wins over deferred native resume",
+    "Available context resumes automatically while intent remains play",
+    "Simulated interrupted state retains muted stopped follower (not a real OS interruption)",
+    "Closed context shows unavailable state and disables Play",
+    "Close file removes listeners, invalidates pending recovery, and replacement plays",
+    "Interrupted recovery near Selection end wraps and continues playback",
+    "Media end stops video and clears playback intent after recovery"
+  ],
+  "errors": [],
+  "limitations": [
+    "Headless Chromium on macOS; AudioContext.suspend is real, resume policy rejection/pending and explicit interrupted report are controlled injections.",
+    "OS sleep, device exclusivity, mobile Safari interruptions and physical output changes were not exercised."
+  ]
+}

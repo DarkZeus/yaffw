@@ -16,8 +16,12 @@ import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { MediaTimeUs } from "@/editor-core/model";
 
+import type { PreviewAudioPlaybackState } from "../../audio/engine/preview-audio-engine";
+
 export type PreviewTransportRegionProps = {
-	isPlaying: boolean;
+	playbackRequested: boolean;
+	audioPlaybackState: PreviewAudioPlaybackState;
+	onRecoverAudio: () => void | Promise<void>;
 	muted: boolean;
 	onPlaybackRateChange: (playbackRate: number) => void;
 	onSeekByUs: (deltaUs: MediaTimeUs) => void;
@@ -34,7 +38,9 @@ export type PreviewTransportRegionProps = {
 const playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
 export const PreviewTransportRegion = memo(function PreviewTransportRegion({
-	isPlaying,
+	playbackRequested,
+	audioPlaybackState,
+	onRecoverAudio,
 	muted,
 	onPlaybackRateChange,
 	onSeekByUs,
@@ -68,7 +74,8 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 					className="flex min-w-0 flex-wrap items-center justify-start gap-1 md:flex-nowrap"
 				>
 					<Button
-						aria-label={isPlaying ? "Pause" : "Play"}
+						aria-label={playbackRequested ? "Pause" : "Play"}
+						disabled={audioPlaybackState === "closed"}
 						className="cinema-play-button"
 						onClick={() => {
 							void onTogglePlayback();
@@ -76,7 +83,7 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 						size="icon"
 						type="button"
 					>
-						{isPlaying ? (
+						{playbackRequested ? (
 							<Pause data-icon="inline-start" />
 						) : (
 							<Play data-icon="inline-start" />
@@ -181,6 +188,31 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 					</Button>
 				</div>
 			</div>
+			{(audioPlaybackState === "interrupted" ||
+				audioPlaybackState === "recovery-required" ||
+				audioPlaybackState === "closed" ||
+				audioPlaybackState === "buffering") && (
+				<output className="flex items-center gap-2 text-xs text-muted-foreground">
+					<span>
+						{audioPlaybackState === "closed"
+							? "Preview audio is unavailable. Close and reopen the file to restore audio."
+							: audioPlaybackState === "buffering"
+								? "Preparing Preview audio…"
+								: "Preview audio is interrupted."}
+					</span>
+					{(audioPlaybackState === "interrupted" ||
+						audioPlaybackState === "recovery-required") && (
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => void onRecoverAudio()}
+							type="button"
+						>
+							Resume audio
+						</Button>
+					)}
+				</output>
+			)}
 		</section>
 	);
 });

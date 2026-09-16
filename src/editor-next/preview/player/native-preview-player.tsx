@@ -4,6 +4,7 @@ import {
 	memo,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -35,6 +36,7 @@ import { PreviewTransportRegion } from "../regions/preview-transport-region";
 import { PreviewViewerRegion } from "../regions/preview-viewer-region";
 import { useScrubPreview } from "../scrub/use-scrub-preview";
 import { resolvePreviewClockMode } from "../transport/preview-clock-mode";
+import { createPreviewMediaTransport } from "../transport/preview-media-transport";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
@@ -76,6 +78,16 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 }: NativePreviewPlayerProps) {
 	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const videoRef = useRef<MediaPlayerInstance | null>(null);
+	const mediaTransportRef = useMemo(
+		() => ({
+			get current() {
+				return videoRef.current
+					? createPreviewMediaTransport(videoRef.current)
+					: null;
+			},
+		}),
+		[],
+	);
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const audioMixRef = useRef(audioMix);
 	const audioMonitoringStatusRef = useRef<PreviewAudioMonitoringStatus>("idle");
@@ -172,10 +184,14 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		handleNativePause,
 		handleNativePlay,
 		isPlaying,
+		playbackRequested,
+		audioPlaybackState,
+		recoverAudio,
 		muted,
 		playbackRate,
 		playheadUs,
 		previewScrubToUs,
+		seekToUs,
 		selectionLoopEnabled,
 		setPreviewPlaybackRate,
 		setPreviewVolume,
@@ -191,7 +207,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		previewClockMode,
 		selection,
 		source,
-		videoRef,
+		videoRef: mediaTransportRef,
 	});
 	const scrubPreview = useScrubPreview({
 		activeMediaAssetCleanupScope,
@@ -205,9 +221,17 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 				asset.durationUs,
 			);
 			scrubPreview.requestFrame(clampedPlayheadUs, { priority: "final" });
-			previewScrubToUs(clampedPlayheadUs);
+			if (playbackRequested && !isPlaying) seekToUs(clampedPlayheadUs);
+			else previewScrubToUs(clampedPlayheadUs);
 		},
-		[asset.durationUs, previewScrubToUs, scrubPreview.requestFrame],
+		[
+			asset.durationUs,
+			previewScrubToUs,
+			scrubPreview.requestFrame,
+			playbackRequested,
+			isPlaying,
+			seekToUs,
+		],
 	);
 	const seekByUsWithScrubPreview = useCallback(
 		(deltaUs: MediaTimeUs) => {
@@ -362,7 +386,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			}
 			transport={
 				<PreviewTransportRegion
-					isPlaying={isPlaying}
+					playbackRequested={playbackRequested}
+					audioPlaybackState={audioPlaybackState}
+					onRecoverAudio={recoverAudio}
 					muted={muted}
 					onPlaybackRateChange={setPreviewPlaybackRate}
 					onSeekByUs={seekByUsWithScrubPreview}
