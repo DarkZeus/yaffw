@@ -233,6 +233,7 @@ dist
 # Upload directories and video files
 uploads/
 *.mp4
+!public/export-correctness-fixtures/*.mp4
 *.avi
 *.mov
 *.mkv
@@ -548,6 +549,11 @@ benchmarks/results/
 # Documentation build
 docs/build/
 docs/.docusaurus/
+docs/*
+!docs/agents/
+!docs/agents/*.md
+!docs/adr/
+!docs/adr/*.md
 
 # API documentation
 api-docs/
@@ -579,3 +585,5 @@ Icon?
 
 # Windows shortcut files
 *.lnk
+
+.examples/

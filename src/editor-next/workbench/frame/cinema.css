@@ -1,0 +1,347 @@
+.cinema-workbench {
+	--cinema-selection-resizer-size: 12px;
+	height: 100dvh;
+	min-height: 760px;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	background: var(--workbench);
+	color: var(--workbench-foreground);
+	font-size: 13px;
+	line-height: 1.5;
+}
+.workbench
+	:is(button, a, input, select, [role="slider"]):focus-visible:not(
+		[data-pointer-focus="true"]
+	) {
+	outline: 2px solid var(--workbench-focus);
+	outline-offset: 3px;
+}
+.workbench :is(button, a) {
+	touch-action: manipulation;
+}
+.cinema-header {
+	height: 48px;
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 0 32px;
+	border-bottom: 1px solid var(--workbench-border);
+}
+.cinema-brand {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 16px;
+	font-weight: 600;
+	letter-spacing: -.6px;
+}
+.cinema-mark {
+	width: 18px;
+	color: oklch(0.76 0.145 76);
+	stroke-width: 1.7;
+}
+.cinema-stage {
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	overflow: auto;
+	padding: 0 40px;
+}
+.cinema-stage[data-editing="true"] {
+	padding-inline: 0;
+}
+.cinema-session {
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+.cinema-footer {
+	height: 40px;
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 0 32px;
+	font-size: 11px;
+	color: var(--muted-foreground);
+}
+.cinema-layout,
+.cinema-top-layout,
+.cinema-top-pane,
+.cinema-viewer-pane {
+	height: 100%;
+	min-height: 0;
+	min-width: 0;
+}
+.cinema-viewer-pane {
+	display: flex;
+	flex-direction: column;
+}
+.cinema-viewer {
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+}
+.cinema-transport {
+	flex: none;
+}
+.cinema-inspector-pane {
+	padding: 0 12px;
+	min-width: 0;
+}
+.cinema-inspector {
+	height: 100%;
+	min-height: 0;
+	min-width: 0;
+	overflow: hidden;
+}
+.cinema-tabs {
+	height: 46px;
+	width: 100%;
+	justify-content: flex-start;
+	gap: 20px;
+	padding: 0;
+	background: transparent;
+	border-radius: 0;
+	border-bottom: 1px solid var(--workbench-border);
+}
+.cinema-tabs .cinema-tab {
+	height: 46px;
+	flex: 0 1 auto;
+	padding: 0 1px;
+	font-size: 13px;
+	font-weight: 400;
+	color: var(--muted-foreground);
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+.cinema-tabs .cinema-tab[data-state="active"] {
+	font-weight: 500;
+	color: var(--workbench-foreground);
+	background: transparent;
+	box-shadow: inset 0 -2px 0 currentColor;
+}
+.cinema-tab-content {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	margin: 0;
+	padding: 20px 0 0;
+	overscroll-behavior: contain;
+}
+.cinema-selection {
+	min-height: 0;
+	min-width: 0;
+	overflow: auto;
+}
+.cinema-resizer {
+	background: transparent;
+	flex-shrink: 0;
+}
+.cinema-inspector-resizer {
+	width: 24px;
+}
+.cinema-selection-resizer[data-panel-group-direction="vertical"] {
+	height: var(--cinema-selection-resizer-size);
+}
+.cinema-resizer::before {
+	content: "";
+	background: var(--workbench-border);
+}
+.cinema-inspector-resizer::before {
+	width: 1px;
+	height: 100%;
+}
+.cinema-selection-resizer::before {
+	width: 100%;
+	height: 1px;
+}
+.cinema-resizer:focus-visible {
+	outline: 2px solid var(--workbench-focus);
+	outline-offset: -2px;
+}
+.cinema-import {
+	min-height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 48px 24px;
+	background: var(--workbench);
+}
+.cinema-transport-controls {
+	/* Count the space above the resize handle’s centered divider as toolbar padding. */
+	min-height: calc(52px - var(--cinema-selection-resizer-size) / 2);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 9px 24px calc(9px - var(--cinema-selection-resizer-size) / 2) 12px;
+	font-size: 11px;
+	color: var(--muted-foreground);
+}
+.cinema-viewer-surface {
+	display: grid;
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	place-items: center;
+	overflow: hidden;
+	padding: 0 40px;
+}
+.cinema-transport-button,
+.cinema-play-button {
+	flex: none;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+}
+.cinema-transport-button {
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--workbench-foreground);
+}
+.cinema-toggle-button[aria-pressed="true"] {
+	border: 0;
+	background: var(--workbench-hover);
+	box-shadow: inset 0 0 0 1px var(--workbench-border-strong);
+	color: var(--workbench-foreground);
+}
+.cinema-play-button {
+	margin-right: 8px;
+	border: 0;
+	border-radius: 5px;
+	background: var(--primary);
+	color: var(--primary-foreground);
+}
+@media (hover: hover) and (pointer: fine) {
+	.cinema-play-button:hover {
+		filter: brightness(0.85);
+	}
+	.cinema-transport-button:hover {
+		background: var(--workbench-hover);
+		filter: none;
+	}
+	.cinema-tabs .cinema-tab:hover {
+		color: var(--workbench-foreground);
+	}
+	.cinema-resizer:hover::before {
+		background: var(--workbench-border-strong);
+	}
+}
+@media (max-width: 760px) {
+	.cinema-workbench {
+		--cinema-selection-resizer-size: 0px;
+		height: auto;
+		min-height: 100dvh;
+		overflow: visible;
+	}
+	.cinema-header {
+		padding: 0 20px;
+		gap: 12px;
+	}
+	.cinema-brand {
+		font-size: 15px;
+		gap: 6px;
+	}
+	.cinema-mark {
+		width: 18px;
+	}
+	.cinema-stage {
+		padding: 0 20px;
+		overflow: visible;
+	}
+	.cinema-session {
+		height: auto;
+		overflow: visible;
+	}
+	.cinema-layout {
+		display: flex !important;
+		flex-direction: column;
+		gap: 12px;
+		height: auto !important;
+		overflow: visible !important;
+	}
+	/* Flatten the existing panel tree instead of remounting the playing video. */
+	.cinema-top-pane,
+	.cinema-top-layout,
+	.cinema-viewer-pane,
+	.cinema-inspector-pane {
+		display: contents !important;
+	}
+	.cinema-resizer {
+		display: none;
+	}
+	.cinema-viewer {
+		order: 0;
+		height: 290px;
+		flex: none;
+	}
+	.cinema-transport {
+		order: 1;
+	}
+	.cinema-selection {
+		order: 2;
+		flex: none !important;
+		height: 350px;
+	}
+	.cinema-inspector {
+		order: 3;
+		height: auto;
+		overflow: visible;
+		padding: 12px 0 28px;
+	}
+	.cinema-tab-content {
+		overflow: visible;
+	}
+	.cinema-tabs {
+		gap: 28px;
+	}
+	.cinema-tabs .cinema-tab {
+		font-size: 14px;
+	}
+	.cinema-viewer-surface {
+		padding: 0 8px 8px;
+	}
+	.cinema-transport-controls {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 12px;
+	}
+	.cinema-transport-controls [aria-label="Primary preview controls"] {
+		gap: 2px;
+		justify-content: space-between;
+		flex-wrap: wrap;
+	}
+	.cinema-transport-button,
+	.cinema-play-button {
+		width: 40px;
+		height: 40px;
+	}
+	.cinema-play-button {
+		margin-right: 0;
+	}
+	.cinema-transport-controls [aria-label="Preview playback settings"] {
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.cinema-transport-controls select {
+		height: 38px;
+	}
+	.cinema-footer {
+		height: 64px;
+		padding: 20px;
+		font-size: 10px;
+	}
+	.cinema-import {
+		padding: 44px 4px;
+	}
+}

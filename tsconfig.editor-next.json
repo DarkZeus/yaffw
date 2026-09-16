@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/routes/**/*.tsx",
+    "src/routeTree.gen.ts",
+    "src/components/ui/**/*.tsx",
+    "src/editor-core/**/*.ts",
+    "src/editor-next/**/*.ts",
+    "src/editor-next/**/*.tsx",
+    "src/lib/**/*.ts"
+  ]
+}

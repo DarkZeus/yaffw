@@ -1,3 +1,5 @@
+/// <reference types="vitest/config" />
+
 import { defineConfig } from 'vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -18,7 +20,6 @@ const cleanupUploadsPlugin = () => ({
         files.forEach(file => {
           rmSync(resolve(uploadsPath, file), { recursive: true, force: true })
         })
-        console.log('✨ Uploads folder contents cleaned up')
       } catch (error) {
         console.warn('⚠️ Could not cleanup uploads folder:', error)
       }
@@ -39,6 +40,9 @@ export default defineConfig({
     port: 3000,
     open: true,
     host: true,
+  },
+  test: {
+    setupFiles: ['./src/vitest.setup.ts'],
   },
   resolve: {
     alias: {

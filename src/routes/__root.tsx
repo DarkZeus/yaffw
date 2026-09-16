@@ -1,30 +1,24 @@
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar.tsx'
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
-import { ThemeProvider } from 'next-themes'
+import type { QueryClient } from "@tanstack/react-query";
+import { Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
 
-import { Toaster } from '../components/ui/sonner'
-
-import { AppSidebar } from '@/components/app-sidebar.tsx'
-import type { QueryClient } from '@tanstack/react-query'
+import { Toaster } from "@/components/ui/sonner";
 
 type MyRouterContext = {
-  queryClient: QueryClient
-}
+	queryClient: QueryClient;
+};
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  component: () => (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <SidebarProvider defaultOpen={false}>
-        <AppSidebar />
-        <SidebarInset>
-          <main className="flex-1 overflow-y-auto px-4">
-            <Outlet />
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-      <Toaster expand={true} />
-      {/* <TanStackRouterDevtools /> */}
-      {/* <TanStackQueryLayout /> */}
-    </ThemeProvider>
-  )
-})
+	component: RootComponent,
+});
+
+function RootComponent() {
+	return (
+		<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+			<main className="relative flex min-h-svh w-full flex-col overflow-hidden bg-transparent">
+				<Outlet />
+			</main>
+			<Toaster expand={true} />
+		</ThemeProvider>
+	);
+}

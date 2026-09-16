@@ -1,0 +1,31 @@
+{
+  "title": "Choose YAFFW's grounded redesign",
+  "question": "Keep the media-first workspace, re-roll its composition, or take the familiar editor fallback.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Media-First Workspace",
+      "kicker": "GROUNDED DIRECTION",
+      "lineage": "contemporary desktop media utilities and direct-manipulation tools",
+      "thesis": "The loaded video is the app; Selection is its single continuous control surface, and everything else appears only when needed.",
+      "palette": ["#F2F4F3", "#0E1011", "#C9D0CD", "#2B67F6"],
+      "materials": ["cool matte desktop surfaces", "crisp one-pixel rules", "deep media aperture"],
+      "viewport": "A large edge-to-edge media field occupies the upper workspace, one uninterrupted Selection strip spans the bottom, and a single contextual drawer replaces permanent nested inspectors.",
+      "risk": "Secondary audio and output state must remain discoverable without rebuilding the inspector stack in disguise.",
+      "sketch": ".impeccable/sketches-v2/assigned.webp"
+    }
+  ],
+  "reroll": true,
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "lineage": "professional desktop video editors",
+    "thesis": "A dark central viewer, inspector, transport bar, and stacked timeline executed with impeccable restraint.",
+    "palette": ["#121314", "#26282B", "#E9EAEC", "#4AB0A7"],
+    "materials": ["dark control surfaces", "subtle separators", "familiar media chrome"],
+    "viewport": "The conventional editor arrangement, simplified and polished around one active asset.",
+    "risk": "It returns to the category language and persistent panel structure the redesign is meant to escape.",
+    "sketch": ".impeccable/sketches/canon.webp"
+  },
+  "steer": true
+}
