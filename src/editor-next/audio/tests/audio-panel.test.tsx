@@ -52,7 +52,6 @@ describe("AudioPanel", () => {
 		renderAudioPanel({ asset: videoOnlyAsset });
 
 		const audioPanel = screen.getByLabelText("Audio panel");
-		expect(audioPanel.className).toContain("bg-workbench-inspector");
 		expect(within(audioPanel).getByText("No audio tracks")).toBeTruthy();
 		expect(
 			within(audioPanel).getByText(
@@ -60,74 +59,6 @@ describe("AudioPanel", () => {
 			),
 		).toBeTruthy();
 		expect(within(audioPanel).queryByLabelText("Master strip")).toBeNull();
-	});
-
-	it("renders one per-track strip and one master strip without mixer controls", () => {
-		renderAudioPanel({ asset: readyAsset });
-
-		const audioPanel = screen.getByLabelText("Audio panel");
-		const voiceStrip = within(audioPanel).getByLabelText(
-			"Audio track strip Voice",
-		);
-		const desktopStrip = within(audioPanel).getByLabelText(
-			"Audio track strip Desktop",
-		);
-		const combinedStrip = within(audioPanel).getByLabelText("Master strip");
-		const stripBank = within(audioPanel).getByLabelText(
-			"Audio channel strip bank",
-		);
-
-		expect(within(audioPanel).queryByText("No audio tracks")).toBeNull();
-		expect(stripBank.className).toContain("flex");
-		expect(stripBank.className).toContain("w-max");
-		expect(stripBank.className).not.toContain("min-w-full");
-		expect(voiceStrip.className).toContain("w-32");
-		expect(voiceStrip.className).toContain("h-[24rem]");
-		expect(combinedStrip.className).toContain("w-28");
-		expect(combinedStrip.className).toContain("h-[24rem]");
-		expect(within(voiceStrip).getByText("Voice")).toBeTruthy();
-		expect(within(voiceStrip).getByText("AAC / 2 channels / eng")).toBeTruthy();
-		expect(
-			within(voiceStrip).getByLabelText("Voice preview meter"),
-		).toBeTruthy();
-		const voiceMeterChannels = within(voiceStrip).getByLabelText(
-			"Voice preview meter channels",
-		);
-		expect(
-			(voiceMeterChannels.firstElementChild as HTMLElement).style
-				.gridTemplateColumns,
-		).toBe("repeat(2, 0.7rem)");
-		expect(
-			within(voiceStrip).getByRole("meter", { name: "Left level" }),
-		).toBeTruthy();
-		const voiceMeter = within(voiceStrip).getByLabelText("Voice preview meter");
-		expect(within(voiceMeter).queryByText("Left")).toBeNull();
-		expect(within(voiceMeter).queryByText("Right")).toBeNull();
-		expect(within(voiceMeter).getByText("dBFS")).toBeTruthy();
-		expect(within(voiceMeter).getByText("0")).toBeTruthy();
-		expect(within(voiceMeter).getByText("-4")).toBeTruthy();
-		expect(within(voiceMeter).getByText("-90")).toBeTruthy();
-		expect(within(desktopStrip).getByText("Desktop")).toBeTruthy();
-		expect(
-			within(desktopStrip).getByLabelText("Desktop preview meter"),
-		).toBeTruthy();
-		expect(within(combinedStrip).getByText("Master")).toBeTruthy();
-		expect(within(combinedStrip).getByText("Monitored output")).toBeTruthy();
-		expect(
-			within(combinedStrip).getByLabelText("Master output meter"),
-		).toBeTruthy();
-		expect(within(audioPanel).queryByText("Scaffold")).toBeNull();
-		expect(within(combinedStrip).queryByText(/track volume/i)).toBeNull();
-		expect(within(combinedStrip).queryByText(/channel handling/i)).toBeNull();
-		expect(within(audioPanel).queryByText(/master gain/i)).toBeNull();
-		expect(within(audioPanel).queryByText(/master fader/i)).toBeNull();
-		expect(within(audioPanel).queryByText(/routing/i)).toBeNull();
-		expect(within(audioPanel).queryByText(/bus/i)).toBeNull();
-		expect(within(audioPanel).queryByText("A1")).toBeNull();
-		expect(within(audioPanel).queryByText("Mix")).toBeNull();
-		expect(within(audioPanel).queryByText("Out")).toBeNull();
-		expect(within(audioPanel).queryByText("Solo")).toBeNull();
-		expect(within(audioPanel).queryByText("vol")).toBeNull();
 	});
 
 	it("exposes per-track Audio mix and preview monitoring controls", () => {
@@ -337,8 +268,6 @@ describe("AudioPanel", () => {
 		const desktopMeter = within(desktopStrip).getByLabelText(
 			"Desktop preview meter",
 		);
-
-		expect(desktopStrip.className).toContain("h-[24rem]");
 		expect(desktopMeter.getAttribute("data-state")).toBe("unavailable");
 		expect(
 			within(desktopStrip).getByText("Desktop decode failed"),

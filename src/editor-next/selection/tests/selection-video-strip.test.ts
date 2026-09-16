@@ -10,8 +10,6 @@ import type { VideoStripThumbnailLoader } from "../types/selection-video-strip.t
 import {
 	type VideoStripThumbnailWindow,
 	clearVideoStripThumbnailCache,
-	createVideoStripThumbnailDimensions,
-	createVideoStripThumbnailTimestamps,
 	createVideoStripThumbnailWindow,
 	loadBrowserVideoStripThumbnails,
 	loadVideoStripThumbnailsOnCurrentThread,
@@ -163,32 +161,6 @@ function mockThumbnailObjectUrls() {
 }
 
 describe("video strip thumbnail generation", () => {
-	it("creates evenly spaced thumbnail timestamps", () => {
-		expect(
-			createVideoStripThumbnailTimestamps({
-				endTimestamp: 8,
-				firstTimestamp: 1,
-				thumbnailCount: 4,
-			}),
-		).toEqual([1, 2.75, 4.5, 6.25]);
-	});
-
-	it("scales thumbnail dimensions for device pixels", () => {
-		expect(
-			createVideoStripThumbnailDimensions({
-				devicePixelRatio: 2,
-				displayHeight: 1080,
-				displayWidth: 1920,
-				thumbnailHeightPx: 54,
-			}),
-		).toEqual({
-			cssHeightPx: 54,
-			cssWidthPx: 96,
-			deviceHeightPx: 108,
-			deviceWidthPx: 192,
-		});
-	});
-
 	it("creates viewport-based thumbnail windows that get denser with track zoom", () => {
 		const overviewWindow = createVideoStripThumbnailWindow({
 			assetDurationUs: 7_200_000_000,

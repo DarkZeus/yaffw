@@ -20,7 +20,7 @@ Success means a user can make and review precise editing decisions, understand t
 
 YAFFW combines a focused, professional-style editor workbench with a deliberately single-asset product model. It offers more inspection and output control than a basic browser trimmer without becoming a multi-asset nonlinear editor or requiring server-backed project infrastructure.
 
-Browser-local processing is the primary mechanism. External URL acquisition and standalone bulk download are import utilities, not the center of the product or the shape of the editor core.
+Browser-local processing is the primary mechanism. The current product imports local files; future external URL acquisition must use import adapters outside the editor core.
 
 ## Operating Context
 
@@ -28,7 +28,7 @@ Browser-local processing is the primary mechanism. External URL acquisition and 
 - A session centers on one active media asset and the Editing decisions for that asset.
 - The workflow moves through local import, asset analysis, preview, Selection and audio decisions, Output settings, Export review, an Export job, Generated media, and a separate Delivery action.
 - Users work in a dense, viewport-height editor workbench with preview, transport, Selection and Waveform context, media facts, audio controls, and export state.
-- Standalone bulk download remains available at `/bulk-download` in local environments and stays separate from editor behavior.
+- The editor has no app navigation sidebar; bulk download and its URL-acquisition workflow have been removed.
 
 ## Capabilities and Constraints
 
@@ -39,7 +39,7 @@ Browser-local processing is the primary mechanism. External URL acquisition and 
 - The editor requires the standards-based media APIs used by the workflow and is Chromium/WebCodecs-first. Unsupported runtimes are blocked with an explicit explanation rather than receiving a reduced editor.
 - Editor processing and export remain browser-local. There is no server export fallback, native FFmpeg path, or silent output-profile fallback in the current product.
 - The active editing session and its media are not persisted as a project across page refreshes. Browser-local workbench layout preferences and Output setting presets may persist without becoming editing projects.
-- Acquisition code, URL download behavior, and bulk download must not shape the editor core.
+- Future acquisition code must not shape the editor core.
 - The product remains a single-asset editor until a future workflow provides concrete evidence for a broader model.
 - Selected-range export is best effort until real browser-runner evidence proves requested start and end boundaries; the product must not claim precision beyond the evidence on hand.
 

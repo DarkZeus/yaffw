@@ -1,18 +1,10 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
-import { EventEmitter } from 'events'
 import { ensureDirectoryExists } from './utils/fileUtils.js'
 import uploadRoutes from './routes/upload.js'
 import videoRoutes from './routes/video.js'
 import cleanupRoutes from './routes/cleanup.js'
-import downloadRoutes from './routes/download.js'
-import twitterDownloadRoutes from './routes/twitter-download.js'
-import metadataRoutes from './routes/metadata.js'
-import sseRoutes from './routes/sse.js'
-
-// Increase max listeners to prevent warnings
-EventEmitter.defaultMaxListeners = 15
 
 const app = new Hono()
 
@@ -29,10 +21,6 @@ ensureDirectoryExists('uploads')
 app.route('/api', uploadRoutes)
 app.route('/api', videoRoutes)
 app.route('/api', cleanupRoutes)
-app.route('/api/download', downloadRoutes)
-app.route('/api/twitter', twitterDownloadRoutes)
-app.route('/api/metadata', metadataRoutes)
-app.route('/api/sse', sseRoutes)
 
 const port = 3001
 console.log(`Video processing server running on http://localhost:${port}`)
@@ -40,4 +28,4 @@ console.log(`Video processing server running on http://localhost:${port}`)
 serve({
   fetch: app.fetch,
   port
-}) 
+})

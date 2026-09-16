@@ -10,17 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BulkDownloadRouteImport } from './routes/bulk-download'
 import { Route as EditorNextRouteImport } from './routes/editor-next'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BulkDownloadRoute = BulkDownloadRouteImport.update({
-  id: '/bulk-download',
-  path: '/bulk-download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditorNextRoute = EditorNextRouteImport.update({
@@ -31,31 +25,27 @@ const EditorNextRoute = EditorNextRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/bulk-download': typeof BulkDownloadRoute
   '/editor-next': typeof EditorNextRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bulk-download' | '/editor-next'
+  fullPaths: '/' | '/editor-next'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bulk-download' | '/editor-next'
-  id: '__root__' | '/' | '/bulk-download' | '/editor-next'
+  to: '/' | '/editor-next'
+  id: '__root__' | '/' | '/editor-next'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BulkDownloadRoute: typeof BulkDownloadRoute
   EditorNextRoute: typeof EditorNextRoute
 }
 
@@ -66,13 +56,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bulk-download': {
-      id: '/bulk-download'
-      path: '/bulk-download'
-      fullPath: '/bulk-download'
-      preLoaderRoute: typeof BulkDownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/editor-next': {
@@ -87,7 +70,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BulkDownloadRoute: BulkDownloadRoute,
   EditorNextRoute: EditorNextRoute,
 }
 export const routeTree = rootRouteImport

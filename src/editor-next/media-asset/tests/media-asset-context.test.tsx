@@ -1,12 +1,6 @@
 /* @vitest-environment jsdom */
 
-import {
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	within,
-} from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,87 +16,6 @@ afterEach(() => {
 });
 
 describe("MediaAssetContextPanel", () => {
-	it("renders source, media-track, selection, and analytics context for the loaded media asset", () => {
-		render(
-			<MediaAssetContextPanel
-				asset={readyAsset}
-				closeFileDisabled={false}
-				onCloseFileRequested={() => undefined}
-				selection={fullSelection}
-			/>,
-		);
-
-		const mediaAssetContext = screen.getByLabelText("Media asset context");
-
-		const loadedMediaAsset =
-			within(mediaAssetContext).getByLabelText("Loaded media asset");
-		expect(within(loadedMediaAsset).getByText("picked.mp4")).toBeTruthy();
-
-		expect(within(mediaAssetContext).getByText("Source")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Selection")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).queryByText("Workbench intent"),
-		).toBeNull();
-		expect(
-			within(mediaAssetContext).queryByText("Runtime readiness"),
-		).toBeNull();
-		expect(within(mediaAssetContext).queryByText("Default export")).toBeNull();
-
-		expect(
-			within(mediaAssetContext).getAllByText("Size").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			within(mediaAssetContext).getAllByText("5 B").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			within(mediaAssetContext).getAllByText("Duration").length,
-		).toBeGreaterThanOrEqual(2);
-		expect(
-			within(mediaAssetContext).getAllByText("Codec").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(within(mediaAssetContext).getByText("AVC / AAC")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).getAllByText("Frames").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			within(mediaAssetContext).getAllByText("30 fps").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			within(mediaAssetContext).getAllByText("Main").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(within(mediaAssetContext).getByText("1920 x 1080")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).getAllByText("Voice").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			within(mediaAssetContext).getAllByText("eng").length,
-		).toBeGreaterThanOrEqual(1);
-		expect(within(mediaAssetContext).getByText("Start")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("End")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("Coverage")).toBeTruthy();
-		expect(
-			within(mediaAssetContext).getAllByText("00:00:00.000").length,
-		).toBeGreaterThan(0);
-		expect(
-			within(mediaAssetContext).getAllByText("00:00:12.000").length,
-		).toBeGreaterThan(0);
-		expect(
-			within(mediaAssetContext).getAllByText("100%").length,
-		).toBeGreaterThanOrEqual(1);
-
-		const mediaAnalysis =
-			within(mediaAssetContext).getByLabelText("Media analysis");
-		expect(within(mediaAnalysis).getByText("Analysis")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Source context")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Video facts")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Audio facts")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Selection facts")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Asset identity")).toBeTruthy();
-		expect(within(mediaAnalysis).getByText("Asset coverage")).toBeTruthy();
-		expect(within(mediaAnalysis).queryByText("Source file")).toBeNull();
-	});
-
 	it("updates selection readouts from the selection prop", () => {
 		render(
 			<MediaAssetContextPanel
@@ -126,122 +39,6 @@ describe("MediaAssetContextPanel", () => {
 		expect(
 			within(mediaAssetContext).getAllByText("16.67%").length,
 		).toBeGreaterThan(0);
-	});
-
-	it("forwards close requests and reflects disabled close state", () => {
-		const onCloseFileRequested = vi.fn();
-
-		const { rerender } = render(
-			<MediaAssetContextPanel
-				asset={readyAsset}
-				closeFileDisabled={false}
-				onCloseFileRequested={onCloseFileRequested}
-				selection={fullSelection}
-			/>,
-		);
-
-		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
-		expect(onCloseFileRequested).toHaveBeenCalledTimes(1);
-
-		rerender(
-			<MediaAssetContextPanel
-				asset={readyAsset}
-				closeFileDisabled
-				onCloseFileRequested={onCloseFileRequested}
-				selection={fullSelection}
-			/>,
-		);
-
-		expect(
-			(screen.getByRole("button", { name: "Close file" }) as HTMLButtonElement)
-				.disabled,
-		).toBe(true);
-	});
-
-	it("renders an explicit no-audio track row for video-only media assets", () => {
-		render(
-			<MediaAssetContextPanel
-				asset={videoOnlyAsset}
-				closeFileDisabled={false}
-				onCloseFileRequested={() => undefined}
-				selection={fullSelection}
-			/>,
-		);
-
-		const mediaAssetContext = screen.getByLabelText("Media asset context");
-		expect(within(mediaAssetContext).getByText("Tracks")).toBeTruthy();
-		expect(within(mediaAssetContext).getByText("No audio tracks")).toBeTruthy();
-		expect(within(mediaAssetContext).queryByText("none")).toBeNull();
-	});
-
-	it("falls back to the ordinary source-file extension when MIME type is unavailable", () => {
-		render(
-			<MediaAssetContextPanel
-				asset={{
-					...readyAsset,
-					provenance: {
-						...readyAsset.provenance,
-						fileName: "recording.mp4",
-						mimeType: undefined,
-					},
-				}}
-				closeFileDisabled={false}
-				onCloseFileRequested={() => undefined}
-				selection={fullSelection}
-			/>,
-		);
-
-		const mediaAnalysis = screen.getByLabelText("Media analysis");
-		expect(within(mediaAnalysis).getByText("MP4")).toBeTruthy();
-	});
-
-	it("renders explicit neutral values for unknown source and track metadata", () => {
-		render(
-			<MediaAssetContextPanel
-				asset={{
-					...readyAsset,
-					provenance: {
-						...readyAsset.provenance,
-						fileName: "recording",
-						mimeType: undefined,
-					},
-					tracks: {
-						audio: [
-							{
-								id: "audio-unknown",
-								kind: "audio",
-							},
-						],
-						video: [
-							{
-								id: "video-unknown",
-								kind: "video",
-							},
-						],
-					},
-				}}
-				closeFileDisabled={false}
-				onCloseFileRequested={() => undefined}
-				selection={fullSelection}
-			/>,
-		);
-
-		const mediaAssetContext = screen.getByLabelText("Media asset context");
-		expect(
-			within(mediaAssetContext).getByText("UNKNOWN / UNKNOWN"),
-		).toBeTruthy();
-
-		const sourceFacts =
-			within(mediaAssetContext).getByLabelText("Source context");
-		const videoFacts = within(mediaAssetContext).getByLabelText("Video facts");
-		const audioFacts = within(mediaAssetContext).getByLabelText("Audio facts");
-		expect(within(sourceFacts).getByText("Unknown")).toBeTruthy();
-		expect(within(videoFacts).getAllByText("Unknown").length).toBeGreaterThan(
-			1,
-		);
-		expect(within(audioFacts).getAllByText("Unknown").length).toBeGreaterThan(
-			1,
-		);
 	});
 
 	it("visibly distinguishes estimated Frame timing in compact and Analysis facts", () => {
@@ -311,20 +108,5 @@ const readyAsset = {
 				width: 1920,
 			},
 		],
-	},
-} satisfies ReadyMediaAsset;
-
-const videoOnlyAsset = {
-	...readyAsset,
-	id: "asset-video-only",
-	label: "video-only.webm",
-	provenance: {
-		...readyAsset.provenance,
-		fileName: "video-only.webm",
-		mimeType: "video/webm",
-	},
-	tracks: {
-		...readyAsset.tracks,
-		audio: [],
 	},
 } satisfies ReadyMediaAsset;

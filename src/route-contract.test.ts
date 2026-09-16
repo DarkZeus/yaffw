@@ -1,8 +1,5 @@
 /* @vitest-environment jsdom */
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { QueryClient } from "@tanstack/react-query";
 import {
 	RouterProvider,
@@ -13,33 +10,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AppSidebar } from "./components/app-sidebar";
-import { getAppSidebarItems } from "./components/app-sidebar-items";
-import { SidebarProvider } from "./components/ui/sidebar";
 import { routeTree } from "./routeTree.gen";
-
-const legacyRoutePath = "/legacy-editor";
-const performanceDemoRoutePath = "/test";
-const sourceDir = dirname(fileURLToPath(import.meta.url));
-const legacyRouteFile = join(sourceDir, "routes/legacy-editor.tsx");
-const performanceDemoRouteFile = join(sourceDir, "routes/test.tsx");
-const removedPrototypeRoutes = [
-	{
-		path: "/editor-next-workbench-prototype",
-		routeFile: join(sourceDir, "routes/editor-next-workbench-prototype.tsx"),
-	},
-	{
-		path: "/editor-layout-prototype",
-		routeFile: join(sourceDir, "routes/editor-layout-prototype.tsx"),
-	},
-	{
-		path: "/vidstack-preview-prototype",
-		routeFile: join(sourceDir, "routes/vidstack-preview-prototype.tsx"),
-	},
-];
-const routeTreeFile = join(sourceDir, "routeTree.gen.ts");
-const appSidebarFile = join(sourceDir, "components/app-sidebar.tsx");
-const rootRouteFile = join(sourceDir, "routes/__root.tsx");
 const routeRenderTimeout = { timeout: 5_000 };
 
 beforeEach(() => {
@@ -64,7 +35,7 @@ afterEach(() => {
 });
 
 describe("app route contract", () => {
-	it("renders editor-next as the canonical root editor inside the collapsed sidebar shell without a redundant editor rail", async () => {
+	it("renders the canonical editor at the root route", async () => {
 		renderAppAt("/");
 
 		expect(
@@ -74,18 +45,6 @@ describe("app route contract", () => {
 				routeRenderTimeout,
 			),
 		).toBeTruthy();
-		expect(screen.queryByLabelText("Editor workbench rail")).toBeNull();
-
-		const sidebar = document.querySelector('[data-slot="sidebar"]');
-		expect(sidebar?.getAttribute("data-state")).toBe("collapsed");
-
-		const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]');
-		expect(sidebarInset?.className).toContain(
-			"md:peer-data-[variant=inset]:!m-0",
-		);
-		expect(sidebarInset?.className).toContain(
-			"md:peer-data-[variant=inset]:!rounded-none",
-		);
 	});
 
 	it("redirects /editor-next to the canonical root route", async () => {
@@ -101,99 +60,6 @@ describe("app route contract", () => {
 				routeRenderTimeout,
 			),
 		).toBeTruthy();
-	});
-
-	it("does not publish the temporary legacy editor fallback", () => {
-		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
-		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-
-		expect(routeTreeSource).not.toContain(legacyRoutePath);
-		expect(existsSync(legacyRouteFile)).toBe(false);
-		expect(appSidebarSource).not.toContain(legacyRoutePath);
-	});
-
-	it("does not publish or retain the React performance demo route", () => {
-		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
-		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-		const rootRouteSource = readFileSync(rootRouteFile, "utf8");
-
-		expect(routeTreeSource).not.toContain(performanceDemoRoutePath);
-		expect(existsSync(performanceDemoRouteFile)).toBe(false);
-		expect(appSidebarSource).not.toContain(performanceDemoRoutePath);
-		expect(rootRouteSource).not.toContain(performanceDemoRoutePath);
-	});
-
-	it("keeps bulk download reachable in the normal app shell", async () => {
-		renderAppAt("/bulk-download");
-
-		expect(
-			await screen.findByRole(
-				"heading",
-				{ name: /bulk download/i },
-				routeRenderTimeout,
-			),
-		).toBeTruthy();
-
-		const sidebarInset = document.querySelector('[data-slot="sidebar-inset"]');
-		expect(sidebarInset?.className).not.toContain(
-			"md:peer-data-[variant=inset]:!m-0",
-		);
-	});
-
-	it("shows only canonical product navigation labels", async () => {
-		renderAppAt("/");
-
-		expect(await screen.findAllByText("YAFFW")).not.toHaveLength(0);
-		expect(screen.getByRole("link", { name: "Editor" })).toBeTruthy();
-		expect(screen.getAllByRole("link", { name: "Bulk download" })).toHaveLength(
-			1,
-		);
-		expect(screen.queryByRole("link", { name: "Editor Next" })).toBeNull();
-		expect(screen.queryByRole("link", { name: "Legacy Editor" })).toBeNull();
-		expect(screen.queryByText("Yet Another FFMPEG wrapper")).toBeNull();
-	});
-
-	it("keeps bulk download navigation local to localhost browser origins", () => {
-		expect(
-			getAppSidebarItems({ hostname: "localhost" }).map((item) => item.title),
-		).toEqual(["Editor", "Bulk download"]);
-		expect(
-			getAppSidebarItems({ hostname: "127.0.0.1" }).map((item) => item.title),
-		).toEqual(["Editor", "Bulk download"]);
-		expect(
-			getAppSidebarItems({ hostname: "yaffw.example" }).map(
-				(item) => item.title,
-			),
-		).toEqual(["Editor"]);
-	});
-
-	it("hides the retractable sidebar when only one navigation item is available", () => {
-		render(
-			createElement(
-				SidebarProvider,
-				{ defaultOpen: false },
-				createElement(AppSidebar, {
-					environment: { hostname: "yaffw.example" },
-				}),
-			),
-		);
-
-		expect(document.querySelector('[data-slot="sidebar"]')).toBeNull();
-		expect(screen.queryByLabelText("Toggle Sidebar")).toBeNull();
-		expect(screen.queryByRole("link", { name: "Bulk download" })).toBeNull();
-	});
-
-	it("does not publish removed prototype routes or retain shell exceptions for them", () => {
-		const routeTreeSource = readFileSync(routeTreeFile, "utf8");
-		const appSidebarSource = readFileSync(appSidebarFile, "utf8");
-		const rootRouteSource = readFileSync(rootRouteFile, "utf8");
-
-		for (const removedPrototype of removedPrototypeRoutes) {
-			expect(routeTreeSource).not.toContain(removedPrototype.path);
-			expect(existsSync(removedPrototype.routeFile)).toBe(false);
-			expect(appSidebarSource).not.toContain(removedPrototype.path);
-			expect(rootRouteSource).not.toContain(removedPrototype.path);
-		}
 	});
 });
 

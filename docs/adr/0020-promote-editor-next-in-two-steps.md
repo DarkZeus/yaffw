@@ -1,5 +1,7 @@
 # Promote editor-next in two steps
 
+**Status:** Bulk-download preservation and app-sidebar clauses superseded by [ADR-0025](./0025-remove-bulk-download.md).
+
 Editor-next should replace the root editor through a two-step cutover: first promote `EditorNextRoute` to `/` while keeping the legacy editor reachable at a temporary route, then remove the legacy editor in a separate cleanup commit after the promoted route is verified. This separates product cutover risk from dead-code removal and supersedes the parallel-route phase from ADR 0003 once editor-next is ready to become the primary editor.
 
 **Consequences**

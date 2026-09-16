@@ -95,8 +95,8 @@ fixture is `public/export-correctness-fixtures/sync-flash-click.mp4`.
 The fast Vitest path models the important clock ownership cases without relying
 on real browser media rendering:
 
-- play, pause, seek, and frame-step keep the audio click timestamp, Playhead,
-  and visual flash timestamp aligned
+- play, pause, seek, and frame-step keep controlled audio-clock, Playhead,
+  and video-follower media times aligned
 - selection-loop playback uses the authoritative audio-master clock at the loop
   boundary
 - Audio mix changes, including Track volume, include/exclude, preview solo, and

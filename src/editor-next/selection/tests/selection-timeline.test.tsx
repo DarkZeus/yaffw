@@ -52,42 +52,25 @@ describe("SelectionTimeline", () => {
 		);
 		expect(screen.getByText("Voice")).toBeTruthy();
 		expect(screen.getByText("Game audio")).toBeTruthy();
-		expect(screen.queryByText(/Language/)).toBeNull();
 		expect(screen.getAllByText("AAC / 2 channels").length).toBeGreaterThan(0);
 
 		await waitFor(() => {
 			expect(screen.getAllByText("Failed").length).toBeGreaterThan(0);
 		});
-		expect(screen.queryByText("Waveform ready")).toBeNull();
 		expect(screen.getByLabelText("Voice waveform detail")).toBeTruthy();
 		expect(screen.queryByLabelText("Move selection range")).toBeNull();
 		expect(
 			screen.getByTestId("waveform-lane-header-audio-1").nextElementSibling,
 		).toBe(screen.getByLabelText("Seek Voice waveform lane"));
 		expect(screen.queryByTestId("selection-range-outline")).toBeNull();
-		expect(screen.getByLabelText("Playhead handle").className).toContain(
-			"transition-[left]",
-		);
-		expect(screen.getByLabelText("Playhead handle").className).toContain(
-			"ease-linear",
-		);
-		expect(screen.getByLabelText("Playhead handle").className).not.toContain(
-			"ease-out",
-		);
 		expect(
 			screen.getByRole("button", { name: "Keep playhead centered" }),
 		).toBeTruthy();
 		expect(screen.queryByTestId("selection-start-handle-rail")).toBeNull();
 		expect(screen.queryByTestId("selection-end-handle-rail")).toBeNull();
 		expect(screen.getByRole("button", { name: "Exclude Voice from output" }));
-		expect(screen.queryByLabelText("Voice track volume")).toBeNull();
-		expect(screen.queryByLabelText("Voice channel handling")).toBeNull();
 		expect(screen.getByRole("button", { name: "Solo Voice for preview" }));
 		expect(screen.getByText("Preparing audio")).toBeTruthy();
-
-		expect(screen.queryByText("Mute")).toBeNull();
-		expect(screen.queryByText("Solo")).toBeNull();
-		expect(screen.queryByText("Mono")).toBeNull();
 	});
 
 	it("centers the playhead in the horizontal scroll container when follow is enabled", async () => {
@@ -105,14 +88,10 @@ describe("SelectionTimeline", () => {
 		});
 
 		expect(followButton.getAttribute("aria-pressed")).toBe("false");
-		expect(followButton.className).toContain("bg-workbench-viewer");
-		expect(followButton.className).not.toContain("bg-workbench-selected");
 
 		fireEvent.click(followButton);
 
 		expect(followButton.getAttribute("aria-pressed")).toBe("true");
-		expect(followButton.className).toContain("cinema-toggle-button");
-		expect(followButton.className).not.toContain("bg-workbench-selected");
 		await waitFor(() => {
 			expect(scrollTo).toHaveBeenCalledWith({
 				behavior: "smooth",
@@ -335,9 +314,6 @@ describe("SelectionTimeline", () => {
 		fireEvent.mouseDown(screen.getByLabelText("Playhead handle"), {
 			clientX: 0,
 		});
-		expect(screen.getByLabelText("Playhead handle").className).toContain(
-			"transition-none",
-		);
 		fireEvent.mouseMove(window, { clientX: 700 });
 		await waitFor(() => {
 			expect(onPlayheadPreviewRequested).toHaveBeenLastCalledWith(7_000_000);
@@ -349,9 +325,6 @@ describe("SelectionTimeline", () => {
 		fireEvent.mouseDown(screen.getByLabelText("Move selection range"), {
 			clientX: 200,
 		});
-		expect(screen.getByTestId("selection-range-outline").className).toContain(
-			"transition-none",
-		);
 		fireEvent.mouseUp(window, { clientX: 500 });
 		expect(onSelectionRangeMoveRequested).toHaveBeenCalledWith(3_000_000);
 

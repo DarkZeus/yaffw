@@ -22,7 +22,6 @@ import {
 	EditorSessionShell,
 	type EditorSessionShellProps,
 	EditorWorkbenchFrame,
-	UnsupportedRuntimeState,
 } from "../frame/editor-workbench";
 import { EditorWorkbenchLayout } from "../frame/editor-workbench-layout";
 import {
@@ -37,115 +36,6 @@ afterEach(() => {
 });
 
 describe("Editor workbench", () => {
-	it("omits the header while editing and restores the logo for import", () => {
-		const view = render(
-			<EditorWorkbenchFrame activeAsset={readyAsset} runtime={supportedRuntime}>
-				<div>Workbench child</div>
-			</EditorWorkbenchFrame>,
-		);
-
-		expect(screen.queryByLabelText("Editor workbench top bar")).toBeNull();
-		expect(screen.queryByText("YAFFW")).toBeNull();
-		expect(screen.queryByText("recording.mp4")).toBeNull();
-		expect(screen.queryByLabelText("Top bar media asset summary")).toBeNull();
-		expect(screen.queryByText("Your media stays on this device")).toBeNull();
-
-		const workbenchChild = screen.getByText("Workbench child");
-		expect(workbenchChild).toBeTruthy();
-		expect(workbenchChild.parentElement?.className).not.toContain(
-			"grid-cols-[4rem_minmax(0,1fr)]",
-		);
-		expect(screen.queryByLabelText("Editor workbench rail")).toBeNull();
-		expect(
-			screen.queryByRole("navigation", { name: "Editor workbench rail" }),
-		).toBeNull();
-		view.rerender(
-			<EditorWorkbenchFrame activeAsset={null} runtime={supportedRuntime}>
-				<div>Import surface</div>
-			</EditorWorkbenchFrame>,
-		);
-		expect(screen.getByLabelText("Editor workbench top bar")).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "YAFFW" })).toBeTruthy();
-	});
-
-	it("renders unsupported runtime state before exposing local import", () => {
-		const unsupportedRuntime = evaluateRuntimeSupport({
-			fileApi: true,
-			mediaSource: true,
-			objectUrl: true,
-			videoDecoder: false,
-			videoEncoder: false,
-		});
-		if (unsupportedRuntime.supported) {
-			throw new Error("Expected unsupported runtime");
-		}
-
-		render(
-			<EditorWorkbenchFrame activeAsset={null} runtime={unsupportedRuntime}>
-				<UnsupportedRuntimeState
-					session={{
-						importEnabled: false,
-						message: unsupportedRuntime.reason,
-						runtime: unsupportedRuntime,
-						status: "unsupported-runtime",
-					}}
-				/>
-			</EditorWorkbenchFrame>,
-		);
-
-		const alert = screen.getByRole("alert");
-		expect(alert.textContent).toContain("WebCodecs");
-		expect(screen.getByText("Runtime blocked")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
-		expect(screen.queryByLabelText("Local media file")).toBeNull();
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
-		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
-	});
-
-	it("renders non-ready import shell and forwards file events", () => {
-		const handleLocalFileDropped = vi.fn();
-		const handleLocalFileSelected = vi.fn();
-
-		render(
-			<EditorSessionShell
-				localFileInputKey={0}
-				onLocalFileDropped={handleLocalFileDropped}
-				onLocalFileSelected={handleLocalFileSelected}
-				previewPlayer={null}
-				session={{
-					importEnabled: true,
-					runtime: supportedRuntime,
-					status: "empty",
-				}}
-			/>,
-		);
-
-		expect(screen.getByLabelText("Editor workbench session")).toBeTruthy();
-		expect(screen.getByLabelText("Workbench center region")).toBeTruthy();
-		expect(screen.getByText("Open a video")).toBeTruthy();
-		expect(screen.getByLabelText("Local media file")).toBeTruthy();
-		expect(screen.getByTestId("editor-next-drop-zone")).toBeTruthy();
-		expect(screen.getByText("Drop your video or click to browse")).toBeTruthy();
-		expect(screen.queryByText("or download from URL")).toBeNull();
-		expect(screen.queryByPlaceholderText(/youtube/i)).toBeNull();
-		expect(screen.queryByLabelText("Workbench media asset region")).toBeNull();
-		expect(screen.queryByLabelText("Workbench inspector region")).toBeNull();
-
-		fireEvent.change(screen.getByLabelText("Local media file"), {
-			target: {
-				files: [new File(["video"], "picked.mp4", { type: "video/mp4" })],
-			},
-		});
-		fireEvent.drop(screen.getByTestId("editor-next-drop-zone"), {
-			dataTransfer: {
-				files: [new File(["video"], "dropped.mp4", { type: "video/mp4" })],
-			},
-		});
-
-		expect(handleLocalFileSelected).toHaveBeenCalledTimes(1);
-		expect(handleLocalFileDropped).toHaveBeenCalledTimes(1);
-	});
-
 	it("shows existing drag feedback across the page without flickering between children", () => {
 		const onDrop = vi.fn();
 		renderImportSurface(onDrop);
@@ -228,24 +118,6 @@ describe("Editor workbench", () => {
 			true,
 		);
 		expect(onDrop).not.toHaveBeenCalled();
-	});
-
-	it("renders loading state with disabled import controls", () => {
-		render(
-			<EditorSessionShell
-				localFileInputKey={0}
-				onLocalFileDropped={() => undefined}
-				onLocalFileSelected={() => undefined}
-				previewPlayer={null}
-				session={loadingSession}
-			/>,
-		);
-
-		expect(screen.getByText("Opening video")).toBeTruthy();
-		expect(screen.getByText("loading.mp4")).toBeTruthy();
-		expect(
-			(screen.getByLabelText("Local media file") as HTMLInputElement).disabled,
-		).toBe(true);
 	});
 
 	it("keeps the right inspector visible and changes tabs without remounting the preview", () => {

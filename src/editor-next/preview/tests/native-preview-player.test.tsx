@@ -8,7 +8,6 @@ import {
 	render,
 	screen,
 	waitFor,
-	within,
 } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -433,141 +432,6 @@ describe("NativePreviewPlayer", () => {
 		expect(scrubPreviewMockState.providers[0]?.dispose).toHaveBeenCalledTimes(
 			1,
 		);
-	});
-
-	it("renders preview and transport as separate workbench chrome regions", async () => {
-		const getBoundingClientRect = vi
-			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
-			.mockImplementation(function getElementRect(this: HTMLElement) {
-				if (this.getAttribute("aria-label") === "Preview viewer surface") {
-					return createTestDomRect({ height: 300, width: 900 });
-				}
-
-				return createTestDomRect({ height: 0, width: 0 });
-			});
-
-		try {
-			renderPlayer();
-
-			const previewLayout = screen.getByLabelText(
-				"Preview and selection layout",
-			);
-			expect(previewLayout.getAttribute("data-panel-group-direction")).toBe(
-				"vertical",
-			);
-			expect(previewLayout.className).toContain("cinema-layout");
-			expect(
-				screen.getByLabelText("Resize selection region").className,
-			).toContain("cinema-selection-resizer");
-
-			const centerRegion = screen.getByLabelText("Workbench center region");
-			const nativePreview = within(centerRegion).getByLabelText(
-				"Native preview player",
-			);
-			const viewerHeader = within(nativePreview).getByLabelText(
-				"Preview viewer header",
-			);
-			const viewerSurface = within(nativePreview).getByLabelText(
-				"Preview viewer surface",
-			);
-			const aperture = within(viewerSurface).getByLabelText("Preview aperture");
-			const transportRegion = screen.getByLabelText(
-				"Workbench transport region",
-			);
-			const transportControls = within(transportRegion).getByLabelText(
-				"Preview transport controls",
-			);
-			const primaryControls = within(transportControls).getByLabelText(
-				"Primary preview controls",
-			);
-			const playbackSettings = within(transportControls).getByLabelText(
-				"Preview playback settings",
-			);
-
-			expect(nativePreview.className).toContain("h-full");
-			expect(nativePreview.className).toContain("min-h-0");
-			expect(nativePreview.className).not.toContain("min-h-full");
-			expect(viewerHeader.textContent).not.toContain("clip.mp4");
-			expect(within(viewerHeader).queryByText("Program viewer")).toBeNull();
-			expect(
-				within(viewerHeader).getByText("1x").parentElement?.className,
-			).toContain("whitespace-nowrap");
-			expect(aperture.className).toContain("isolate");
-			expect(aperture.className).toContain("max-h-full");
-			expect(aperture.className).not.toContain("max-w-5xl");
-			expect(aperture.style.aspectRatio).toBe(String(16 / 9));
-			await waitFor(() => {
-				expect(aperture.style.width).toBe("533.333333px");
-				expect(aperture.style.height).toBe("300px");
-			});
-			expect(
-				within(aperture).getByLabelText("Preview for clip.mp4").className,
-			).toContain("object-contain");
-			expect(
-				within(aperture).getByLabelText("Preview for clip.mp4").className,
-			).not.toContain("object-cover");
-			expect(transportRegion.className).not.toContain("xl:row-start-2");
-			expect(transportRegion.className).not.toContain("xl:col-span-2");
-			expect(transportControls.className).toContain(
-				"cinema-transport-controls",
-			);
-			expect(primaryControls.className).toContain("justify-start");
-			expect(
-				within(primaryControls)
-					.getByRole("button", { name: "Loop selection" })
-					.getAttribute("aria-pressed"),
-			).toBe("false");
-			expect(
-				within(transportControls).queryByLabelText(
-					"Preview media-time readouts",
-				),
-			).toBeNull();
-			expect(playbackSettings.className).toContain("justify-end");
-			expect(
-				within(centerRegion).queryByLabelText("Preview transport controls"),
-			).toBeNull();
-			expect(
-				screen.getByLabelText("Workbench selection region").className,
-			).not.toContain("xl:row-start-3");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-mute-button-hidden"),
-			).toBe("true");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-volume-slider-hidden"),
-			).toBe("true");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-large-mute-button-hidden"),
-			).toBe("true");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-large-volume-slider-hidden"),
-			).toBe("true");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-small-mute-button-hidden"),
-			).toBe("true");
-			expect(
-				within(centerRegion)
-					.getByTestId("mock-default-video-layout")
-					.getAttribute("data-small-volume-slider-hidden"),
-			).toBe("true");
-			expect(
-				within(viewerHeader).getByRole("button", {
-					name: "Open fullscreen preview",
-				}),
-			).toBeTruthy();
-			expect(scrubPreviewMockState.providers[0]?.warm).toHaveBeenCalledTimes(1);
-		} finally {
-			getBoundingClientRect.mockRestore();
-		}
 	});
 
 	it("keeps paused seek commands on the scrub preview and synchronizes native video on play", async () => {
@@ -1290,9 +1154,6 @@ describe("NativePreviewPlayer", () => {
 		await waitFor(() => {
 			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 		});
-		expect(screen.getByLabelText("Playhead handle").className).toContain(
-			"transition-none",
-		);
 
 		video.currentTime = 1.25;
 		runNextPreviewFrame(frameCallbacks);

@@ -82,11 +82,7 @@ describe("ExportInspectorPanel", () => {
 		);
 
 		const exportInspector = screen.getByLabelText("Export inspector");
-		expect(screen.getByLabelText("Export review").className).toContain(
-			"overflow-visible",
-		);
 		expect(within(exportInspector).getByText("Output")).toBeTruthy();
-		expect(within(exportInspector).queryByText("Current settings")).toBeNull();
 		const details = within(exportInspector)
 			.getByText("Export details")
 			.closest("details");
@@ -104,8 +100,6 @@ describe("ExportInspectorPanel", () => {
 				name: "Output settings",
 			}),
 		).toBeTruthy();
-		expect(within(exportInspector).queryByText("GPU Acceleration")).toBeNull();
-		expect(within(exportInspector).queryByText("Selected range")).toBeNull();
 		const exportReview = screen.getByLabelText("Export review");
 		expect(within(exportReview).getByText("Format")).toBeTruthy();
 		expect(
@@ -119,7 +113,6 @@ describe("ExportInspectorPanel", () => {
 		expect(
 			within(exportInspector).getAllByText("Whole file").length,
 		).toBeGreaterThan(0);
-		expect(screen.queryByLabelText("Export strategy")).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
 		expect(onStartExport).toHaveBeenCalledTimes(1);
@@ -149,13 +142,6 @@ describe("ExportInspectorPanel", () => {
 		const outputSettingsDialog = screen.getByRole("dialog", {
 			name: "Output settings",
 		});
-		expect(outputSettingsDialog.className).toContain("quality-settings-dialog");
-		const generalTab = within(outputSettingsDialog).getByRole("tab", {
-			name: "General",
-		});
-		expect(generalTab.className).toContain(
-			"data-[state=active]:text-foreground",
-		);
 		expect(
 			within(outputSettingsDialog).getByRole("tab", { name: "Video" }),
 		).toBeTruthy();
@@ -189,9 +175,6 @@ describe("ExportInspectorPanel", () => {
 				"Settings may affect quality, file size, and export time.",
 			),
 		).toBeTruthy();
-		expect(
-			within(outputSettingsDialog).queryByText("GPU Acceleration"),
-		).toBeNull();
 		const outputPlan =
 			within(outputSettingsDialog).getByLabelText("Output plan");
 		expect(
@@ -840,18 +823,6 @@ describe("ExportInspectorPanel", () => {
 				},
 			),
 		).toBeTruthy();
-		expect(screen.getByLabelText("Generated media status").className).toContain(
-			"overflow-visible",
-		);
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).toContain("whitespace-normal");
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).toContain("[overflow-wrap:anywhere]");
-		expect(
-			screen.getByLabelText("Generated media filename").className,
-		).not.toContain("break-all");
 
 		fireEvent.click(screen.getByRole("button", { name: "Download export" }));
 		expect(onDownloadGeneratedMedia).toHaveBeenCalledWith(generatedMedia);

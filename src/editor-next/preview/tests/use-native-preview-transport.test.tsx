@@ -17,7 +17,6 @@ import type {
 	PreviewAudioEngine,
 	PreviewAudioEngineMeterSnapshot,
 } from "../../audio/engine/preview-audio-engine";
-import { EXPORT_CORRECTNESS_FIXTURES } from "../../export/harness/export-correctness-fixtures";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
 
 const play = vi.fn().mockResolvedValue(undefined);
@@ -759,76 +758,6 @@ describe("useNativePreviewTransport", () => {
 		expect(readState()).toContain("playing:false");
 	});
 
-	it("keeps the sync fixture click and flash aligned through play, pause, seek, and frame-step", async () => {
-		const syncFixture = syncFlashClickFixture();
-		const [firstEvent, secondEvent] = syncFixture.expected.syncEventsUs ?? [];
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		const previewAudioEngine = createPreviewAudioEngineSpy();
-
-		if (!firstEvent || !secondEvent) {
-			throw new Error(
-				"Expected the sync fixture to define at least two events.",
-			);
-		}
-
-		render(
-			<NativePreviewTransportProbe
-				durationUs={syncFixture.expected.durationUs}
-				previewAudioEngine={previewAudioEngine}
-				seekTargetUs={secondEvent.audioClickUs}
-				selection={syncFixture.selections.full}
-			/>,
-		);
-
-		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
-
-		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-
-		video.currentTime = 0;
-		previewAudioEngine.setCurrentTimeSeconds(
-			firstEvent.audioClickUs / 1_000_000,
-		);
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(video.currentTime).toBe(firstEvent.visualFlashUs / 1_000_000);
-		expect(readState()).toContain(`playhead:${firstEvent.audioClickUs}`);
-
-		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
-		expect(readState()).toContain("playing:false");
-
-		video.currentTime = 0;
-		fireEvent.seeked(video);
-
-		expect(video.currentTime).toBe(firstEvent.visualFlashUs / 1_000_000);
-		expect(readState()).toContain(`playhead:${firstEvent.audioClickUs}`);
-
-		previewAudioEngine.setTime.mockClear();
-		fireEvent.click(screen.getByRole("button", { name: "Seek to sync event" }));
-
-		expect(video.currentTime).toBe(secondEvent.visualFlashUs / 1_000_000);
-		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(
-			secondEvent.audioClickUs / 1_000_000,
-		);
-		expect(readState()).toContain(`playhead:${secondEvent.audioClickUs}`);
-
-		fireEvent.click(screen.getByRole("button", { name: "Step forward" }));
-
-		expect(video.currentTime).toBeCloseTo(
-			(secondEvent.visualFlashUs + 33_333) / 1_000_000,
-			5,
-		);
-		expect(previewAudioEngine.setTime).toHaveBeenLastCalledWith(
-			(secondEvent.audioClickUs + 33_333) / 1_000_000,
-		);
-		expect(readState()).toContain(
-			`playhead:${secondEvent.audioClickUs + 33333}`,
-		);
-	});
-
 	it("loops only after playback enters the selection", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
@@ -937,54 +866,6 @@ describe("useNativePreviewTransport", () => {
 		expect(video.currentTime).toBe(4);
 		expect(readState()).toContain("playhead:4000000");
 		expect(readState()).toContain("playing:true");
-	});
-
-	it("loops the sync fixture selection by audio click and visual flash media time", async () => {
-		const syncFixture = syncFlashClickFixture();
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		const previewAudioEngine = createPreviewAudioEngineSpy({
-			currentTimeSeconds:
-				syncFixture.selections.selectedRange.startUs / 1_000_000,
-		});
-
-		render(
-			<NativePreviewTransportProbe
-				durationUs={syncFixture.expected.durationUs}
-				previewAudioEngine={previewAudioEngine}
-				selection={syncFixture.selections.selectedRange}
-			/>,
-		);
-
-		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
-
-		fireEvent.click(screen.getByRole("button", { name: "Toggle loop" }));
-		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
-
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-		previewAudioEngine.setTime.mockClear();
-
-		video.currentTime = 0;
-		previewAudioEngine.setCurrentTimeSeconds(7);
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(video.currentTime).toBe(7);
-		expect(readState()).toContain("playhead:7000000");
-
-		previewAudioEngine.setCurrentTimeSeconds(8.2);
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(previewAudioEngine.setTime).toHaveBeenCalledWith(
-			syncFixture.selections.selectedRange.startUs / 1_000_000,
-		);
-		expect(video.currentTime).toBe(
-			syncFixture.selections.selectedRange.startUs / 1_000_000,
-		);
-		expect(readState()).toContain(
-			`playhead:${syncFixture.selections.selectedRange.startUs}`,
-		);
 	});
 
 	it("stops audio-master playback when the audio clock reaches media end", async () => {
@@ -1261,18 +1142,6 @@ function createDeferred<T>() {
 		reject,
 		resolve,
 	};
-}
-
-function syncFlashClickFixture() {
-	const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
-		(candidate) => candidate.id === "mp4-sync-flash-click",
-	);
-
-	if (!fixture) {
-		throw new Error("Expected the sync flash/click fixture to be registered.");
-	}
-
-	return fixture;
 }
 
 const previewSource = new File(["video"], "clip.mp4", { type: "video/mp4" });

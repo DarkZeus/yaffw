@@ -1,6 +1,6 @@
 # YAFFW
 
-YAFFW is a local-first media editor for personal video editing workflows. Its core domain is preparing media assets for preview, selection, and export; acquisition from external URLs is an import path, not the product center.
+YAFFW is a local-first media editor for personal video editing workflows. Its core domain is preparing media assets for preview, selection, and export; local-file import is the current input path. Future acquisition from external URLs must use import adapters outside the editor core.
 
 ## Language
 
@@ -255,6 +255,7 @@ _Avoid_: first-slice requirement, automatic fallback
 ## Relationships
 
 - YAFFW edits one active **Media asset** at a time.
+- Standalone bulk download, URL-acquisition UI and its server endpoints are removed. The editor has no app navigation sidebar; future URL import must produce **Media asset drafts** through an **Import adapter**.
 - Editor-next may use an **Editor workbench** UI inspired by professional media editors, but the product model remains a **Single-asset editing session**, not a multi-asset project or composition.
 - The **Editor workbench** frame is the persistent editor-next surface across empty import, analysis, failure, unsupported-runtime, and ready states, but the tabbed inspector is available only after a **Ready media asset** exists and remains visible throughout editing.
 - The **Default workbench layout** uses the Cinema arrangement: a large central preview, a full-width lower selection/waveform surface, and a persistent right inspector for asset facts, audio, export review, and delivery.

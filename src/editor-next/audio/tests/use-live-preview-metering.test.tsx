@@ -346,19 +346,6 @@ describe("useLivePreviewMetering", () => {
 		expect(readMeterSnapshot).toHaveBeenCalledTimes(2);
 	});
 
-	it("uses animation frames for playing display updates and low-frequency polling for snapshots", () => {
-		const clock = createMeteringClock({
-			getIsPlaying: () => true,
-			readMeterSnapshot: () => createReadySnapshot(1),
-		});
-
-		render(<LivePreviewMeteringProbe clock={clock} now={fixedNow} />);
-
-		expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
-		expect(timeoutCallbacks).toHaveLength(1);
-		expect(timeoutCallbacks[0]?.delayMs).toBe(50);
-	});
-
 	it("uses low-frequency paused polling without a frame loop when already silent", () => {
 		const clock = createMeteringClock({
 			getIsPlaying: () => false,

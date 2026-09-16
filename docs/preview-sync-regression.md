@@ -29,16 +29,15 @@ The fast Vitest regression path covers the clock ownership behavior that can be
 asserted without real browser media rendering:
 
 - play, pause, seek, frame-step: the audio-master clock owns the Playhead and
-  the native video follower is moved to the matching visual flash timestamp
+  the native video follower is synchronized to the requested media time
 - selection loop: loop boundaries use the audio-master media time and return to
   the selected start without native-video free-run
 - audio mix changes: Track volume, include/exclude, preview solo, and channel
   handling changes keep preview audio monitoring on the audio-master clock
 
-These tests catch the original visible-drift failure by modelling the audio
-clock at a click timestamp while the native video is still behind, then
-asserting that the visual follower is synchronized to the matching flash
-timestamp.
+These tests use controlled audio and video clocks to exercise drift correction,
+seek ordering, and playback state. They do not decode the fixture or measure
+audible clicks against rendered flashes; the manual path below checks that.
 
 ## Manual QA
 

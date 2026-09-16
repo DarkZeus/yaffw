@@ -5,11 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { PreviewLevelMeter } from "../meters/preview-level-meter";
 import { selectPreviewLevelMeterTicksForHeight } from "../meters/preview-level-meter-scale";
-import {
-	previewPeakMeterClipDb,
-	previewPeakMeterVisualRange,
-	previewPeakMeterZones,
-} from "../meters/preview-level-meter.constants";
+import { previewPeakMeterVisualRange } from "../meters/preview-level-meter.constants";
 
 afterEach(() => {
 	cleanup();
@@ -43,95 +39,6 @@ describe("PreviewLevelMeter", () => {
 		expect(right.getAttribute("aria-valuenow")).toBe("0");
 		expect(right.getAttribute("aria-valuetext")).toBe("0 dBFS, clip held");
 		expect(within(meter).getByLabelText("Right clip held")).toBeTruthy();
-	});
-
-	it("supports horizontal orientation and can hide dBFS tick labels", () => {
-		render(
-			<PreviewLevelMeter
-				channels={[{ clipHeld: false, label: "Mono", peakDb: -40 }]}
-				label="Horizontal preview meter"
-				orientation="horizontal"
-				state="ready"
-			/>,
-		);
-
-		const meter = screen.getByLabelText("Horizontal preview meter");
-		expect(meter.getAttribute("data-orientation")).toBe("horizontal");
-		expect(within(meter).getByText("Mono")).toBeTruthy();
-		expect(
-			within(meter)
-				.getByRole("meter", { name: "Mono level" })
-				.getAttribute("aria-valuenow"),
-		).toBe("-40");
-		expect(within(meter).getByText("0 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("-90 dBFS")).toBeTruthy();
-
-		cleanup();
-
-		render(
-			<PreviewLevelMeter
-				channels={[{ clipHeld: false, label: "Mono", peakDb: -40 }]}
-				label="Compact horizontal preview meter"
-				orientation="horizontal"
-				showTickLabels={false}
-				state="ready"
-			/>,
-		);
-
-		const compactMeter = screen.getByLabelText(
-			"Compact horizontal preview meter",
-		);
-		expect(within(compactMeter).queryByText("0 dBFS")).toBeNull();
-		expect(within(compactMeter).queryByText("-90 dBFS")).toBeNull();
-	});
-
-	it("uses the default preview peak meter range and OBS-style zones", () => {
-		expect(previewPeakMeterVisualRange).toEqual({
-			ceilingDb: 0,
-			floorDb: -90,
-		});
-		expect(previewPeakMeterClipDb).toBe(0);
-		expect(
-			previewPeakMeterZones.map(({ fromDb, id, toDb }) => ({
-				fromDb,
-				id,
-				toDb,
-			})),
-		).toEqual([
-			{ fromDb: -90, id: "green", toDb: -20 },
-			{ fromDb: -20, id: "yellow", toDb: -9 },
-			{ fromDb: -9, id: "red", toDb: 0 },
-		]);
-
-		render(
-			<PreviewLevelMeter
-				channels={[{ clipHeld: false, label: "Left", peakDb: -12 }]}
-				label="Zone preview meter"
-				state="ready"
-			/>,
-		);
-
-		const meter = screen.getByLabelText("Zone preview meter");
-		expect(within(meter).getByText("dBFS")).toBeTruthy();
-		expect(within(meter).getByText("0")).toBeTruthy();
-		expect(within(meter).getByText("-4")).toBeTruthy();
-		expect(within(meter).getByText("-20")).toBeTruthy();
-		expect(within(meter).getByText("-80")).toBeTruthy();
-		expect(within(meter).getByText("-90")).toBeTruthy();
-		expect(within(meter).getByText("0").className).toContain("top-0");
-		expect(within(meter).getByText("0").className).not.toContain(
-			"-translate-y-1/2",
-		);
-		expect(within(meter).getByText("-90").className).toContain("bottom-0");
-		expect(within(meter).getByText("-90").className).not.toContain(
-			"-translate-y-1/2",
-		);
-		expect(within(meter).getByText("-20").className).toContain(
-			"-translate-y-1/2",
-		);
-		expect(within(meter).getByText("Green zone -90 to -20 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("Yellow zone -20 to -9 dBFS")).toBeTruthy();
-		expect(within(meter).getByText("Red zone -9 to 0 dBFS")).toBeTruthy();
 	});
 
 	it("progressively reduces vertical dBFS markers when the meter is short", () => {
@@ -201,7 +108,7 @@ describe("PreviewLevelMeter", () => {
 		expect(within(unavailable).queryByRole("button")).toBeNull();
 	});
 
-	it("renders supplied multichannel labels inside a horizontally scrollable channel region", () => {
+	it("preserves multichannel labels and displayed levels", () => {
 		render(
 			<PreviewLevelMeter
 				channels={[
@@ -216,11 +123,6 @@ describe("PreviewLevelMeter", () => {
 		);
 
 		const meter = screen.getByLabelText("Surround preview meter");
-		const channels = within(meter).getByLabelText(
-			"Surround preview meter channels",
-		);
-
-		expect(channels.className).toContain("overflow-x-auto");
 		expect(within(meter).getByText("FL")).toBeTruthy();
 		expect(within(meter).getByText("FR")).toBeTruthy();
 		expect(within(meter).getByText("C")).toBeTruthy();

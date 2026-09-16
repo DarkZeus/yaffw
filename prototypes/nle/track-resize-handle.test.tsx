@@ -33,23 +33,6 @@ function Timeline() {
 	);
 }
 describe("bottom track resizing", () => {
-	it("renders one bottom handle per track, including newly added tracks", () => {
-		render(<Timeline />);
-		const before = screen.getAllByRole("separator").length;
-		fireEvent.click(screen.getByRole("button", { name: "Add audio" }));
-		const handles = screen.getAllByRole("separator");
-		expect(handles).toHaveLength(before + 1);
-		expect(
-			handles.every((handle) =>
-				handle.parentElement?.classList.contains("track-head"),
-			),
-		).toBe(true);
-		expect(
-			handles.every((h) =>
-				h.getAttribute("aria-label")?.endsWith("from bottom"),
-			),
-		).toBe(true);
-	});
 	it("supports keyboard steps, bounds, and resetting to the track default", () => {
 		render(<ResizableTrack />);
 		const handle = screen.getByRole("separator");

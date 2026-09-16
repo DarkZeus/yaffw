@@ -38,7 +38,6 @@
     "@tanstack/router-plugin": "^1.168.23",
     "@types/node": "^24.13.3",
     "@vidstack/react": "1.15.6",
-    "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "culori": "^4.0.2",
