@@ -3,6 +3,12 @@
 This is the manual QA companion for the automated preview-clock regression
 coverage from PRD #53 issue #59.
 
+For quantitative baseline measurements, use the
+[Preview audiovisual alignment procedure](../verification/preview-av-alignment/README.md)
+and [recorded baseline](./verification/preview-av-alignment.md) from #112.
+The listening checks below are qualitative. Browser timestamps and Playhead
+agreement alone do not establish physical speaker/display alignment.
+
 ## Fixture
 
 Use `public/export-correctness-fixtures/sync-flash-click.mp4`.

@@ -1,0 +1,50 @@
+{
+	"schemaVersion": 1,
+	"measurement": "physical speaker/display capture",
+	"status": "unmeasured",
+	"fixtureSha256": "bb4ab356f4807237faad19d8b86f79d5450e9648289c7e57c9e8a2131ef00f7a",
+	"revision": null,
+	"configuration": {
+		"browser": null,
+		"os": null,
+		"outputRoute": null,
+		"displayRefreshHz": null,
+		"recorderSampleRate": null,
+		"microphonePosition": null
+	},
+	"calibration": {
+		"recordingPath": null,
+		"sha256": null,
+		"method": null,
+		"audioMinusVisualSensorDelayMs": null,
+		"uncertaintyMs": null
+	},
+	"onsetThresholds": { "audio": null, "photodiode": null },
+	"uncertaintyMs": {
+		"sampling": null,
+		"onsetDetection": null,
+		"fixture": null,
+		"combined": null
+	},
+	"trials": [],
+	"trialFormat": {
+		"variant": "baseline or candidate",
+		"pairId": null,
+		"playbackRate": null,
+		"recordingPath": null,
+		"recordingSha256": null,
+		"events": [],
+		"eventFields": [
+			"id",
+			"audioOnsetSample",
+			"visualOnsetSample",
+			"rawOffsetMs",
+			"correctedOffsetMs",
+			"rejectionReason"
+		],
+		"medianOffsetMs": null,
+		"rangeMs": null,
+		"sampleStandardDeviationMs": null
+	},
+	"candidateEnablement": "inconclusive until calibrated physical trials and regression gates pass"
+}

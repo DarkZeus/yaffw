@@ -1,0 +1,74 @@
+{
+	"url": "/export-correctness-fixtures/sync-flash-click.mp4",
+	"sha256": "bb4ab356f4807237faad19d8b86f79d5450e9648289c7e57c9e8a2131ef00f7a",
+	"durationSeconds": 10,
+	"frameRate": 50,
+	"sampleRate": 48000,
+	"thresholds": {
+		"audioAbsoluteAmplitude": 0.005,
+		"videoLuminance": 128,
+		"audioSilenceGapSeconds": 0.05
+	},
+	"uncertainty": {
+		"audioSampleMs": 0.020833333333333332,
+		"videoFrameIntervalMs": 20,
+		"fixtureAlignmentToleranceMs": 1,
+		"note": "Frame onset uses decoded presentation timestamps, with one audio-sample timing resolution. Video frame interval is the display quantization, not a measured device presentation error. AAC threshold crossing introduces a measured offset recorded per event."
+	},
+	"events": [
+		{
+			"id": 1,
+			"videoTimeSeconds": 1,
+			"audioTimeSeconds": 1.0000625,
+			"fixtureOffsetMs": 0.06250000000007638
+		},
+		{
+			"id": 2,
+			"videoTimeSeconds": 2,
+			"audioTimeSeconds": 2.0000625,
+			"fixtureOffsetMs": 0.06249999999985434
+		},
+		{
+			"id": 3,
+			"videoTimeSeconds": 3,
+			"audioTimeSeconds": 3.0000625,
+			"fixtureOffsetMs": 0.06249999999985434
+		},
+		{
+			"id": 4,
+			"videoTimeSeconds": 4,
+			"audioTimeSeconds": 4.000041666666666,
+			"fixtureOffsetMs": 0.0416666666662735
+		},
+		{
+			"id": 5,
+			"videoTimeSeconds": 5,
+			"audioTimeSeconds": 5.000041666666666,
+			"fixtureOffsetMs": 0.0416666666662735
+		},
+		{
+			"id": 6,
+			"videoTimeSeconds": 6,
+			"audioTimeSeconds": 6.000041666666666,
+			"fixtureOffsetMs": 0.0416666666662735
+		},
+		{
+			"id": 7,
+			"videoTimeSeconds": 7,
+			"audioTimeSeconds": 7.000041666666666,
+			"fixtureOffsetMs": 0.0416666666662735
+		},
+		{
+			"id": 8,
+			"videoTimeSeconds": 8,
+			"audioTimeSeconds": 8.000020833333334,
+			"fixtureOffsetMs": 0.020833333334024928
+		},
+		{
+			"id": 9,
+			"videoTimeSeconds": 9,
+			"audioTimeSeconds": 9.000020833333334,
+			"fixtureOffsetMs": 0.020833333334024928
+		}
+	]
+}
