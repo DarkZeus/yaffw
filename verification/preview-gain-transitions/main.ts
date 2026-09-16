@@ -248,7 +248,7 @@ export async function runPreviewGainTransitionChecks() {
 				"settle cancels pending global ramp at target",
 				await render(ctx, [
 					{ frame: START, run: () => audioGraph.setOutputGain(0, true) },
-					{ frame: RETARGET, run: () => audioGraph.settleOutputGain() },
+					{ frame: RETARGET, run: () => audioGraph.settleGains() },
 				]),
 				(frame, channel) =>
 					[0.75, 0.25][channel] *
@@ -282,6 +282,171 @@ export async function runPreviewGainTransitionChecks() {
 				(frame, channel) =>
 					[0.75, 0.25][channel] *
 					(frame < RETARGET ? ramp(frame, START, 1, 0) : 0.2),
+			),
+		);
+		replacement?.destroy();
+	}
+	// A single track transition targets monitor * volume. Independently fading
+	// both controls would produce a curved product and fail this sample oracle.
+	{
+		const ctx = context();
+		const audioGraph = graph(ctx);
+		audioGraph.setTrackMonitorGain(0, 1);
+		graphSource(ctx, audioGraph, 0, 768);
+		graphSource(ctx, audioGraph, 768, LENGTH - 768);
+		const held = ramp(RETARGET, START, 1, 0.2);
+		const mutedHeld = ramp(768, RETARGET, held, 0);
+		const resumedHeld = ramp(896, 768, mutedHeld, 0.6);
+		const globalHeld = ramp(896, RETARGET, 1, 0.4);
+		checks.push(
+			measure(
+				"interleaved track monitor, volume and global ramps across PCM chunks",
+				await render(ctx, [
+					{
+						frame: START,
+						run: () => audioGraph.setTrackVolumeGain(0, 0.2, true),
+					},
+					{
+						frame: RETARGET,
+						run: () => {
+							audioGraph.setTrackMonitorGain(0, 0, true);
+							audioGraph.setOutputGain(0.4, true);
+						},
+					},
+					{
+						frame: 768,
+						run: () => {
+							audioGraph.setTrackVolumeGain(0, 0.6, true);
+							audioGraph.setTrackMonitorGain(0, 1, true);
+						},
+					},
+					{
+						frame: 896,
+						run: () => {
+							audioGraph.setTrackVolumeGain(0, 0, true);
+							audioGraph.setOutputGain(0.8, true);
+						},
+					},
+				]),
+				(frame, channel) => {
+					const track =
+						frame < RETARGET
+							? ramp(frame, START, 1, 0.2)
+							: frame < 768
+								? ramp(frame, RETARGET, held, 0)
+								: frame < 896
+									? ramp(frame, 768, mutedHeld, 0.6)
+									: ramp(frame, 896, resumedHeld, 0);
+					const global =
+						frame < 896
+							? ramp(frame, RETARGET, 1, 0.4)
+							: ramp(frame, 896, globalHeld, 0.8);
+					return [0.75, 0.25][channel] * track * global;
+				},
+			),
+		);
+		audioGraph.destroy();
+	}
+	for (const [mode, amplitudes] of [
+		["preserve", [0.75, 0.25]],
+		["use-left-as-mono", [0.75, 0.75]],
+		["use-right-as-mono", [0.25, 0.25]],
+		["duplicate-left-to-stereo", [0.75, 0.75]],
+		["duplicate-right-to-stereo", [0.25, 0.25]],
+		["average-to-mono", [0.5, 0.5]],
+	] as const) {
+		const ctx = context();
+		const audioGraph = graph(ctx);
+		audioGraph.setTrackChannelMode(0, mode);
+		audioGraph.setTrackVolumeGain(0, 0.6);
+		audioGraph.setTrackMonitorGain(0, 1);
+		graphSource(ctx, audioGraph);
+		checks.push(
+			measure(
+				`track monitor mute/unmute preserves ${mode} routing`,
+				await render(ctx, [
+					{
+						frame: START,
+						run: () => audioGraph.setTrackMonitorGain(0, 0, true),
+					},
+					{
+						frame: 1536,
+						run: () => audioGraph.setTrackMonitorGain(0, 1, true),
+					},
+					// Repeated targets must not extend the transition deadline.
+					{
+						frame: 1664,
+						run: () => audioGraph.setTrackVolumeGain(0, 0.6, true),
+					},
+				]),
+				(frame, channel) =>
+					amplitudes[channel] *
+					(frame < 1536
+						? ramp(frame, START, 0.6, 0)
+						: ramp(frame, 1536, 0, 0.6)),
+			),
+		);
+		audioGraph.destroy();
+	}
+	{
+		const ctx = context();
+		const audioGraph = graph(ctx);
+		audioGraph.setTrackMonitorGain(0, 1);
+		graphSource(ctx, audioGraph);
+		checks.push(
+			measure(
+				"settle cancels simultaneous track and global automation",
+				await render(ctx, [
+					{
+						frame: START,
+						run: () => {
+							audioGraph.setTrackVolumeGain(0, 0.4, true);
+							audioGraph.setOutputGain(0.5, true);
+						},
+					},
+					{ frame: RETARGET, run: () => audioGraph.settleGains() },
+				]),
+				(frame, channel) =>
+					[0.75, 0.25][channel] *
+					(frame < RETARGET
+						? ramp(frame, START, 1, 0.4) * ramp(frame, START, 1, 0.5)
+						: 0.2),
+			),
+		);
+		audioGraph.destroy();
+	}
+	{
+		const ctx = context();
+		const audioGraph = graph(ctx);
+		audioGraph.setTrackMonitorGain(0, 1);
+		graphSource(ctx, audioGraph);
+		let replacement: ReturnType<typeof graph> | undefined;
+		checks.push(
+			measure(
+				"destroy active track and global ramps then recreate with settled track state",
+				await render(ctx, [
+					{
+						frame: START,
+						run: () => {
+							audioGraph.setTrackMonitorGain(0, 0, true);
+							audioGraph.setOutputGain(0, true);
+						},
+					},
+					{
+						frame: RETARGET,
+						run: () => {
+							audioGraph.destroy();
+							replacement = graph(ctx);
+							replacement.setTrackVolumeGain(0, 0.4);
+							replacement.setTrackMonitorGain(0, 1);
+							replacement.setOutputGain(0.5);
+							graphSource(ctx, replacement, RETARGET, LENGTH - RETARGET);
+						},
+					},
+				]),
+				(frame, channel) =>
+					[0.75, 0.25][channel] *
+					(frame < RETARGET ? ramp(frame, START, 1, 0) ** 2 : 0.2),
 			),
 		);
 		replacement?.destroy();
@@ -359,11 +524,15 @@ export async function runPreviewGainTransitionChecks() {
 		graphSource(ctx, audioGraph);
 		checks.push(
 			measure(
-				"global mute reaches exact zero while pre-global meters retain track mix",
+				"global mute reaches exact zero while pre-global meters follow track ramp",
 				await render(ctx, [
 					{ frame: START, run: () => audioGraph.setOutputGain(0, true) },
 					{
-						frame: 3072,
+						frame: RETARGET,
+						run: () => audioGraph.setTrackVolumeGain(0, 0.8, true),
+					},
+					{
+						frame: 3584,
 						run: () => {
 							const snapshot = audioGraph.readMeterSnapshot(true, new Map());
 							const track = snapshot.trackStates.track;
@@ -383,7 +552,7 @@ export async function runPreviewGainTransitionChecks() {
 								);
 								peaks.forEach((peak, channel) =>
 									assert(
-										Math.abs(peak - [0.375, 0.125][channel]) < TOLERANCE,
+										Math.abs(peak - [0.6, 0.2][channel]) < TOLERANCE,
 										`Pre-global meter changed after mute: channel ${channel}, peak ${peak}`,
 									),
 								);
@@ -391,7 +560,10 @@ export async function runPreviewGainTransitionChecks() {
 						},
 					},
 				]),
-				(frame, channel) => [0.375, 0.125][channel] * ramp(frame, START, 1, 0),
+				(frame, channel) =>
+					[0.75, 0.25][channel] *
+					ramp(frame, RETARGET, 0.5, 0.8) *
+					ramp(frame, START, 1, 0),
 			),
 		);
 		audioGraph.destroy();

@@ -8,6 +8,7 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -168,6 +169,114 @@ describe("AudioPanel", () => {
 				name: "Solo Voice for preview",
 			}),
 		).toBeTruthy();
+	});
+
+	it("updates volume immediately and keeps excluded-track solo separate from output decisions", () => {
+		const source: PreviewMeteringSource = {
+			...createMeteringClock({
+				snapshot: createMeterSnapshot({
+					combinedPeaks: [0.5, 0.25],
+					trackPeaks: { "audio-voice": [0.25, 0.125] },
+				}),
+			}),
+			retryTrack: () => undefined,
+		};
+		function ControlledPanel() {
+			const [audioMix, setAudioMix] = useState(() =>
+				createDefaultAudioMix(readyAsset),
+			);
+			return (
+				<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
+					<PreviewMeteringProvider asset={readyAsset} audioMix={audioMix}>
+						<PreviewMeteringSourceProbe source={source} />
+						<AudioPanel
+							asset={readyAsset}
+							audioMix={audioMix}
+							onAudioTrackIncludedChange={(trackId, include) => {
+								setAudioMix((current) => ({
+									...current,
+									tracks: {
+										...current.tracks,
+										[trackId]: { ...current.tracks[trackId], include },
+									},
+								}));
+							}}
+							onAudioTrackVolumePercentChange={(trackId, volumePercent) => {
+								setAudioMix((current) => ({
+									...current,
+									tracks: {
+										...current.tracks,
+										[trackId]: { ...current.tracks[trackId], volumePercent },
+									},
+								}));
+							}}
+						/>
+						<output aria-label="Output mix decisions">
+							{JSON.stringify(audioMix)}
+						</output>
+					</PreviewMeteringProvider>
+				</PreviewAudioMonitoringProvider>
+			);
+		}
+		render(<ControlledPanel />);
+		const strip = screen.getByLabelText("Audio track strip Voice");
+		const slider = within(strip).getByRole("slider", {
+			name: "Voice track volume",
+		});
+		const decisions = () =>
+			screen.getByLabelText("Output mix decisions").textContent;
+		fireEvent.change(slider, { target: { value: "37" } });
+		expect(slider.getAttribute("aria-valuetext")).toBe("37%");
+		expect(within(strip).getByText("37%")).toBeTruthy();
+		expect(
+			JSON.parse(decisions() ?? "{}").tracks["audio-voice"].volumePercent,
+		).toBe(37);
+
+		fireEvent.click(
+			within(strip).getByRole("button", { name: "Exclude Voice from output" }),
+		);
+		expect(slider).toHaveProperty("value", "37");
+		expect(strip.getAttribute("data-preview-meter-excluded")).toBe("true");
+		const excludedDecisions = decisions();
+		fireEvent.click(
+			within(strip).getByRole("button", { name: "Solo Voice for preview" }),
+		);
+		expect(
+			within(strip)
+				.getByRole("button", { name: "Include Voice in output" })
+				.getAttribute("aria-pressed"),
+		).toBe("false");
+		expect(strip.getAttribute("data-preview-meter-excluded")).toBeNull();
+		expect(decisions()).toBe(excludedDecisions);
+
+		// Meter samples already contain engine gain; the panel must not apply the fader again.
+		const meter = within(strip).getByLabelText("Voice preview meter");
+		expect(
+			Number(
+				within(meter)
+					.getByRole("meter", { name: "Left level" })
+					.getAttribute("aria-valuenow"),
+			),
+		).toBeCloseTo(-12.04, 2);
+		const master = screen.getByLabelText("Master output meter");
+		expect(
+			Number(
+				within(master)
+					.getByRole("meter", { name: "Left level" })
+					.getAttribute("aria-valuenow"),
+			),
+		).toBeCloseTo(-6.02, 2);
+
+		fireEvent.click(
+			within(strip).getByRole("button", { name: "Clear Voice preview solo" }),
+		);
+		expect(strip.getAttribute("data-preview-meter-excluded")).toBe("true");
+		expect(decisions()).toBe(excludedDecisions);
+		fireEvent.click(
+			within(strip).getByRole("button", { name: "Include Voice in output" }),
+		);
+		expect(strip.getAttribute("data-preview-meter-excluded")).toBeNull();
+		expect(slider).toHaveProperty("value", "37");
 	});
 
 	it("renders controlled preview metering ready and preparing states without live peak values yet", () => {

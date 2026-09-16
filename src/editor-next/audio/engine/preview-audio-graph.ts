@@ -60,11 +60,12 @@ export function createPreviewAudioGraph(
 	});
 	const tracks = resources.map((resource) => {
 		const gainNode = audioContext.createGain();
-		gainNode.gain.value = 0;
+		const transition = createPreviewGainTransition(gainNode.gain, 0);
 		gainNode.connect(mix);
 		return {
 			resource: { ...resource },
 			gainNode,
+			transition,
 			monitorGain: 0,
 			volumeGain: 1,
 			channelMode: "preserve" as AudioTrackChannelMode,
@@ -121,8 +122,10 @@ export function createPreviewAudioGraph(
 				smooth,
 			);
 		},
-		settleOutputGain() {
+		settleGains() {
 			outputTransition.settle(audioContext.currentTime);
+			for (const track of tracks)
+				track.transition.settle(audioContext.currentTime);
 		},
 		setTrackChannelMode(index: number, mode: AudioTrackChannelMode) {
 			const track = tracks[index];
@@ -147,18 +150,26 @@ export function createPreviewAudioGraph(
 			});
 			return true;
 		},
-		setTrackMonitorGain(index: number, gain: number) {
+		setTrackMonitorGain(index: number, gain: number, smooth = false) {
 			const track = tracks[index];
 			if (track) {
 				track.monitorGain = clampPreviewVolume(gain);
-				track.gainNode.gain.value = track.monitorGain * track.volumeGain;
+				track.transition.setTarget(
+					track.monitorGain * track.volumeGain,
+					audioContext.currentTime,
+					smooth,
+				);
 			}
 		},
-		setTrackVolumeGain(index: number, gain: number) {
+		setTrackVolumeGain(index: number, gain: number, smooth = false) {
 			const track = tracks[index];
 			if (track) {
 				track.volumeGain = clampPreviewVolume(gain);
-				track.gainNode.gain.value = track.monitorGain * track.volumeGain;
+				track.transition.setTarget(
+					track.monitorGain * track.volumeGain,
+					audioContext.currentTime,
+					smooth,
+				);
 			}
 		},
 		readMeterSnapshot(
@@ -210,6 +221,7 @@ export function createPreviewAudioGraph(
 		destroy() {
 			outputTransition.dispose(audioContext.currentTime);
 			for (const track of tracks) {
+				track.transition.dispose(audioContext.currentTime);
 				for (const route of track.routes.values()) route.dispose();
 				track.routes.clear();
 				disposePreviewAudioMeterTapState(track.meterTap);

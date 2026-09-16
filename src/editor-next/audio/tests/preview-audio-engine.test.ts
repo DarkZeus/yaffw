@@ -10,6 +10,7 @@ import type {
 import {
 	type PreviewAudioEngine,
 	type PreviewAudioEngineMeterSnapshot,
+	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine,
 	previewOutputGainForAudioMonitoring,
 	previewTrackMonitorGainForAudioTrackResource,
@@ -87,6 +88,96 @@ describe("bounded production Preview audio engine", () => {
 		expect(replacement.context.createdGains[0].gain.value).toBe(0.25);
 		expect(
 			replacement.context.createdGains[0].gain.linearRampToValueAtTime,
+		).not.toHaveBeenCalled();
+	});
+	it("retargets the combined track gain without changing decisions or restarting sources", async () => {
+		const { engine, context, provider } = await setup();
+		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
+		const resources = provider.trackIds.map(createResource);
+		const apply = (soloedAudioTrackId: string | null = null) =>
+			applyPreviewAudioEngineMix({
+				audioMix,
+				resources,
+				previewAudioEngine: engine,
+				muted: false,
+				volume: 1,
+				soloedAudioTrackId,
+			});
+		apply();
+		const track = context.createdGains[2].gain;
+		expect(track.value).toBe(1);
+		expect(track.linearRampToValueAtTime).not.toHaveBeenCalled();
+		await engine.play();
+		const sources = context.createdSources.slice();
+		context.currentTime = 0.1;
+		audioMix.tracks["audio-1"].volumePercent = 50;
+		apply();
+		expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[0]).toBe(0.25);
+		expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[1]).toBeCloseTo(
+			0.108,
+		);
+		context.currentTime = 0.104;
+		audioMix.tracks["audio-1"].include = false;
+		apply();
+		expect(track.setValueAtTime.mock.calls.at(-1)?.[0]).toBeCloseTo(0.625);
+		expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[0]).toBe(0);
+		context.currentTime = 0.108;
+		apply("audio-1");
+		expect(track.setValueAtTime.mock.calls.at(-1)?.[0]).toBeCloseTo(0.3125);
+		expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[0]).toBe(0.25);
+		expect(audioMix.tracks["audio-1"]).toMatchObject({
+			include: false,
+			volumePercent: 50,
+		});
+		const ramps = track.linearRampToValueAtTime.mock.calls.length;
+		apply("audio-1");
+		expect(track.linearRampToValueAtTime).toHaveBeenCalledTimes(ramps);
+		expect(provider.openGeneration).toHaveBeenCalledTimes(1);
+		expect(context.createdSources).toEqual(sources);
+		expect(sources.every((source) => source.stop.mock.calls.length === 0)).toBe(
+			true,
+		);
+	});
+	it("settles all track gains on pause, seek, speed and routing changes and cancels them on replacement", async () => {
+		const { engine, context } = await setup();
+		const track = context.createdGains[2].gain;
+		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackVolumeGain(0, 0.5);
+		expect(track.value).toBe(0.5);
+		await engine.play();
+		for (const reset of [
+			async () => engine.pause(),
+			async () => engine.setTime(4),
+			async () => engine.setPlaybackRate(2),
+			async () => engine.setTrackChannelMode(0, "use-left-as-mono"),
+		]) {
+			context.currentTime += 0.01;
+			engine.setTrackMonitorGain(0, 0);
+			expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[0]).toBe(0);
+			await reset();
+			expect(track.value).toBe(0);
+			expect(track.cancelScheduledValues).toHaveBeenLastCalledWith(
+				context.currentTime,
+			);
+			engine.pause();
+			const count = track.linearRampToValueAtTime.mock.calls.length;
+			engine.setTrackMonitorGain(0, 1);
+			expect(track.value).toBe(0.5);
+			await engine.play();
+			expect(track.linearRampToValueAtTime).toHaveBeenCalledTimes(count);
+		}
+		engine.setTrackVolumeGain(0, 0.75);
+		engine.destroy();
+		expect(track.value).toBe(0);
+		const calls = track.setValueAtTime.mock.calls.length;
+		engine.setTrackVolumeGain(0, 1);
+		engine.setTrackMonitorGain(0, 1);
+		expect(track.setValueAtTime).toHaveBeenCalledTimes(calls);
+		const replacement = await setup();
+		replacement.engine.setTrackMonitorGain(0, 1);
+		expect(replacement.context.createdGains[2].gain.value).toBe(1);
+		expect(
+			replacement.context.createdGains[2].gain.linearRampToValueAtTime,
 		).not.toHaveBeenCalled();
 	});
 	it("primes only the current two-second window and shares one clock across distinct tracks", async () => {

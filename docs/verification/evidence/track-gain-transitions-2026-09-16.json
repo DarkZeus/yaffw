@@ -1,0 +1,168 @@
+{
+  "passed": true,
+  "sampleRate": 48000,
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "transitionMilliseconds": 8,
+  "checks": [
+    {
+      "name": "mute",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.002604246139526367,
+      "frames": 4096
+    },
+    {
+      "name": "unmute",
+      "maxError": 1.9868214962137642e-8,
+      "maxAdjacentDelta": 0.002604186534881592,
+      "frames": 4096
+    },
+    {
+      "name": "volume endpoint",
+      "maxError": 5.960464477539063e-8,
+      "maxAdjacentDelta": 0.0015625357627868652,
+      "frames": 4096
+    },
+    {
+      "name": "mid-ramp retarget from rendered value",
+      "maxError": 4.635916805995066e-8,
+      "maxAdjacentDelta": 0.002604246139526367,
+      "frames": 4096
+    },
+    {
+      "name": "production graph composition, repeated target and chunk continuity",
+      "maxError": 2.9802322387695312e-8,
+      "maxAdjacentDelta": 0.0005859732627868652,
+      "frames": 4096
+    },
+    {
+      "name": "paused initialization and explicit stereo routing",
+      "maxError": 0,
+      "maxAdjacentDelta": 0,
+      "frames": 4096
+    },
+    {
+      "name": "settle cancels pending global ramp at target",
+      "maxError": 9.934107481068821e-9,
+      "maxAdjacentDelta": 0.501953125,
+      "frames": 4096
+    },
+    {
+      "name": "destroy during ramp and recreate without stale automation",
+      "maxError": 9.934107481068821e-9,
+      "maxAdjacentDelta": 0.3519531190395355,
+      "frames": 4096
+    },
+    {
+      "name": "interleaved track monitor, volume and global ramps across PCM chunks",
+      "maxError": 7.390975953480705e-8,
+      "maxAdjacentDelta": 0.002289414405822754,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves preserve routing",
+      "maxError": 5.960464477539063e-8,
+      "maxAdjacentDelta": 0.0011719167232513428,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves use-left-as-mono routing",
+      "maxError": 5.960464477539063e-8,
+      "maxAdjacentDelta": 0.0011719167232513428,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves use-right-as-mono routing",
+      "maxError": 1.4901161193847656e-8,
+      "maxAdjacentDelta": 0.0003906339406967163,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves duplicate-left-to-stereo routing",
+      "maxError": 5.960464477539063e-8,
+      "maxAdjacentDelta": 0.0011719167232513428,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves duplicate-right-to-stereo routing",
+      "maxError": 1.4901161193847656e-8,
+      "maxAdjacentDelta": 0.0003906339406967163,
+      "frames": 4096
+    },
+    {
+      "name": "track monitor mute/unmute preserves average-to-mono routing",
+      "maxError": 2.9802322387695312e-8,
+      "maxAdjacentDelta": 0.0007812678813934326,
+      "frames": 4096
+    },
+    {
+      "name": "settle cancels simultaneous track and global automation",
+      "maxError": 8.344650270775134e-8,
+      "maxAdjacentDelta": 0.3517593443393707,
+      "frames": 4096
+    },
+    {
+      "name": "destroy active track and global ramps then recreate with settled track state",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.18594259023666382,
+      "frames": 4096
+    },
+    {
+      "name": "rapid and same-time retargets at 44100 Hz",
+      "maxError": 4.6008715615109e-8,
+      "maxAdjacentDelta": 0.002834498882293701,
+      "frames": 4096
+    },
+    {
+      "name": "rapid and same-time retargets at 48000 Hz",
+      "maxError": 4.768371575369912e-8,
+      "maxAdjacentDelta": 0.002604246139526367,
+      "frames": 4096
+    },
+    {
+      "name": "retarget after completed ramp preserves long constant hold",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.001953125,
+      "frames": 4096
+    },
+    {
+      "name": "global mute reaches exact zero while pre-global meters follow track ramp",
+      "maxError": 3.2782554670873765e-8,
+      "maxAdjacentDelta": 0.0013656720984727144,
+      "frames": 4096
+    }
+  ],
+  "meterPeaks": {
+    "track": [
+      0.6000000238418579,
+      0.20000000298023224
+    ],
+    "combined": [
+      0.6000000238418579,
+      0.20000000298023224
+    ]
+  },
+  "candidates": [
+    {
+      "milliseconds": 5,
+      "name": "5 ms reference ramp",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.004166722297668457,
+      "frames": 4096
+    },
+    {
+      "milliseconds": 8,
+      "name": "8 ms reference ramp",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.002604246139526367,
+      "frames": 4096
+    },
+    {
+      "milliseconds": 10,
+      "name": "10 ms reference ramp",
+      "maxError": 3.9736429924275285e-8,
+      "maxAdjacentDelta": 0.0020833611488342285,
+      "frames": 4096
+    }
+  ],
+  "selection": "8 ms limits full-scale gain delta to about 0.0026042/sample versus 0.0041667 at 5 ms, and reaches exact zero 2 ms sooner than 10 ms. PCM checks establish continuity and bounded endpoints; they do not establish perceptual inaudibility."
+}

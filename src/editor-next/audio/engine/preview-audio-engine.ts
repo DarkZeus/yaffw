@@ -183,7 +183,7 @@ export async function createPreviewAudioEngine({
 	);
 	let destroyed = false;
 	const unsubscribeGainLifecycle = controller.subscribe(() => {
-		if (!scheduler.isPlaying()) graph.settleOutputGain();
+		if (!scheduler.isPlaying()) graph.settleGains();
 	});
 	const destroy = () => {
 		if (destroyed) return;
@@ -214,7 +214,7 @@ export async function createPreviewAudioEngine({
 		getMetrics: controller.getMetrics,
 		pause() {
 			controller.pause();
-			graph.settleOutputGain();
+			graph.settleGains();
 		},
 		play: controller.play,
 		retryTrack: controller.retryTrack,
@@ -227,8 +227,14 @@ export async function createPreviewAudioEngine({
 			if (destroyed) return;
 			graph.setOutputGain(gain, scheduler.isPlaying());
 		},
-		setTrackMonitorGain: graph.setTrackMonitorGain,
-		setTrackVolumeGain: graph.setTrackVolumeGain,
+		setTrackMonitorGain(index, gain) {
+			if (destroyed) return;
+			graph.setTrackMonitorGain(index, gain, scheduler.isPlaying());
+		},
+		setTrackVolumeGain(index, gain) {
+			if (destroyed) return;
+			graph.setTrackVolumeGain(index, gain, scheduler.isPlaying());
+		},
 		setTrackChannelMode(index, mode) {
 			if (destroyed) return;
 			if (graph.setTrackChannelMode(index, mode))
