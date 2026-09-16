@@ -1,0 +1,452 @@
+{
+  "recordedAt": "2026-09-16T16:18:16.661400+00:00",
+  "issue": 114,
+  "baseCommit": "744e946696f1c1d01cc095c1186d30ef63dd5706",
+  "pcm": {
+    "passed": true,
+    "sampleRate": 48000,
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+    "transitionMilliseconds": 8,
+    "checks": [
+      {
+        "name": "mute",
+        "maxError": 3.9736429924275285e-08,
+        "maxAdjacentDelta": 0.002604246139526367,
+        "frames": 4096
+      },
+      {
+        "name": "unmute",
+        "maxError": 1.9868214962137642e-08,
+        "maxAdjacentDelta": 0.002604186534881592,
+        "frames": 4096
+      },
+      {
+        "name": "volume endpoint",
+        "maxError": 5.960464477539063e-08,
+        "maxAdjacentDelta": 0.0015625357627868652,
+        "frames": 4096
+      },
+      {
+        "name": "mid-ramp retarget from rendered value",
+        "maxError": 4.635916805995066e-08,
+        "maxAdjacentDelta": 0.002604246139526367,
+        "frames": 4096
+      },
+      {
+        "name": "production graph composition, repeated target and chunk continuity",
+        "maxError": 2.9802322387695312e-08,
+        "maxAdjacentDelta": 0.0005859732627868652,
+        "frames": 4096
+      },
+      {
+        "name": "paused initialization and explicit stereo routing",
+        "maxError": 0,
+        "maxAdjacentDelta": 0,
+        "frames": 4096
+      },
+      {
+        "name": "settle cancels pending global ramp at target",
+        "maxError": 9.934107481068821e-09,
+        "maxAdjacentDelta": 0.501953125,
+        "frames": 4096
+      },
+      {
+        "name": "destroy during ramp and recreate without stale automation",
+        "maxError": 9.934107481068821e-09,
+        "maxAdjacentDelta": 0.3519531190395355,
+        "frames": 4096
+      },
+      {
+        "name": "rapid and same-time retargets at 44100 Hz",
+        "maxError": 4.6008715615109e-08,
+        "maxAdjacentDelta": 0.002834498882293701,
+        "frames": 4096
+      },
+      {
+        "name": "rapid and same-time retargets at 48000 Hz",
+        "maxError": 4.768371575369912e-08,
+        "maxAdjacentDelta": 0.002604246139526367,
+        "frames": 4096
+      },
+      {
+        "name": "retarget after completed ramp preserves long constant hold",
+        "maxError": 3.9736429924275285e-08,
+        "maxAdjacentDelta": 0.001953125,
+        "frames": 4096
+      },
+      {
+        "name": "global mute reaches exact zero while pre-global meters retain track mix",
+        "maxError": 1.4901161221603232e-08,
+        "maxAdjacentDelta": 0.0009765923023223877,
+        "frames": 4096
+      }
+    ],
+    "meterPeaks": {
+      "track": [
+        0.375,
+        0.125
+      ],
+      "combined": [
+        0.375,
+        0.125
+      ]
+    },
+    "candidates": [
+      {
+        "milliseconds": 5,
+        "name": "5 ms reference ramp",
+        "maxError": 3.9736429924275285e-08,
+        "maxAdjacentDelta": 0.004166722297668457,
+        "frames": 4096
+      },
+      {
+        "milliseconds": 8,
+        "name": "8 ms reference ramp",
+        "maxError": 3.9736429924275285e-08,
+        "maxAdjacentDelta": 0.002604246139526367,
+        "frames": 4096
+      },
+      {
+        "milliseconds": 10,
+        "name": "10 ms reference ramp",
+        "maxError": 3.9736429924275285e-08,
+        "maxAdjacentDelta": 0.0020833611488342285,
+        "frames": 4096
+      }
+    ],
+    "selection": "8 ms limits full-scale gain delta to about 0.0026042/sample versus 0.0041667 at 5 ms, and reaches exact zero 2 ms sooner than 10 ms. PCM checks establish continuity and bounded endpoints; they do not establish perceptual inaudibility."
+  },
+  "browser": {
+    "passed": true,
+    "verificationMode": "production build fulfilled by isolated Playwright routes; no local server started",
+    "audioText": "Sync clicks A\nMP4A.40.2 / 2 channels / und\n100%\nSync clicks A track volume\nGreen zone -90 to -20 dBFS\nYellow zone -20 to -9 dBFS\nRed zone -9 to 0 dBFS\nDBFS\n0\n-20\n-40\n-60\n-90\nSync clicks A channel handling\nAuto-fix quiet side\nKeep as recorded\nCenter left-side audio\nCenter right-side audio\nCenter both sides\nOutput included\nPreview solo\nSync clicks B\nMP4A.40.2 / 2 channels / und\n100%\nSync clicks B track volume\nGreen zone -90 to -20 dBFS\nYellow zone -20 to -9 dBFS\nRed zone -9 to 0 dBFS\nDBFS\n0\n-20\n-40\n-60\n-90\nSync clicks B channel handling\nAuto-fix quiet side\nKeep as recorded\nCenter left-side audio\nCenter right-side audio\nCenter both sides\nOutput included\nPreview solo\nMaster\nMonitored output\nGreen zone -90 to -20 dBFS\nYellow zone -20 to -9 dBFS\nRed zone -9 to 0 dBFS\nDBFS\n0\n-12\n-24\n-36\n-50\n-60\n-70\n-80\n-90",
+    "exportText": "Output\nReady\n\nFormat\nMP4 / H.264 video / AAC audio\n\nResolution\n160x90\nVideo quality\nPreserve source\nAudio quality\nPreserve source\nRange\nWhole file\nOutput settings\nStart export\nExport details",
+    "paused": {
+      "gain": 0.25,
+      "ramps": 4
+    },
+    "contexts": [
+      {
+        "state": "closed",
+        "gain": 0.25,
+        "events": [
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0.005333333333333333
+            ],
+            "time": 0.005333333333333333
+          },
+          {
+            "node": 0,
+            "method": "cancelAndHoldAtTime",
+            "args": [
+              0.112
+            ],
+            "time": 0.112
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0.112
+            ],
+            "time": 0.112
+          },
+          {
+            "node": 0,
+            "method": "linearRampToValueAtTime",
+            "args": [
+              0.4000000059604645,
+              0.12
+            ],
+            "time": 0.112
+          },
+          {
+            "node": 0,
+            "method": "cancelAndHoldAtTime",
+            "args": [
+              0.14933333333333335
+            ],
+            "time": 0.14933333333333335
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0.4000000059604645,
+              0.14933333333333335
+            ],
+            "time": 0.14933333333333335
+          },
+          {
+            "node": 0,
+            "method": "linearRampToValueAtTime",
+            "args": [
+              0,
+              0.15733333333333335
+            ],
+            "time": 0.14933333333333335
+          },
+          {
+            "node": 0,
+            "method": "cancelAndHoldAtTime",
+            "args": [
+              0.19733333333333333
+            ],
+            "time": 0.19733333333333333
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0,
+              0.19733333333333333
+            ],
+            "time": 0.19733333333333333
+          },
+          {
+            "node": 0,
+            "method": "linearRampToValueAtTime",
+            "args": [
+              0.699999988079071,
+              0.20533333333333334
+            ],
+            "time": 0.19733333333333333
+          },
+          {
+            "node": 0,
+            "method": "cancelAndHoldAtTime",
+            "args": [
+              0.2986666666666667
+            ],
+            "time": 0.2986666666666667
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0.699999988079071,
+              0.2986666666666667
+            ],
+            "time": 0.2986666666666667
+          },
+          {
+            "node": 0,
+            "method": "linearRampToValueAtTime",
+            "args": [
+              0,
+              0.3066666666666667
+            ],
+            "time": 0.2986666666666667
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.3466666666666667
+            ],
+            "time": 0.3466666666666667
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0,
+              0.3466666666666667
+            ],
+            "time": 0.3466666666666667
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.37866666666666665
+            ],
+            "time": 0.37866666666666665
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0.699999988079071,
+              0.37866666666666665
+            ],
+            "time": 0.37866666666666665
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.3893333333333333
+            ],
+            "time": 0.3893333333333333
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0.25,
+              0.3893333333333333
+            ],
+            "time": 0.3893333333333333
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0.512
+            ],
+            "time": 0.512
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              0,
+              0.512
+            ],
+            "time": 0.512
+          }
+        ]
+      },
+      {
+        "state": "running",
+        "gain": 1,
+        "events": [
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "cancelScheduledValues",
+            "args": [
+              0
+            ],
+            "time": 0
+          },
+          {
+            "node": 0,
+            "method": "setValueAtTime",
+            "args": [
+              1,
+              0
+            ],
+            "time": 0
+          }
+        ]
+      }
+    ],
+    "errors": []
+  }
+}

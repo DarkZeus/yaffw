@@ -39,6 +39,56 @@ async function setup(
 	return { engine, context, provider };
 }
 describe("bounded production Preview audio engine", () => {
+	it("smooths only playing output changes and settles automation before paused resume or routing rebuild", async () => {
+		const { engine, context } = await setup();
+		const output = context.createdGains[0].gain;
+		engine.setOutputGain(0.5);
+		expect(output.value).toBe(0.5);
+		expect(output.linearRampToValueAtTime).not.toHaveBeenCalled();
+		await engine.play();
+		context.currentTime = 1;
+		engine.setOutputGain(0);
+		expect(output.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 1.008);
+		context.currentTime = 1.004;
+		engine.setOutputGain(1);
+		expect(output.setValueAtTime.mock.calls.at(-1)?.[0]).toBeCloseTo(0.25);
+		expect(output.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 1.012);
+		engine.pause();
+		expect(output.value).toBe(1);
+		expect(output.cancelScheduledValues).toHaveBeenLastCalledWith(1.004);
+		const ramps = output.linearRampToValueAtTime.mock.calls.length;
+		await engine.play();
+		expect(output.linearRampToValueAtTime).toHaveBeenCalledTimes(ramps);
+		engine.setOutputGain(0);
+		engine.setTrackChannelMode(0, "use-left-as-mono");
+		expect(output.value).toBe(0);
+		await engine.play();
+		expect(output.linearRampToValueAtTime).toHaveBeenCalledTimes(ramps + 1);
+	});
+	it("settles pending output automation across seek and rate changes and isolates destroyed assets", async () => {
+		const { engine, context } = await setup();
+		const output = context.createdGains[0].gain;
+		await engine.play();
+		context.currentTime = 0.1;
+		engine.setOutputGain(0);
+		await engine.setTime(4);
+		expect(output.value).toBe(0);
+		engine.setOutputGain(0.5);
+		await engine.setPlaybackRate(2);
+		expect(output.value).toBe(0.5);
+		engine.setOutputGain(1);
+		engine.destroy();
+		expect(output.value).toBe(0);
+		const rampCount = output.linearRampToValueAtTime.mock.calls.length;
+		engine.setOutputGain(0.75);
+		expect(output.linearRampToValueAtTime).toHaveBeenCalledTimes(rampCount);
+		const replacement = await setup();
+		replacement.engine.setOutputGain(0.25);
+		expect(replacement.context.createdGains[0].gain.value).toBe(0.25);
+		expect(
+			replacement.context.createdGains[0].gain.linearRampToValueAtTime,
+		).not.toHaveBeenCalled();
+	});
 	it("primes only the current two-second window and shares one clock across distinct tracks", async () => {
 		const { engine, context, provider } = await setup(createProvider(), {
 			initialTimeSeconds: 5,
@@ -63,7 +113,7 @@ describe("bounded production Preview audio engine", () => {
 			context.createdSources[10]?.buffer?.getChannelData(0)[0],
 		).toBeCloseTo(0.5);
 		expect(context.createdGains[2]?.gain.value).toBe(0.5);
-		expect(context.createdGains[0]?.gain.value).toBe(0.6);
+		expect(context.createdGains[0]?.gain.value).toBeCloseTo(0.6);
 		context.currentTime = 1;
 		expect(engine.getCurrentTime()).toBe(6.5);
 		await engine.setPlaybackRate(2);
@@ -630,14 +680,16 @@ function createAudioContextSpy() {
 		createGain: vi.fn(() => {
 			const gain = {
 				...createAudioNodeSpy(),
-				gain: { value: 1 },
+				gain: createGainParamSpy(),
 			};
 			context.createdGains.push(gain);
 
 			return gain;
 		}),
 		createdGains: [] as Array<
-			ReturnType<typeof createAudioNodeSpy> & { gain: { value: number } }
+			ReturnType<typeof createAudioNodeSpy> & {
+				gain: ReturnType<typeof createGainParamSpy>;
+			}
 		>,
 		createdAnalysers: [] as Array<
 			ReturnType<typeof createAudioNodeSpy> & {
@@ -797,3 +849,16 @@ const readyAssetWithAudio = {
 		],
 	},
 } satisfies ReadyMediaAsset;
+
+function createGainParamSpy() {
+	const param = {
+		value: 1,
+		cancelAndHoldAtTime: vi.fn(),
+		cancelScheduledValues: vi.fn(),
+		linearRampToValueAtTime: vi.fn(),
+		setValueAtTime: vi.fn((value: number, _time: number) => {
+			param.value = value;
+		}),
+	};
+	return param;
+}

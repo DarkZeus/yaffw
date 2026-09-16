@@ -14,6 +14,7 @@ import type {
 	PreviewAudioGainNodeLike,
 	PreviewAudioNodeLike,
 } from "./preview-audio-engine";
+import { createPreviewGainTransition } from "./preview-gain-transition";
 type PreviewAudioTrackChannelRouting = {
 	dispose: () => void;
 	inputNode: PreviewAudioNodeLike;
@@ -46,7 +47,7 @@ export function createPreviewAudioGraph(
 	const outputChannelCount =
 		normalizePreviewAudioMeterOutputChannelCount(outputChannels);
 	const outputGain = audioContext.createGain();
-	outputGain.gain.value = 1;
+	const outputTransition = createPreviewGainTransition(outputGain.gain);
 	outputGain.connect(audioContext.destination);
 	const mix = audioContext.createGain();
 	configurePreviewAudioOutputChannels(mix, outputChannelCount);
@@ -113,8 +114,15 @@ export function createPreviewAudioGraph(
 	}
 	return {
 		destination,
-		setOutputGain(gain: number) {
-			outputGain.gain.value = clampPreviewVolume(gain);
+		setOutputGain(gain: number, smooth = false) {
+			outputTransition.setTarget(
+				clampPreviewVolume(gain),
+				audioContext.currentTime,
+				smooth,
+			);
+		},
+		settleOutputGain() {
+			outputTransition.settle(audioContext.currentTime);
 		},
 		setTrackChannelMode(index: number, mode: AudioTrackChannelMode) {
 			const track = tracks[index];
@@ -200,6 +208,7 @@ export function createPreviewAudioGraph(
 			};
 		},
 		destroy() {
+			outputTransition.dispose(audioContext.currentTime);
 			for (const track of tracks) {
 				for (const route of track.routes.values()) route.dispose();
 				track.routes.clear();

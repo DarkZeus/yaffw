@@ -12,6 +12,7 @@ import type { PreviewAudioResource } from "../types/preview-audio-resources.type
 import type { MediaWindowProvider } from "./media-window-provider";
 import { createPreviewAudioGraph } from "./preview-audio-graph";
 import { createPreviewAudioWindowController } from "./preview-audio-window-controller";
+import type { PreviewGainParam } from "./preview-gain-transition";
 import {
 	type ScheduledWindowEngineStatus,
 	createScheduledWindowEngine,
@@ -108,9 +109,7 @@ export type PreviewAudioAnalyserNodeLike = PreviewAudioNodeLike & {
 };
 
 export type PreviewAudioGainNodeLike = PreviewAudioNodeLike & {
-	gain: {
-		value: number;
-	};
+	gain: PreviewGainParam;
 };
 
 export type PreviewAudioBufferSourceNodeLike = PreviewAudioNodeLike & {
@@ -183,9 +182,13 @@ export async function createPreviewAudioEngine({
 		initialPlaybackRate,
 	);
 	let destroyed = false;
+	const unsubscribeGainLifecycle = controller.subscribe(() => {
+		if (!scheduler.isPlaying()) graph.settleOutputGain();
+	});
 	const destroy = () => {
 		if (destroyed) return;
 		destroyed = true;
+		unsubscribeGainLifecycle();
 		signal?.removeEventListener("abort", destroy);
 		controller.destroy();
 		graph.destroy();
@@ -209,7 +212,10 @@ export async function createPreviewAudioEngine({
 		getStatus: scheduler.getStatus,
 		subscribe: controller.subscribe,
 		getMetrics: controller.getMetrics,
-		pause: controller.pause,
+		pause() {
+			controller.pause();
+			graph.settleOutputGain();
+		},
 		play: controller.play,
 		retryTrack: controller.retryTrack,
 		setTime: controller.setTime,
@@ -217,7 +223,10 @@ export async function createPreviewAudioEngine({
 		setPlaybackEnd: scheduler.setPlaybackEnd,
 		readMeterSnapshot: () =>
 			graph.readMeterSnapshot(scheduler.isPlaying(), controller.getFailures()),
-		setOutputGain: graph.setOutputGain,
+		setOutputGain(gain) {
+			if (destroyed) return;
+			graph.setOutputGain(gain, scheduler.isPlaying());
+		},
 		setTrackMonitorGain: graph.setTrackMonitorGain,
 		setTrackVolumeGain: graph.setTrackVolumeGain,
 		setTrackChannelMode(index, mode) {

@@ -747,6 +747,98 @@ describe("NativePreviewPlayer", () => {
 		);
 	});
 
+	it("applies rapid Preview volume and mute targets immediately without restarting playback or changing the export mix", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
+		render(<AudioMasterPlayerProbe />);
+		await waitFor(() => {
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
+		});
+		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
+		const originalAudioMix = readAudioMixSnapshot();
+		const volume = screen.getByRole("slider", { name: "Preview volume" });
+		const video = screen.getByLabelText("Preview for clip.mp4");
+
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+			expect(previewAudioEngine.play).toHaveBeenCalled();
+		});
+		previewAudioEngine.play.mockClear();
+		previewAudioEngine.setOutputGain.mockClear();
+		previewAudioEngine.setTime.mockClear();
+		previewAudioEngine.pause.mockClear();
+
+		for (const target of [20, 85, 0, 100, 35]) {
+			fireEvent.change(volume, { target: { value: String(target) } });
+			expect(volume).toHaveProperty("value", String(target));
+			expect(lastOutputGain(previewAudioEngine)).toBe(target / 100);
+		}
+		for (let index = 0; index < 3; index += 1) {
+			fireEvent.click(
+				screen.getByRole("button", { name: "Mute preview audio" }),
+			);
+			expect(
+				screen.getByRole("button", { name: "Unmute preview audio" }),
+			).toBeTruthy();
+			expect(lastOutputGain(previewAudioEngine)).toBe(0);
+			expect(volume).toHaveProperty("value", "35");
+			fireEvent.click(
+				screen.getByRole("button", { name: "Unmute preview audio" }),
+			);
+			expect(
+				screen.getByRole("button", { name: "Mute preview audio" }),
+			).toBeTruthy();
+			expect(lastOutputGain(previewAudioEngine)).toBe(0.35);
+		}
+
+		expect(video).toHaveProperty("muted", true);
+		expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+		expect(readAudioMixSnapshot()).toBe(originalAudioMix);
+		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
+		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
+		expect(previewAudioEngine.play).not.toHaveBeenCalled();
+		expect(previewAudioEngine.pause).not.toHaveBeenCalled();
+		expect(previewAudioEngine.setTime).not.toHaveBeenCalled();
+		expect(previewAudioEngine.destroy).not.toHaveBeenCalled();
+		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
+		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
+	});
+
+	it("retains volume changes made while muted and restores the latest Preview target on unmute", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
+		render(<AudioMasterPlayerProbe />);
+		await waitFor(() => {
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
+		});
+		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
+		const originalAudioMix = readAudioMixSnapshot();
+		const volume = screen.getByRole("slider", { name: "Preview volume" });
+
+		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
+		for (const target of [15, 90, 42]) {
+			fireEvent.change(volume, { target: { value: String(target) } });
+			expect(volume).toHaveProperty("value", String(target));
+			expect(lastOutputGain(previewAudioEngine)).toBe(0);
+			expect(
+				screen.getByRole("button", { name: "Unmute preview audio" }),
+			).toBeTruthy();
+		}
+		fireEvent.click(
+			screen.getByRole("button", { name: "Unmute preview audio" }),
+		);
+		expect(lastOutputGain(previewAudioEngine)).toBe(0.42);
+		expect(volume).toHaveProperty("value", "42");
+		expect(readAudioMixSnapshot()).toBe(originalAudioMix);
+		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
+		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
+	});
+
 	it("retries a failed track through the existing engine without recreating asset resources", async () => {
 		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
 
