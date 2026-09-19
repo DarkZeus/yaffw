@@ -59,6 +59,15 @@ export type ScheduledWindowTickResult = {
 	throughSeconds: number;
 };
 
+/** The exact epoch used by source.start(), never reconstructed from a clamped clock. */
+export type ScheduledWindowPlaybackEpoch = Readonly<{
+	id: number;
+	contextTimeSeconds: number;
+	mediaTimeSeconds: number;
+	playbackRate: number;
+	endSeconds: number;
+}>;
+
 export type ScheduledWindowEngine = {
 	applyTrackStates: (publication: {
 		generationId: number;
@@ -70,6 +79,7 @@ export type ScheduledWindowEngine = {
 	}) => void;
 	destroy: () => Promise<void>;
 	getCurrentTime: () => number;
+	getPlaybackEpoch: () => ScheduledWindowPlaybackEpoch | null;
 	getGenerationId: () => number | null;
 	getMetrics: () => ScheduledWindowEngineMetrics;
 	getStatus: () => ScheduledWindowEngineStatus;
@@ -181,6 +191,7 @@ export function createScheduledWindowEngine({
 	let playbackStartMediaTimeSeconds = 0;
 	let playing = false;
 	let playIntent = 0;
+	let epochId = 0;
 
 	function getCurrentTime() {
 		if (!playing) {
@@ -197,6 +208,7 @@ export function createScheduledWindowEngine({
 	}
 
 	function syncCurrentTime() {
+		epochId += 1;
 		currentTimeSeconds = getCurrentTime();
 		playbackStartContextTimeSeconds = audioContext.currentTime;
 		playbackStartMediaTimeSeconds = currentTimeSeconds;
@@ -393,6 +405,7 @@ export function createScheduledWindowEngine({
 		playing = false;
 		playIntent += 1;
 		clearRetainedChunks();
+		epochId += 1;
 		generationId = nextGenerationId;
 		currentTimeSeconds = clamp(startSeconds, 0, durationSeconds);
 		playbackStartContextTimeSeconds = audioContext.currentTime;
@@ -612,6 +625,16 @@ export function createScheduledWindowEngine({
 			metrics.cleanupCount += 1;
 		},
 		getCurrentTime,
+		getPlaybackEpoch: () =>
+			playing && !destroyed
+				? {
+						id: epochId,
+						contextTimeSeconds: playbackStartContextTimeSeconds,
+						mediaTimeSeconds: playbackStartMediaTimeSeconds,
+						playbackRate,
+						endSeconds: playbackEndSeconds ?? durationSeconds,
+					}
+				: null,
 		getGenerationId: () => generationId,
 		getMetrics() {
 			updateRetainedPcmMetrics();
@@ -654,6 +677,7 @@ export function createScheduledWindowEngine({
 				return;
 			}
 
+			epochId += 1;
 			playing = true;
 			playbackStartContextTimeSeconds = audioContext.currentTime;
 			playbackStartMediaTimeSeconds = currentTimeSeconds;

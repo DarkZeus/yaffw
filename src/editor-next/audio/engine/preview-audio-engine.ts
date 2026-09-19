@@ -14,6 +14,8 @@ import type { PreviewAudioContextLifecycleSource } from "./preview-audio-context
 import { createPreviewAudioGraph } from "./preview-audio-graph";
 import { createPreviewAudioWindowController } from "./preview-audio-window-controller";
 import type { PreviewGainParam } from "./preview-gain-transition";
+import { createPreviewOutputTime } from "./preview-output-time";
+import { PREVIEW_OUTPUT_TIMING_ENABLED } from "./preview-output-timing-enabled";
 import {
 	type ScheduledWindowEngineStatus,
 	createScheduledWindowEngine,
@@ -28,6 +30,7 @@ export type PreviewAudioEngine = {
 	retryTrack: (trackId: string) => Promise<void>;
 	setPlaybackEnd: (endSeconds: number | null) => void;
 	getCurrentTime: () => number;
+	getPresentationTime: () => number;
 	getStatus: () => PreviewAudioEngineStatus;
 	getPlaybackState: () => PreviewAudioPlaybackState;
 	pause: () => void;
@@ -97,6 +100,7 @@ export type PreviewAudioContextLike = PreviewAudioContextLifecycleSource & {
 	createChannelSplitter?: (numberOfOutputs?: number) => PreviewAudioNodeLike;
 	createGain: () => PreviewAudioGainNodeLike;
 	currentTime: number;
+	getOutputTimestamp?: () => { contextTime?: number; performanceTime?: number };
 	destination: PreviewAudioNodeLike;
 	resume?: () => Promise<void> | void;
 	sampleRate: number;
@@ -135,6 +139,7 @@ export type PreviewAudioBufferSourceNodeLike = PreviewAudioNodeLike & {
 
 export type CreatePreviewAudioEngineOptions = {
 	createAudioContext?: () => PreviewAudioContextLike;
+	outputTimingEnabled?: boolean;
 	provider: MediaWindowProvider;
 	initialTimeSeconds?: number;
 	initialPlaybackRate?: number;
@@ -156,6 +161,7 @@ export async function createPreviewAudioEngine({
 	createAudioContext = () =>
 		new AudioContext() as unknown as PreviewAudioContextLike,
 	provider,
+	outputTimingEnabled = PREVIEW_OUTPUT_TIMING_ENABLED,
 	outputChannels,
 	resources,
 	initialTimeSeconds = 0,
@@ -188,6 +194,7 @@ export async function createPreviewAudioEngine({
 		throw error;
 	}
 	const graph = ownedGraph;
+	const outputTime = createPreviewOutputTime();
 	const controller = createPreviewAudioWindowController(
 		provider,
 		scheduler,
@@ -222,6 +229,28 @@ export async function createPreviewAudioEngine({
 	return {
 		destroy,
 		getCurrentTime: scheduler.getCurrentTime,
+		getPresentationTime() {
+			const fallback = scheduler.getCurrentTime();
+			if (!outputTimingEnabled) return fallback;
+			let timestamp:
+				| ReturnType<NonNullable<PreviewAudioContextLike["getOutputTimestamp"]>>
+				| undefined;
+			try {
+				timestamp = audioContext.getOutputTimestamp?.();
+			} catch {
+				/* Browser timestamp unavailable. */
+			}
+			return outputTime.read({
+				epoch:
+					controller.getPlaybackState() === "playing"
+						? scheduler.getPlaybackEpoch()
+						: null,
+				renderingTimeSeconds: fallback,
+				contextTimeSeconds: audioContext.currentTime,
+				performanceTimeMilliseconds: performance.now(),
+				timestamp,
+			});
+		},
 		getStatus: scheduler.getStatus,
 		getPlaybackState: controller.getPlaybackState,
 		subscribe: controller.subscribe,

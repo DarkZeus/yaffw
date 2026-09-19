@@ -41,6 +41,178 @@ async function setup(
 	return { engine, context, provider };
 }
 
+describe("Preview presentation timing candidate", () => {
+	it("resets output mapping through seek, rate, interruption recovery and disposal", async () => {
+		vi.useFakeTimers();
+		vi.advanceTimersByTime(1000);
+		const context = Object.assign(createLifecycleContext(), {
+			getOutputTimestamp: () => ({
+				contextTime: context.currentTime - 0.1,
+				performanceTime: performance.now(),
+			}),
+		});
+		const { engine } = await setup(undefined, {
+			createAudioContext: () => context,
+			outputTimingEnabled: true,
+		});
+		await engine.play();
+		context.currentTime = 0.5;
+		expect(engine.getPresentationTime()).toBeCloseTo(0.4);
+		await engine.setTime(5);
+		expect(engine.getPresentationTime()).toBe(5);
+		vi.advanceTimersByTime(200);
+		context.currentTime = 0.7;
+		expect(engine.getPresentationTime()).toBeCloseTo(5.1);
+		await engine.setPlaybackRate(2);
+		context.currentTime = 0.9;
+		expect(engine.getPresentationTime()).toBeCloseTo(5.4);
+		context.resume.mockRejectedValue(new Error("Gesture required"));
+		context.changeState("interrupted");
+		await flushMicrotasks();
+		expect(engine.getPresentationTime()).toBeCloseTo(5.6);
+		context.currentTime = 10;
+		expect(engine.getPresentationTime()).toBeCloseTo(5.6);
+		context.changeState("running");
+		await flushMicrotasks();
+		context.currentTime = 10.2;
+		expect(engine.getPresentationTime()).toBeCloseTo(5.8);
+		engine.destroy();
+		expect(engine.getPresentationTime()).toBe(engine.getCurrentTime());
+	});
+	it("publishes the new seek epoch before notifying buffering observers", async () => {
+		const { engine, context } = await setup();
+		await engine.play();
+		context.currentTime = 8;
+		const observed: number[] = [];
+		engine.subscribe(() => {
+			if (engine.getPlaybackState() === "buffering")
+				observed.push(engine.getCurrentTime());
+		});
+		await engine.setTime(2);
+		expect(observed.length).toBeGreaterThan(0);
+		expect(observed.every((time) => time === 2)).toBe(true);
+	});
+
+	it("holds the latest seek during buffering and discards the previous presentation epoch", async () => {
+		vi.useFakeTimers();
+		vi.advanceTimersByTime(1000);
+		const late = deferred<MediaWindowTrackState[]>();
+		const provider = createProvider((options, end) =>
+			options.startSeconds === 4
+				? late.promise
+				: states(options.startSeconds, end, ["audio-1", "audio-2"]),
+		);
+		const context = Object.assign(createLifecycleContext(), {
+			getOutputTimestamp: () => ({
+				contextTime: context.currentTime - 0.1,
+				performanceTime: performance.now(),
+			}),
+		});
+		const { engine } = await setup(provider, {
+			createAudioContext: () => context,
+			outputTimingEnabled: true,
+		});
+		await engine.play();
+		context.currentTime = 0.5;
+		expect(engine.getPresentationTime()).toBeCloseTo(0.4);
+		const seek = engine.setTime(4);
+		expect(engine.getPlaybackState()).toBe("buffering");
+		context.currentTime = 1;
+		expect(engine.getPresentationTime()).toBe(4);
+		late.resolve(states(4, 6, ["audio-1", "audio-2"]));
+		await seek;
+		expect(engine.getPresentationTime()).toBe(4);
+		vi.advanceTimersByTime(200);
+		context.currentTime = 1.2;
+		expect(engine.getPresentationTime()).toBeCloseTo(4.1);
+	});
+
+	it("keeps scheduling, clipping, rates, seeks, and cleanup identical to baseline", async () => {
+		vi.useFakeTimers();
+		vi.advanceTimersByTime(1000);
+		const run = async (outputTimingEnabled: boolean) => {
+			const context = {
+				...createAudioContextSpy(),
+				getOutputTimestamp: vi.fn(() => ({
+					contextTime: context.currentTime - 0.1,
+					performanceTime: performance.now(),
+				})),
+			};
+			const { engine, provider } = await setup(undefined, {
+				createAudioContext: () => context,
+				outputTimingEnabled,
+			});
+			await engine.play();
+			context.currentTime = 0.5;
+			const rendering = engine.getCurrentTime();
+			const presentation = engine.getPresentationTime();
+			engine.setPlaybackEnd(1.5);
+			await engine.setPlaybackRate(2);
+			context.currentTime = 0.75;
+			engine.getPresentationTime();
+			await engine.setTime(1);
+			engine.getPresentationTime();
+			context.currentTime = 1;
+			engine.getPresentationTime();
+			engine.pause();
+			expect(engine.getPresentationTime()).toBe(engine.getCurrentTime());
+			await engine.play();
+			context.currentTime = 1.1;
+			engine.getPresentationTime();
+			const schedule = context.createdSources.map((source) => ({
+				start: source.start.mock.calls,
+				stop: source.stop.mock.calls,
+				rate: source.playbackRate.value,
+			}));
+			const metrics = engine.getMetrics();
+			engine.destroy();
+			expect(engine.getMetrics().activeTimers).toBe(0);
+			return {
+				rendering,
+				presentation,
+				schedule,
+				metrics,
+				pulls: provider.pulls,
+			};
+		};
+		const baseline = await run(false);
+		const candidate = await run(true);
+		expect(candidate.rendering).toBe(baseline.rendering);
+		expect(candidate.presentation).toBeCloseTo(0.4);
+		expect(baseline.presentation).toBe(0.5);
+		expect(candidate.schedule).toEqual(baseline.schedule);
+		expect(candidate.metrics).toEqual(baseline.metrics);
+		expect(candidate.pulls).toEqual(baseline.pulls);
+	});
+	it("defaults to rendering time and tolerates an unsupported or throwing browser timestamp", async () => {
+		const context = {
+			...createAudioContextSpy(),
+			getOutputTimestamp: vi.fn(() => {
+				throw new Error("unavailable");
+			}),
+		};
+		const baseline = await setup(undefined, {
+			createAudioContext: () => context,
+		});
+		await baseline.engine.play();
+		context.currentTime = 0.5;
+		expect(baseline.engine.getPresentationTime()).toBe(0.5);
+		expect(context.getOutputTimestamp).not.toHaveBeenCalled();
+		const candidate = await setup(undefined, {
+			createAudioContext: () => context,
+			outputTimingEnabled: true,
+		});
+		await candidate.engine.play();
+		context.currentTime = 1;
+		expect(candidate.engine.getPresentationTime()).toBe(0.5);
+		expect(context.getOutputTimestamp).toHaveBeenCalledOnce();
+		const unsupported = await setup(undefined, { outputTimingEnabled: true });
+		await unsupported.engine.play();
+		unsupported.context.currentTime = 0.5;
+		expect(unsupported.engine.getPresentationTime()).toBe(0.5);
+	});
+});
+
 describe("Preview audio context interruptions", () => {
 	it("keeps duplicate Play idempotent while running", async () => {
 		const context = createLifecycleContext();

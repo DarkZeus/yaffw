@@ -1,0 +1,1191 @@
+{
+  "recordedAt": "2026-09-19T15:51:33.986Z",
+  "revision": "issue-113-output-timing-candidate",
+  "fixture": {
+    "name": "yaffw-111-continuous.mp4",
+    "sizeBytes": 3080511,
+    "sha256": "6d7222af75d4ddd67a774544df8f62e7467ca579b20a511515b1519cb41a6171",
+    "durationUs": 40000000,
+    "tracks": {
+      "audio": [
+        {
+          "channels": 2,
+          "codec": "mp4a.40.2",
+          "id": "2",
+          "kind": "audio",
+          "label": "Audio 1",
+          "language": "und",
+          "sampleRate": 48000
+        },
+        {
+          "channels": 2,
+          "codec": "mp4a.40.2",
+          "id": "3",
+          "kind": "audio",
+          "label": "Audio 2",
+          "language": "und",
+          "sampleRate": 48000
+        }
+      ],
+      "video": [
+        {
+          "codec": "avc1.42c00b",
+          "height": 90,
+          "id": "1",
+          "kind": "video",
+          "label": "Video 1",
+          "width": 160
+        }
+      ]
+    }
+  },
+  "functional": {
+    "issue": 109,
+    "schemaVersion": 1,
+    "recordedAt": "2026-09-19T15:49:03.715Z",
+    "revision": "issue-113-output-timing-candidate",
+    "fixture": {
+      "name": "yaffw-111-continuous.mp4",
+      "sizeBytes": 3080511,
+      "sha256": "6d7222af75d4ddd67a774544df8f62e7467ca579b20a511515b1519cb41a6171",
+      "durationUs": 40000000,
+      "tracks": {
+        "audio": [
+          {
+            "channels": 2,
+            "codec": "mp4a.40.2",
+            "id": "2",
+            "kind": "audio",
+            "label": "Audio 1",
+            "language": "und",
+            "sampleRate": 48000
+          },
+          {
+            "channels": 2,
+            "codec": "mp4a.40.2",
+            "id": "3",
+            "kind": "audio",
+            "label": "Audio 2",
+            "language": "und",
+            "sampleRate": 48000
+          }
+        ],
+        "video": [
+          {
+            "codec": "avc1.42c00b",
+            "height": 90,
+            "id": "1",
+            "kind": "video",
+            "label": "Video 1",
+            "width": 160
+          }
+        ]
+      }
+    },
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+    "operations": [
+      {
+        "name": "Independent per-track and master meter taps",
+        "passed": true,
+        "evidence": {
+          "tracks": {
+            "2": 0.0897577702999115,
+            "3": 0.08842732012271881
+          },
+          "combined": 0.15737327933311462
+        }
+      },
+      {
+        "name": "Preview mute preserves pre-output meters",
+        "passed": true,
+        "evidence": {
+          "tracks": {
+            "2": 0.08952045440673828,
+            "3": 0.08868216723203659
+          },
+          "combined": 0.1569693684577942
+        }
+      },
+      {
+        "name": "Track volume affects its tap",
+        "passed": true,
+        "evidence": {
+          "before": {
+            "tracks": {
+              "2": 0.0896984413266182,
+              "3": 0.08848605304956436
+            },
+            "combined": 0.1572447121143341
+          },
+          "after": {
+            "tracks": {
+              "2": 0.04474470391869545,
+              "3": 0.08845212310552597
+            },
+            "combined": 0.12149949371814728
+          },
+          "ratio": 0.49883479865348973
+        }
+      },
+      {
+        "name": "Include/exclude and solo gain boundary isolates a track",
+        "passed": true,
+        "evidence": {
+          "tracks": {
+            "2": 0,
+            "3": 0.0885494127869606
+          },
+          "combined": 0.0885494127869606
+        }
+      },
+      {
+        "name": "Channel routing rebuild retains playback and mono channel identity",
+        "passed": true,
+        "evidence": {
+          "snapshot": {
+            "trackStates": {
+              "2": {
+                "status": "ready",
+                "trackId": "2",
+                "channels": [
+                  {
+                    "label": "Mono",
+                    "peak": 0.08892923593521118
+                  }
+                ]
+              },
+              "3": {
+                "status": "ready",
+                "trackId": "3",
+                "channels": [
+                  {
+                    "label": "Left",
+                    "peak": 0.08861950784921646
+                  },
+                  {
+                    "label": "Right",
+                    "peak": 0.08861950784921646
+                  }
+                ]
+              }
+            },
+            "combinedState": {
+              "status": "ready",
+              "channels": [
+                {
+                  "label": "Left",
+                  "peak": 0.15619033575057983
+                },
+                {
+                  "label": "Right",
+                  "peak": 0.15619033575057983
+                }
+              ],
+              "partial": false
+            }
+          },
+          "metrics": {
+            "generationsOpened": 3,
+            "generationsCancelled": 2,
+            "stalePullResults": 0,
+            "trackRetries": 0,
+            "cleanupCount": 0,
+            "activeTimers": 1,
+            "engine": {
+              "cleanupCount": 0,
+              "generationResets": 3,
+              "maxUnderrunSeconds": 0,
+              "minScheduledLeadSeconds": 0,
+              "peakLiveSourceNodes": 22,
+              "peakRetainedPcmBytes": 1646592,
+              "retainedPcmBytes": 1536000,
+              "sourceNodesCreated": 46,
+              "sourceNodesEnded": 6,
+              "sourceNodesStopped": 20,
+              "staleTrackStatePublications": 0,
+              "totalUnderrunSeconds": 0,
+              "underruns": 0
+            }
+          }
+        }
+      },
+      {
+        "name": "Pause freezes audio clock and reports meter silence; resume advances",
+        "passed": true,
+        "evidence": {
+          "paused": 6.8533333333333335,
+          "afterPause": 6.8533333333333335,
+          "resumed": 7.056,
+          "peaks": {
+            "tracks": {
+              "2": 0,
+              "3": 0
+            },
+            "combined": 0
+          }
+        }
+      },
+      {
+        "name": "Latest seek wins and obsolete PCM is released",
+        "passed": true,
+        "evidence": {
+          "time": 6,
+          "metrics": {
+            "generationsOpened": 6,
+            "generationsCancelled": 5,
+            "stalePullResults": 0,
+            "trackRetries": 0,
+            "cleanupCount": 0,
+            "activeTimers": 1,
+            "engine": {
+              "cleanupCount": 0,
+              "generationResets": 6,
+              "maxUnderrunSeconds": 0,
+              "minScheduledLeadSeconds": 0,
+              "peakLiveSourceNodes": 22,
+              "peakRetainedPcmBytes": 1646592,
+              "retainedPcmBytes": 1536000,
+              "sourceNodesCreated": 86,
+              "sourceNodesEnded": 8,
+              "sourceNodesStopped": 58,
+              "staleTrackStatePublications": 0,
+              "totalUnderrunSeconds": 0,
+              "underruns": 0
+            }
+          }
+        }
+      },
+      {
+        "name": "Playback rate follows audio-master clock",
+        "passed": true,
+        "evidence": {
+          "mediaDelta": 0.5013333333333332,
+          "wallDelta": 0.2525
+        }
+      },
+      {
+        "name": "Selection end clips sources; control-plane wrap completes within 100 ms",
+        "passed": true,
+        "evidence": {
+          "boundaryTime": 3.008,
+          "clippedPeaks": {
+            "tracks": {
+              "2": 0,
+              "3": 0
+            },
+            "combined": 0
+          },
+          "wrapMs": 14
+        }
+      },
+      {
+        "name": "Per-track failure remains explicit; isolated retry recovers",
+        "passed": true,
+        "evidence": {
+          "status": "degraded",
+          "failed": {
+            "trackStates": {
+              "2": {
+                "status": "unavailable",
+                "reason": "Harness-injected per-track failure",
+                "trackId": "2"
+              },
+              "3": {
+                "status": "ready",
+                "trackId": "3",
+                "channels": [
+                  {
+                    "label": "Left",
+                    "peak": 0
+                  },
+                  {
+                    "label": "Right",
+                    "peak": 0
+                  }
+                ]
+              }
+            },
+            "combinedState": {
+              "status": "ready",
+              "channels": [
+                {
+                  "label": "Left",
+                  "peak": 0
+                },
+                {
+                  "label": "Right",
+                  "peak": 0
+                }
+              ],
+              "partial": true,
+              "reason": "Some monitored tracks are unavailable: Harness-injected per-track failure"
+            }
+          },
+          "recovered": {
+            "tracks": {
+              "2": 0.08933530747890472,
+              "3": 0.09007778763771057
+            },
+            "combined": 0.1587611436843872
+          },
+          "metrics": {
+            "generationsOpened": 12,
+            "generationsCancelled": 10,
+            "stalePullResults": 0,
+            "trackRetries": 1,
+            "cleanupCount": 0,
+            "activeTimers": 1,
+            "engine": {
+              "cleanupCount": 0,
+              "generationResets": 11,
+              "maxUnderrunSeconds": 0,
+              "minScheduledLeadSeconds": 0,
+              "peakLiveSourceNodes": 22,
+              "peakRetainedPcmBytes": 1646592,
+              "retainedPcmBytes": 1536000,
+              "sourceNodesCreated": 184,
+              "sourceNodesEnded": 14,
+              "sourceNodesStopped": 150,
+              "staleTrackStatePublications": 0,
+              "totalUnderrunSeconds": 0,
+              "underruns": 0
+            }
+          }
+        }
+      },
+      {
+        "name": "Replacement disposes the previous asset and starts fresh",
+        "passed": true,
+        "evidence": {
+          "cleanup": {
+            "engine": {
+              "generationsOpened": 12,
+              "generationsCancelled": 12,
+              "stalePullResults": 0,
+              "trackRetries": 1,
+              "cleanupCount": 1,
+              "activeTimers": 0,
+              "engine": {
+                "cleanupCount": 1,
+                "generationResets": 11,
+                "maxUnderrunSeconds": 0,
+                "minScheduledLeadSeconds": 0,
+                "peakLiveSourceNodes": 22,
+                "peakRetainedPcmBytes": 1646592,
+                "retainedPcmBytes": 0,
+                "sourceNodesCreated": 184,
+                "sourceNodesEnded": 14,
+                "sourceNodesStopped": 170,
+                "staleTrackStatePublications": 0,
+                "totalUnderrunSeconds": 0,
+                "underruns": 0
+              }
+            },
+            "provider": {
+              "generationsOpened": 12,
+              "generationsCancelled": 12,
+              "activeGenerations": 0,
+              "pulls": 12,
+              "publishedChunks": 202,
+              "publishedPcmBytes": 15394816,
+              "publishedMediaSeconds": 40.09066666666669,
+              "disposalsCompleted": 1,
+              "initialTrackStates": {
+                "2": "playable",
+                "3": "playable"
+              }
+            },
+            "context": {
+              "contextsClosed": 1,
+              "contextState": "closed",
+              "sourcesCreated": 184,
+              "sourcesDisconnected": 184,
+              "residualSources": 0
+            }
+          },
+          "peaks": {
+            "tracks": {
+              "2": 0.09031888842582703,
+              "3": 0.08956935256719589
+            },
+            "combined": 0.1584230363368988
+          }
+        }
+      },
+      {
+        "name": "Final teardown releases sources, PCM, timers, provider and context",
+        "passed": true,
+        "evidence": {
+          "engine": {
+            "generationsOpened": 1,
+            "generationsCancelled": 1,
+            "stalePullResults": 0,
+            "trackRetries": 0,
+            "cleanupCount": 1,
+            "activeTimers": 0,
+            "engine": {
+              "cleanupCount": 1,
+              "generationResets": 1,
+              "maxUnderrunSeconds": 0,
+              "minScheduledLeadSeconds": 0,
+              "peakLiveSourceNodes": 20,
+              "peakRetainedPcmBytes": 1536000,
+              "retainedPcmBytes": 0,
+              "sourceNodesCreated": 20,
+              "sourceNodesEnded": 0,
+              "sourceNodesStopped": 20,
+              "staleTrackStatePublications": 0,
+              "totalUnderrunSeconds": 0,
+              "underruns": 0
+            }
+          },
+          "provider": {
+            "generationsOpened": 1,
+            "generationsCancelled": 1,
+            "activeGenerations": 0,
+            "pulls": 1,
+            "publishedChunks": 20,
+            "publishedPcmBytes": 1536000,
+            "publishedMediaSeconds": 4.000000000000001,
+            "disposalsCompleted": 1,
+            "initialTrackStates": {
+              "2": "playable",
+              "3": "playable"
+            }
+          },
+          "context": {
+            "contextsClosed": 1,
+            "contextState": "closed",
+            "sourcesCreated": 20,
+            "sourcesDisconnected": 20,
+            "residualSources": 0
+          }
+        }
+      }
+    ],
+    "passed": true
+  },
+  "trials": [
+    {
+      "trialNumber": 1,
+      "readinessMs": 8.5,
+      "readinessStates": {
+        "2": "playable",
+        "3": "playable"
+      },
+      "observedPlaybackSeconds": 30.013400000005962,
+      "atReadiness": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 0,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": null,
+          "peakLiveSourceNodes": 0,
+          "peakRetainedPcmBytes": 1536000,
+          "retainedPcmBytes": 1536000,
+          "sourceNodesCreated": 0,
+          "sourceNodesEnded": 0,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "beforeCleanup": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 1,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": 0,
+          "peakLiveSourceNodes": 24,
+          "peakRetainedPcmBytes": 1687552,
+          "retainedPcmBytes": 1265664,
+          "sourceNodesCreated": 354,
+          "sourceNodesEnded": 336,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "responsiveness": {
+        "allTimerIntervals": {
+          "count": 2830,
+          "maxMs": 1000.6999999880791,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 3
+        },
+        "naturalTimerIntervals": {
+          "count": 2827,
+          "maxMs": 11.599999994039536,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 0
+        },
+        "longTasks": {
+          "count": 3,
+          "maxMs": 1000,
+          "medianMs": 500,
+          "p95Ms": 1000,
+          "over50Ms": 3
+        },
+        "stalls": [
+          {
+            "requestedMs": 250,
+            "actualMs": 250
+          },
+          {
+            "requestedMs": 500,
+            "actualMs": 500
+          },
+          {
+            "requestedMs": 1000,
+            "actualMs": 1000
+          }
+        ]
+      },
+      "cleanup": {
+        "engine": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "stalePullResults": 0,
+          "trackRetries": 0,
+          "cleanupCount": 1,
+          "activeTimers": 0,
+          "engine": {
+            "cleanupCount": 1,
+            "generationResets": 1,
+            "maxUnderrunSeconds": 0,
+            "minScheduledLeadSeconds": 0,
+            "peakLiveSourceNodes": 24,
+            "peakRetainedPcmBytes": 1687552,
+            "retainedPcmBytes": 0,
+            "sourceNodesCreated": 354,
+            "sourceNodesEnded": 336,
+            "sourceNodesStopped": 18,
+            "staleTrackStatePublications": 0,
+            "totalUnderrunSeconds": 0,
+            "underruns": 0
+          }
+        },
+        "provider": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "activeGenerations": 0,
+          "pulls": 55,
+          "publishedChunks": 354,
+          "publishedPcmBytes": 24178688,
+          "publishedMediaSeconds": 62.965333333333376,
+          "disposalsCompleted": 1,
+          "initialTrackStates": {
+            "2": "playable",
+            "3": "playable"
+          }
+        },
+        "context": {
+          "contextsClosed": 1,
+          "contextState": "closed",
+          "sourcesCreated": 354,
+          "sourcesDisconnected": 354,
+          "residualSources": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "trialNumber": 2,
+      "readinessMs": 10.900000005960464,
+      "readinessStates": {
+        "2": "playable",
+        "3": "playable"
+      },
+      "observedPlaybackSeconds": 30.010400000005962,
+      "atReadiness": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 0,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": null,
+          "peakLiveSourceNodes": 0,
+          "peakRetainedPcmBytes": 1536000,
+          "retainedPcmBytes": 1536000,
+          "sourceNodesCreated": 0,
+          "sourceNodesEnded": 0,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "beforeCleanup": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 1,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": 0,
+          "peakLiveSourceNodes": 24,
+          "peakRetainedPcmBytes": 1687552,
+          "retainedPcmBytes": 1306624,
+          "sourceNodesCreated": 356,
+          "sourceNodesEnded": 336,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "responsiveness": {
+        "allTimerIntervals": {
+          "count": 2831,
+          "maxMs": 1002.5,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 3
+        },
+        "naturalTimerIntervals": {
+          "count": 2828,
+          "maxMs": 23,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 0
+        },
+        "longTasks": {
+          "count": 3,
+          "maxMs": 1000,
+          "medianMs": 500,
+          "p95Ms": 1000,
+          "over50Ms": 3
+        },
+        "stalls": [
+          {
+            "requestedMs": 250,
+            "actualMs": 250
+          },
+          {
+            "requestedMs": 500,
+            "actualMs": 500
+          },
+          {
+            "requestedMs": 1000,
+            "actualMs": 1000
+          }
+        ]
+      },
+      "cleanup": {
+        "engine": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "stalePullResults": 0,
+          "trackRetries": 0,
+          "cleanupCount": 1,
+          "activeTimers": 0,
+          "engine": {
+            "cleanupCount": 1,
+            "generationResets": 1,
+            "maxUnderrunSeconds": 0,
+            "minScheduledLeadSeconds": 0,
+            "peakLiveSourceNodes": 24,
+            "peakRetainedPcmBytes": 1687552,
+            "retainedPcmBytes": 0,
+            "sourceNodesCreated": 356,
+            "sourceNodesEnded": 336,
+            "sourceNodesStopped": 20,
+            "staleTrackStatePublications": 0,
+            "totalUnderrunSeconds": 0,
+            "underruns": 0
+          }
+        },
+        "provider": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "activeGenerations": 0,
+          "pulls": 56,
+          "publishedChunks": 356,
+          "publishedPcmBytes": 24231936,
+          "publishedMediaSeconds": 63.10400000000007,
+          "disposalsCompleted": 1,
+          "initialTrackStates": {
+            "2": "playable",
+            "3": "playable"
+          }
+        },
+        "context": {
+          "contextsClosed": 1,
+          "contextState": "closed",
+          "sourcesCreated": 356,
+          "sourcesDisconnected": 356,
+          "residualSources": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "trialNumber": 3,
+      "readinessMs": 7.800000011920929,
+      "readinessStates": {
+        "2": "playable",
+        "3": "playable"
+      },
+      "observedPlaybackSeconds": 30.0105,
+      "atReadiness": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 0,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": null,
+          "peakLiveSourceNodes": 0,
+          "peakRetainedPcmBytes": 1536000,
+          "retainedPcmBytes": 1536000,
+          "sourceNodesCreated": 0,
+          "sourceNodesEnded": 0,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "beforeCleanup": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 1,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": 0,
+          "peakLiveSourceNodes": 26,
+          "peakRetainedPcmBytes": 1687552,
+          "retainedPcmBytes": 1609728,
+          "sourceNodesCreated": 360,
+          "sourceNodesEnded": 336,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "responsiveness": {
+        "allTimerIntervals": {
+          "count": 2831,
+          "maxMs": 1002.5,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.100000023841858,
+          "over50Ms": 3
+        },
+        "naturalTimerIntervals": {
+          "count": 2828,
+          "maxMs": 15.199999988079071,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.100000023841858,
+          "over50Ms": 0
+        },
+        "longTasks": {
+          "count": 3,
+          "maxMs": 1000,
+          "medianMs": 500,
+          "p95Ms": 1000,
+          "over50Ms": 3
+        },
+        "stalls": [
+          {
+            "requestedMs": 250,
+            "actualMs": 250
+          },
+          {
+            "requestedMs": 500,
+            "actualMs": 500
+          },
+          {
+            "requestedMs": 1000,
+            "actualMs": 1000
+          }
+        ]
+      },
+      "cleanup": {
+        "engine": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "stalePullResults": 0,
+          "trackRetries": 0,
+          "cleanupCount": 1,
+          "activeTimers": 0,
+          "engine": {
+            "cleanupCount": 1,
+            "generationResets": 1,
+            "maxUnderrunSeconds": 0,
+            "minScheduledLeadSeconds": 0,
+            "peakLiveSourceNodes": 26,
+            "peakRetainedPcmBytes": 1687552,
+            "retainedPcmBytes": 0,
+            "sourceNodesCreated": 360,
+            "sourceNodesEnded": 336,
+            "sourceNodesStopped": 24,
+            "staleTrackStatePublications": 0,
+            "totalUnderrunSeconds": 0,
+            "underruns": 0
+          }
+        },
+        "provider": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "activeGenerations": 0,
+          "pulls": 56,
+          "publishedChunks": 360,
+          "publishedPcmBytes": 24535040,
+          "publishedMediaSeconds": 63.893333333333395,
+          "disposalsCompleted": 1,
+          "initialTrackStates": {
+            "2": "playable",
+            "3": "playable"
+          }
+        },
+        "context": {
+          "contextsClosed": 1,
+          "contextState": "closed",
+          "sourcesCreated": 360,
+          "sourcesDisconnected": 360,
+          "residualSources": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "trialNumber": 4,
+      "readinessMs": 12.5,
+      "readinessStates": {
+        "2": "playable",
+        "3": "playable"
+      },
+      "observedPlaybackSeconds": 30.01030000001192,
+      "atReadiness": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 0,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": null,
+          "peakLiveSourceNodes": 0,
+          "peakRetainedPcmBytes": 1536000,
+          "retainedPcmBytes": 1536000,
+          "sourceNodesCreated": 0,
+          "sourceNodesEnded": 0,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "beforeCleanup": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 1,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": 0,
+          "peakLiveSourceNodes": 26,
+          "peakRetainedPcmBytes": 1687552,
+          "retainedPcmBytes": 1419264,
+          "sourceNodesCreated": 364,
+          "sourceNodesEnded": 342,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "responsiveness": {
+        "allTimerIntervals": {
+          "count": 2831,
+          "maxMs": 1000.1999999880791,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 3
+        },
+        "naturalTimerIntervals": {
+          "count": 2828,
+          "maxMs": 25,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 0
+        },
+        "longTasks": {
+          "count": 3,
+          "maxMs": 1000,
+          "medianMs": 500,
+          "p95Ms": 1000,
+          "over50Ms": 3
+        },
+        "stalls": [
+          {
+            "requestedMs": 250,
+            "actualMs": 250
+          },
+          {
+            "requestedMs": 500,
+            "actualMs": 500
+          },
+          {
+            "requestedMs": 1000,
+            "actualMs": 1000
+          }
+        ]
+      },
+      "cleanup": {
+        "engine": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "stalePullResults": 0,
+          "trackRetries": 0,
+          "cleanupCount": 1,
+          "activeTimers": 0,
+          "engine": {
+            "cleanupCount": 1,
+            "generationResets": 1,
+            "maxUnderrunSeconds": 0,
+            "minScheduledLeadSeconds": 0,
+            "peakLiveSourceNodes": 26,
+            "peakRetainedPcmBytes": 1687552,
+            "retainedPcmBytes": 0,
+            "sourceNodesCreated": 364,
+            "sourceNodesEnded": 342,
+            "sourceNodesStopped": 22,
+            "staleTrackStatePublications": 0,
+            "totalUnderrunSeconds": 0,
+            "underruns": 0
+          }
+        },
+        "provider": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "activeGenerations": 0,
+          "pulls": 57,
+          "publishedChunks": 364,
+          "publishedPcmBytes": 24379392,
+          "publishedMediaSeconds": 63.487999999999964,
+          "disposalsCompleted": 1,
+          "initialTrackStates": {
+            "2": "playable",
+            "3": "playable"
+          }
+        },
+        "context": {
+          "contextsClosed": 1,
+          "contextState": "closed",
+          "sourcesCreated": 364,
+          "sourcesDisconnected": 364,
+          "residualSources": 0
+        }
+      },
+      "errors": []
+    },
+    {
+      "trialNumber": 5,
+      "readinessMs": 7.0999999940395355,
+      "readinessStates": {
+        "2": "playable",
+        "3": "playable"
+      },
+      "observedPlaybackSeconds": 30.0075,
+      "atReadiness": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 0,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": null,
+          "peakLiveSourceNodes": 0,
+          "peakRetainedPcmBytes": 1536000,
+          "retainedPcmBytes": 1536000,
+          "sourceNodesCreated": 0,
+          "sourceNodesEnded": 0,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "beforeCleanup": {
+        "generationsOpened": 1,
+        "generationsCancelled": 0,
+        "stalePullResults": 0,
+        "trackRetries": 0,
+        "cleanupCount": 0,
+        "activeTimers": 1,
+        "engine": {
+          "cleanupCount": 0,
+          "generationResets": 1,
+          "maxUnderrunSeconds": 0,
+          "minScheduledLeadSeconds": 0,
+          "peakLiveSourceNodes": 24,
+          "peakRetainedPcmBytes": 1687552,
+          "retainedPcmBytes": 1306624,
+          "sourceNodesCreated": 354,
+          "sourceNodesEnded": 336,
+          "sourceNodesStopped": 0,
+          "staleTrackStatePublications": 0,
+          "totalUnderrunSeconds": 0,
+          "underruns": 0
+        }
+      },
+      "responsiveness": {
+        "allTimerIntervals": {
+          "count": 2830,
+          "maxMs": 1004.5999999940395,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 3
+        },
+        "naturalTimerIntervals": {
+          "count": 2827,
+          "maxMs": 26,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 11.099999994039536,
+          "over50Ms": 0
+        },
+        "longTasks": {
+          "count": 3,
+          "maxMs": 1000,
+          "medianMs": 500,
+          "p95Ms": 1000,
+          "over50Ms": 3
+        },
+        "stalls": [
+          {
+            "requestedMs": 250,
+            "actualMs": 250
+          },
+          {
+            "requestedMs": 500,
+            "actualMs": 500
+          },
+          {
+            "requestedMs": 1000,
+            "actualMs": 1000
+          }
+        ]
+      },
+      "cleanup": {
+        "engine": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "stalePullResults": 0,
+          "trackRetries": 0,
+          "cleanupCount": 1,
+          "activeTimers": 0,
+          "engine": {
+            "cleanupCount": 1,
+            "generationResets": 1,
+            "maxUnderrunSeconds": 0,
+            "minScheduledLeadSeconds": 0,
+            "peakLiveSourceNodes": 24,
+            "peakRetainedPcmBytes": 1687552,
+            "retainedPcmBytes": 0,
+            "sourceNodesCreated": 354,
+            "sourceNodesEnded": 336,
+            "sourceNodesStopped": 18,
+            "staleTrackStatePublications": 0,
+            "totalUnderrunSeconds": 0,
+            "underruns": 0
+          }
+        },
+        "provider": {
+          "generationsOpened": 1,
+          "generationsCancelled": 1,
+          "activeGenerations": 0,
+          "pulls": 55,
+          "publishedChunks": 354,
+          "publishedPcmBytes": 24195072,
+          "publishedMediaSeconds": 63.00800000000008,
+          "disposalsCompleted": 1,
+          "initialTrackStates": {
+            "2": "playable",
+            "3": "playable"
+          }
+        },
+        "context": {
+          "contextsClosed": 1,
+          "contextState": "closed",
+          "sourcesCreated": 354,
+          "sourcesDisconnected": 354,
+          "residualSources": 0
+        }
+      },
+      "errors": []
+    }
+  ],
+  "evaluation": {
+    "readiness": {
+      "count": 5,
+      "maxMs": 12.5,
+      "medianMs": 8.5,
+      "p95Ms": 12.5,
+      "over50Ms": 0
+    },
+    "gates": {
+      "fiveCompleteTrials": true,
+      "medianReadinessBelow100MsAndBothBaselines": true,
+      "p95ReadinessBelow250Ms": true,
+      "peakPcmAtMost2MiB": true,
+      "zeroUnderruns": true,
+      "naturalTimerP95AtMost25Ms": true,
+      "sourceChurnAtMost14PerSecond": true,
+      "allStallsObserved": true,
+      "allTracksCrossReadinessBarrier": true,
+      "cleanup": true
+    },
+    "passed": true
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+  "limitation": "New 40-second two-stereo-AAC continuous fixture; preserves existing numerical gates but is not the historical #109 controlled fixture comparison.",
+  "activationCount": 1,
+  "presentationPollingIntervalMs": 20
+}

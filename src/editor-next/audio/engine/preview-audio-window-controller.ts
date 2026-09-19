@@ -231,12 +231,12 @@ export function createPreviewAudioWindowController(
 		);
 		engine.pause();
 		invalidate();
-		if (desiredPlaying && contextLifecycle.isRunning())
-			setPlaybackState("buffering");
 		failures.clear();
 		const owned = open(startSeconds);
 		active = owned;
 		engine.beginGeneration({ generationId: owned.generation.id, startSeconds });
+		if (desiredPlaying && contextLifecycle.isRunning())
+			setPlaybackState("buffering");
 		notify();
 		const pending = (async () => {
 			if (startSeconds >= provider.durationSeconds) {

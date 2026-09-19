@@ -42,6 +42,94 @@ afterEach(() => {
 });
 
 describe("useNativePreviewTransport", () => {
+	it("uses one presentation time for video and Playhead without seeking the audio scheduler", async () => {
+		const { frameCallbacks } = stubPreviewAnimationFrames();
+		const engine = createPreviewAudioEngineSpy();
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.setCurrentTimeSeconds(5);
+		engine.getPresentationTime.mockReturnValue(4.6);
+		engine.setTime.mockClear();
+		runNextPreviewFrame(frameCallbacks);
+		expect(readState()).toContain("playhead:4600000");
+		expect(
+			(screen.getByLabelText("Preview video") as HTMLVideoElement).currentTime,
+		).toBe(4.6);
+		expect(engine.setTime).not.toHaveBeenCalled();
+	});
+
+	it("wraps once at rendering end even while output presentation is behind", async () => {
+		stubPreviewAnimationFrames();
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		render(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				selection={{ startUs: 4_000_000, endUs: 8_000_000 }}
+			/>,
+		);
+		fireEvent.click(screen.getByText("Toggle loop"));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.setCurrentTimeSeconds(7.9);
+		engine.getPresentationTime.mockReturnValue(7.5);
+		fireEvent.timeUpdate(screen.getByLabelText("Preview video"));
+		engine.setTime.mockClear();
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(8);
+		engine.setCurrentTimeSeconds(8);
+		engine.getPresentationTime.mockReturnValue(7.6);
+		fireEvent.timeUpdate(screen.getByLabelText("Preview video"));
+		expect(engine.setTime).toHaveBeenCalledExactlyOnceWith(4);
+		expect(readState()).toContain("playhead:4000000");
+		engine.getPresentationTime.mockReturnValue(4);
+		fireEvent.timeUpdate(screen.getByLabelText("Preview video"));
+		expect(engine.setTime).toHaveBeenCalledTimes(1);
+	});
+
+	it("finishes only at rendering media end, with delayed presentation unable to truncate audio", async () => {
+		const { frameCallbacks } = stubPreviewAnimationFrames();
+		const engine = createPreviewAudioEngineSpy();
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.pause.mockClear();
+		engine.setCurrentTimeSeconds(11.9);
+		engine.getPresentationTime.mockReturnValue(11.5);
+		runNextPreviewFrame(frameCallbacks);
+		expect(engine.pause).not.toHaveBeenCalled();
+		engine.setCurrentTimeSeconds(12);
+		runNextPreviewFrame(frameCallbacks);
+		expect(engine.pause).toHaveBeenCalledOnce();
+		expect(readState()).toContain("playhead:12000000");
+		expect(readState()).toContain("playing:false");
+	});
+
+	it("resumes the visible paused frame with output timing, preserving explicit seek precedence", async () => {
+		stubPreviewAnimationFrames();
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.setCurrentTimeSeconds(5);
+		engine.getPresentationTime.mockReturnValue(4.6);
+		fireEvent.timeUpdate(screen.getByLabelText("Preview video"));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		expect(readState()).toContain("playing:false");
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		expect(engine.setTime).toHaveBeenLastCalledWith(4.6);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		fireEvent.click(screen.getByText("Seek to sync event"));
+		engine.getPresentationTime.mockReturnValue(2);
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		expect(engine.setTime).toHaveBeenLastCalledWith(2);
+	});
+
 	it("ignores keyboard Play when the audio context is closed", async () => {
 		const engine = createPreviewAudioEngineSpy();
 		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
@@ -1147,7 +1235,7 @@ function NativePreviewTransportProbe({
 	onTransport,
 	previewClockMode = "audio-master",
 	seekTargetUs = 2_000_000,
-	selection = { endUs: 12_000_000, startUs: 0 },
+	selection = defaultSelection,
 	source = previewSource,
 }: {
 	durationUs?: number;
@@ -1272,6 +1360,7 @@ function createPreviewAudioEngineSpy({
 			};
 		},
 		getCurrentTime: vi.fn(() => currentTime),
+		getPresentationTime: vi.fn(() => currentTime),
 		pause: vi.fn(() => setPlaybackState("paused")),
 		play: vi.fn(async () => setPlaybackState("playing")),
 		readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),

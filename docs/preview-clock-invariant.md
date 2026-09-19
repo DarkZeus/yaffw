@@ -87,6 +87,18 @@ returns iterators, closes caller-owned samples, disposes the input, and drops
 all queued PCM references. See
 [production verification](./verification/production-preview-audio-window.md).
 
+## Output-time evaluation
+
+[#113's output-time candidate](./verification/preview-output-timing.md) separates
+presentation reads from rendering time, but remains disabled in production.
+The experimental mapper projects browser output timestamp pairs through the
+scheduler epoch for video/Playhead presentation. Rendering time still determines
+Selection entry, source clipping, wrap commands and media end. It does not add an
+output-drain phase or change export inputs. Invalid/unsupported output timestamps
+fall back to rendering time; seek, pause/recovery, buffering and rate changes
+invalidate presentation history with the scheduler epoch. See the evaluation for
+boundary semantics, measurement limitations and the gate required for enablement.
+
 ## Export boundary
 
 Export jobs continue to use the original source media plus the committed

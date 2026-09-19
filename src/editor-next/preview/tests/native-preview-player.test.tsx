@@ -38,6 +38,7 @@ const adapterMockState = vi.hoisted(() => ({
 	previewAudioEngines: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
 		getCurrentTime: ReturnType<typeof vi.fn>;
+		getPresentationTime: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
 		getStatus: ReturnType<typeof vi.fn>;
@@ -325,6 +326,7 @@ beforeEach(() => {
 		const previewAudioEngine = {
 			destroy: vi.fn(),
 			getCurrentTime: vi.fn(() => currentTimeSeconds),
+			getPresentationTime: vi.fn(() => currentTimeSeconds),
 			getStatus: vi.fn(() => "ready"),
 			getPlaybackState: vi.fn(() => playbackState),
 			getMetrics: vi.fn(),

@@ -37,6 +37,7 @@ it("applies the production default audio mix before exposing a ready trial engin
 		retryTrack: vi.fn(),
 		setPlaybackEnd: vi.fn(),
 		getCurrentTime: vi.fn(),
+		getPresentationTime: vi.fn(),
 		getStatus: () => "ready",
 		pause: vi.fn(),
 		play: vi.fn(),

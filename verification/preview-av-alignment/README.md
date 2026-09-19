@@ -189,3 +189,42 @@ measurements with browser timing or zeros.
 6. Apply the fixed comparison gate above. If Bluetooth or calibrated capture is
    unavailable, say so explicitly. This limitation is an allowed outcome of
    #112, not evidence that those configurations pass.
+
+## #113 paired candidate comparison
+
+`browser-comparison.mjs` retains the #112 collector, fixture, event report schema,
+thresholds and uncertainty budget unchanged. It runs five paired independent
+imports at each speed, reversing both rate order and baseline/candidate order on
+alternate repetitions (30 trials). Use the same verified output route and keep
+the window visible. Do not edit the application while collecting evidence.
+
+```sh
+YAFFW_HEADED=1 YAFFW_PLAYWRIGHT_PATH=/Users/fuad/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright node verification/preview-av-alignment/browser-comparison.mjs
+```
+
+The existing server must already be running at `127.0.0.1:3000`. No server is
+started. The sole application intervention is the Vite module
+`/src/editor-next/audio/engine/preview-output-timing-enabled.ts`: its disabled
+export is delivered unchanged for baseline and changed from `false` to `true`
+for candidate. Each trial records the URL and original/delivered SHA-256. No
+other asset is replaced. The runner records per-trial UTC start/end times and a
+SHA-256 snapshot of every source file, rejecting a run whose source changes
+during collection. This measures the actual candidate through native
+Preview controls; it does not simulate timestamp pairs or replace the engine.
+
+Results default to `/tmp/yaffw-113-comparison.json`; the same output-path,
+configuration, repetition and pilot environment variables apply. Failures are
+retained, with raw capture when available, and do not count as qualified pairs.
+A pair requires both members from the same repetition and rate to meet #112
+coverage. Duplicated, missing, failed or invalid members cannot qualify. The
+summary retains signed and absolute trial-median statistics, paired absolute
+improvement (positive means improvement), combined browser budget, and every
+pair including unfavorable outcomes. Per-event signed offsets, exclusions and
+raw timing stay in the original trial reports. A failed coverage gate exits
+unsuccessfully after saving the evidence; pilot evidence cannot authorize release.
+
+Browser comparisons are diagnostic only. Without separately calibrated physical
+paired captures and verified output routes, physical uncertainty stays `null`,
+the physical gate is inconclusive, and candidate enablement remains false even
+if all browser offsets improve. Apply the unchanged physical gate above before
+considering production enablement.
