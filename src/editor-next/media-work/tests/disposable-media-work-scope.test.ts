@@ -20,7 +20,7 @@ describe("disposable media work scope", () => {
 		const cleanup = vi.fn(() => {
 			calls.push("cleanup");
 		});
-		const scope = createDisposableMediaWorkScope();
+		const scope = createDisposableMediaWorkScope(vi.fn());
 
 		scope.registerDisposable({ dispose });
 		scope.registerClosable({ close });
@@ -99,6 +99,21 @@ describe("disposable media work scope", () => {
 			reason: "The media work was cancelled.",
 			status: "unavailable",
 		});
+		expect(dispose).toHaveBeenCalledTimes(1);
+	});
+
+	it("fails pending work and cleans up after an idle source failure", async () => {
+		const dispose = vi.fn();
+		const failure = new Error("Blob became unreadable.");
+
+		await expect(
+			withDisposableMediaWorkScope((scope) => {
+				scope.registerDisposable({ dispose });
+				scope.handleUnhandledSourceError(failure);
+
+				return new Promise<never>(() => undefined);
+			}),
+		).rejects.toBe(failure);
 		expect(dispose).toHaveBeenCalledTimes(1);
 	});
 });

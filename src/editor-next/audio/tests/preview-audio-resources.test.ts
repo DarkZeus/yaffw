@@ -124,7 +124,9 @@ function createInputTrack(overrides: Record<string, unknown> = {}) {
 	return {
 		canDecode: vi.fn(async () => true),
 		computeDuration: vi.fn(async () => 10),
+		getCodec: vi.fn(async () => "aac"),
 		getFirstTimestamp: vi.fn(async () => 0.75),
+		getPreRollDuration: vi.fn(async () => 0),
 		getNumberOfChannels: vi.fn(async () => 2),
 		getSampleRate: vi.fn(async () => 48_000),
 		id: "audio-1",

@@ -1,12 +1,18 @@
-import type { EncodedPacket, EncodedPacketSink } from "mediabunny";
+import type {
+	EncodedPacket,
+	EncodedPacketSink,
+	VideoSample,
+	VideoSampleSink,
+} from "mediabunny";
 
 import type { MediaTimeUs } from "@/editor-core/model";
+import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 import { createKeyframeIndex } from "./keyframe-index";
 import { createScrubFrameCache } from "./scrub-frame-cache";
 
 const DEFAULT_MAX_OUTPUT_DIMENSION_PX = 1280;
 const EXACT_SETTLE_DELAY_MS = 120;
-const EXACT_PREFETCH_PACKET_COUNT = 24;
+const EXACT_PREFETCH_SAMPLE_COUNT = 24;
 
 export type ScrubFrame = {
 	actualTimestampUs: MediaTimeUs;
@@ -46,14 +52,6 @@ type PendingScrubFrameRequest = {
 	timestampUs: MediaTimeUs;
 };
 
-type FrameWaiter = {
-	actualTimestampUs: MediaTimeUs;
-	promise: Promise<boolean>;
-	request: PendingScrubFrameRequest;
-	resolve: (rendered: boolean) => void;
-	resolved: boolean;
-};
-
 export function createMediabunnyScrubFrameProvider({
 	displayHeight,
 	displayWidth,
@@ -63,6 +61,7 @@ export function createMediabunnyScrubFrameProvider({
 	source,
 }: ScrubFrameProviderRequest): ScrubFrameProvider {
 	const requestSource = new LatestScrubFrameRequestSource();
+	const sourceFailure = createMediaSourceFailureBoundary();
 	const decodedFrames = createScrubFrameCache({
 		byteBudget: 96 * 1024 * 1024,
 		frameDurationUs,
@@ -76,20 +75,19 @@ export function createMediabunnyScrubFrameProvider({
 		| CanvasRenderingContext2D
 		| OffscreenCanvasRenderingContext2D
 		| null;
-	const frameWaiters = new Map<number, Set<FrameWaiter>>();
+	// One forward sample iterator is the scrub session decoder: requests within
+	// the same GOP keep pulling from it, and a GOP jump or reversal reseeds it.
 	let activeKeySequenceNumber: number | null = null;
-	let decoder: VideoDecoder | null = null;
-	let decoderConfig: VideoDecoderConfig | null = null;
 	let disposed = false;
 	let input: { dispose: () => void } | null = null;
-	let iterator: AsyncGenerator<EncodedPacket, void, unknown> | null = null;
 	let keyframeIndex: ReturnType<typeof createKeyframeIndex> | null = null;
-	let lastSubmittedPacket: EncodedPacket | null = null;
+	let lastDecodedTimestampUs: MediaTimeUs | null = null;
 	let latestRequestId = 0;
 	let packetSink: EncodedPacketSink | null = null;
 	let running: Promise<void> | null = null;
+	let sampleIterator: AsyncGenerator<VideoSample, void, unknown> | null = null;
+	let sampleSink: VideoSampleSink | null = null;
 	let settleTimer: ReturnType<typeof setTimeout> | null = null;
-	let trackRotationDegrees = 0;
 
 	function reportUnavailable(error: unknown) {
 		if (!disposed) {
@@ -97,36 +95,19 @@ export function createMediabunnyScrubFrameProvider({
 		}
 	}
 
-	function handleDecoderOutput(frame: VideoFrame) {
+	function cacheDecodedSample(sample: VideoSample) {
 		try {
 			if (!scratchContext || disposed) {
 				return;
 			}
 
-			drawVideoFrameToOutput({
-				context: scratchContext,
-				frame,
-				height: dimensions.height,
-				rotationDegrees: trackRotationDegrees,
-				width: dimensions.width,
-			});
-			decodedFrames.set(frame.timestamp, scratchCanvas);
-			const waiters = frameWaiters.get(frame.timestamp);
-			if (!waiters) {
-				return;
-			}
-
-			frameWaiters.delete(frame.timestamp);
-			for (const waiter of waiters) {
-				const rendered = emitDecodedFrame(
-					waiter.request,
-					waiter.actualTimestampUs,
-				);
-				waiter.resolved = true;
-				waiter.resolve(rendered);
-			}
+			scratchContext.clearRect(0, 0, dimensions.width, dimensions.height);
+			// The sample carries the track's rotation and flip metadata.
+			sample.drawWithFit(scratchContext, { fit: "fill" });
+			decodedFrames.set(sample.microsecondTimestamp, scratchCanvas);
+			lastDecodedTimestampUs = sample.microsecondTimestamp;
 		} finally {
-			frame.close();
+			sample.close();
 		}
 	}
 
@@ -153,92 +134,6 @@ export function createMediabunnyScrubFrameProvider({
 		return true;
 	}
 
-	function createFrameWaiter(
-		actualTimestampUs: MediaTimeUs,
-		request: PendingScrubFrameRequest,
-	): FrameWaiter {
-		let resolvePromise: (rendered: boolean) => void = () => undefined;
-		const promise = new Promise<boolean>((resolve) => {
-			resolvePromise = resolve;
-		});
-		const waiter: FrameWaiter = {
-			actualTimestampUs,
-			promise,
-			request,
-			resolve: resolvePromise,
-			resolved: false,
-		};
-		let timestampWaiters = frameWaiters.get(actualTimestampUs);
-		if (!timestampWaiters) {
-			timestampWaiters = new Set();
-			frameWaiters.set(actualTimestampUs, timestampWaiters);
-		}
-		timestampWaiters.add(waiter);
-		return waiter;
-	}
-
-	function removeFrameWaiter(waiter: FrameWaiter) {
-		const waiters = frameWaiters.get(waiter.actualTimestampUs);
-		waiters?.delete(waiter);
-		if (waiters?.size === 0) {
-			frameWaiters.delete(waiter.actualTimestampUs);
-		}
-		waiter.resolved = true;
-		waiter.resolve(false);
-	}
-
-	function resolveFrameWaiters(rendered: boolean) {
-		for (const waiters of frameWaiters.values()) {
-			for (const waiter of waiters) {
-				waiter.resolved = true;
-				waiter.resolve(rendered);
-			}
-		}
-		frameWaiters.clear();
-	}
-
-	function ensureDecoder() {
-		if (decoder || !decoderConfig) {
-			return;
-		}
-
-		decoder = new VideoDecoder({
-			error(error) {
-				reportUnavailable(error);
-				resolveFrameWaiters(false);
-			},
-			output: handleDecoderOutput,
-		});
-		decoder.configure(decoderConfig);
-	}
-
-	function reseedDecoder() {
-		ensureDecoder();
-		if (!decoder || !decoderConfig) {
-			return;
-		}
-
-		if (decoder.state === "configured") {
-			decoder.reset();
-		}
-		decoder.configure(decoderConfig);
-		resolveFrameWaiters(false);
-		lastSubmittedPacket = null;
-	}
-
-	async function decodePacket(packet: EncodedPacket) {
-		ensureDecoder();
-		if (!decoder || decoder.state !== "configured") {
-			return;
-		}
-
-		while (decoder.decodeQueueSize > 2 && !disposed) {
-			await waitForDecoderDequeue(decoder);
-		}
-		decoder.decode(packet.toEncodedVideoChunk());
-		lastSubmittedPacket = packet;
-	}
-
 	async function resolveKeyPacket(timestampSeconds: number) {
 		if (!packetSink) {
 			return null;
@@ -247,11 +142,18 @@ export function createMediabunnyScrubFrameProvider({
 		return packetSink.getKeyPacket(indexedTimestamp ?? timestampSeconds);
 	}
 
-	async function seedAtKeyPacket(keyPacket: EncodedPacket) {
+	async function closeSampleIterator() {
+		const iterator = sampleIterator;
+		sampleIterator = null;
+		activeKeySequenceNumber = null;
+		lastDecodedTimestampUs = null;
 		await iterator?.return();
-		iterator = packetSink?.packets(keyPacket) ?? null;
+	}
+
+	async function seedAtKeyPacket(keyPacket: EncodedPacket) {
+		await closeSampleIterator();
+		sampleIterator = sampleSink?.samples(keyPacket.timestamp) ?? null;
 		activeKeySequenceNumber = keyPacket.sequenceNumber;
-		reseedDecoder();
 	}
 
 	async function showCachedExact(request: PendingScrubFrameRequest) {
@@ -286,66 +188,47 @@ export function createMediabunnyScrubFrameProvider({
 		if (!keyPacket || request.id !== latestRequestId || disposed) {
 			return;
 		}
-		const canReuseCursor =
-			iterator !== null &&
-			decoder?.state === "configured" &&
+		const canReuseIterator =
+			sampleIterator !== null &&
 			activeKeySequenceNumber === keyPacket.sequenceNumber &&
-			lastSubmittedPacket !== null &&
-			lastSubmittedPacket.sequenceNumber <= targetPacket.sequenceNumber;
-		if (!canReuseCursor) {
+			lastDecodedTimestampUs !== null &&
+			lastDecodedTimestampUs < actualTimestampUs;
+		if (!canReuseIterator) {
 			await seedAtKeyPacket(keyPacket);
 		}
-		if (!iterator || request.id !== latestRequestId || disposed) {
-			return;
-		}
-		const targetWaiter = createFrameWaiter(actualTimestampUs, request);
 
-		let passedTarget = false;
-		let packetsAfterTarget = 0;
-		while (request.id === latestRequestId && !disposed) {
-			const next = await iterator.next();
-			if (next.done || !next.value) {
+		let emitted = false;
+		let samplesAfterTarget = 0;
+		while (
+			sampleIterator &&
+			request.id === latestRequestId &&
+			!disposed &&
+			samplesAfterTarget < EXACT_PREFETCH_SAMPLE_COUNT
+		) {
+			const next = await sampleIterator.next();
+			if (next.done) {
+				await closeSampleIterator();
 				break;
 			}
-			await decodePacket(next.value);
-			if (next.value.sequenceNumber >= targetPacket.sequenceNumber) {
-				passedTarget = true;
+			const timestampUs = next.value.microsecondTimestamp;
+			cacheDecodedSample(next.value);
+			if (timestampUs >= actualTimestampUs) {
+				samplesAfterTarget += 1;
 			}
-			if (passedTarget) {
-				packetsAfterTarget += 1;
-			}
-			if (
-				targetWaiter.resolved &&
-				packetsAfterTarget >= EXACT_PREFETCH_PACKET_COUNT
-			) {
-				break;
-			}
-			if (packetsAfterTarget >= EXACT_PREFETCH_PACKET_COUNT * 2) {
-				break;
+			if (!emitted && timestampUs === actualTimestampUs) {
+				emitted = emitDecodedFrame(request, actualTimestampUs);
 			}
 		}
-		if (request.id !== latestRequestId || disposed) {
-			removeFrameWaiter(targetWaiter);
-			return;
-		}
-
-		if (!targetWaiter.resolved && decoder) {
-			await decoder.flush();
-			activeKeySequenceNumber = null;
-			await iterator?.return();
-			iterator = null;
-		}
-		if (!targetWaiter.resolved) {
-			removeFrameWaiter(targetWaiter);
-			return;
-		}
-		await targetWaiter.promise;
 	}
 
 	async function consumeFrames() {
-		const { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } = await import(
-			"mediabunny"
-		);
+		const {
+			ALL_FORMATS,
+			BlobSource,
+			EncodedPacketSink,
+			Input,
+			VideoSampleSink,
+		} = await import("mediabunny");
 		if (disposed) {
 			return;
 		}
@@ -355,7 +238,9 @@ export function createMediabunnyScrubFrameProvider({
 
 		const mediaInput = new Input({
 			formats: ALL_FORMATS,
-			source: new BlobSource(source),
+			source: new BlobSource(source, {
+				handleUnhandledError: sourceFailure.handleUnhandledError,
+			}),
 		});
 		input = mediaInput;
 		try {
@@ -363,14 +248,7 @@ export function createMediabunnyScrubFrameProvider({
 			if (!videoTrack) {
 				throw new Error("The active media asset has no video track to scrub.");
 			}
-			decoderConfig = await videoTrack.getDecoderConfig();
-			if (!decoderConfig) {
-				throw new Error(
-					"The primary video track has no decoder configuration.",
-				);
-			}
-			const support = await VideoDecoder.isConfigSupported(decoderConfig);
-			if (!support.supported) {
+			if (!(await videoTrack.canDecode())) {
 				throw new Error(
 					"This browser cannot decode the primary video track for scrubbing.",
 				);
@@ -378,8 +256,9 @@ export function createMediabunnyScrubFrameProvider({
 
 			packetSink = new EncodedPacketSink(videoTrack);
 			keyframeIndex = createKeyframeIndex(new EncodedPacketSink(videoTrack));
-			trackRotationDegrees = normalizeRotation(await videoTrack.getRotation());
-			ensureDecoder();
+			sampleSink = new VideoSampleSink(videoTrack, {
+				optimizeForLatency: true,
+			});
 
 			while (!disposed) {
 				const request = await requestSource.next();
@@ -395,9 +274,7 @@ export function createMediabunnyScrubFrameProvider({
 				}
 			}
 		} finally {
-			await iterator?.return();
-			iterator = null;
-			closeDecoder();
+			await closeSampleIterator();
 			mediaInput.dispose();
 			if (input === mediaInput) {
 				input = null;
@@ -407,7 +284,7 @@ export function createMediabunnyScrubFrameProvider({
 
 	function warm() {
 		if (!disposed) {
-			running ??= consumeFrames().catch(reportUnavailable);
+			running ??= sourceFailure.run(consumeFrames()).catch(reportUnavailable);
 		}
 	}
 
@@ -418,17 +295,6 @@ export function createMediabunnyScrubFrameProvider({
 		}
 	}
 
-	function closeDecoder() {
-		try {
-			if (decoder?.state !== "closed") {
-				decoder?.close();
-			}
-		} catch {
-			// Decoder errors may close it before provider cleanup runs.
-		}
-		decoder = null;
-	}
-
 	return {
 		dispose() {
 			if (disposed) {
@@ -437,11 +303,9 @@ export function createMediabunnyScrubFrameProvider({
 			disposed = true;
 			clearSettleTimer();
 			requestSource.close();
-			resolveFrameWaiters(false);
 			decodedFrames.clear();
 			scratchCanvas.width = 0;
 			scratchCanvas.height = 0;
-			closeDecoder();
 			input?.dispose();
 			input = null;
 		},
@@ -539,46 +403,6 @@ function createOutputCanvas(width: number, height: number) {
 	canvas.width = width;
 	canvas.height = height;
 	return canvas;
-}
-
-function drawVideoFrameToOutput({
-	context,
-	frame,
-	height,
-	rotationDegrees,
-	width,
-}: {
-	context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-	frame: VideoFrame;
-	height: number;
-	rotationDegrees: number;
-	width: number;
-}) {
-	context.clearRect(0, 0, width, height);
-	context.save();
-	context.translate(width / 2, height / 2);
-	context.rotate((rotationDegrees * Math.PI) / 180);
-	const swapsDimensions = rotationDegrees % 180 !== 0;
-	const drawWidth = swapsDimensions ? height : width;
-	const drawHeight = swapsDimensions ? width : height;
-	context.drawImage(
-		frame,
-		-drawWidth / 2,
-		-drawHeight / 2,
-		drawWidth,
-		drawHeight,
-	);
-	context.restore();
-}
-
-function normalizeRotation(rotationDegrees: number) {
-	return ((Math.round(rotationDegrees) % 360) + 360) % 360;
-}
-
-function waitForDecoderDequeue(decoder: VideoDecoder) {
-	return new Promise<void>((resolve) => {
-		decoder.addEventListener("dequeue", () => resolve(), { once: true });
-	});
 }
 
 function usableDimension(value: number | undefined) {

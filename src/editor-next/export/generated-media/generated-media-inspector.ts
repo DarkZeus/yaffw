@@ -11,37 +11,48 @@ import type {
 	GeneratedMediaTrackInspection,
 } from "@/editor-core/export-correctness";
 import { resolveMediabunnyInputTrackCodec } from "../../media-work/adapters/mediabunny-input-track-metadata";
+import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 
 export async function inspectGeneratedMediaBlob(
 	blob: Blob,
 ): Promise<GeneratedMediaInspection> {
+	const sourceFailure = createMediaSourceFailureBoundary();
 	const input = new Input({
 		formats: ALL_FORMATS,
-		source: new BlobSource(blob),
+		source: new BlobSource(blob, {
+			handleUnhandledError: sourceFailure.handleUnhandledError,
+		}),
 	});
 
 	try {
-		const [durationSeconds, mimeType, videoTracks, audioTracks] =
-			await Promise.all([
-				input.computeDuration(),
-				readMimeType(input),
-				input.getVideoTracks(),
-				input.getAudioTracks(),
-			]);
-
-		return {
-			container: containerFromMimeType(mimeType),
-			durationUs: secondsToMicroseconds(durationSeconds),
-			mimeType,
-			sizeBytes: blob.size,
-			tracks: {
-				audio: await Promise.all(audioTracks.map(inspectAudioTrack)),
-				video: await Promise.all(videoTracks.map(inspectVideoTrack)),
-			},
-		};
+		return await sourceFailure.run(inspectInput(input, blob.size));
 	} finally {
 		input.dispose();
 	}
+}
+
+async function inspectInput(
+	input: Input,
+	sizeBytes: number,
+): Promise<GeneratedMediaInspection> {
+	const [durationSeconds, mimeType, videoTracks, audioTracks] =
+		await Promise.all([
+			input.computeDuration(),
+			readMimeType(input),
+			input.getVideoTracks(),
+			input.getAudioTracks(),
+		]);
+
+	return {
+		container: containerFromMimeType(mimeType),
+		durationUs: secondsToMicroseconds(durationSeconds),
+		mimeType,
+		sizeBytes,
+		tracks: {
+			audio: await Promise.all(audioTracks.map(inspectAudioTrack)),
+			video: await Promise.all(videoTracks.map(inspectVideoTrack)),
+		},
+	};
 }
 
 async function inspectVideoTrack(

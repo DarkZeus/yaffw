@@ -6,6 +6,7 @@ import {
 	Input,
 } from "mediabunny";
 
+import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 import type {
 	WaveformLaneRequest,
 	WaveformLaneResult,
@@ -24,96 +25,18 @@ export async function loadDecodedWaveformLane({
 }: WaveformLaneLoadRequest): Promise<WaveformLaneResult> {
 	throwIfAborted(signal);
 
+	const sourceFailure = createMediaSourceFailureBoundary();
 	const input = new Input({
 		formats: ALL_FORMATS,
-		source: new BlobSource(source),
+		source: new BlobSource(source, {
+			handleUnhandledError: sourceFailure.handleUnhandledError,
+		}),
 	});
 
 	try {
-		const tracks = await input.getAudioTracks();
-		throwIfAborted(signal);
-
-		const track = tracks[trackIndex];
-
-		if (!track) {
-			return {
-				reason: "The analyzed audio track is no longer available.",
-				status: "unavailable",
-			};
-		}
-
-		if (!(await track.canDecode())) {
-			return {
-				reason: "This browser cannot decode the audio track for waveform use.",
-				status: "unavailable",
-			};
-		}
-		throwIfAborted(signal);
-
-		const assetDurationSeconds = assetDurationUs / 1_000_000;
-		const trackEndTimestamp = await track.computeDuration();
-		throwIfAborted(signal);
-
-		if (
-			!Number.isFinite(assetDurationSeconds) ||
-			assetDurationSeconds <= 0 ||
-			!Number.isFinite(trackEndTimestamp) ||
-			trackEndTimestamp <= 0
-		) {
-			return {
-				reason: "The audio track duration could not be measured.",
-				status: "unavailable",
-			};
-		}
-
-		const sink = new AudioSampleSink(track);
-		const buckets = new Float32Array(WAVEFORM_SAMPLE_COUNT);
-		let framesRead = 0;
-		let sampleRate = 0;
-		const iterator = sink
-			.samples(0, Math.min(assetDurationSeconds, trackEndTimestamp))
-			[Symbol.asyncIterator]();
-
-		try {
-			while (true) {
-				throwIfAborted(signal);
-
-				const { done, value } = await iterator.next();
-				if (done) {
-					break;
-				}
-
-				throwIfAborted(signal);
-
-				const sample = value;
-				try {
-					throwIfAborted(signal);
-					sampleRate = sample.sampleRate;
-					addAudioSampleToBuckets({
-						buckets,
-						mediaDurationSeconds: assetDurationSeconds,
-						sample,
-					});
-					framesRead += sample.numberOfFrames;
-				} finally {
-					sample.close();
-				}
-			}
-		} finally {
-			await iterator.return?.();
-		}
-
-		if (framesRead === 0 || sampleRate === 0) {
-			return {
-				reason: "No audio samples were decoded for this track.",
-				status: "unavailable",
-			};
-		}
-
-		return {
-			samples: normalizeBuckets(buckets),
-			status: "ready",
-		};
+		return await sourceFailure.run(
+			decodeWaveformLane({ assetDurationUs, input, signal, trackIndex }),
+		);
 	} catch (error) {
 		if (signal?.aborted || isWaveformAbortError(error)) {
 			throw createWaveformAbortError();
@@ -126,6 +49,103 @@ export async function loadDecodedWaveformLane({
 	} finally {
 		input.dispose();
 	}
+}
+
+async function decodeWaveformLane({
+	assetDurationUs,
+	input,
+	signal,
+	trackIndex,
+}: Pick<
+	WaveformLaneLoadRequest,
+	"assetDurationUs" | "signal" | "trackIndex"
+> & {
+	input: Input;
+}): Promise<WaveformLaneResult> {
+	const tracks = await input.getAudioTracks();
+	throwIfAborted(signal);
+
+	const track = tracks[trackIndex];
+
+	if (!track) {
+		return {
+			reason: "The analyzed audio track is no longer available.",
+			status: "unavailable",
+		};
+	}
+
+	if (!(await track.canDecode())) {
+		return {
+			reason: "This browser cannot decode the audio track for waveform use.",
+			status: "unavailable",
+		};
+	}
+	throwIfAborted(signal);
+
+	const assetDurationSeconds = assetDurationUs / 1_000_000;
+	const trackEndTimestamp = await track.computeDuration();
+	throwIfAborted(signal);
+
+	if (
+		!Number.isFinite(assetDurationSeconds) ||
+		assetDurationSeconds <= 0 ||
+		!Number.isFinite(trackEndTimestamp) ||
+		trackEndTimestamp <= 0
+	) {
+		return {
+			reason: "The audio track duration could not be measured.",
+			status: "unavailable",
+		};
+	}
+
+	const sink = new AudioSampleSink(track);
+	const buckets = new Float32Array(WAVEFORM_SAMPLE_COUNT);
+	let framesRead = 0;
+	let sampleRate = 0;
+	const iterator = sink
+		.samples(0, Math.min(assetDurationSeconds, trackEndTimestamp))
+		[Symbol.asyncIterator]();
+
+	try {
+		while (true) {
+			throwIfAborted(signal);
+
+			const { done, value } = await iterator.next();
+			if (done) {
+				break;
+			}
+
+			throwIfAborted(signal);
+
+			const sample = value;
+			try {
+				throwIfAborted(signal);
+				sampleRate = sample.sampleRate;
+				addAudioSampleToBuckets({
+					buckets,
+					mediaDurationSeconds: assetDurationSeconds,
+					sample,
+				});
+				framesRead += sample.numberOfFrames;
+			} finally {
+				sample.close();
+			}
+		}
+	} finally {
+		await iterator.return?.();
+	}
+
+	if (framesRead === 0 || sampleRate === 0) {
+		return {
+			reason: "No audio samples were decoded for this track.",
+			status: "unavailable",
+		};
+	}
+
+	return {
+		samples: normalizeBuckets(buckets),
+		status: "ready",
+	};
 }
 
 export function addAudioSampleToBuckets({

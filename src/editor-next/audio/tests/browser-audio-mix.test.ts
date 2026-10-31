@@ -103,6 +103,8 @@ type MockAudioTrack = {
 	getNumberOfChannels: ReturnType<typeof vi.fn>;
 	getSampleRate: ReturnType<typeof vi.fn>;
 	id: string;
+	getCodec: () => Promise<string>;
+	getPreRollDuration: () => Promise<number>;
 	sample: ReturnType<typeof createDecodedSample>;
 };
 
@@ -117,6 +119,8 @@ function createAudioTrack(
 		getNumberOfChannels: vi.fn(async () => numberOfChannels),
 		getSampleRate: vi.fn(async () => sampleRate),
 		id,
+		getCodec: async () => "aac",
+		getPreRollDuration: async () => 0,
 		sample: createDecodedSample({ numberOfChannels, sampleRate }),
 	};
 }

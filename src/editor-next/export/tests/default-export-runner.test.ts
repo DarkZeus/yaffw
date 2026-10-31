@@ -334,6 +334,24 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
 	});
 
+	it("forbids copy timestamp shifts that would desync the separate audio mix", async () => {
+		let conversionConfig: MockConversionConfig | undefined;
+		mediabunnyMock.conversionExecute = (_conversion, config) => {
+			conversionConfig = config;
+			return Promise.resolve();
+		};
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
+			audioBuffer: {} as AudioBuffer,
+			includedTrackCount: 1,
+		});
+
+		await browserDefaultExportRunner.run(
+			createExportRequest({ audioMix: includedAudioMix }),
+		);
+
+		expect(conversionConfig?.copy).toEqual({ shiftTolerance: 0 });
+	});
+
 	it("drives video conversion and the Generated audio mix into one Output", async () => {
 		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
 			audioBuffer: {} as AudioBuffer,
@@ -650,6 +668,7 @@ type MockConversion = {
 
 type MockConversionConfig = {
 	composable?: boolean;
+	copy?: unknown;
 	output: MockOutput;
 	video: {
 		codec: string;

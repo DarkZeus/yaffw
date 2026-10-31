@@ -197,6 +197,7 @@ function videoAnalysisFactsForAsset(
 		},
 		{ label: "Frame timing", value: frameTiming },
 		{ label: "Codec", value: formatCodec(primaryVideoTrack?.codec) },
+		{ label: "Bitrate", value: formatBitrate(primaryVideoTrack?.bitrate) },
 	];
 }
 
@@ -226,6 +227,7 @@ function audioAnalysisFactsForAsset(
 			value: formatSampleRate(primaryAudioTrack.sampleRate),
 		},
 		{ label: "Codec", value: formatCodec(primaryAudioTrack.codec) },
+		{ label: "Bitrate", value: formatBitrate(primaryAudioTrack.bitrate) },
 		{ label: "Language", value: formatLanguage(primaryAudioTrack.language) },
 	];
 }
@@ -480,6 +482,16 @@ function formatSampleRate(sampleRate?: number): string {
 	return sampleRate >= 1_000
 		? `${formatNumber(sampleRate / 1_000)} kHz`
 		: `${sampleRate} Hz`;
+}
+
+function formatBitrate(bitrate?: number): string {
+	if (!bitrate || bitrate <= 0) {
+		return "Unknown";
+	}
+
+	return bitrate >= 1_000_000
+		? `${formatNumber(bitrate / 1_000_000)} Mbps`
+		: `${formatNumber(bitrate / 1_000)} kbps`;
 }
 
 function formatCodec(codec?: string, fallback = "Unknown"): string {

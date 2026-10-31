@@ -186,6 +186,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 		mediabunnyMock.getDurationFromMetadata.mockResolvedValueOnce(2.5);
 		mediabunnyMock.getVideoTracks.mockResolvedValueOnce([
 			createVideoTrack({
+				averageBitrate: 8_000_000,
 				codec: "avc",
 				codecParameterString: "avc1.640028",
 				displayHeight: 1080,
@@ -193,6 +194,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 				id: 7,
 				internalCodecId: "avc1",
 				name: "Camera",
+				peakBitrate: 12_000_000,
 			}),
 		]);
 		mediabunnyMock.getAudioTracks.mockResolvedValueOnce([
@@ -204,6 +206,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 				internalCodecId: "mp4a",
 				languageCode: "eng",
 				name: "Voice",
+				peakBitrate: 192_000,
 				sampleRate: 48_000,
 			}),
 			createAudioTrack({
@@ -227,6 +230,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 		).resolves.toEqual({
 			audioTracks: [
 				{
+					bitrate: 192_000,
 					channels: 2,
 					codec: "mp4a.40.2",
 					id: "8",
@@ -251,6 +255,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 			},
 			videoTracks: [
 				{
+					bitrate: 8_000_000,
 					codec: "avc1.640028",
 					height: 1080,
 					id: "7",
@@ -341,6 +346,7 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 });
 
 function createVideoTrack({
+	averageBitrate = null,
 	codec,
 	codecParameterString,
 	displayHeight,
@@ -348,7 +354,9 @@ function createVideoTrack({
 	id,
 	internalCodecId,
 	name,
+	peakBitrate = null,
 }: {
+	averageBitrate?: number | null;
 	codec: string | null;
 	codecParameterString: string | null;
 	displayHeight: number;
@@ -356,9 +364,12 @@ function createVideoTrack({
 	id: number;
 	internalCodecId: string | null;
 	name: string | null;
+	peakBitrate?: number | null;
 }) {
 	return {
-		computePacketStats: vi.fn(async () => ({ averagePacketRate: 30 })),
+		computeFrameRateMetrics: vi.fn(async () => ({ bestGuessFrameRate: 30 })),
+		getAverageBitrate: vi.fn(async () => averageBitrate),
+		getBitrate: vi.fn(async () => peakBitrate),
 		getCodec: vi.fn(async () => codec),
 		getCodecParameterString: vi.fn(async () => codecParameterString),
 		getDisplayHeight: vi.fn(async () => displayHeight),
@@ -370,6 +381,7 @@ function createVideoTrack({
 }
 
 function createAudioTrack({
+	averageBitrate = null,
 	channels,
 	codec,
 	codecParameterString,
@@ -377,8 +389,10 @@ function createAudioTrack({
 	internalCodecId,
 	languageCode,
 	name,
+	peakBitrate = null,
 	sampleRate,
 }: {
+	averageBitrate?: number | null;
 	channels: number;
 	codec: string | null;
 	codecParameterString: string | null;
@@ -386,9 +400,12 @@ function createAudioTrack({
 	internalCodecId: string | null;
 	languageCode: string;
 	name: string | null;
+	peakBitrate?: number | null;
 	sampleRate: number;
 }) {
 	return {
+		getAverageBitrate: vi.fn(async () => averageBitrate),
+		getBitrate: vi.fn(async () => peakBitrate),
 		getCodec: vi.fn(async () => codec),
 		getCodecParameterString: vi.fn(async () => codecParameterString),
 		getInternalCodecId: vi.fn(async () => internalCodecId),

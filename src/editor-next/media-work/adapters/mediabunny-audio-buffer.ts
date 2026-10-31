@@ -1,5 +1,11 @@
 import { AudioSampleSink, EncodedPacketSink } from "mediabunny";
 
+import {
+	AudioPacketTimeline,
+	DecodedAudioTimestampProjector,
+	audioPacketDurationsMaySpanGaps,
+} from "./audio-packet-timeline";
+
 export type MediabunnyAudioFormat = {
 	numberOfChannels: number;
 	sampleRate: number;
@@ -38,18 +44,25 @@ export async function decodeMediabunnyAudioTrackRange({
 		numberOfChannels: format.numberOfChannels,
 		sampleRate: format.sampleRate,
 	});
-	const encodedGaps = await findEncodedAudioGaps({
+	const preRollSeconds = (await track.getPreRollDuration()) ?? 0;
+	const packetTimeline = await readAudioPacketTimeline({
 		endSeconds,
 		sampleRate: format.sampleRate,
 		signal,
-		startSeconds,
+		startSeconds: startSeconds - preRollSeconds,
 		track,
 	});
-	const projectTimestamp = createDecodedTimestampProjector(encodedGaps);
+	const decodeStartSeconds = packetTimeline.decodeStartFor(
+		startSeconds,
+		preRollSeconds,
+	);
+	const timestampProjector = new DecodedAudioTimestampProjector(
+		decodeStartSeconds,
+	);
 	const sink = new AudioSampleSink(track);
 	let copiedFrameCount = 0;
 
-	for await (const sample of sink.samples(startSeconds, endSeconds)) {
+	for await (const sample of sink.samples(decodeStartSeconds, endSeconds)) {
 		throwIfAborted(signal);
 
 		try {
@@ -62,7 +75,11 @@ export async function decodeMediabunnyAudioTrackRange({
 				);
 			}
 
-			const projectedTimestamp = projectTimestamp(sample.timestamp);
+			const projectedTimestamp = timestampProjector.project(
+				sample.timestamp,
+				sample.numberOfFrames / sample.sampleRate,
+				packetTimeline,
+			);
 			const projectedStartFrame = Math.round(
 				(projectedTimestamp - startSeconds) * format.sampleRate,
 			);
@@ -107,12 +124,7 @@ export async function decodeMediabunnyAudioTrackRange({
 	return output;
 }
 
-type EncodedAudioGap = {
-	endSeconds: number;
-	startSeconds: number;
-};
-
-async function findEncodedAudioGaps({
+async function readAudioPacketTimeline({
 	endSeconds,
 	sampleRate,
 	signal,
@@ -124,8 +136,13 @@ async function findEncodedAudioGaps({
 	signal: AbortSignal;
 	startSeconds: number;
 	track: ConstructorParameters<typeof EncodedPacketSink>[0];
-}): Promise<EncodedAudioGap[]> {
-	const packetRanges: EncodedAudioGap[] = [];
+}): Promise<AudioPacketTimeline> {
+	const timeline = new AudioPacketTimeline({
+		packetDurationsMaySpanGaps: audioPacketDurationsMaySpanGaps(
+			await track.getCodec(),
+		),
+		sampleRate,
+	});
 	const sink = new EncodedPacketSink(track);
 
 	for await (const packet of sink.packets(undefined, undefined, {
@@ -133,71 +150,26 @@ async function findEncodedAudioGaps({
 	})) {
 		throwIfAborted(signal);
 		if (
-			Number.isFinite(packet.timestamp) &&
-			Number.isFinite(packet.duration) &&
-			packet.duration > 0 &&
-			packet.timestamp < endSeconds &&
-			packet.timestamp + packet.duration > startSeconds
+			!Number.isFinite(packet.timestamp) ||
+			!Number.isFinite(packet.duration) ||
+			packet.duration <= 0 ||
+			packet.timestamp + packet.duration <= startSeconds
 		) {
-			packetRanges.push({
-				endSeconds: packet.timestamp + packet.duration,
-				startSeconds: packet.timestamp,
-			});
+			continue;
+		}
+
+		timeline.add({
+			endSeconds: packet.timestamp + packet.duration,
+			startSeconds: packet.timestamp,
+		});
+		// One packet past the range bounds a trailing gap.
+		if (packet.timestamp >= endSeconds) {
+			break;
 		}
 	}
 
-	packetRanges.sort((left, right) => left.startSeconds - right.startSeconds);
-	const gaps: EncodedAudioGap[] = [];
-	const gapToleranceSeconds = 2 / sampleRate;
-	let previousEndSeconds: number | null = null;
-
-	for (const packet of packetRanges) {
-		if (
-			previousEndSeconds !== null &&
-			packet.startSeconds - previousEndSeconds > gapToleranceSeconds
-		) {
-			gaps.push({
-				endSeconds: Math.min(endSeconds, packet.startSeconds),
-				startSeconds: Math.max(startSeconds, previousEndSeconds),
-			});
-		}
-
-		previousEndSeconds = Math.max(
-			previousEndSeconds ?? Number.NEGATIVE_INFINITY,
-			packet.endSeconds,
-		);
-	}
-
-	return gaps.filter((gap) => gap.endSeconds > gap.startSeconds);
-}
-
-function createDecodedTimestampProjector(gaps: EncodedAudioGap[]) {
-	let cumulativeCollapsedGapSeconds = 0;
-	let gapIndex = 0;
-
-	return (decodedTimestampSeconds: number) => {
-		let projectedTimestampSeconds =
-			decodedTimestampSeconds + cumulativeCollapsedGapSeconds;
-
-		while (gapIndex < gaps.length) {
-			const gap = gaps[gapIndex];
-
-			if (!gap || projectedTimestampSeconds < gap.startSeconds) {
-				break;
-			}
-
-			gapIndex += 1;
-			if (projectedTimestampSeconds >= gap.endSeconds) {
-				continue;
-			}
-
-			const collapsedGapSeconds = gap.endSeconds - gap.startSeconds;
-			cumulativeCollapsedGapSeconds += collapsedGapSeconds;
-			projectedTimestampSeconds += collapsedGapSeconds;
-		}
-
-		return projectedTimestampSeconds;
-	};
+	timeline.sort();
+	return timeline;
 }
 
 export function createBrowserAudioBuffer({

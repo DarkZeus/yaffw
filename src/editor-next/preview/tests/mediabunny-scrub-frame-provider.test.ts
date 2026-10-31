@@ -1,34 +1,42 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
+	canDecode: true,
 	decodedTimestampsUs: [] as number[],
-	decoderCloses: [] as Array<ReturnType<typeof vi.fn>>,
-	decoderResets: [] as Array<ReturnType<typeof vi.fn>>,
+	drawnSamples: [] as Array<{ fit: string }>,
 	inputDisposals: [] as Array<ReturnType<typeof vi.fn>>,
-	packetIteratorStarts: [] as number[],
 	primaryVideoTrack: {} as object | null,
+	sampleCloses: 0,
+	sampleIteratorReturns: 0,
+	sampleIteratorStarts: [] as number[],
+	sampleSinkOptions: [] as unknown[],
 }));
 
 vi.mock("mediabunny", () => {
 	class MockPacket {
 		microsecondTimestamp: number;
-		type: "delta" | "key";
 
 		constructor(
 			public timestamp: number,
 			public sequenceNumber: number,
-			type?: "delta" | "key",
 		) {
 			this.microsecondTimestamp = Math.round(timestamp * 1_000_000);
-			this.type = type ?? (sequenceNumber % 10 === 0 ? "key" : "delta");
+		}
+	}
+
+	class MockSample {
+		readonly microsecondTimestamp: number;
+
+		constructor(timestamp: number) {
+			this.microsecondTimestamp = Math.round(timestamp * 1_000_000);
 		}
 
-		toEncodedVideoChunk() {
-			return {
-				duration: 1_000_000,
-				timestamp: this.microsecondTimestamp,
-				type: this.type,
-			};
+		close() {
+			mediabunnyMock.sampleCloses += 1;
+		}
+
+		drawWithFit(_context: unknown, options: { fit: string }) {
+			mediabunnyMock.drawnSamples.push(options);
 		}
 	}
 
@@ -39,38 +47,23 @@ vi.mock("mediabunny", () => {
 		},
 		EncodedPacketSink: class EncodedPacketSink {
 			async getFirstKeyPacket() {
-				return new MockPacket(0, 0, "key");
+				return new MockPacket(0, 0);
 			}
 
 			async getNextKeyPacket(packet: MockPacket) {
-				return packet.sequenceNumber < 20
-					? new MockPacket(
-							packet.timestamp + 10,
-							packet.sequenceNumber + 10,
-							"key",
-						)
+				return packet.sequenceNumber < 50
+					? new MockPacket(packet.timestamp + 10, packet.sequenceNumber + 10)
 					: null;
 			}
 
 			async getKeyPacket(timestamp: number) {
 				const sequenceNumber = Math.floor(timestamp / 10) * 10;
-				return new MockPacket(sequenceNumber, sequenceNumber, "key");
+				return new MockPacket(sequenceNumber, sequenceNumber);
 			}
 
 			async getPacket(timestamp: number) {
 				const sequenceNumber = Math.max(0, Math.floor(timestamp));
 				return new MockPacket(sequenceNumber, sequenceNumber);
-			}
-
-			async *packets(startPacket: MockPacket) {
-				mediabunnyMock.packetIteratorStarts.push(startPacket.timestamp);
-				for (
-					let sequenceNumber = startPacket.sequenceNumber;
-					sequenceNumber <= 60;
-					sequenceNumber += 1
-				) {
-					yield new MockPacket(sequenceNumber, sequenceNumber);
-				}
 			}
 		},
 		Input: class Input {
@@ -85,13 +78,29 @@ vi.mock("mediabunny", () => {
 					return null;
 				}
 				return {
-					getDecoderConfig: async () => ({
-						codec: "avc1.640034",
-						codedHeight: 2160,
-						codedWidth: 3840,
-					}),
-					getRotation: async () => 0,
+					canDecode: async () => mediabunnyMock.canDecode,
 				};
+			}
+		},
+		VideoSampleSink: class VideoSampleSink {
+			constructor(_track: unknown, options: unknown) {
+				mediabunnyMock.sampleSinkOptions.push(options);
+			}
+
+			async *samples(startTimestamp: number) {
+				mediabunnyMock.sampleIteratorStarts.push(startTimestamp);
+				try {
+					for (
+						let timestamp = Math.ceil(startTimestamp);
+						timestamp <= 100;
+						timestamp += 1
+					) {
+						mediabunnyMock.decodedTimestampsUs.push(timestamp * 1_000_000);
+						yield new MockSample(timestamp);
+					}
+				} finally {
+					mediabunnyMock.sampleIteratorReturns += 1;
+				}
 			}
 		},
 	};
@@ -101,10 +110,6 @@ class MockOffscreenCanvas {
 	readonly context = {
 		clearRect: vi.fn(),
 		drawImage: vi.fn(),
-		restore: vi.fn(),
-		rotate: vi.fn(),
-		save: vi.fn(),
-		translate: vi.fn(),
 	};
 
 	constructor(
@@ -117,67 +122,22 @@ class MockOffscreenCanvas {
 	}
 }
 
-class MockVideoDecoder extends EventTarget {
-	static async isConfigSupported(config: VideoDecoderConfig) {
-		return { config, supported: true };
-	}
-
-	decodeQueueSize = 0;
-	state: CodecState = "unconfigured";
-	readonly close = vi.fn(() => {
-		this.state = "closed";
-	});
-	readonly reset = vi.fn(() => {
-		this.state = "unconfigured";
-	});
-
-	constructor(
-		private callbacks: {
-			error: (error: DOMException) => void;
-			output: (frame: VideoFrame) => void;
-		},
-	) {
-		super();
-		mediabunnyMock.decoderCloses.push(this.close);
-		mediabunnyMock.decoderResets.push(this.reset);
-	}
-
-	configure(_config: VideoDecoderConfig) {
-		this.state = "configured";
-	}
-
-	decode(chunk: EncodedVideoChunk) {
-		mediabunnyMock.decodedTimestampsUs.push(chunk.timestamp);
-		queueMicrotask(() => {
-			this.callbacks.output({
-				close: vi.fn(),
-				displayHeight: 2160,
-				displayWidth: 3840,
-				timestamp: chunk.timestamp,
-			} as unknown as VideoFrame);
-			this.dispatchEvent(new Event("dequeue"));
-		});
-	}
-
-	async flush() {
-		await Promise.resolve();
-	}
-}
-
 import {
 	createMediabunnyScrubFrameProvider,
 	resolveScrubFrameDimensions,
 } from "../scrub/mediabunny-scrub-frame-provider";
 
 beforeEach(() => {
+	mediabunnyMock.canDecode = true;
 	mediabunnyMock.decodedTimestampsUs = [];
-	mediabunnyMock.decoderCloses = [];
-	mediabunnyMock.decoderResets = [];
+	mediabunnyMock.drawnSamples = [];
 	mediabunnyMock.inputDisposals = [];
-	mediabunnyMock.packetIteratorStarts = [];
 	mediabunnyMock.primaryVideoTrack = {};
+	mediabunnyMock.sampleCloses = 0;
+	mediabunnyMock.sampleIteratorReturns = 0;
+	mediabunnyMock.sampleIteratorStarts = [];
+	mediabunnyMock.sampleSinkOptions = [];
 	vi.stubGlobal("OffscreenCanvas", MockOffscreenCanvas);
-	vi.stubGlobal("VideoDecoder", MockVideoDecoder);
 });
 
 afterEach(() => {
@@ -186,13 +146,16 @@ afterEach(() => {
 });
 
 describe("Mediabunny scrub frame provider", () => {
-	it("warms the packet index and decoder without presenting a frame", async () => {
+	it("warms the packet index and sample sink without presenting a frame", async () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 
 		provider.warm();
-		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		await waitForCondition(() => mediabunnyMock.sampleSinkOptions.length === 1);
 
+		expect(mediabunnyMock.sampleSinkOptions).toEqual([
+			{ optimizeForLatency: true },
+		]);
 		expect(mediabunnyMock.decodedTimestampsUs).toEqual([]);
 		expect(onFrame).not.toHaveBeenCalled();
 		provider.dispose();
@@ -202,7 +165,7 @@ describe("Mediabunny scrub frame provider", () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
-		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		await waitForCondition(() => mediabunnyMock.sampleSinkOptions.length === 1);
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
@@ -237,7 +200,7 @@ describe("Mediabunny scrub frame provider", () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
-		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		await waitForCondition(() => mediabunnyMock.sampleSinkOptions.length === 1);
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "final" });
@@ -257,7 +220,7 @@ describe("Mediabunny scrub frame provider", () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
-		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		await waitForCondition(() => mediabunnyMock.sampleSinkOptions.length === 1);
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
@@ -311,7 +274,7 @@ describe("Mediabunny scrub frame provider", () => {
 		const onFrame = vi.fn();
 		const provider = createProvider(onFrame);
 		provider.warm();
-		await waitForCondition(() => mediabunnyMock.decoderCloses.length === 1);
+		await waitForCondition(() => mediabunnyMock.sampleSinkOptions.length === 1);
 		vi.useFakeTimers();
 
 		provider.requestFrame(8_000_000, { priority: "interactive" });
@@ -324,6 +287,62 @@ describe("Mediabunny scrub frame provider", () => {
 		expect(
 			onFrame.mock.calls.map(([frame]) => frame.actualTimestampUs),
 		).toEqual([9_000_000]);
+		provider.dispose();
+	});
+
+	it("draws samples with their own rotation and flip metadata and closes them", async () => {
+		const onFrame = vi.fn();
+		const provider = createProvider(onFrame);
+
+		provider.requestFrame(8_000_000, { priority: "final" });
+		await waitForCondition(() => onFrame.mock.calls.length === 1);
+		provider.dispose();
+		await waitForCondition(() => mediabunnyMock.sampleIteratorReturns === 1);
+
+		expect(mediabunnyMock.drawnSamples.length).toBeGreaterThan(0);
+		expect(mediabunnyMock.drawnSamples).toEqual(
+			mediabunnyMock.drawnSamples.map(() => ({ fit: "fill" })),
+		);
+		expect(mediabunnyMock.sampleCloses).toBe(
+			mediabunnyMock.decodedTimestampsUs.length,
+		);
+	});
+
+	it("reseeds the sample iterator only for a GOP jump", async () => {
+		const onFrame = vi.fn();
+		const provider = createProvider(onFrame);
+
+		provider.requestFrame(5_000_000, { priority: "final" });
+		await waitForCondition(() => onFrame.mock.calls.length === 1);
+		provider.requestFrame(7_000_000, { priority: "final" });
+		await waitForCondition(() => onFrame.mock.calls.length === 2);
+		expect(mediabunnyMock.sampleIteratorStarts).toEqual([0]);
+
+		provider.requestFrame(45_000_000, { priority: "final" });
+		await waitForCondition(() => onFrame.mock.calls.length === 3);
+
+		expect(mediabunnyMock.sampleIteratorStarts).toEqual([0, 40]);
+		expect(mediabunnyMock.sampleIteratorReturns).toBe(1);
+		expect(onFrame.mock.calls[2]?.[0].actualTimestampUs).toBe(45_000_000);
+		provider.dispose();
+	});
+
+	it("reports an undecodable primary video track", async () => {
+		mediabunnyMock.canDecode = false;
+		const onUnavailable = vi.fn();
+		const provider = createMediabunnyScrubFrameProvider({
+			frameDurationUs: 1_000_000,
+			onFrame: vi.fn(),
+			onUnavailable,
+			source: new Blob(["video"]),
+		});
+
+		provider.requestFrame(1_000_000);
+		await waitForCondition(() => onUnavailable.mock.calls.length === 1);
+
+		expect(onUnavailable).toHaveBeenCalledWith(
+			"This browser cannot decode the primary video track for scrubbing.",
+		);
 		provider.dispose();
 	});
 

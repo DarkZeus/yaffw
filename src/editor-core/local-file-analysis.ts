@@ -12,6 +12,7 @@ import type {
 import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type VideoTrackInspection = {
+	bitrate?: number;
 	codec?: string;
 	height?: number;
 	id: string;
@@ -20,6 +21,7 @@ export type VideoTrackInspection = {
 };
 
 export type AudioTrackInspection = {
+	bitrate?: number;
 	channels?: number;
 	codec?: string;
 	id: string;
@@ -191,6 +193,7 @@ function validateInspection(
 
 function toVideoTrack(track: VideoTrackInspection): VideoMediaTrack {
 	return {
+		bitrate: track.bitrate,
 		codec: track.codec,
 		height: track.height,
 		id: track.id,
@@ -202,6 +205,7 @@ function toVideoTrack(track: VideoTrackInspection): VideoMediaTrack {
 
 function toAudioTrack(track: AudioTrackInspection): AudioMediaTrack {
 	return {
+		bitrate: track.bitrate,
 		channels: track.channels,
 		codec: track.codec,
 		id: track.id,

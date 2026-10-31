@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediaMock = vi.hoisted(() => ({
 	inputs: [] as MockInput[],
+	sourceOptions: [] as Array<{
+		handleUnhandledError?: (error: unknown) => void;
+	}>,
 	tracks: [] as MockTrack[],
 }));
 
@@ -21,7 +24,12 @@ vi.mock("mediabunny", () => ({
 		}
 	},
 	BlobSource: class BlobSource {
-		constructor(readonly blob: Blob) {}
+		constructor(
+			readonly blob: Blob,
+			options: { handleUnhandledError?: (error: unknown) => void } = {},
+		) {
+			mediaMock.sourceOptions.push(options);
+		}
 	},
 	EncodedPacketSink: class EncodedPacketSink {
 		constructor(private readonly track: MockTrack) {}
@@ -76,6 +84,7 @@ import { createMediaWindowProvider } from "../engine/media-window-provider";
 
 beforeEach(() => {
 	mediaMock.inputs = [];
+	mediaMock.sourceOptions = [];
 	mediaMock.tracks = [];
 	vi.stubGlobal("AudioBuffer", FakeAudioBuffer);
 });
@@ -348,6 +357,65 @@ describe("createMediaWindowProvider", () => {
 		await provider.dispose();
 	});
 
+	it.each([
+		{
+			label: "from the start",
+			startSeconds: 0,
+			expectedStarts: [0, 0.2, 0.4, 1.4, 1.6],
+		},
+		{ label: "inside the gap", startSeconds: 0.7, expectedStarts: [1.4, 1.6] },
+	])(
+		"restores a gap hidden inside an inferred packet duration $label",
+		async ({ expectedStarts, startSeconds }) => {
+			const decodedSamples = [0, 0.2, 0.4, 0.6, 0.8]
+				.filter((timestamp) => timestamp + 0.2 > Math.min(startSeconds, 0.4))
+				.map((timestamp) =>
+					createAudioSample({
+						channels: [[1, 2]],
+						sampleRate: 10,
+						timestamp,
+					}),
+				);
+			// Containers that infer each duration from the next packet make the
+			// packet at 0.4 s appear to span the real 0.6–1.4 s gap.
+			mediaMock.tracks = [
+				createTrack({
+					iterators: [createSampleIterator(decodedSamples)],
+					packets: [
+						createPacket(0, 0.2),
+						createPacket(0.2, 0.2),
+						createPacket(0.4, 1),
+						createPacket(1.4, 0.2),
+						createPacket(1.6, 0.2),
+					],
+				}),
+			];
+			const provider = await createMediaWindowProvider({
+				source: new Blob(["matroska gap fixture"]),
+			});
+			const generation = provider.openGeneration({
+				signal: new AbortController().signal,
+				startSeconds,
+			});
+
+			const gapWindow = await generation.pullThrough(1.2);
+			const afterGap = await generation.pullThrough(1.8);
+
+			const playedStarts = [gapWindow, afterGap].flatMap((result) =>
+				result.tracks.flatMap((track) =>
+					track.kind === "playable"
+						? track.chunks.map((chunk) => chunk.startSeconds)
+						: [],
+				),
+			);
+			expect(playedStarts.map((value) => Number(value.toFixed(5)))).toEqual(
+				expectedStarts,
+			);
+
+			await provider.dispose();
+		},
+	);
+
 	it("anchors collapsed timestamps after seeking beyond an earlier gap", async () => {
 		const afterSeek = createAudioSample({
 			channels: [[9, 10]],
@@ -454,6 +522,34 @@ describe("createMediaWindowProvider", () => {
 		]);
 		expect(sample.close).toHaveBeenCalledOnce();
 
+		await provider.dispose();
+	});
+
+	it("fails every track when the source errors while no read is pending", async () => {
+		mediaMock.tracks = [
+			createTrack({ iterators: [], packets: [createPacket(0, 0.1)] }),
+		];
+		const provider = await createMediaWindowProvider({
+			source: new Blob(["fixture"]),
+		});
+
+		mediaMock.sourceOptions[0]?.handleUnhandledError?.(
+			new Error("The file could not be read."),
+		);
+		const result = await provider
+			.openGeneration({
+				signal: new AbortController().signal,
+				startSeconds: 0,
+			})
+			.pullThrough(0.1);
+
+		expect(result.tracks).toEqual([
+			expect.objectContaining({
+				kind: "failure",
+				reason: "The file could not be read.",
+				trackId: "audio-1",
+			}),
+		]);
 		await provider.dispose();
 	});
 
@@ -798,8 +894,10 @@ type MockTrack = {
 	canDecode: ReturnType<typeof vi.fn>;
 	computeDuration: ReturnType<typeof vi.fn>;
 	fullPacketScanCalls: number;
+	getCodec: ReturnType<typeof vi.fn>;
 	getFirstTimestamp: ReturnType<typeof vi.fn>;
 	getNumberOfChannels: ReturnType<typeof vi.fn>;
+	getPreRollDuration: ReturnType<typeof vi.fn>;
 	getSampleRate: ReturnType<typeof vi.fn>;
 	id: string;
 	iterators: MockSampleIterator[];
@@ -826,8 +924,10 @@ function createTrack({
 			),
 		),
 		fullPacketScanCalls: 0,
+		getCodec: vi.fn(async () => "aac"),
 		getFirstTimestamp: vi.fn(async () => packets[0]?.timestamp ?? 0),
 		getNumberOfChannels: vi.fn(async () => 1),
+		getPreRollDuration: vi.fn(async () => 0),
 		getSampleRate: vi.fn(async () => 10),
 		id,
 		iterators,

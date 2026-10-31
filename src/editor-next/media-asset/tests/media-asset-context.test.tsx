@@ -61,6 +61,26 @@ describe("MediaAssetContextPanel", () => {
 
 		expect(screen.getAllByText("30 fps estimated")).toHaveLength(2);
 	});
+
+	it("shows declared track bitrates in Analysis facts", () => {
+		render(
+			<MediaAssetContextPanel
+				asset={{
+					...readyAsset,
+					tracks: {
+						audio: [{ ...readyAsset.tracks.audio[0], bitrate: 192_000 }],
+						video: [{ ...readyAsset.tracks.video[0], bitrate: 8_500_000 }],
+					},
+				}}
+				closeFileDisabled={false}
+				onCloseFileRequested={() => undefined}
+				selection={fullSelection}
+			/>,
+		);
+
+		expect(screen.getByText("8.5 Mbps")).toBeTruthy();
+		expect(screen.getByText("192 kbps")).toBeTruthy();
+	});
 });
 
 const fullSelection = {

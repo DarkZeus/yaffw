@@ -41,6 +41,8 @@ export type FrameTiming =
 	  };
 
 export type VideoMediaTrack = {
+	/** Bits per second declared by container metadata; not measured. */
+	bitrate?: number;
 	codec?: string;
 	height?: number;
 	id: string;
@@ -50,6 +52,8 @@ export type VideoMediaTrack = {
 };
 
 export type AudioMediaTrack = {
+	/** Bits per second declared by container metadata; not measured. */
+	bitrate?: number;
 	channels?: number;
 	codec?: string;
 	id: string;

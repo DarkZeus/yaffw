@@ -13,11 +13,11 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 
-import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 import {
 	createBrowserAudioBuffer,
 	decodeMediabunnyAudioTrackRange,
 } from "../../media-work/adapters/mediabunny-audio-buffer";
+import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 
 const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
 const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
@@ -59,7 +59,9 @@ export async function renderBrowserAudioMix({
 		const input = scope.registerDisposable(
 			new Input({
 				formats: ALL_FORMATS,
-				source: new BlobSource(source),
+				source: new BlobSource(source, {
+					handleUnhandledError: scope.handleUnhandledSourceError,
+				}),
 			}),
 		);
 		const inputTracks = await input.getAudioTracks();

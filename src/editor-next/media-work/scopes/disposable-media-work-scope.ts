@@ -1,9 +1,13 @@
+import { createMediaSourceFailureBoundary } from "./media-source-failure-boundary";
+
 type Awaitable<T> = T | Promise<T>;
 
 export type DisposableMediaCleanup = () => Awaitable<void>;
 
 export type DisposableMediaWorkScope = {
 	dispose: () => Promise<void>;
+	/** Pass as a Mediabunny source's `handleUnhandledError` option. */
+	handleUnhandledSourceError: (error: unknown) => void;
 	registerCancellable: <T extends { cancel: () => Awaitable<void> }>(
 		resource: T,
 	) => T;
@@ -16,7 +20,9 @@ export type DisposableMediaWorkScope = {
 	) => T;
 };
 
-export function createDisposableMediaWorkScope(): DisposableMediaWorkScope {
+export function createDisposableMediaWorkScope(
+	handleUnhandledSourceError: (error: unknown) => void,
+): DisposableMediaWorkScope {
 	const cleanups: DisposableMediaCleanup[] = [];
 	let disposed = false;
 
@@ -66,6 +72,7 @@ export function createDisposableMediaWorkScope(): DisposableMediaWorkScope {
 
 	return {
 		dispose,
+		handleUnhandledSourceError,
 		registerCancellable<T extends { cancel: () => Awaitable<void> }>(
 			resource: T,
 		) {
@@ -107,10 +114,13 @@ export function createDisposableMediaCleanup(
 export async function withDisposableMediaWorkScope<T>(
 	work: (scope: DisposableMediaWorkScope) => Awaitable<T>,
 ): Promise<T> {
-	const scope = createDisposableMediaWorkScope();
+	const sourceFailure = createMediaSourceFailureBoundary();
+	const scope = createDisposableMediaWorkScope(
+		sourceFailure.handleUnhandledError,
+	);
 
 	try {
-		const result = await work(scope);
+		const result = await sourceFailure.run((async () => work(scope))());
 		await scope.dispose();
 
 		return result;

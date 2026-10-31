@@ -177,7 +177,9 @@ async function runBrowserMediaExport({
 		const input = scope.registerDisposable(
 			new Input({
 				formats: ALL_FORMATS,
-				source: new BlobSource(source),
+				source: new BlobSource(source, {
+					handleUnhandledError: scope.handleUnhandledSourceError,
+				}),
 			}),
 		);
 		const target = new BufferTarget();
@@ -192,6 +194,9 @@ async function runBrowserMediaExport({
 		const conversion = await Conversion.init({
 			audio: { discard: true },
 			...(mixedAudioOutput ? { composable: true } : {}),
+			// Copied video must keep the Selection-relative timeline because the
+			// mixed audio is a separate zero-based source outside this Conversion.
+			copy: { shiftTolerance: 0 },
 			input,
 			output,
 			showWarnings: false,

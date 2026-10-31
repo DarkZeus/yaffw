@@ -2,6 +2,7 @@ import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 
 import type { MediaTimeUs } from "@/editor-core/model";
 
+import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 import type {
 	VideoStripThumbnailFrame,
 	VideoStripThumbnailRequest,
@@ -27,146 +28,25 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 }: VideoStripThumbnailRequest): Promise<VideoStripThumbnailResult> {
 	throwIfAborted(signal);
 
+	const sourceFailure = createMediaSourceFailureBoundary();
 	const input = new Input({
 		formats: ALL_FORMATS,
-		source: new BlobSource(source),
+		source: new BlobSource(source, {
+			handleUnhandledError: sourceFailure.handleUnhandledError,
+		}),
 	});
 
 	try {
-		const videoTrack = await input.getPrimaryVideoTrack();
-		throwIfAborted(signal);
-
-		if (!videoTrack) {
-			return {
-				reason: "The active media asset has no video track.",
-				status: "unavailable",
-			};
-		}
-
-		if ((await videoTrack.getCodec()) === null) {
-			return {
-				reason: "The primary video track uses an unsupported codec.",
-				status: "unavailable",
-			};
-		}
-
-		if (!(await videoTrack.canDecode())) {
-			return {
-				reason: "This browser cannot decode the primary video track.",
-				status: "unavailable",
-			};
-		}
-
-		const [displayWidth, displayHeight, firstTimestamp, trackEndTimestamp] =
-			await Promise.all([
-				videoTrack.getDisplayWidth(),
-				videoTrack.getDisplayHeight(),
-				videoTrack.getFirstTimestamp(),
-				videoTrack.computeDuration(),
-			]);
-		throwIfAborted(signal);
-
-		const assetDurationSeconds = assetDurationUs / 1_000_000;
-		const thumbnailEndTimestamp = Number.isFinite(assetDurationSeconds)
-			? Math.min(trackEndTimestamp, assetDurationSeconds)
-			: trackEndTimestamp;
-
-		if (
-			!Number.isFinite(displayWidth) ||
-			displayWidth <= 0 ||
-			!Number.isFinite(displayHeight) ||
-			displayHeight <= 0 ||
-			!Number.isFinite(firstTimestamp) ||
-			!Number.isFinite(thumbnailEndTimestamp) ||
-			thumbnailEndTimestamp <= firstTimestamp
-		) {
-			return {
-				reason:
-					"The primary video track dimensions or duration could not be measured.",
-				status: "unavailable",
-			};
-		}
-
-		const dimensions = createVideoStripThumbnailDimensions({
-			devicePixelRatio,
-			displayHeight,
-			displayWidth,
-			thumbnailHeightPx,
-		});
-		const timestamps = createBoundedVideoStripThumbnailTimestamps({
-			endTimestamp: thumbnailEndTimestamp,
-			firstTimestamp,
-			timestampsUs,
-		});
-
-		if (timestamps.length === 0) {
-			return {
-				reason: "No visible video thumbnail timestamps were requested.",
-				status: "unavailable",
-			};
-		}
-
-		const sink = new CanvasSink(videoTrack, {
-			fit: "cover",
-			height: dimensions.deviceHeightPx,
-			poolSize: CANVAS_POOL_SIZE,
-			width: dimensions.deviceWidthPx,
-		});
-		const frames: VideoStripThumbnailFrame[] = [];
-		let index = 0;
-		const iterator = sink
-			.canvasesAtTimestamps(timestamps)
-			[Symbol.asyncIterator]();
-
-		try {
-			while (true) {
-				throwIfAborted(signal);
-
-				const { done, value: wrappedCanvas } = await iterator.next();
-				if (done) {
-					break;
-				}
-
-				throwIfAborted(signal);
-
-				if (wrappedCanvas) {
-					const frame = {
-						imageBlob: await canvasToThumbnailBlob(wrappedCanvas.canvas),
-						index,
-						timestampUs: secondsToMicroseconds(
-							timestamps[index] ?? wrappedCanvas.timestamp,
-						),
-					};
-					frames.push(frame);
-					onFrame?.({
-						frame,
-						thumbnailCount: timestamps.length,
-						thumbnailHeightPx: dimensions.cssHeightPx,
-						thumbnailWidthPx: dimensions.cssWidthPx,
-					});
-				}
-
-				index += 1;
-			}
-		} finally {
-			if (signal?.aborted) {
-				await iterator.return?.();
-			}
-		}
-
-		if (frames.length === 0) {
-			return {
-				reason: "No video frames were decoded for thumbnail navigation.",
-				status: "unavailable",
-			};
-		}
-
-		return {
-			frames,
-			status: "ready",
-			thumbnailHeightPx: dimensions.cssHeightPx,
-			thumbnailWidthPx: dimensions.cssWidthPx,
-		};
+		return await sourceFailure.run(
+			loadThumbnails(input, {
+				assetDurationUs,
+				devicePixelRatio,
+				onFrame,
+				signal,
+				thumbnailHeightPx,
+				timestampsUs,
+			}),
+		);
 	} catch (error) {
 		if (signal?.aborted || isAbortError(error)) {
 			throw createAbortError();
@@ -179,6 +59,153 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 	} finally {
 		input.dispose();
 	}
+}
+
+async function loadThumbnails(
+	input: Input,
+	{
+		assetDurationUs,
+		devicePixelRatio,
+		onFrame,
+		signal,
+		thumbnailHeightPx,
+		timestampsUs,
+	}: Omit<VideoStripThumbnailRequest, "source">,
+): Promise<VideoStripThumbnailResult> {
+	const videoTrack = await input.getPrimaryVideoTrack();
+	throwIfAborted(signal);
+
+	if (!videoTrack) {
+		return {
+			reason: "The active media asset has no video track.",
+			status: "unavailable",
+		};
+	}
+
+	if ((await videoTrack.getCodec()) === null) {
+		return {
+			reason: "The primary video track uses an unsupported codec.",
+			status: "unavailable",
+		};
+	}
+
+	if (!(await videoTrack.canDecode())) {
+		return {
+			reason: "This browser cannot decode the primary video track.",
+			status: "unavailable",
+		};
+	}
+
+	const [displayWidth, displayHeight, firstTimestamp, trackEndTimestamp] =
+		await Promise.all([
+			videoTrack.getDisplayWidth(),
+			videoTrack.getDisplayHeight(),
+			videoTrack.getFirstTimestamp(),
+			videoTrack.computeDuration(),
+		]);
+	throwIfAborted(signal);
+
+	const assetDurationSeconds = assetDurationUs / 1_000_000;
+	const thumbnailEndTimestamp = Number.isFinite(assetDurationSeconds)
+		? Math.min(trackEndTimestamp, assetDurationSeconds)
+		: trackEndTimestamp;
+
+	if (
+		!Number.isFinite(displayWidth) ||
+		displayWidth <= 0 ||
+		!Number.isFinite(displayHeight) ||
+		displayHeight <= 0 ||
+		!Number.isFinite(firstTimestamp) ||
+		!Number.isFinite(thumbnailEndTimestamp) ||
+		thumbnailEndTimestamp <= firstTimestamp
+	) {
+		return {
+			reason:
+				"The primary video track dimensions or duration could not be measured.",
+			status: "unavailable",
+		};
+	}
+
+	const dimensions = createVideoStripThumbnailDimensions({
+		devicePixelRatio,
+		displayHeight,
+		displayWidth,
+		thumbnailHeightPx,
+	});
+	const timestamps = createBoundedVideoStripThumbnailTimestamps({
+		endTimestamp: thumbnailEndTimestamp,
+		firstTimestamp,
+		timestampsUs,
+	});
+
+	if (timestamps.length === 0) {
+		return {
+			reason: "No visible video thumbnail timestamps were requested.",
+			status: "unavailable",
+		};
+	}
+
+	const sink = new CanvasSink(videoTrack, {
+		fit: "cover",
+		height: dimensions.deviceHeightPx,
+		poolSize: CANVAS_POOL_SIZE,
+		width: dimensions.deviceWidthPx,
+	});
+	const frames: VideoStripThumbnailFrame[] = [];
+	let index = 0;
+	const iterator = sink
+		.canvasesAtTimestamps(timestamps)
+		[Symbol.asyncIterator]();
+
+	try {
+		while (true) {
+			throwIfAborted(signal);
+
+			const { done, value: wrappedCanvas } = await iterator.next();
+			if (done) {
+				break;
+			}
+
+			throwIfAborted(signal);
+
+			if (wrappedCanvas) {
+				const frame = {
+					imageBlob: await canvasToThumbnailBlob(wrappedCanvas.canvas),
+					index,
+					timestampUs: secondsToMicroseconds(
+						timestamps[index] ?? wrappedCanvas.timestamp,
+					),
+				};
+				frames.push(frame);
+				onFrame?.({
+					frame,
+					thumbnailCount: timestamps.length,
+					thumbnailHeightPx: dimensions.cssHeightPx,
+					thumbnailWidthPx: dimensions.cssWidthPx,
+				});
+			}
+
+			index += 1;
+		}
+	} finally {
+		if (signal?.aborted) {
+			await iterator.return?.();
+		}
+	}
+
+	if (frames.length === 0) {
+		return {
+			reason: "No video frames were decoded for thumbnail navigation.",
+			status: "unavailable",
+		};
+	}
+
+	return {
+		frames,
+		status: "ready",
+		thumbnailHeightPx: dimensions.cssHeightPx,
+		thumbnailWidthPx: dimensions.cssWidthPx,
+	};
 }
 
 export function createVideoStripThumbnailTimestamps({

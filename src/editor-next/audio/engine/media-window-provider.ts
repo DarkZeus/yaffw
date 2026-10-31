@@ -9,6 +9,13 @@ import {
 	type InputAudioTrack,
 } from "mediabunny";
 
+import {
+	type AudioPacketRange,
+	AudioPacketTimeline,
+	DecodedAudioTimestampProjector,
+	audioPacketDurationsMaySpanGaps,
+} from "../../media-work/adapters/audio-packet-timeline";
+
 const DEFAULT_BATCH_DURATION_SECONDS = 0.2;
 const MAX_BATCH_DURATION_SECONDS = 0.2;
 
@@ -103,15 +110,12 @@ type TrackDescriptor = {
 		numberOfChannels: number;
 		sampleRate: number;
 	};
+	packetDurationsMaySpanGaps: boolean;
+	preRollSeconds: number;
 	track: InputAudioTrack | null;
 	trackIndex: number;
 	trackEndSeconds: number;
 	trackId: string;
-};
-
-type PacketRange = {
-	endSeconds: number;
-	startSeconds: number;
 };
 
 type PcmSegment = {
@@ -130,9 +134,21 @@ export async function createMediaWindowProvider({
 }: CreateMediaWindowProviderOptions): Promise<MediaWindowProvider> {
 	validateBatchDuration(batchDurationSeconds);
 	if (signal?.aborted) throw createAbortError();
+	let descriptors: TrackDescriptor[] = [];
+	let sourceFailureReason: string | null = null;
+	// A source error with no pending read fails every track; retrying a track
+	// re-describes it once the source is readable again.
+	const failTracksOnSourceError = (error: unknown) => {
+		if (inputDisposed) return;
+		sourceFailureReason = errorToMessage(error);
+		for (const descriptor of descriptors)
+			descriptor.failureReason = sourceFailureReason;
+	};
 	const input = new Input({
 		formats: ALL_FORMATS,
-		source: new BlobSource(source),
+		source: new BlobSource(source, {
+			handleUnhandledError: failTracksOnSourceError,
+		}),
 	});
 	let inputDisposed = false;
 	const disposeInput = () => {
@@ -145,7 +161,7 @@ export async function createMediaWindowProvider({
 		const tracks = await input.getAudioTracks();
 		const identities =
 			assetTracks ?? tracks.map((track) => ({ id: String(track.id) }));
-		const descriptors = await Promise.all(
+		descriptors = await Promise.all(
 			identities.map((identity, index) =>
 				describeTrack(
 					tracks[index] ?? null,
@@ -155,6 +171,9 @@ export async function createMediaWindowProvider({
 				),
 			),
 		);
+		if (sourceFailureReason)
+			for (const descriptor of descriptors)
+				descriptor.failureReason = sourceFailureReason;
 		if (signal?.aborted) throw createAbortError();
 		return new MediabunnyMediaWindowProvider(
 			input,
@@ -451,15 +470,14 @@ class TrackWindowCursor {
 	private iteratorEnded = false;
 	private packetCursor: EncodedPacket | null = null;
 	private packetCursorInitialized = false;
-	private readonly packetRanges: PacketRange[] = [];
+	private readonly packetTimeline: AudioPacketTimeline;
 	private packetSink: EncodedPacketSink | null = null;
 	private cancelPromise: Promise<void> | null = null;
 	private initialized = false;
 	private activePull: Promise<MediaWindowTrackState | null> | null = null;
 	private readonly pcmSegments: PcmSegment[] = [];
-	private projectedGapSeconds = 0;
-	private projectedThroughGapEndSeconds = Number.NEGATIVE_INFINITY;
-	private timestampProjectionCalibrated = false;
+	// Replaced when the sample iterator opens at its planned decode start.
+	private timestampProjector: DecodedAudioTimestampProjector;
 
 	constructor(
 		private readonly descriptor: TrackDescriptor,
@@ -468,6 +486,13 @@ class TrackWindowCursor {
 	) {
 		this.decodedThroughSeconds = generationStartSeconds;
 		this.failureReason = descriptor.failureReason;
+		this.packetTimeline = new AudioPacketTimeline({
+			packetDurationsMaySpanGaps: descriptor.packetDurationsMaySpanGaps,
+			sampleRate: descriptor.format.sampleRate,
+		});
+		this.timestampProjector = new DecodedAudioTimestampProjector(
+			generationStartSeconds,
+		);
 	}
 
 	pull(options: {
@@ -511,14 +536,14 @@ class TrackWindowCursor {
 			await this.scanPacketsThrough(endSeconds, isGenerationCancelled);
 			this.throwIfUnavailable(isGenerationCancelled);
 			const occupiedRanges = intersectRanges(
-				this.packetRanges,
+				this.packetTimeline.presentedRanges(),
 				startSeconds,
 				endSeconds,
 			);
 
 			if (occupiedRanges.length === 0) {
 				consumeSegmentsThrough(this.pcmSegments, endSeconds);
-				this.prunePacketRanges(endSeconds);
+				this.packetTimeline.prune(endSeconds);
 				return {
 					endSeconds,
 					kind: "silence",
@@ -545,10 +570,10 @@ class TrackWindowCursor {
 					"The audio track decoded no presentable samples for an encoded window.";
 				await this.releaseIterator();
 				this.pcmSegments.length = 0;
-				this.prunePacketRanges(endSeconds);
+				this.packetTimeline.prune(endSeconds);
 				return this.createFailure(startSeconds, endSeconds);
 			}
-			this.prunePacketRanges(endSeconds);
+			this.packetTimeline.prune(endSeconds);
 
 			return {
 				chunks,
@@ -577,7 +602,7 @@ class TrackWindowCursor {
 		if (this.cancelPromise) return this.cancelPromise;
 		this.cancelled = true;
 		this.pcmSegments.length = 0;
-		this.packetRanges.length = 0;
+		this.packetTimeline.clear();
 		this.packetCursor = null;
 		this.cancelPromise = settleCleanup([
 			this.releaseIterator(),
@@ -605,32 +630,38 @@ class TrackWindowCursor {
 		if (!packetSink) throw new Error("Audio packet reader is unavailable.");
 
 		if (!this.packetCursorInitialized) {
+			// Include the decoder pre-roll so a gap it crosses is known up front.
 			this.packetCursor =
-				(await packetSink.getPacket(this.generationStartSeconds, options)) ??
-				(await packetSink.getFirstPacket(options));
+				(await packetSink.getPacket(
+					this.generationStartSeconds - this.descriptor.preRollSeconds,
+					options,
+				)) ?? (await packetSink.getFirstPacket(options));
 			this.packetCursorInitialized = true;
 		}
 
 		while (this.packetCursor && this.packetCursor.timestamp < endSeconds) {
 			this.throwIfUnavailable(isGenerationCancelled);
 			const packet = this.packetCursor;
-			if (
-				Number.isFinite(packet.timestamp) &&
-				Number.isFinite(packet.duration) &&
-				packet.duration > 0
-			) {
-				this.packetRanges.push({
-					endSeconds: packet.timestamp + packet.duration,
-					startSeconds: packet.timestamp,
-				});
-			}
-
+			this.addPacketToTimeline(packet);
 			this.packetCursor = await packetSink.getNextPacket(packet, options);
 		}
+		// The already-read packet past the horizon bounds a trailing gap.
+		if (this.packetCursor) this.addPacketToTimeline(this.packetCursor);
 
-		this.packetRanges.sort(
-			(left, right) => left.startSeconds - right.startSeconds,
-		);
+		this.packetTimeline.sort();
+	}
+
+	private addPacketToTimeline(packet: EncodedPacket) {
+		if (
+			Number.isFinite(packet.timestamp) &&
+			Number.isFinite(packet.duration) &&
+			packet.duration > 0
+		) {
+			this.packetTimeline.add({
+				endSeconds: packet.timestamp + packet.duration,
+				startSeconds: packet.timestamp,
+			});
+		}
 	}
 
 	private async decodeThrough(
@@ -638,8 +669,15 @@ class TrackWindowCursor {
 		isGenerationCancelled: () => boolean,
 	) {
 		if (!this.iterator && !this.iteratorEnded && this.descriptor.track) {
-			this.iterator = new AudioSampleSink(this.descriptor.track).samples(
+			const decodeStartSeconds = this.packetTimeline.decodeStartFor(
 				this.generationStartSeconds,
+				this.descriptor.preRollSeconds,
+			);
+			this.timestampProjector = new DecodedAudioTimestampProjector(
+				decodeStartSeconds,
+			);
+			this.iterator = new AudioSampleSink(this.descriptor.track).samples(
+				decodeStartSeconds,
 				this.descriptor.trackEndSeconds,
 			);
 		}
@@ -693,12 +731,13 @@ class TrackWindowCursor {
 					return data;
 				},
 			);
-			const projectedStartSeconds = this.projectDecodedTimestamp(
+			const durationSeconds = sample.numberOfFrames / sampleRate;
+			const projectedStartSeconds = this.timestampProjector.project(
 				sample.timestamp,
-				sampleRate,
+				durationSeconds,
+				this.packetTimeline,
 			);
-			const endSeconds =
-				projectedStartSeconds + sample.numberOfFrames / sampleRate;
+			const endSeconds = projectedStartSeconds + durationSeconds;
 
 			this.pcmSegments.push({
 				channels,
@@ -715,74 +754,10 @@ class TrackWindowCursor {
 		}
 	}
 
-	private projectDecodedTimestamp(
-		decodedTimestampSeconds: number,
-		sampleRate: number,
-	) {
-		if (!this.timestampProjectionCalibrated) {
-			const anchorPacket = this.packetRanges.find(
-				(range) => range.endSeconds > this.generationStartSeconds,
-			);
-			if (anchorPacket) {
-				this.projectedGapSeconds = Math.max(
-					0,
-					anchorPacket.startSeconds - decodedTimestampSeconds,
-				);
-				this.projectedThroughGapEndSeconds = anchorPacket.startSeconds;
-			}
-			this.timestampProjectionCalibrated = true;
-		}
-
-		const gaps = findPacketGaps(this.packetRanges, sampleRate);
-		let projectedTimestampSeconds =
-			decodedTimestampSeconds + this.projectedGapSeconds;
-
-		for (const gap of gaps) {
-			if (gap.endSeconds <= this.projectedThroughGapEndSeconds) {
-				continue;
-			}
-			if (projectedTimestampSeconds < gap.startSeconds) {
-				break;
-			}
-
-			this.projectedThroughGapEndSeconds = gap.endSeconds;
-			if (projectedTimestampSeconds >= gap.endSeconds) {
-				continue;
-			}
-
-			const collapsedGapSeconds = gap.endSeconds - gap.startSeconds;
-			this.projectedGapSeconds += collapsedGapSeconds;
-			projectedTimestampSeconds += collapsedGapSeconds;
-		}
-
-		return projectedTimestampSeconds;
-	}
-
-	private prunePacketRanges(throughSeconds: number) {
-		let predecessor: PacketRange | null = null;
-		const futureRanges: PacketRange[] = [];
-
-		for (const range of this.packetRanges) {
-			if (range.endSeconds <= throughSeconds) {
-				if (!predecessor || range.endSeconds > predecessor.endSeconds) {
-					predecessor = range;
-				}
-				continue;
-			}
-			futureRanges.push(range);
-		}
-
-		this.packetRanges.length = 0;
-		if (predecessor) {
-			this.packetRanges.push(predecessor);
-		}
-		this.packetRanges.push(...futureRanges);
-	}
-
 	private consumeChunks(
 		startSeconds: number,
 		endSeconds: number,
-		occupiedRanges: readonly PacketRange[],
+		occupiedRanges: readonly AudioPacketRange[],
 	) {
 		const slices = occupiedRanges.flatMap((range) =>
 			collectPcmSlices(
@@ -1007,7 +982,7 @@ function batchPcmSlices({
 }
 
 function intersectRanges(
-	ranges: readonly PacketRange[],
+	ranges: readonly AudioPacketRange[],
 	startSeconds: number,
 	endSeconds: number,
 ) {
@@ -1021,7 +996,7 @@ function intersectRanges(
 			startSeconds: Math.max(startSeconds, range.startSeconds),
 		}))
 		.sort((left, right) => left.startSeconds - right.startSeconds);
-	const merged: PacketRange[] = [];
+	const merged: AudioPacketRange[] = [];
 
 	for (const range of intersections) {
 		const previous = merged.at(-1);
@@ -1035,33 +1010,6 @@ function intersectRanges(
 	return merged;
 }
 
-function findPacketGaps(
-	ranges: readonly PacketRange[],
-	sampleRate: number,
-): PacketRange[] {
-	const gaps: PacketRange[] = [];
-	const toleranceSeconds = 2 / sampleRate;
-	let previousEndSeconds: number | null = null;
-
-	for (const range of ranges) {
-		if (
-			previousEndSeconds !== null &&
-			range.startSeconds - previousEndSeconds > toleranceSeconds
-		) {
-			gaps.push({
-				endSeconds: range.startSeconds,
-				startSeconds: previousEndSeconds,
-			});
-		}
-		previousEndSeconds = Math.max(
-			previousEndSeconds ?? Number.NEGATIVE_INFINITY,
-			range.endSeconds,
-		);
-	}
-
-	return gaps;
-}
-
 async function describeTrack(
 	track: InputAudioTrack | null,
 	trackId: string,
@@ -1073,14 +1021,18 @@ async function describeTrack(
 			throw new Error("The analyzed audio track is no longer available.");
 		const [
 			canDecode,
+			codec,
 			firstTimestampSeconds,
 			numberOfChannels,
+			preRollSeconds,
 			sampleRate,
 			trackEndSeconds,
 		] = await Promise.all([
 			track.canDecode(),
+			track.getCodec(),
 			track.getFirstTimestamp(),
 			track.getNumberOfChannels(),
+			track.getPreRollDuration(),
 			track.getSampleRate(),
 			track.computeDuration(),
 		]);
@@ -1098,6 +1050,8 @@ async function describeTrack(
 				: "Track is not decodable in this browser.",
 			firstTimestampSeconds,
 			format: { numberOfChannels, sampleRate },
+			packetDurationsMaySpanGaps: audioPacketDurationsMaySpanGaps(codec),
+			preRollSeconds: preRollSeconds ?? 0,
 			track,
 			trackEndSeconds,
 			trackId,
@@ -1111,6 +1065,8 @@ async function describeTrack(
 				numberOfChannels: fallback.channels || 1,
 				sampleRate: fallback.sampleRate || 48_000,
 			},
+			packetDurationsMaySpanGaps: false,
+			preRollSeconds: 0,
 			track,
 			trackEndSeconds: 0,
 			trackId,

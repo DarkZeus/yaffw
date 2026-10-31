@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
+	codec: "aac" as string,
 	packets: [] as Array<{ duration: number; timestamp: number }>,
 	samples: [] as MockAudioSample[],
 	samplesArguments: [] as Array<[number | undefined, number | undefined]>,
@@ -27,7 +28,13 @@ vi.mock("mediabunny", () => ({
 
 import { decodeMediabunnyAudioTrackRange } from "../adapters/mediabunny-audio-buffer";
 
+const track = {
+	getCodec: async () => mediabunnyMock.codec,
+	getPreRollDuration: async () => 0,
+} as never;
+
 beforeEach(() => {
+	mediabunnyMock.codec = "aac";
 	mediabunnyMock.samples = [];
 	mediabunnyMock.packets = [];
 	mediabunnyMock.samplesArguments = [];
@@ -67,7 +74,7 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 			format: { numberOfChannels: 2, sampleRate: 10 },
 			signal: new AbortController().signal,
 			startSeconds: 1,
-			track: {} as never,
+			track,
 		});
 
 		expect(mediabunnyMock.samplesArguments).toEqual([[1, 2]]);
@@ -97,11 +104,63 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 			format: { numberOfChannels: 1, sampleRate: 10 },
 			signal: new AbortController().signal,
 			startSeconds: 0,
-			track: {} as never,
+			track,
 		});
 
 		expect(Array.from(decoded.getChannelData(0))).toEqual([
 			1, 2, 0, 0, 0, 0, 3, 4,
+		]);
+	});
+
+	it("restores a gap hidden inside an inferred packet duration", async () => {
+		mediabunnyMock.packets = inferredGapPackets;
+		mediabunnyMock.samples = continuousDecodedSamples();
+
+		const decoded = await decodeMediabunnyAudioTrackRange({
+			endSeconds: 1.8,
+			format: { numberOfChannels: 1, sampleRate: 10 },
+			signal: new AbortController().signal,
+			startSeconds: 0,
+			track,
+		});
+
+		expect(Array.from(decoded.getChannelData(0))).toEqual([
+			1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 9, 10,
+		]);
+	});
+
+	it("restores an inferred-duration gap when the range starts inside it", async () => {
+		mediabunnyMock.packets = inferredGapPackets;
+		mediabunnyMock.samples = continuousDecodedSamples().slice(2);
+
+		const decoded = await decodeMediabunnyAudioTrackRange({
+			endSeconds: 1.8,
+			format: { numberOfChannels: 1, sampleRate: 10 },
+			signal: new AbortController().signal,
+			startSeconds: 0.7,
+			track,
+		});
+
+		expect(Array.from(decoded.getChannelData(0))).toEqual([
+			0, 0, 0, 0, 0, 0, 0, 7, 8, 9, 10,
+		]);
+	});
+
+	it("keeps declared PCM packet durations even when one packet is long", async () => {
+		mediabunnyMock.codec = "pcm-s16";
+		mediabunnyMock.packets = inferredGapPackets;
+		mediabunnyMock.samples = continuousDecodedSamples();
+
+		const decoded = await decodeMediabunnyAudioTrackRange({
+			endSeconds: 1,
+			format: { numberOfChannels: 1, sampleRate: 10 },
+			signal: new AbortController().signal,
+			startSeconds: 0,
+			track,
+		});
+
+		expect(Array.from(decoded.getChannelData(0))).toEqual([
+			1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 		]);
 	});
 
@@ -119,7 +178,7 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 				format: { numberOfChannels: 2, sampleRate: 48_000 },
 				signal: new AbortController().signal,
 				startSeconds: 0,
-				track: {} as never,
+				track,
 			}),
 		).rejects.toThrow("Decoded audio format changed");
 		expect(changedFormat.close).toHaveBeenCalledOnce();
@@ -141,7 +200,7 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 				format: { numberOfChannels: 2, sampleRate: 48_000 },
 				signal: controller.signal,
 				startSeconds: 0,
-				track: {} as never,
+				track,
 			}),
 		).rejects.toMatchObject({ name: "AbortError" });
 		expect(sample.close).toHaveBeenCalledOnce();
@@ -224,4 +283,24 @@ class FakeAudioBuffer {
 	getChannelData(channel: number) {
 		return this.channels[channel] ?? new Float32Array();
 	}
+}
+
+// Containers that infer each duration from the next packet make the packet at
+// 0.4 s appear to last until the next packet after the 0.6–1.4 s gap.
+const inferredGapPackets = [
+	{ duration: 0.2, timestamp: 0 },
+	{ duration: 0.2, timestamp: 0.2 },
+	{ duration: 1, timestamp: 0.4 },
+	{ duration: 0.2, timestamp: 1.4 },
+	{ duration: 0.2, timestamp: 1.6 },
+];
+
+function continuousDecodedSamples() {
+	return [0, 0.2, 0.4, 0.6, 0.8].map((timestamp, index) =>
+		createAudioSample({
+			channels: [[index * 2 + 1, index * 2 + 2]],
+			sampleRate: 10,
+			timestamp,
+		}),
+	);
 }
