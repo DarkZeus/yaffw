@@ -1,0 +1,910 @@
+{
+  "comparison": {
+    "browser": "151.0.7922.71",
+    "recordedAt": "2026-11-05T23:53:05.646Z",
+    "mediabunny": "1.65.2",
+    "sourceSha256": "4e1b76adac3d317be8dff0cb59fad25b8d450d0f3b7c321935dfac8c9fb2d40c",
+    "selection": {
+      "startUs": 1137000,
+      "endUs": 13283000
+    },
+    "artifacts": [
+      {
+        "repetition": 0,
+        "counts": {
+          "video": 400,
+          "audio": 573
+        },
+        "layout": [
+          {
+            "type": "ftyp",
+            "offset": 0,
+            "size": 28
+          },
+          {
+            "type": "moov",
+            "offset": 28,
+            "size": 7703
+          },
+          {
+            "type": "free",
+            "offset": 7731,
+            "size": 63784
+          },
+          {
+            "type": "mdat",
+            "offset": 71515,
+            "size": 66291608
+          }
+        ],
+        "identicalEncodedTrackPackets": true,
+        "packetEvidenceSha256": "9e1035d89c87e0997abe56e7d3c98444782b3bd681e72a412b2ee485670201e8"
+      },
+      {
+        "repetition": 1,
+        "counts": {
+          "video": 400,
+          "audio": 573
+        },
+        "layout": [
+          {
+            "type": "ftyp",
+            "offset": 0,
+            "size": 28
+          },
+          {
+            "type": "moov",
+            "offset": 28,
+            "size": 7703
+          },
+          {
+            "type": "free",
+            "offset": 7731,
+            "size": 63784
+          },
+          {
+            "type": "mdat",
+            "offset": 71515,
+            "size": 66291608
+          }
+        ],
+        "identicalEncodedTrackPackets": true,
+        "packetEvidenceSha256": "9e1035d89c87e0997abe56e7d3c98444782b3bd681e72a412b2ee485670201e8"
+      }
+    ],
+    "results": [
+      {
+        "repetition": 0,
+        "candidate": false,
+        "exported": {
+          "elapsedMs": 380.5,
+          "size": 66299331,
+          "fileBacked": false,
+          "includedTracks": 2
+        },
+        "budgets": {
+          "targetPeak": 67108864,
+          "muxPayloadBeforeFinalization": 66168232,
+          "muxState": {
+            "state": "started",
+            "fastStart": "in-memory",
+            "counts": [
+              {
+                "samples": 0,
+                "chunks": 0,
+                "queued": 400
+              }
+            ]
+          },
+          "reservation": [
+            {
+              "type": "video"
+            },
+            {
+              "type": "audio"
+            }
+          ],
+          "mixedPcm": {
+            "frames": 583008,
+            "channels": 2,
+            "sampleRate": 48000,
+            "bytes": 4664064
+          }
+        },
+        "inspection": {
+          "container": "mp4",
+          "durationUs": 12196337,
+          "mimeType": "video/mp4; codecs=\"avc1.4d4029, mp4a.40.2\"",
+          "sizeBytes": 66299331,
+          "tracks": {
+            "audio": [
+              {
+                "channels": 2,
+                "codec": "mp4a.40.2",
+                "durationUs": 12180000,
+                "id": "2",
+                "kind": "audio",
+                "label": "Mixed audio",
+                "language": "und",
+                "sampleRate": 48000
+              }
+            ],
+            "video": [
+              {
+                "codec": "avc1.4d4029",
+                "durationUs": 12196337,
+                "height": 720,
+                "id": "1",
+                "kind": "video",
+                "label": "Video 1",
+                "width": 1280
+              }
+            ]
+          }
+        },
+        "retained": {
+          "usedSize": 12403928,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1402560,
+          "backingStorageSize": 167602837
+        },
+        "retainedAfterGc": {
+          "usedSize": 12074096,
+          "totalSize": 13713408,
+          "embedderHeapUsedSize": 1552208,
+          "backingStorageSize": 8383679
+        },
+        "afterInspection": {
+          "usedSize": 12640916,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1604944,
+          "backingStorageSize": 89243273
+        },
+        "afterDelivery": {
+          "usedSize": 12147516,
+          "totalSize": 13713408,
+          "embedderHeapUsedSize": 1760720,
+          "backingStorageSize": 8383827
+        },
+        "race": null,
+        "staging": null,
+        "sha256": "bc6333f8280d193023a7a3738a15b0c27a9a0b62d3ce720d918cb4dd5775d970",
+        "sampleCount": 31,
+        "sampledPeakBackingBytes": 167602962,
+        "sampledExportPeakBackingBytes": 101351739,
+        "sampledPeakJsHeapBytes": 16956004
+      },
+      {
+        "repetition": 0,
+        "candidate": true,
+        "exported": {
+          "elapsedMs": 342.19999998807907,
+          "size": 66363123,
+          "fileBacked": true,
+          "includedTracks": 2
+        },
+        "budgets": {
+          "targetPeak": 0,
+          "muxPayloadBeforeFinalization": 66168232,
+          "muxState": {
+            "state": "started",
+            "fastStart": "reserve",
+            "counts": [
+              {
+                "samples": 0,
+                "chunks": 0,
+                "queued": 400
+              }
+            ]
+          },
+          "reservation": [
+            {
+              "type": "video",
+              "maximumPacketCount": 662
+            },
+            {
+              "type": "audio",
+              "maximumPacketCount": 919
+            }
+          ],
+          "mixedPcm": {
+            "frames": 583008,
+            "channels": 2,
+            "sampleRate": 48000,
+            "bytes": 4664064
+          }
+        },
+        "inspection": {
+          "container": "mp4",
+          "durationUs": 12196337,
+          "mimeType": "video/mp4; codecs=\"avc1.4d4029, mp4a.40.2\"",
+          "sizeBytes": 66363123,
+          "tracks": {
+            "audio": [
+              {
+                "channels": 2,
+                "codec": "mp4a.40.2",
+                "durationUs": 12180000,
+                "id": "2",
+                "kind": "audio",
+                "label": "Mixed audio",
+                "language": "und",
+                "sampleRate": 48000
+              }
+            ],
+            "video": [
+              {
+                "codec": "avc1.4d4029",
+                "durationUs": 12196337,
+                "height": 720,
+                "id": "1",
+                "kind": "video",
+                "label": "Video 1",
+                "width": 1280
+              }
+            ]
+          }
+        },
+        "retained": {
+          "usedSize": 13359776,
+          "totalSize": 23937024,
+          "embedderHeapUsedSize": 1603048,
+          "backingStorageSize": 41031391
+        },
+        "retainedAfterGc": {
+          "usedSize": 12145088,
+          "totalSize": 13451264,
+          "embedderHeapUsedSize": 1579704,
+          "backingStorageSize": 8397709
+        },
+        "afterInspection": {
+          "usedSize": 13578008,
+          "totalSize": 23937024,
+          "embedderHeapUsedSize": 1621944,
+          "backingStorageSize": 41162570
+        },
+        "afterDelivery": {
+          "usedSize": 12234204,
+          "totalSize": 13451264,
+          "embedderHeapUsedSize": 1786744,
+          "backingStorageSize": 8397856
+        },
+        "race": {
+          "readAfterDeletion": "NotFoundError",
+          "failure": "download.saveAs: canceled",
+          "browserFailure": "canceled"
+        },
+        "staging": {
+          "writes": 66,
+          "writtenBytes": 66370842,
+          "maxWriteBytes": 1048576,
+          "backpatchWrites": 2,
+          "removed": true
+        },
+        "sha256": "aa9cd0a3c57137d993716816b674d5c95887b8ecf1716253e0fe40e456b34682",
+        "sampleCount": 28,
+        "sampledPeakBackingBytes": 133615135,
+        "sampledExportPeakBackingBytes": 133615135,
+        "sampledPeakJsHeapBytes": 14980732
+      },
+      {
+        "repetition": 1,
+        "candidate": true,
+        "exported": {
+          "elapsedMs": 341.2999999821186,
+          "size": 66363123,
+          "fileBacked": true,
+          "includedTracks": 2
+        },
+        "budgets": {
+          "targetPeak": 0,
+          "muxPayloadBeforeFinalization": 66168232,
+          "muxState": {
+            "state": "started",
+            "fastStart": "reserve",
+            "counts": [
+              {
+                "samples": 0,
+                "chunks": 0,
+                "queued": 400
+              }
+            ]
+          },
+          "reservation": [
+            {
+              "type": "video",
+              "maximumPacketCount": 662
+            },
+            {
+              "type": "audio",
+              "maximumPacketCount": 919
+            }
+          ],
+          "mixedPcm": {
+            "frames": 583008,
+            "channels": 2,
+            "sampleRate": 48000,
+            "bytes": 4664064
+          }
+        },
+        "inspection": {
+          "container": "mp4",
+          "durationUs": 12196337,
+          "mimeType": "video/mp4; codecs=\"avc1.4d4029, mp4a.40.2\"",
+          "sizeBytes": 66363123,
+          "tracks": {
+            "audio": [
+              {
+                "channels": 2,
+                "codec": "mp4a.40.2",
+                "durationUs": 12180000,
+                "id": "2",
+                "kind": "audio",
+                "label": "Mixed audio",
+                "language": "und",
+                "sampleRate": 48000
+              }
+            ],
+            "video": [
+              {
+                "codec": "avc1.4d4029",
+                "durationUs": 12196337,
+                "height": 720,
+                "id": "1",
+                "kind": "video",
+                "label": "Video 1",
+                "width": 1280
+              }
+            ]
+          }
+        },
+        "retained": {
+          "usedSize": 13349224,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1576752,
+          "backingStorageSize": 41454562
+        },
+        "retainedAfterGc": {
+          "usedSize": 12146544,
+          "totalSize": 13189120,
+          "embedderHeapUsedSize": 1523728,
+          "backingStorageSize": 8397726
+        },
+        "afterInspection": {
+          "usedSize": 13567456,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1596240,
+          "backingStorageSize": 41585741
+        },
+        "afterDelivery": {
+          "usedSize": 12235396,
+          "totalSize": 13189120,
+          "embedderHeapUsedSize": 1748536,
+          "backingStorageSize": 8397873
+        },
+        "race": {
+          "readAfterDeletion": "NotFoundError",
+          "failure": "download.saveAs: canceled",
+          "browserFailure": "canceled"
+        },
+        "staging": {
+          "writes": 66,
+          "writtenBytes": 66370842,
+          "maxWriteBytes": 1048576,
+          "backpatchWrites": 2,
+          "removed": true
+        },
+        "sha256": "145fad4ffde01ff99d0af55a4b36d80ccfc1997a302db12f334c711fc450f652",
+        "sampleCount": 26,
+        "sampledPeakBackingBytes": 136277550,
+        "sampledExportPeakBackingBytes": 136277550,
+        "sampledPeakJsHeapBytes": 14874332
+      },
+      {
+        "repetition": 1,
+        "candidate": false,
+        "exported": {
+          "elapsedMs": 320.59999999403954,
+          "size": 66299331,
+          "fileBacked": false,
+          "includedTracks": 2
+        },
+        "budgets": {
+          "targetPeak": 67108864,
+          "muxPayloadBeforeFinalization": 66168232,
+          "muxState": {
+            "state": "started",
+            "fastStart": "in-memory",
+            "counts": [
+              {
+                "samples": 0,
+                "chunks": 0,
+                "queued": 400
+              }
+            ]
+          },
+          "reservation": [
+            {
+              "type": "video"
+            },
+            {
+              "type": "audio"
+            }
+          ],
+          "mixedPcm": {
+            "frames": 583008,
+            "channels": 2,
+            "sampleRate": 48000,
+            "bytes": 4664064
+          }
+        },
+        "inspection": {
+          "container": "mp4",
+          "durationUs": 12196337,
+          "mimeType": "video/mp4; codecs=\"avc1.4d4029, mp4a.40.2\"",
+          "sizeBytes": 66299331,
+          "tracks": {
+            "audio": [
+              {
+                "channels": 2,
+                "codec": "mp4a.40.2",
+                "durationUs": 12180000,
+                "id": "2",
+                "kind": "audio",
+                "label": "Mixed audio",
+                "language": "und",
+                "sampleRate": 48000
+              }
+            ],
+            "video": [
+              {
+                "codec": "avc1.4d4029",
+                "durationUs": 12196337,
+                "height": 720,
+                "id": "1",
+                "kind": "video",
+                "label": "Video 1",
+                "width": 1280
+              }
+            ]
+          }
+        },
+        "retained": {
+          "usedSize": 12398240,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1522296,
+          "backingStorageSize": 162944585
+        },
+        "retainedAfterGc": {
+          "usedSize": 12073032,
+          "totalSize": 12926976,
+          "embedderHeapUsedSize": 1398360,
+          "backingStorageSize": 8383680
+        },
+        "afterInspection": {
+          "usedSize": 12626820,
+          "totalSize": 23674880,
+          "embedderHeapUsedSize": 1623280,
+          "backingStorageSize": 89243274
+        },
+        "afterDelivery": {
+          "usedSize": 12144900,
+          "totalSize": 13189120,
+          "embedderHeapUsedSize": 1861080,
+          "backingStorageSize": 8383828
+        },
+        "race": null,
+        "staging": null,
+        "sha256": "13b9d54d9b2a312539591796b8808491d4d29fd667bb5ea32f87244b43c916c8",
+        "sampleCount": 25,
+        "sampledPeakBackingBytes": 162944710,
+        "sampledExportPeakBackingBytes": 96694648,
+        "sampledPeakJsHeapBytes": 16710080
+      }
+    ]
+  },
+  "lifecycle": {
+    "browser": "151.0.7922.71",
+    "results": [
+      {
+        "scenario": "cancel",
+        "failure": {
+          "name": "DefaultExportCancelledError",
+          "message": "Default export was cancelled."
+        },
+        "remaining": []
+      },
+      {
+        "scenario": "quota",
+        "failure": {
+          "name": "FileBackedExportStorageError",
+          "message": "File-backed export write: OPFS storage quota was exceeded.",
+          "code": "quota"
+        },
+        "remaining": []
+      },
+      {
+        "scenario": "unavailable",
+        "failure": {
+          "name": "FileBackedExportStorageError",
+          "message": "File-backed export setup: OPFS is unavailable in this browser context.",
+          "code": "unavailable"
+        },
+        "remaining": []
+      }
+    ]
+  },
+  "app": {
+    "limitations": [
+      "Candidate runner is served-module instrumentation; production source is unchanged.",
+      "Production artifact store does not dispose OPFS staging; proof explicitly deletes staging after observing UI invalidation.",
+      "This UI runner awaits Download completion before deletion; check.mjs separately reproduces cancellation when staging is deleted immediately after Download.",
+      "CFR/VFR/No audio cover MP4 reserve output only; other output profiles are not proven."
+    ],
+    "recordedAt": "2026-11-05T23:53:02.199Z",
+    "browser": "151.0.7922.71",
+    "results": [
+      {
+        "kind": "cfr",
+        "selection": {
+          "start": 1.133,
+          "end": 5.283
+        },
+        "avEvents": [
+          {
+            "sourceSecond": 2,
+            "addedDeltaMs": -0.021166666666516676
+          },
+          {
+            "sourceSecond": 3,
+            "addedDeltaMs": -0.000333333333379926
+          },
+          {
+            "sourceSecond": 4,
+            "addedDeltaMs": -0.021166666666516676
+          },
+          {
+            "sourceSecond": 5,
+            "addedDeltaMs": -0.021166666666960765
+          }
+        ],
+        "review": "Boundaries unverified",
+        "explicitDelivery": true,
+        "invalidation": true,
+        "closeAndReimport": true,
+        "reimportPlayback": true,
+        "errors": [],
+        "retainedStage": {
+          "name": "yaffw-export-proof-78cd2f41-0a4b-4a3c-87cb-c38625db649c.mp4",
+          "fileBacked": true,
+          "size": 56403
+        },
+        "invalidationStorage": {
+          "automaticallyDeleted": false,
+          "proofDeleted": true
+        },
+        "artifact": {
+          "selection": {
+            "start": 1.133,
+            "end": 5.283
+          },
+          "presented": {
+            "frames": {
+              "count": 252,
+              "first": {
+                "pts": 0,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 68,
+                "flash": false,
+                "end": 0.016667,
+                "sourcePts": 1.133333,
+                "sourceEnd": 1.15
+              },
+              "last": {
+                "pts": 4.2,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 320,
+                "flash": false,
+                "end": 4.216667,
+                "sourcePts": 5.333333,
+                "sourceEnd": 5.35
+              }
+            },
+            "start": 0,
+            "end": 4.216667,
+            "sourceStart": 1.133333,
+            "sourceEnd": 5.35,
+            "mappedSourceEnd": 5.35,
+            "flashes": [
+              {
+                "id": 120,
+                "pts": 0.866667,
+                "sourcePts": 2
+              },
+              {
+                "id": 180,
+                "pts": 1.866667,
+                "sourcePts": 3
+              },
+              {
+                "id": 240,
+                "pts": 2.866667,
+                "sourcePts": 4
+              },
+              {
+                "id": 300,
+                "pts": 3.866667,
+                "sourcePts": 5
+              }
+            ]
+          },
+          "audio": {
+            "sampleRate": 48000,
+            "start": 0,
+            "duration": 4.18,
+            "clicks": [
+              {
+                "pts": 0.8719791666666666,
+                "sample": 41855,
+                "sourceSecond": 2,
+                "inferredSourcePts": 2.005333333333333,
+                "alignmentError": -0.00035416666666643337
+              },
+              {
+                "pts": 1.8747083333333334,
+                "sample": 89986,
+                "sourceSecond": 3,
+                "inferredSourcePts": 3.0080416666666667,
+                "alignmentError": -0.0003333333333332966
+              },
+              {
+                "pts": 2.8773125,
+                "sample": 138111,
+                "sourceSecond": 4,
+                "inferredSourcePts": 4.010666666666666,
+                "alignmentError": -0.00035416666666687746
+              },
+              {
+                "pts": 3.8799791666666668,
+                "sample": 186239,
+                "sourceSecond": 5,
+                "inferredSourcePts": 5.013333333333334,
+                "alignmentError": -0.00035416666666687746
+              }
+            ]
+          }
+        }
+      },
+      {
+        "kind": "vfr",
+        "selection": {
+          "start": 2.133,
+          "end": 6.283
+        },
+        "avEvents": [
+          {
+            "sourceSecond": 3,
+            "addedDeltaMs": -0.000333333333379926
+          },
+          {
+            "sourceSecond": 4,
+            "addedDeltaMs": -0.0003333333331578814
+          },
+          {
+            "sourceSecond": 5,
+            "addedDeltaMs": -0.021166666666960765
+          },
+          {
+            "sourceSecond": 6,
+            "addedDeltaMs": -0.0003333333329358368
+          }
+        ],
+        "review": "Boundaries unverified",
+        "explicitDelivery": true,
+        "invalidation": true,
+        "closeAndReimport": true,
+        "reimportPlayback": true,
+        "errors": [],
+        "retainedStage": {
+          "name": "yaffw-export-proof-af28ab8e-1632-4c5f-8b46-cc9f7ef263ff.mp4",
+          "fileBacked": true,
+          "size": 55764
+        },
+        "invalidationStorage": {
+          "automaticallyDeleted": false,
+          "proofDeleted": true
+        },
+        "artifact": {
+          "selection": {
+            "start": 2.133,
+            "end": 6.283
+          },
+          "presented": {
+            "frames": {
+              "count": 168,
+              "first": {
+                "pts": 0,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 128,
+                "flash": false,
+                "end": 0.016667,
+                "sourcePts": 2.133333,
+                "sourceEnd": 2.15
+              },
+              "last": {
+                "pts": 4.166667,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 378,
+                "flash": false,
+                "end": 4.183334,
+                "sourcePts": 6.3,
+                "sourceEnd": 6.333333
+              }
+            },
+            "start": 0,
+            "end": 4.183334,
+            "sourceStart": 2.133333,
+            "sourceEnd": 6.333333,
+            "mappedSourceEnd": 6.316667,
+            "flashes": [
+              {
+                "id": 180,
+                "pts": 0.866667,
+                "sourcePts": 3
+              },
+              {
+                "id": 240,
+                "pts": 1.866667,
+                "sourcePts": 4
+              },
+              {
+                "id": 300,
+                "pts": 2.866667,
+                "sourcePts": 5
+              },
+              {
+                "id": 360,
+                "pts": 3.866667,
+                "sourcePts": 6
+              }
+            ]
+          },
+          "audio": {
+            "sampleRate": 48000,
+            "start": 0,
+            "duration": 4.18,
+            "clicks": [
+              {
+                "pts": 0.8747083333333333,
+                "sample": 41986,
+                "sourceSecond": 3,
+                "inferredSourcePts": 3.0080416666666667,
+                "alignmentError": -0.0003333333333332966
+              },
+              {
+                "pts": 1.8773333333333333,
+                "sample": 90112,
+                "sourceSecond": 4,
+                "inferredSourcePts": 4.010666666666666,
+                "alignmentError": -0.00033333333333285253
+              },
+              {
+                "pts": 2.8799791666666668,
+                "sample": 138239,
+                "sourceSecond": 5,
+                "inferredSourcePts": 5.013333333333334,
+                "alignmentError": -0.00035416666666687746
+              },
+              {
+                "pts": 3.8827083333333334,
+                "sample": 186370,
+                "sourceSecond": 6,
+                "inferredSourcePts": 6.016041666666666,
+                "alignmentError": -0.00033333333333285253
+              }
+            ]
+          }
+        }
+      },
+      {
+        "kind": "no-audio",
+        "selection": {
+          "start": 1.133,
+          "end": 5.283
+        },
+        "avEvents": [],
+        "review": "Boundaries unverified",
+        "explicitDelivery": true,
+        "invalidation": true,
+        "closeAndReimport": true,
+        "reimportPlayback": true,
+        "errors": [],
+        "retainedStage": {
+          "name": "yaffw-export-proof-85aff56e-1074-45d7-be92-83b4dccefcd6.mp4",
+          "fileBacked": true,
+          "size": 33031
+        },
+        "invalidationStorage": {
+          "automaticallyDeleted": false,
+          "proofDeleted": true
+        },
+        "artifact": {
+          "selection": {
+            "start": 1.133,
+            "end": 5.283
+          },
+          "presented": {
+            "frames": {
+              "count": 252,
+              "first": {
+                "pts": 0,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 68,
+                "flash": false,
+                "end": 0.016667,
+                "sourcePts": 1.133333,
+                "sourceEnd": 1.15
+              },
+              "last": {
+                "pts": 4.2,
+                "duration": 0.016667,
+                "keyFrame": false,
+                "id": 320,
+                "flash": false,
+                "end": 4.216667,
+                "sourcePts": 5.333333,
+                "sourceEnd": 5.35
+              }
+            },
+            "start": 0,
+            "end": 4.216667,
+            "sourceStart": 1.133333,
+            "sourceEnd": 5.35,
+            "mappedSourceEnd": 5.35,
+            "flashes": [
+              {
+                "id": 120,
+                "pts": 0.866667,
+                "sourcePts": 2
+              },
+              {
+                "id": 180,
+                "pts": 1.866667,
+                "sourcePts": 3
+              },
+              {
+                "id": 240,
+                "pts": 2.866667,
+                "sourcePts": 4
+              },
+              {
+                "id": 300,
+                "pts": 3.866667,
+                "sourcePts": 5
+              }
+            ]
+          },
+          "audio": null
+        }
+      }
+    ]
+  },
+  "sourceHashes": {
+    "src/editor-next/export/runners/default-export-runner.ts": "f59e551cef4bcd118970f38add6d152a0eda9b00ef251dd1cc9b2a198376a6ca",
+    "src/editor-next/export/generated-media/generated-media-delivery.ts": "cf3f044fc991fc965a99459a33a32d6c816946f0de8b5b1a13d5120c1d0438ec",
+    "verification/file-backed-export/app-check.mjs": "3c76c160986695544bcc5a4b2510c5417dbb2a1cadfab8af67541ecc81b8ad8e",
+    "verification/file-backed-export/browser-check.ts": "a8857e8fc79080eb0b444437fbdf7919447eac2664dc369e492e1e7ab1ab0c0a",
+    "verification/file-backed-export/check.mjs": "9b9070b9f1190e264f50d9eac4d98f4d55609b14373f853452036708149afe37",
+    "verification/file-backed-export/fixtures.mjs": "9acc1fc8f69310b0cf94651d1c5cba8542a5cdd501379bc4ae7a805ea8f47525",
+    "verification/file-backed-export/inspect.mjs": "3e2235383301e58a0d6a232090c1fc5de249fce3822e0e7a38705814f1af53f8",
+    "verification/file-backed-export/instrument.mjs": "c60451273c6d819b694b5954bf0145ec479fefcebc08afc29534d9c91c80efad",
+    "verification/file-backed-export/lifecycle.mjs": "e91a6f04c6bb8742e94b4b99ddd88baee268a93d74c2e6b160bcb1373d9530c6",
+    "verification/file-backed-export/retain.mjs": "e453a81fd84b883b804a5dda49a48dd863e7d5796d96129b6e11a1de3df20c54",
+    "verification/file-backed-export/staging.ts": "17ee1cf619ff918c403849d4774ab236ef716a62f0223a6f9e56d4f8d80a01f2"
+  }
+}

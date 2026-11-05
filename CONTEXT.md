@@ -527,6 +527,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Export review** should not treat preview-only solo state as part of the generated audio mix.
 - **Smart rendering** is a future **Export capability**, not a requirement for the first local-file editor slice.
 - An **Export job** produces **Generated media**; saving or downloading that result is a separate delivery concern.
+- Generated media remains buffered after the #124 file-backed proof: OPFS/reserved MP4 removed the output ArrayBuffer, but immediate temporary-file deletion canceled the existing Download action. File-backed adoption requires acknowledged delivery ownership and disposal across invalidation, Close file, replacement, and stale jobs; seekable output alone does not bound mux queues or full-Selection PCM. See [the proof and follow-up design](docs/verification/file-backed-export.md).
 - The first slice should require an explicit **Delivery action** such as download after export succeeds; auto-download can be a later preference.
 - The first slice does not preview **Generated media** before delivery.
 - **Generated media** may become a **Media asset draft** only through explicit user action, but this is deferred beyond the first slice.
