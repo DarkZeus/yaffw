@@ -1,0 +1,3854 @@
+{
+  "baseline": "234286135b2c2af3272ec94fc4a4392fd607e792",
+  "recordedAt": "2026-11-05T22:59:56.104Z",
+  "browser": "155.0.8059.85",
+  "mediabunny": "1.65.2",
+  "fixtures": [
+    {
+      "name": "long-gop.mp4",
+      "duration": 600,
+      "gopSeconds": 10,
+      "frameRate": 10,
+      "kind": "video",
+      "path": "/Users/fuad/code/yaffw/tmp/scrub-index/long-gop.mp4",
+      "sha256": "9c66d1c3ff800719b9c4dcaa00337cf6141641975a2b235fcc9151bf3aa797cb",
+      "bytes": 10135262,
+      "packetCount": 6000
+    },
+    {
+      "name": "short-long-gop.mp4",
+      "duration": 61,
+      "gopSeconds": 20,
+      "frameRate": 10,
+      "kind": "video",
+      "path": "/Users/fuad/code/yaffw/tmp/scrub-index/short-long-gop.mp4",
+      "sha256": "fff917ee29102d72b71e9cdc797346172500942ed05a34b8d15106861c6dedb3",
+      "bytes": 1029307,
+      "packetCount": 610
+    },
+    {
+      "name": "sparse-cues.mkv",
+      "duration": 600,
+      "gopSeconds": 10,
+      "frameRate": 10,
+      "cuePoints": 60,
+      "originalCuePoints": 60,
+      "clusterCount": 1020,
+      "clusterTimeLimitMs": 500,
+      "kind": "video",
+      "path": "/Users/fuad/code/yaffw/tmp/scrub-index/sparse-cues.mkv",
+      "sha256": "a737c801b96e4de9c41171e7630e1e0d960c9f15215a9c85fee71f339adb2eec",
+      "bytes": 10132851,
+      "packetCount": 6000
+    },
+    {
+      "name": "first-cue-only.mkv",
+      "duration": 600,
+      "gopSeconds": 10,
+      "frameRate": 10,
+      "cuePoints": 1,
+      "originalCuePoints": 60,
+      "clusterCount": 1020,
+      "clusterTimeLimitMs": 500,
+      "kind": "video",
+      "path": "/Users/fuad/code/yaffw/tmp/scrub-index/first-cue-only.mkv",
+      "sha256": "ab124c8c3c62a74e9b356a37a514e924a638b602590076bc0daf10a99e6973e5",
+      "bytes": 10132851,
+      "packetCount": 6000
+    }
+  ],
+  "results": [
+    {
+      "trial": 0,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 58.29999998211861,
+      "preparedMs": 58.29999998211861,
+      "preparationWork": {
+        "bytes": 917504,
+        "reads": 1,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 49,
+          "bytes": 239326,
+          "pixels": 528649604
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 3825307376
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 528649604
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.699999988079071,
+          "bytes": 0,
+          "pixels": 2623050985
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 784108921
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 18,
+          "bytes": 196608,
+          "pixels": 2110420274
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1353438,
+        "reads": 3,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 58,
+      "preparedMs": 58,
+      "preparationWork": {
+        "bytes": 2097152,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 34,
+          "bytes": 239326,
+          "pixels": 595194988
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.29999998211860657,
+          "bytes": 0,
+          "pixels": 3331316346
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 595194988
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 2401025475
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.199999988079071,
+          "bytes": 0,
+          "pixels": 2321680141
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.30000001192093,
+          "bytes": 435934,
+          "pixels": 3756463794
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2772412,
+        "reads": 4,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 58.69999998807907,
+      "preparedMs": 259.7999999821186,
+      "preparationWork": {
+        "bytes": 2097152,
+        "reads": 1,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 23.80000001192093,
+          "bytes": 239326,
+          "pixels": 2411994552
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.3999999761581421,
+          "bytes": 0,
+          "pixels": 544111514
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2411994552
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 2898461811
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.0999999940395355,
+          "bytes": 0,
+          "pixels": 3963142009
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.599999994039536,
+          "bytes": 327680,
+          "pixels": 3833121200
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2664158,
+        "reads": 5,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 11.700000017881393,
+      "preparedMs": 213.09999999403954,
+      "preparationWork": {
+        "bytes": 1441792,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 25.5,
+          "bytes": 239326,
+          "pixels": 968983190
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 1084473368
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 968983190
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 2705257245
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 4133296925
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 17.099999994039536,
+          "bytes": 435934,
+          "pixels": 3390300654
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2117052,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 14.599999994039536,
+      "preparedMs": 14.599999994039536,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 97.60000002384186,
+          "bytes": 0,
+          "pixels": 2069713796
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 851679294
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2069713796
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 2398081907
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2000000178813934,
+          "bytes": 0,
+          "pixels": 1706569949
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.30000001192092896,
+          "bytes": 0,
+          "pixels": 2843403458
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 12.900000005960464,
+      "preparedMs": 12.900000005960464,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 99.2999999821186,
+          "bytes": 0,
+          "pixels": 2425929386
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 2090278514
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2425929386
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 104830897
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2000000178813934,
+          "bytes": 0,
+          "pixels": 1592905835
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.30000001192092896,
+          "bytes": 0,
+          "pixels": 2153798418
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 13.400000005960464,
+      "preparedMs": 214.5,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 38,
+          "bytes": 0,
+          "pixels": 1759596656
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 2763208260
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1759596656
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 426314173
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 2116948013
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1,
+          "bytes": 0,
+          "pixels": 425597712
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 13.200000017881393,
+      "preparedMs": 214.30000001192093,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 41.79999998211861,
+          "bytes": 0,
+          "pixels": 907938086
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.7000000178813934,
+          "bytes": 0,
+          "pixels": 3290215634
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 907938086
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 3451204231
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 2634123079
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1,
+          "bytes": 0,
+          "pixels": 2794452816
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 66.5,
+      "preparedMs": 66.5,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 35.39999997615814,
+          "bytes": 0,
+          "pixels": 1069605028
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 99294764
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1069605028
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.7999999821186066,
+          "bytes": 655360,
+          "pixels": 2038962117
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 131072,
+          "pixels": 2097912715
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15,
+          "bytes": 0,
+          "pixels": 893931320
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11025126,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 19.900000005960464,
+      "preparedMs": 19.900000005960464,
+      "preparationWork": {
+        "bytes": 564595,
+        "reads": 4,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 46.099999994039536,
+          "bytes": 196608,
+          "pixels": 208783608
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.699999988079071,
+          "bytes": 0,
+          "pixels": 1140008670
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 208783608
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.800000011920929,
+          "bytes": 0,
+          "pixels": 1006416225
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2.800000011920929,
+          "bytes": 0,
+          "pixels": 441426543
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 93.7999999821186,
+          "bytes": 433523,
+          "pixels": 2230438768
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1194726,
+        "reads": 7,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 21.600000023841858,
+      "preparedMs": 222.80000001192093,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 22.5,
+          "bytes": 0,
+          "pixels": 952953842
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.7999999821186066,
+          "bytes": 0,
+          "pixels": 4131152406
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 952953842
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 5.699999988079071,
+          "bytes": 393216,
+          "pixels": 2561810465
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2.4000000059604645,
+          "bytes": 196608,
+          "pixels": 3772103879
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.699999988079071,
+          "bytes": 0,
+          "pixels": 3515599136
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10828518,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 14.5,
+      "preparedMs": 216.09999999403954,
+      "preparationWork": {
+        "bytes": 1088883,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 24.099999994039536,
+          "bytes": 302451,
+          "pixels": 1770763852
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.699999988079071,
+          "bytes": 0,
+          "pixels": 660524532
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1770763852
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.7000000178813934,
+          "bytes": 0,
+          "pixels": 2126587759
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.600000023841858,
+          "bytes": 0,
+          "pixels": 655760173
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 18,
+          "bytes": 433523,
+          "pixels": 875000874
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1824857,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 22.700000017881393,
+      "preparedMs": 22.700000017881393,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 88.80000001192093,
+          "bytes": 0,
+          "pixels": 2344251768
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 3636481634
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2344251768
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 4.300000011920929,
+          "bytes": 262144,
+          "pixels": 1405283549
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2.0999999940395355,
+          "bytes": 131072,
+          "pixels": 174759615
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 19.5,
+          "bytes": 0,
+          "pixels": 2121908970
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10631910,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 22.299999982118607,
+      "preparedMs": 22.299999982118607,
+      "preparationWork": {
+        "bytes": 302451,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 146.2999999821186,
+          "bytes": 9936243,
+          "pixels": 1754744604
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 22721288
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 1754744604
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 2.5,
+          "bytes": 0,
+          "pixels": 1861680291
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 6.200000017881393,
+          "bytes": 589824,
+          "pixels": 25720499
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 51.400000005960464,
+          "bytes": 0,
+          "pixels": 4282987168
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10828518,
+        "reads": 10,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 57.10000002384186,
+      "preparedMs": 258.10000002384186,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 43.69999998807907,
+          "bytes": 0,
+          "pixels": 2358270974
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 1,
+          "bytes": 0,
+          "pixels": 3093015174
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2358270974
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 5,
+          "bytes": 0,
+          "pixels": 3724092217
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 3.5999999940395355,
+          "bytes": 0,
+          "pixels": 1596016671
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 28,
+          "bytes": 0,
+          "pixels": 3497289976
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 0,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 26.599999994039536,
+      "preparedMs": 227.80000001192093,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 71.90000000596046,
+          "bytes": 8035699,
+          "pixels": 2974595460
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 1.2000000178813934,
+          "bytes": 0,
+          "pixels": 3700801828
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2974595460
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 2.600000023841858,
+          "bytes": 0,
+          "pixels": 2497235617
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 3.199999988079071,
+          "bytes": 0,
+          "pixels": 3183257463
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 38.599999994039536,
+          "bytes": 0,
+          "pixels": 4236946166
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 20,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 24.900000005960464,
+      "preparedMs": 24.900000005960464,
+      "preparationWork": {
+        "bytes": 589824,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 139.2999999821186,
+          "bytes": 239326,
+          "pixels": 1364833828
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 1.800000011920929,
+          "bytes": 0,
+          "pixels": 2356828170
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 1364833828
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.4000000059604645,
+          "bytes": 0,
+          "pixels": 3285481085
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 3.399999976158142,
+          "bytes": 0,
+          "pixels": 228230547
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 33.400000005960464,
+          "bytes": 196608,
+          "pixels": 3135989514
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1025758,
+        "reads": 5,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 28.799999982118607,
+      "preparedMs": 28.799999982118607,
+      "preparationWork": {
+        "bytes": 1114112,
+        "reads": 2,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 152.59999999403954,
+          "bytes": 239326,
+          "pixels": 865409388
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.699999988079071,
+          "bytes": 0,
+          "pixels": 2717705546
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 865409388
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 14.599999994039536,
+          "bytes": 0,
+          "pixels": 416839317
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2.399999976158142,
+          "bytes": 0,
+          "pixels": 4285381511
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 37.19999998807907,
+          "bytes": 393216,
+          "pixels": 566724282
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1746654,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 22.600000023841858,
+      "preparedMs": 223.5,
+      "preparationWork": {
+        "bytes": 131072,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 37.5,
+          "bytes": 239326,
+          "pixels": 846455044
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.7000000178813934,
+          "bytes": 0,
+          "pixels": 3090407196
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 846455044
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 5.5999999940395355,
+          "bytes": 262144,
+          "pixels": 2043985425
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 3.199999988079071,
+          "bytes": 1966080,
+          "pixels": 163204271
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 36.70000001788139,
+          "bytes": 262144,
+          "pixels": 4289576452
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2860766,
+        "reads": 9,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 15.5,
+      "preparedMs": 216.7999999821186,
+      "preparationWork": {
+        "bytes": 851968,
+        "reads": 1,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 22.5,
+          "bytes": 239326,
+          "pixels": 2973744680
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 143746622
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2973744680
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 1685031725
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 1263116339
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.5,
+          "bytes": 435934,
+          "pixels": 2756137476
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1527228,
+        "reads": 5,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 13,
+      "preparedMs": 13,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 97.09999999403954,
+          "bytes": 0,
+          "pixels": 2091628524
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.3999999761581421,
+          "bytes": 0,
+          "pixels": 860551550
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2091628524
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.600000023841858,
+          "bytes": 0,
+          "pixels": 2213958077
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 2692463121
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.29999998211860657,
+          "bytes": 0,
+          "pixels": 3192385678
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 13.399999976158142,
+      "preparedMs": 13.399999976158142,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 94.80000001192093,
+          "bytes": 0,
+          "pixels": 356630630
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 4190286782
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 356630630
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 1726011705
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 1693266427
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.20000001788139343,
+          "bytes": 0,
+          "pixels": 1393227028
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 13.200000017881393,
+      "preparedMs": 214.5,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 40,
+          "bytes": 0,
+          "pixels": 373126426
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 3832095726
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 373126426
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 2798361543
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 151957863
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 2350885070
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 13.599999994039536,
+      "preparedMs": 215.09999999403954,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 38.80000001192093,
+          "bytes": 0,
+          "pixels": 1651709618
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 1008745758
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1651709618
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.399999976158142,
+          "bytes": 0,
+          "pixels": 1064715561
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.0999999940395355,
+          "bytes": 0,
+          "pixels": 92024253
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1.2000000178813934,
+          "bytes": 0,
+          "pixels": 2915370112
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 15.599999994039536,
+      "preparedMs": 15.599999994039536,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 83,
+          "bytes": 302451,
+          "pixels": 1338144512
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 10536570
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1338144512
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 2651249591
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 3062874403
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.19999998807907,
+          "bytes": 433523,
+          "pixels": 1793230378
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2938969,
+        "reads": 5,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 67.19999998807907,
+      "preparedMs": 67.19999998807907,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 8,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 31.19999998807907,
+          "bytes": 0,
+          "pixels": 3542209864
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.3999999761581421,
+          "bytes": 0,
+          "pixels": 1902809144
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 3542209864
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 2.300000011920929,
+          "bytes": 196608,
+          "pixels": 3418067221
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2.2000000178813934,
+          "bytes": 393216,
+          "pixels": 2827723915
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.800000011920929,
+          "bytes": 0,
+          "pixels": 2193820984
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10828518,
+        "reads": 12,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 13.599999994039536,
+      "preparedMs": 216.09999999403954,
+      "preparationWork": {
+        "bytes": 957811,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 24.900000005960464,
+          "bytes": 302451,
+          "pixels": 203363368
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 3757258544
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 203363368
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.399999976158142,
+          "bytes": 0,
+          "pixels": 196688841
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 1396621941
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.30000001192093,
+          "bytes": 433523,
+          "pixels": 3320814462
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1693785,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 22,
+      "preparedMs": 222.5,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 21.900000005960464,
+          "bytes": 0,
+          "pixels": 3883397594
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.30000001192092896,
+          "bytes": 0,
+          "pixels": 4059941132
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.19999998807907104,
+          "bytes": 0,
+          "pixels": 3883397594
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.0999999940395355,
+          "bytes": 524288,
+          "pixels": 2404252903
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.800000011920929,
+          "bytes": 327680,
+          "pixels": 4224541641
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.300000011920929,
+          "bytes": 0,
+          "pixels": 2950055808
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11090662,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 15.400000005960464,
+      "preparedMs": 15.400000005960464,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 89.19999998807907,
+          "bytes": 8035699,
+          "pixels": 917510504
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 354053840
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 917510504
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.699999988079071,
+          "bytes": 0,
+          "pixels": 3724018605
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 1850998513
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.800000011920929,
+          "bytes": 0,
+          "pixels": 165365278
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 67.09999999403954,
+      "preparedMs": 67.09999999403954,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 8,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 31.900000005960464,
+          "bytes": 0,
+          "pixels": 1628803814
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 4279132632
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1628803814
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.7999999821186066,
+          "bytes": 655360,
+          "pixels": 1267593671
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 262144,
+          "pixels": 2522836769
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.099999994039536,
+          "bytes": 0,
+          "pixels": 2217003952
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11156198,
+        "reads": 12,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 12.400000005960464,
+      "preparedMs": 213.90000000596046,
+      "preparationWork": {
+        "bytes": 1088883,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 32.30000001192093,
+          "bytes": 9149811,
+          "pixels": 2652695954
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.6000000238418579,
+          "bytes": 0,
+          "pixels": 1563104244
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2652695954
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.199999988079071,
+          "bytes": 589824,
+          "pixels": 4047257229
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.7999999821186066,
+          "bytes": 327680,
+          "pixels": 2066474167
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.399999976158142,
+          "bytes": 0,
+          "pixels": 1661442564
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11156198,
+        "reads": 11,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 1,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 22,
+      "preparedMs": 225,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 21.899999976158142,
+          "bytes": 0,
+          "pixels": 2347870502
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 2540250184
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2347870502
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.7999999821186066,
+          "bytes": 655360,
+          "pixels": 1139518885
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 262144,
+          "pixels": 1822815495
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.300000011920929,
+          "bytes": 0,
+          "pixels": 4270347358
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11156198,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 56.5,
+      "preparedMs": 56.5,
+      "preparationWork": {
+        "bytes": 983040,
+        "reads": 1,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 36.099999994039536,
+          "bytes": 239326,
+          "pixels": 3884563008
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5999999940395355,
+          "bytes": 0,
+          "pixels": 1880076358
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 3884563008
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 3722595403
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 3559561955
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.400000005960464,
+          "bytes": 435934,
+          "pixels": 4155903972
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1658300,
+        "reads": 4,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 13.099999994039536,
+      "preparedMs": 13.099999994039536,
+      "preparationWork": {
+        "bytes": 1310720,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 73.89999997615814,
+          "bytes": 239326,
+          "pixels": 320205660
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5999999940395355,
+          "bytes": 0,
+          "pixels": 3733977182
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 320205660
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 9.900000005960464,
+          "bytes": 0,
+          "pixels": 1871277015
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 2265380371
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.30000001192093,
+          "bytes": 393216,
+          "pixels": 602069932
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1943262,
+        "reads": 4,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 14.299999982118607,
+      "preparedMs": 214.69999998807907,
+      "preparationWork": {
+        "bytes": 1310720,
+        "reads": 1,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 22.5,
+          "bytes": 239326,
+          "pixels": 4254092138
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.29999998211860657,
+          "bytes": 0,
+          "pixels": 1886201426
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 4254092138
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 3789648499
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 1111299159
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.099999994039536,
+          "bytes": 435934,
+          "pixels": 2184061368
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1985980,
+        "reads": 5,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 15,
+      "preparedMs": 217.90000000596046,
+      "preparationWork": {
+        "bytes": 2097152,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 26.700000017881393,
+          "bytes": 239326,
+          "pixels": 2830490662
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 3853484226
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 2830490662
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.600000023841858,
+          "bytes": 0,
+          "pixels": 3400887911
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 2138974621
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.400000005960464,
+          "bytes": 393216,
+          "pixels": 1671898642
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2729694,
+        "reads": 4,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 13.900000005960464,
+      "preparedMs": 13.900000005960464,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 103.5,
+          "bytes": 0,
+          "pixels": 3721518922
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5999999940395355,
+          "bytes": 0,
+          "pixels": 2221414686
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 3721518922
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.600000023841858,
+          "bytes": 0,
+          "pixels": 1539751575
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 2,
+          "bytes": 0,
+          "pixels": 100142331
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.30000001192092896,
+          "bytes": 0,
+          "pixels": 1377425522
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 12.199999988079071,
+      "preparedMs": 12.199999988079071,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 98.80000001192093,
+          "bytes": 0,
+          "pixels": 2753002032
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 192997836
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2753002032
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 2593153611
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 1323197327
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 0.20000001788139343,
+          "bytes": 0,
+          "pixels": 1062730108
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 14,
+      "preparedMs": 215.2000000178814,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 40.099999994039536,
+          "bytes": 0,
+          "pixels": 2274163198
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.7000000178813934,
+          "bytes": 0,
+          "pixels": 3894302656
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 2274163198
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 3244399651
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 942567997
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 2903677204
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 4,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "short-long-gop.mp4",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 14.099999994039536,
+      "preparedMs": 215.19999998807907,
+      "preparationWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 38.69999998807907,
+          "bytes": 0,
+          "pixels": 716704098
+        },
+        {
+          "target": 59.93,
+          "actualTimestampUs": 59900000,
+          "timestampUs": 59930000,
+          "elapsedMs": 0.30000001192092896,
+          "bytes": 0,
+          "pixels": 799202318
+        },
+        {
+          "target": 59.83,
+          "actualTimestampUs": 59800000,
+          "timestampUs": 59830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 716704098
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 1456372437
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 2611663809
+        },
+        {
+          "target": 49.83,
+          "actualTimestampUs": 49800000,
+          "timestampUs": 49830000,
+          "elapsedMs": 1.2000000178813934,
+          "bytes": 0,
+          "pixels": 2487102800
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 59630000,
+          "actualTimestampUs": 59600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 1029307,
+        "reads": 1,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 67.5,
+      "preparedMs": 67.5,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 6,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 30.399999976158142,
+          "bytes": 0,
+          "pixels": 1452216092
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 4139049538
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1452216092
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.699999988079071,
+          "bytes": 0,
+          "pixels": 1430909877
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 1815988763
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.700000017881393,
+          "bytes": 0,
+          "pixels": 4069251628
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 6,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 15.099999994039536,
+      "preparedMs": 15.099999994039536,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 84.5,
+          "bytes": 302451,
+          "pixels": 917057868
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 1744003500
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 917057868
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 0,
+          "pixels": 3526243303
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.4000000059604645,
+          "bytes": 0,
+          "pixels": 586656655
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16.5,
+          "bytes": 433523,
+          "pixels": 2115852098
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2938969,
+        "reads": 5,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 22.299999982118607,
+      "preparedMs": 224.2999999821186,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 21.899999976158142,
+          "bytes": 0,
+          "pixels": 1922181234
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 322107586
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 1922181234
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.5999999940395355,
+          "bytes": 655360,
+          "pixels": 1466097419
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5999999940395355,
+          "bytes": 327680,
+          "pixels": 1313255515
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.400000005960464,
+          "bytes": 0,
+          "pixels": 576400502
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11221734,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "sparse-cues.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 16.599999994039536,
+      "preparedMs": 217.09999999403954,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 24.400000005960464,
+          "bytes": 302451,
+          "pixels": 228487224
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 3382510460
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 228487224
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.600000023841858,
+          "bytes": 0,
+          "pixels": 3262063099
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.300000011920929,
+          "bytes": 0,
+          "pixels": 1422194039
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 17.100000023841858,
+          "bytes": 433523,
+          "pixels": 2878363812
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 2938969,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "indexed",
+      "readyMs": 67.80000001192093,
+      "preparedMs": 67.80000001192093,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 8,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 32.29999998211861,
+          "bytes": 0,
+          "pixels": 982058456
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.4000000059604645,
+          "bytes": 0,
+          "pixels": 106405034
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 982058456
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 3.5999999940395355,
+          "bytes": 589824,
+          "pixels": 1387624003
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5,
+          "bytes": 262144,
+          "pixels": 578879383
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.599999994039536,
+          "bytes": 0,
+          "pixels": 3166933974
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11090662,
+        "reads": 12,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "immediate",
+      "variant": "direct",
+      "readyMs": 15.300000011920929,
+      "preparedMs": 15.300000011920929,
+      "preparationWork": {
+        "bytes": 2202995,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 80.30000001192093,
+          "bytes": 8035699,
+          "pixels": 3439720994
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 2200380846
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.09999999403953552,
+          "bytes": 0,
+          "pixels": 3439720994
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 2.2999999821186066,
+          "bytes": 0,
+          "pixels": 1742828615
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 8.200000017881393,
+          "bytes": 0,
+          "pixels": 3620712857
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 16,
+          "bytes": 0,
+          "pixels": 3195803046
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 6,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "indexed",
+      "readyMs": 21.900000005960464,
+      "preparedMs": 223.5,
+      "preparationWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 21.700000017881393,
+          "bytes": 0,
+          "pixels": 4128728796
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.3999999761581421,
+          "bytes": 0,
+          "pixels": 1409796156
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0.10000002384185791,
+          "bytes": 0,
+          "pixels": 4128728796
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 4,
+          "bytes": 655360,
+          "pixels": 4274667105
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.5,
+          "bytes": 262144,
+          "pixels": 1373499169
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 14.5,
+          "bytes": 0,
+          "pixels": 1773705176
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 11156198,
+        "reads": 11,
+        "indexEntries": 60,
+        "indexComplete": true,
+        "ready": true
+      }
+    },
+    {
+      "trial": 2,
+      "fixture": "first-cue-only.mkv",
+      "preparation": "prepared",
+      "variant": "direct",
+      "readyMs": 12.800000011920929,
+      "preparedMs": 215,
+      "preparationWork": {
+        "bytes": 2071923,
+        "reads": 2,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      },
+      "frames": [
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 31.30000001192093,
+          "bytes": 8166771,
+          "pixels": 686899440
+        },
+        {
+          "target": 598.93,
+          "actualTimestampUs": 598900000,
+          "timestampUs": 598930000,
+          "elapsedMs": 0.5,
+          "bytes": 0,
+          "pixels": 4039054924
+        },
+        {
+          "target": 598.83,
+          "actualTimestampUs": 598800000,
+          "timestampUs": 598830000,
+          "elapsedMs": 0,
+          "bytes": 0,
+          "pixels": 686899440
+        },
+        {
+          "target": 20.13,
+          "actualTimestampUs": 20100000,
+          "timestampUs": 20130000,
+          "elapsedMs": 1.5,
+          "bytes": 0,
+          "pixels": 3249956497
+        },
+        {
+          "target": 0.13,
+          "actualTimestampUs": 100000,
+          "timestampUs": 130000,
+          "elapsedMs": 1.2999999821186066,
+          "bytes": 0,
+          "pixels": 2698976099
+        },
+        {
+          "target": 588.83,
+          "actualTimestampUs": 588800000,
+          "timestampUs": 588830000,
+          "elapsedMs": 15.200000017881393,
+          "bytes": 0,
+          "pixels": 3734795502
+        }
+      ],
+      "reversalFrames": [
+        {
+          "timestampUs": 598630000,
+          "actualTimestampUs": 598600000
+        }
+      ],
+      "afterDispose": 0,
+      "totalWork": {
+        "bytes": 10238694,
+        "reads": 7,
+        "indexEntries": 0,
+        "indexComplete": false,
+        "ready": true
+      }
+    }
+  ]
+}

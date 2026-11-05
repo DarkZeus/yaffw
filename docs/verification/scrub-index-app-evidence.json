@@ -1,0 +1,62 @@
+{
+  "browser": "155.0.8059.85",
+  "results": [
+    {
+      "file": "long-gop.mp4",
+      "late": "00:09:50.145",
+      "rapidReversal": true,
+      "closeAndReplacement": true,
+      "displayedFrame": {
+        "target": 590.245,
+        "actualTimestampUs": 590200000,
+        "pixels": 3851890154,
+        "visible": true
+      },
+      "replacementFrame": {
+        "target": 10.1,
+        "actualTimestampUs": 10100000,
+        "pixels": 1764773184,
+        "visible": true
+      },
+      "errors": []
+    },
+    {
+      "file": "sparse-cues.mkv",
+      "late": "00:09:50.150",
+      "rapidReversal": true,
+      "closeAndReplacement": true,
+      "displayedFrame": {
+        "target": 590.25,
+        "actualTimestampUs": 590200000,
+        "pixels": 268874198,
+        "visible": true
+      },
+      "replacementFrame": {
+        "target": 10.1,
+        "actualTimestampUs": 10100000,
+        "pixels": 2844669270,
+        "visible": true
+      },
+      "errors": []
+    },
+    {
+      "file": "first-cue-only.mkv",
+      "late": "00:09:50.141",
+      "rapidReversal": true,
+      "closeAndReplacement": true,
+      "displayedFrame": {
+        "target": 590.241,
+        "actualTimestampUs": 590200000,
+        "pixels": 3984318554,
+        "visible": true
+      },
+      "replacementFrame": {
+        "target": 10.1,
+        "actualTimestampUs": 10100000,
+        "pixels": 214549884,
+        "visible": true
+      },
+      "errors": []
+    }
+  ]
+}

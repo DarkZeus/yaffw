@@ -7,7 +7,6 @@ import type {
 
 import type { MediaTimeUs } from "@/editor-core/model";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
-import { createKeyframeIndex } from "./keyframe-index";
 import { createScrubFrameCache } from "./scrub-frame-cache";
 
 const DEFAULT_MAX_OUTPUT_DIMENSION_PX = 1280;
@@ -80,7 +79,6 @@ export function createMediabunnyScrubFrameProvider({
 	let activeKeySequenceNumber: number | null = null;
 	let disposed = false;
 	let input: { dispose: () => void } | null = null;
-	let keyframeIndex: ReturnType<typeof createKeyframeIndex> | null = null;
 	let lastDecodedTimestampUs: MediaTimeUs | null = null;
 	let latestRequestId = 0;
 	let packetSink: EncodedPacketSink | null = null;
@@ -138,8 +136,7 @@ export function createMediabunnyScrubFrameProvider({
 		if (!packetSink) {
 			return null;
 		}
-		const indexedTimestamp = keyframeIndex?.floor(timestampSeconds) ?? null;
-		return packetSink.getKeyPacket(indexedTimestamp ?? timestampSeconds);
+		return packetSink.getKeyPacket(timestampSeconds);
 	}
 
 	async function closeSampleIterator() {
@@ -255,7 +252,6 @@ export function createMediabunnyScrubFrameProvider({
 			}
 
 			packetSink = new EncodedPacketSink(videoTrack);
-			keyframeIndex = createKeyframeIndex(new EncodedPacketSink(videoTrack));
 			sampleSink = new VideoSampleSink(videoTrack, {
 				optimizeForLatency: true,
 			});
