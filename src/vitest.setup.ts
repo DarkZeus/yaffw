@@ -54,6 +54,7 @@ vi.mock("@vidstack/react", async () => {
 	}) => React.createElement("div", props, children);
 
 	return {
+		VideoProviderLoader: class {},
 		MediaPlayer,
 		MediaProvider: ({ children }: { children?: ReactNode }) =>
 			React.createElement(React.Fragment, null, children),

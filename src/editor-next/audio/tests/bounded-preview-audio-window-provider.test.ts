@@ -90,6 +90,52 @@ beforeEach(() => {
 });
 
 describe("createMediaWindowProvider", () => {
+	it("keeps Preview PCM contiguous across unknown Matroska packet durations", async () => {
+		const track = createTrack({
+			packets: [
+				createPacket(0, 0.2),
+				createPacket(0.2, 0),
+				createPacket(0.4, 0.2),
+			],
+			iterators: [
+				createSampleIterator(
+					[0, 1, 2].map((index) =>
+						createAudioSample({
+							channels: [Array(20).fill(index + 1)],
+							sampleRate: 100,
+							timestamp: index * 0.2,
+						}),
+					),
+				),
+			],
+		});
+		track.getSampleRate.mockResolvedValue(100);
+		mediaMock.tracks = [track];
+		const provider = await createMediaWindowProvider({
+			source: new Blob(["fixture"]),
+		});
+		try {
+			const generation = provider.openGeneration({
+				signal: new AbortController().signal,
+				startSeconds: 0,
+			});
+			const result = await generation.pullThrough(0.6);
+			const state = result.tracks[0];
+			expect(state?.kind).toBe("playable");
+			if (state?.kind !== "playable") throw new Error("Expected playable PCM");
+			expect(
+				state.chunks.flatMap((chunk) =>
+					Array.from(chunk.audioBuffer.getChannelData(0)),
+				),
+			).toEqual([
+				...Array(20).fill(1),
+				...Array(20).fill(2),
+				...Array(20).fill(3),
+			]);
+		} finally {
+			await provider.dispose();
+		}
+	});
 	it("retains one Input and one pull-driven iterator across adjacent bounded pulls", async () => {
 		const sample = createAudioSample({
 			channels: [[1, 2, 3, 4]],

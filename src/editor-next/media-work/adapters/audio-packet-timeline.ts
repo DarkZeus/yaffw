@@ -44,13 +44,29 @@ export class AudioPacketTimeline {
 
 	add(range: AudioPacketRange) {
 		// Packets arrive in scan order, so only a re-read lookahead can repeat.
-		if (this.ranges.at(-1)?.startSeconds === range.startSeconds) {
+		const previous = this.ranges.at(-1);
+		if (previous?.startSeconds === range.startSeconds) {
 			return;
+		}
+		// Matroska can leave a cluster's final compressed packet duration unknown
+		// (zero). Its encoded audio still exists. Infer the declared extent from
+		// the next timestamp, just as the demuxer does within a cluster. The normal
+		// gap-spanning rule below still bounds real silence after that packet.
+		if (
+			this.options.packetDurationsMaySpanGaps &&
+			previous &&
+			previous.endSeconds === previous.startSeconds &&
+			range.startSeconds > previous.startSeconds
+		) {
+			previous.endSeconds = range.startSeconds;
+			this.recentDurations.push(previous.endSeconds - previous.startSeconds);
 		}
 		this.cachedGaps = null;
 		this.ranges.push(range);
-		this.recentDurations.push(range.endSeconds - range.startSeconds);
-		if (this.recentDurations.length > TYPICAL_DURATION_WINDOW) {
+		if (range.endSeconds > range.startSeconds) {
+			this.recentDurations.push(range.endSeconds - range.startSeconds);
+		}
+		while (this.recentDurations.length > TYPICAL_DURATION_WINDOW) {
 			this.recentDurations.shift();
 		}
 	}
@@ -78,8 +94,9 @@ export class AudioPacketTimeline {
 		}
 
 		return this.ranges.map((range) =>
+			range.endSeconds === range.startSeconds ||
 			range.endSeconds - range.startSeconds >
-			typicalDuration * GAP_SPANNING_DURATION_FACTOR
+				typicalDuration * GAP_SPANNING_DURATION_FACTOR
 				? {
 						endSeconds: range.startSeconds + typicalDuration,
 						startSeconds: range.startSeconds,

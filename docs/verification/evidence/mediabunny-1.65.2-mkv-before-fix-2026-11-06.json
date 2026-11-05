@@ -1,0 +1,54 @@
+{
+  "mediabunny": "1.65.2",
+  "source": "sync-two-audio.mkv",
+  "selectionUs": [
+    2000000,
+    8000000
+  ],
+  "alignment": {
+    "audioOnsetsSeconds": [
+      0.04,
+      1.06,
+      2.085,
+      3.105,
+      4.125,
+      5.145
+    ],
+    "videoOnsetsSeconds": [
+      0.02,
+      1.02,
+      2.02,
+      3.02,
+      4.02,
+      5.02
+    ],
+    "pairs": [
+      {
+        "videoSeconds": 1.02,
+        "audioSeconds": 1.06,
+        "deltaSeconds": 0.040000000000000036
+      },
+      {
+        "videoSeconds": 2.02,
+        "audioSeconds": 2.085,
+        "deltaSeconds": 0.06499999999999995
+      },
+      {
+        "videoSeconds": 3.02,
+        "audioSeconds": 3.105,
+        "deltaSeconds": 0.08499999999999996
+      },
+      {
+        "videoSeconds": 4.02,
+        "audioSeconds": 4.125,
+        "deltaSeconds": 0.10500000000000043
+      },
+      {
+        "videoSeconds": 5.02,
+        "audioSeconds": 5.145,
+        "deltaSeconds": 0.125
+      }
+    ],
+    "audioProbeResolutionSeconds": 0.005
+  }
+}

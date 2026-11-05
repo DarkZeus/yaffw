@@ -42,6 +42,39 @@ beforeEach(() => {
 });
 
 describe("decodeMediabunnyAudioTrackRange", () => {
+	it.each([0, 0.2, 0.25])(
+		"does not shift decoded events past a zero-duration encoded packet from %s",
+		async (startSeconds) => {
+			mediabunnyMock.packets = [
+				{ timestamp: 0, duration: 0.2 },
+				{ timestamp: 0.2, duration: 0 },
+				{ timestamp: 0.4, duration: 0.2 },
+			];
+			mediabunnyMock.samples = [0, 1, 2]
+				.filter((index) => (index + 1) * 0.2 > startSeconds)
+				.map((index) =>
+					createAudioSample({
+						channels: [Array(20).fill(index + 1)],
+						sampleRate: 100,
+						timestamp: index * 0.2,
+					}),
+				);
+			const decoded = await decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds,
+				endSeconds: 0.6,
+				signal: new AbortController().signal,
+				format: { numberOfChannels: 1, sampleRate: 100 },
+			});
+			expect(Array.from(decoded.getChannelData(0))).toEqual(
+				[
+					...Array(20).fill(1),
+					...Array(20).fill(2),
+					...Array(20).fill(3),
+				].slice(Math.round(startSeconds * 100)),
+			);
+		},
+	);
 	it("preserves media-time gaps and clips decoded samples to the requested range", async () => {
 		const leadingOverlap = createAudioSample({
 			channels: [

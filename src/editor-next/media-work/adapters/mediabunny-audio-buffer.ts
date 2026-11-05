@@ -144,6 +144,9 @@ async function readAudioPacketTimeline({
 		sampleRate,
 	});
 	const sink = new EncodedPacketSink(track);
+	let precedingUnknownPacket: { timestamp: number } | null = null;
+	let precedingKnownRange: { startSeconds: number; endSeconds: number } | null =
+		null;
 
 	for await (const packet of sink.packets(undefined, undefined, {
 		metadataOnly: true,
@@ -152,9 +155,31 @@ async function readAudioPacketTimeline({
 		if (
 			!Number.isFinite(packet.timestamp) ||
 			!Number.isFinite(packet.duration) ||
-			packet.duration <= 0 ||
-			packet.timestamp + packet.duration <= startSeconds
+			packet.duration < 0
 		) {
+			continue;
+		}
+		// A zero duration means unknown, so it can overlap the requested start.
+		// Keep only the immediate predecessor until its next timestamp is known.
+		if (precedingUnknownPacket) {
+			if (packet.timestamp > startSeconds) {
+				if (precedingKnownRange) timeline.add(precedingKnownRange);
+				timeline.add({
+					startSeconds: precedingUnknownPacket.timestamp,
+					endSeconds: precedingUnknownPacket.timestamp,
+				});
+			}
+			precedingUnknownPacket = null;
+		}
+		if (packet.duration === 0 && packet.timestamp <= startSeconds) {
+			precedingUnknownPacket = packet;
+			continue;
+		}
+		if (packet.timestamp + packet.duration <= startSeconds) {
+			precedingKnownRange = {
+				startSeconds: packet.timestamp,
+				endSeconds: packet.timestamp + packet.duration,
+			};
 			continue;
 		}
 
@@ -166,6 +191,13 @@ async function readAudioPacketTimeline({
 		if (packet.timestamp >= endSeconds) {
 			break;
 		}
+	}
+	if (precedingUnknownPacket) {
+		if (precedingKnownRange) timeline.add(precedingKnownRange);
+		timeline.add({
+			startSeconds: precedingUnknownPacket.timestamp,
+			endSeconds: precedingUnknownPacket.timestamp,
+		});
 	}
 
 	timeline.sort();

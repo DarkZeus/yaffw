@@ -120,6 +120,10 @@ vi.mock("@vidstack/react", async () => {
 					className,
 					"data-preview-aspect-ratio": aspectRatio,
 					"data-testid": "mock-vidstack-player",
+					"data-source-type":
+						typeof src === "object" && src && "type" in src
+							? String(src.type)
+							: undefined,
 				},
 				React.createElement("video", {
 					...props,
@@ -147,6 +151,7 @@ vi.mock("@vidstack/react", async () => {
 	);
 
 	return {
+		VideoProviderLoader: class {},
 		MediaPlayer,
 		MediaProvider: ({ children }: { children?: React.ReactNode }) =>
 			React.createElement(React.Fragment, null, children),
@@ -376,6 +381,14 @@ afterEach(() => {
 });
 
 describe("NativePreviewPlayer", () => {
+	it.each(["video/x-matroska", "application/octet-stream", "video/mp4", ""])(
+		"selects the native provider for a local video with file MIME type %s",
+		(type) => {
+			renderPlayer({ source: new File(["video"], "clip.mkv", { type }) });
+			const player = screen.getByTestId("mock-vidstack-player");
+			expect(player.getAttribute("data-source-type")).toBe("video/object");
+		},
+	);
 	it("does not rerender the media player when parent state changes but player props are stable", async () => {
 		const stableCallbacks = {
 			onSelectionEndRequested: vi.fn(),

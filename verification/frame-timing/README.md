@@ -4,7 +4,7 @@ This harness generates small H.264 MP4 assets with ffmpeg, checks their actual
 presentation timestamps with ffprobe, and passes their bytes through production
 local asset analysis in a separate headless Chromium browser. It also computes
 raw Mediabunny metrics in Node and Chromium, comparing those results exactly.
-Mediabunny must remain the project-pinned **1.65.0** for this proof.
+Mediabunny must remain the project-pinned **1.65.2** for this proof.
 
 Use the already-running development app on port 3000. This harness does not start
 a server or require fixture delivery through `public/`.

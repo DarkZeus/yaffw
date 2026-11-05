@@ -376,7 +376,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					playheadUs={playheadUs}
 					previewApertureStyle={previewApertureStyle}
 					previewDisplayAspectRatio={previewDisplayAspectRatio}
-					previewSourceMimeType={source.type}
 					previewSurfaceRef={previewSurfaceRef}
 					previewUrl={previewUrl}
 					scrubCanvasRef={scrubPreview.canvasRef}

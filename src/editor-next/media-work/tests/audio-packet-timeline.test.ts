@@ -2,10 +2,63 @@ import { describe, expect, it } from "vitest";
 
 import {
 	AudioPacketTimeline,
+	DecodedAudioTimestampProjector,
 	audioPacketDurationsMaySpanGaps,
 } from "../adapters/audio-packet-timeline";
 
 describe("AudioPacketTimeline", () => {
+	it("uses observed compressed packet cadence for the final unknown packet", () => {
+		const timeline = createTimeline(true, [
+			[0, 0.02],
+			[0.02, 0],
+		]);
+		expect(timeline.presentedRanges()).toEqual([
+			{ startSeconds: 0, endSeconds: 0.02 },
+			{ startSeconds: 0.02, endSeconds: 0.04 },
+		]);
+	});
+	it("keeps zero-duration AAC packets at Matroska cluster boundaries occupied", () => {
+		const duration = 1024 / 48_000;
+		const timeline = createTimeline(
+			true,
+			Array.from({ length: 470 }, (_, index) => [
+				Math.round(index * duration * 1000) / 1000,
+				index > 0 && index % 47 === 0
+					? 0
+					: Math.round((index + 1) * duration * 1000) / 1000 -
+						Math.round(index * duration * 1000) / 1000,
+			]),
+		);
+		expect(timeline.gaps()).toEqual([]);
+		const projector = new DecodedAudioTimestampProjector(0);
+		for (let index = 0; index < 470; index++) {
+			const timestamp = index * duration;
+			expect(projector.project(timestamp, duration, timeline)).toBe(timestamp);
+		}
+	});
+
+	it("still detects a real gap after a zero-duration compressed packet", () => {
+		const timeline = createTimeline(true, [
+			[0, 0.02],
+			[0.02, 0],
+			[1.04, 0.02],
+		]);
+		expect(timeline.gaps()).toEqual([
+			{ startSeconds: expect.closeTo(0.04, 9), endSeconds: 1.04 },
+		]);
+	});
+
+	it("does not infer variable-length PCM data from an unknown packet duration", () => {
+		const timeline = createTimeline(false, [
+			[0, 0.02],
+			[0.02, 0],
+			[1.04, 0.02],
+		]);
+		expect(timeline.presentedRanges()[1]).toEqual({
+			startSeconds: 0.02,
+			endSeconds: 0.02,
+		});
+	});
 	it("splits a compressed-audio packet whose inferred duration spans a gap", () => {
 		const timeline = createTimeline(true, [
 			[0, 0.02],

@@ -1,0 +1,128 @@
+{
+  "recordedAt": "2026-11-05T22:17:33.672Z",
+  "browser": "155.0.8059.85",
+  "baseUrl": "http://127.0.0.1:3000",
+  "mediabunny": "1.65.2",
+  "runs": [
+    {
+      "name": "fractional-cfr",
+      "sha256": "00396e1e6a88b067ee35c26050653acff63920ef44744f44405dfb461c65f29b",
+      "label": "29.97 fps",
+      "fps": 29.97002997002997,
+      "stepUs": 33367,
+      "forwardPlayheadSeconds": 0.033,
+      "durationSeconds": 12.012,
+      "nativeDurationSeconds": 12.012,
+      "timingText": "Frame timing analysis\nUnderlying rate\n29.97 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n29.97–29.97 fps\nAverage / median\n29.97 / 29.97 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.",
+      "mediaText": "Source\nfractional-cfr.mp4\nSize\n523.14 KB\nDuration\n00:00:12.012\nCodec\nAVC1.42C00B / UNKNOWN\nFrames\n29.97 fps\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:12.012\nDuration\n00:00:12.012\nCoverage\n100%\nAnalysis\nSource context\nAsset identity\nasset-0f556ab9-35f9-4783-aea1-3eb49693f4a8\nDuration\n00:00:12.012\nSize\n523.14 KB\nType\nMP4\nVideo facts\nVideo tracks\n1\nPrimary video\nVideo 1\nResolution\n160x90\nAspect\n16:9\nFrame timing\n29.97 fps\nCodec\navc1.42c00b\nBitrate\n353.97 kbps\nFrame timing analysis\nUnderlying rate\n29.97 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n29.97–29.97 fps\nAverage / median\n29.97 / 29.97 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.\nAudio facts\nAudio tracks\n0\nPrimary audio\nNone\nSelection facts\nSelection start\n00:00:00.000\nSelection end\n00:00:12.012\nSelection duration\n00:00:12.012\nAsset coverage\n100%",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    },
+    {
+      "name": "dropped-cfr",
+      "sha256": "ec4e8bfc272095c7ff882f19553b7bf8a544ed5165e62019edfcb76a65fb9210",
+      "label": "30 fps · variable",
+      "fps": 30,
+      "stepUs": 33333,
+      "forwardPlayheadSeconds": 0.033,
+      "durationSeconds": 13.333,
+      "nativeDurationSeconds": 13.333333,
+      "timingText": "Frame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nVariable in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n15–30 fps\nAverage / median\n27.03 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.",
+      "mediaText": "Source\ndropped-cfr.mp4\nSize\n534.16 KB\nDuration\n00:00:13.333\nCodec\nAVC1.42C00B / UNKNOWN\nFrames\n30 fps · variable\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:13.333\nDuration\n00:00:13.333\nCoverage\n100%\nAnalysis\nSource context\nAsset identity\nasset-74462c01-a06e-417e-88cb-a0c4cbb1d84a\nDuration\n00:00:13.333\nSize\n534.16 KB\nType\nMP4\nVideo facts\nVideo tracks\n1\nPrimary video\nVideo 1\nResolution\n160x90\nAspect\n16:9\nFrame timing\n30 fps · variable\nCodec\navc1.42c00b\nBitrate\n325.53 kbps\nFrame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nVariable in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n15–30 fps\nAverage / median\n27.03 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.\nAudio facts\nAudio tracks\n0\nPrimary audio\nNone\nSelection facts\nSelection start\n00:00:00.000\nSelection end\n00:00:13.333\nSelection duration\n00:00:13.333\nAsset coverage\n100%",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    },
+    {
+      "name": "vfr",
+      "sha256": "54aa0b826ffe1e28c7cc2c6d99904cc300e7bd040640898d71bcfb6edd7529a5",
+      "label": "27.03 fps estimated",
+      "fps": 27.030679821597513,
+      "stepUs": 36995,
+      "forwardPlayheadSeconds": 0.036,
+      "durationSeconds": 13.288,
+      "nativeDurationSeconds": 13.28817,
+      "timingText": "Frame timing analysis\nUnderlying rate\nNot detected\nFrame spacing\nVariable in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n21.05–37.76 fps\nAverage / median\n27.03 / 27.03 fps\nEstimate\nNo consistent underlying frame rate was detected in the packet sample; frame actions use the estimated rate.\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.",
+      "mediaText": "Source\nvfr-generated.mp4\nSize\n81.16 KB\nDuration\n00:00:01.040\nCodec\nAVC1.42C03E / UNKNOWN\nFrames\n27.13 fps estimated\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:01.040\nDuration\n00:00:01.040\nCoverage\n100%\nAnalysis",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Keyboard Selection [1.036, 2.036) keeps Export review best effort; real export and explicit delivery succeed",
+        "Delivered Generated media re-imports as a new Ready media asset",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    },
+    {
+      "name": "single-frame",
+      "sha256": "bffa6e4766d989e00aa64ad4cac5a5e88a2acf8aabbb3253ea615dc8f0c26b52",
+      "label": "30 fps fallback",
+      "fps": 30,
+      "stepUs": 33333,
+      "forwardPlayheadSeconds": 0.033,
+      "durationSeconds": 0.033,
+      "nativeDurationSeconds": 0.033333,
+      "timingText": "Frame timing analysis\nFrame timing\n30 fps fallback; analysis unavailable\nReason\nExact frame timing was unavailable during local asset analysis.",
+      "mediaText": "Source\nsingle-frame.mp4\nSize\n5.05 KB\nDuration\n00:00:00.033\nCodec\nAVC1.42C00B / UNKNOWN\nFrames\n30 fps fallback\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:00.033\nDuration\n00:00:00.033\nCoverage\n100%\nAnalysis\nSource context\nAsset identity\nasset-dc20acff-74d8-4fbf-ac49-b8d81b87c036\nDuration\n00:00:00.033\nSize\n5.05 KB\nType\nMP4\nVideo facts\nVideo tracks\n1\nPrimary video\nVideo 1\nResolution\n160x90\nAspect\n16:9\nFrame timing\n30 fps fallback\nCodec\navc1.42c00b\nBitrate\n1.04 Mbps\nFrame timing analysis\nFrame timing\n30 fps fallback; analysis unavailable\nReason\nExact frame timing was unavailable during local asset analysis.\nAudio facts\nAudio tracks\n0\nPrimary audio\nNone\nSelection facts\nSelection start\n00:00:00.000\nSelection end\n00:00:00.033\nSelection duration\n00:00:00.033\nAsset coverage\n100%",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    },
+    {
+      "name": "nonzero-start",
+      "sha256": "fc07fc66ac47b2ec731b3ac7930401e070eba96d13db6bdf4461c5d1e6f37176",
+      "label": "30 fps",
+      "fps": 30,
+      "stepUs": 33333,
+      "forwardPlayheadSeconds": 0.033,
+      "durationSeconds": 13.966,
+      "nativeDurationSeconds": 11.966667,
+      "timingText": "Frame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n30–30 fps\nAverage / median\n30 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.",
+      "mediaText": "Source\nnonzero-start.mp4\nSize\n520.62 KB\nDuration\n00:00:13.966\nCodec\nAVC1.42C03E / UNKNOWN\nFrames\n30 fps\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:13.966\nDuration\n00:00:13.966\nCoverage\n100%\nAnalysis\nSource context\nAsset identity\nasset-26bb3f8a-d441-4615-ab7a-779a7b4d786e\nDuration\n00:00:13.966\nSize\n520.62 KB\nType\nMP4\nVideo facts\nVideo tracks\n1\nPrimary video\nVideo 1\nResolution\n160x90\nAspect\n16:9\nFrame timing\n30 fps\nCodec\navc1.42c03e\nBitrate\n353.57 kbps\nFrame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n30–30 fps\nAverage / median\n30 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.\nAudio facts\nAudio tracks\n0\nPrimary audio\nNone\nSelection facts\nSelection start\n00:00:00.000\nSelection end\n00:00:13.966\nSelection duration\n00:00:13.966\nAsset coverage\n100%",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    },
+    {
+      "name": "late-vfr",
+      "sha256": "7574b4d89dcf45497e3954e50e207e2d2456d0f26c3461087e9ba06259087507",
+      "label": "30 fps",
+      "fps": 30.00030000300003,
+      "stepUs": 33333,
+      "forwardPlayheadSeconds": 0.033,
+      "durationSeconds": 19.962,
+      "nativeDurationSeconds": 19.962297,
+      "timingText": "Frame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n30–30 fps\nAverage / median\n30 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.",
+      "mediaText": "Source\nlate-vfr.mp4\nSize\n869.34 KB\nDuration\n00:00:19.962\nCodec\nAVC1.42C03E / UNKNOWN\nFrames\n30 fps\nTracks\nVideo 1\n160 x 90\nAudio\nNo audio tracks\nSelection\nStart\n00:00:00.000\nEnd\n00:00:19.962\nDuration\n00:00:19.962\nCoverage\n100%\nAnalysis\nSource context\nAsset identity\nasset-2201b881-41c2-46d6-a85e-04c08a8c92d4\nDuration\n00:00:19.962\nSize\n869.34 KB\nType\nMP4\nVideo facts\nVideo tracks\n1\nPrimary video\nVideo 1\nResolution\n160x90\nAspect\n16:9\nFrame timing\n30 fps\nCodec\navc1.42c03e\nBitrate\n354.49 kbps\nFrame timing analysis\nUnderlying rate\n30 fps detected\nFrame spacing\nConstant in probe\nSample coverage\n256 packets (target 256)\nObserved rates\n30–30 fps\nAverage / median\n30 / 30 fps\nScope\nSampled timestamps; whole-file timing may differ.\nFrame stepping\nNominal time steps; variable spacing may skip or repeat frames.\nAudio facts\nAudio tracks\n0\nPrimary audio\nNone\nSelection facts\nSelection start\n00:00:00.000\nSelection end\n00:00:19.962\nSelection duration\n00:00:19.962\nAsset coverage\n100%",
+      "checks": [
+        "Actual file import and Media compact/Analysis confidence, spacing and coverage facts",
+        "Nominal forward/backward frame steps match measured or fallback duration and clamp at zero",
+        "Seeking and frame steps remain within the asset duration",
+        "Close file returns to import; no uncaught page errors"
+      ],
+      "errors": []
+    }
+  ],
+  "limitations": [
+    "Headless Chromium only; no physical display or adjacent-frame guarantee.",
+    "Frame timing UI and nominal transport behavior are asserted; export start/end frame precision is not inferred from this check."
+  ]
+}

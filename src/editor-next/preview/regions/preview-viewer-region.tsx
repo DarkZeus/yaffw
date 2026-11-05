@@ -31,6 +31,7 @@ import type {
 } from "@/editor-core/model";
 
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
+import { localVideoProviderLoaders } from "../player/local-video-provider-loader";
 
 export type PreviewViewerRegionProps = {
 	asset: ReadyMediaAsset;
@@ -49,7 +50,6 @@ export type PreviewViewerRegionProps = {
 	playheadUs: MediaTimeUs;
 	previewApertureStyle: CSSProperties;
 	previewDisplayAspectRatio: number;
-	previewSourceMimeType: string;
 	previewSurfaceRef: RefObject<HTMLElement | null>;
 	previewUrl: string;
 	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -74,7 +74,6 @@ export function PreviewViewerRegion({
 	playheadUs,
 	previewApertureStyle,
 	previewDisplayAspectRatio,
-	previewSourceMimeType,
 	previewSurfaceRef,
 	previewUrl,
 	scrubCanvasRef,
@@ -82,8 +81,8 @@ export function PreviewViewerRegion({
 	videoRef,
 }: PreviewViewerRegionProps) {
 	const playerSrc = useMemo(
-		() => createPreviewPlayerSrc(previewUrl, previewSourceMimeType, asset),
-		[asset, previewSourceMimeType, previewUrl],
+		() => createPreviewPlayerSrc(previewUrl),
+		[previewUrl],
 	);
 
 	return (
@@ -223,6 +222,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					viewType={asset.tracks.video.length > 0 ? "video" : "audio"}
 				>
 					<MediaProvider
+						loaders={localVideoProviderLoaders}
 						mediaProps={{
 							className: "h-full w-full bg-black object-contain",
 						}}
@@ -411,21 +411,16 @@ function resolveChapterEndSeconds({
 	return startSeconds;
 }
 
-function createPreviewPlayerSrc(
-	previewUrl: string,
-	mimeType: string,
-	asset: ReadyMediaAsset,
-): PlayerSrc | undefined {
+function createPreviewPlayerSrc(previewUrl: string): PlayerSrc | undefined {
 	if (!previewUrl) {
 		return undefined;
 	}
 
 	return {
 		src: previewUrl,
-		type:
-			mimeType ||
-			(asset.tracks.video.length > 0 ? "video/object" : "audio/object"),
-	} as PlayerSrc;
+		// Ready media assets always have video; the local loader owns dispatch.
+		type: "video/object",
+	};
 }
 
 function secondsToMicroseconds(seconds: number): MediaTimeUs {

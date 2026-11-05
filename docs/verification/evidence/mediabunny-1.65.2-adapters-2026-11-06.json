@@ -1,0 +1,1717 @@
+{
+  "recordedAt": "2026-11-05T22:22:14.578Z",
+  "mediabunny": "1.65.2",
+  "browser": "155.0.8059.85",
+  "results": [
+    {
+      "name": "long-gop.mp4",
+      "sha256": "92496ac5644e762e7f2625e1abdf7402100e17f58d6bcefd84c4215cd2e26341",
+      "bytes": 1029105,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "Main",
+            "codec_type": "video",
+            "codec_tag_string": "avc1",
+            "codec_tag": "0x31637661",
+            "width": 160,
+            "height": 90,
+            "coded_width": 160,
+            "coded_height": 90,
+            "closed_captions": 0,
+            "film_grain": 0,
+            "has_b_frames": 2,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 10,
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "refs": 1,
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "id": "0x1",
+            "r_frame_rate": "10/1",
+            "avg_frame_rate": "10/1",
+            "time_base": "1/10240",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 624640,
+            "duration": "61.000000",
+            "bit_rate": "134103",
+            "bits_per_raw_sample": "8",
+            "nb_frames": "610",
+            "nb_read_packets": "610",
+            "extradata_size": 38,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "VideoHandler",
+              "vendor_id": "[0][0][0][0]",
+              "encoder": "Lavc61.19.101 libx264"
+            }
+          }
+        ],
+        "firstPacket": 0,
+        "lastPacket": 60.9,
+        "maxPacketGap": 0.4000000000000057
+      },
+      "observed": {
+        "lookup": [
+          {
+            "target": 59.83,
+            "packet": 59.8,
+            "key": 40,
+            "packetElapsedMs": 1.699999988079071,
+            "keyElapsedMs": 0.09999999403953552
+          },
+          {
+            "target": 59.93,
+            "packet": 59.9,
+            "key": 40,
+            "packetElapsedMs": 0,
+            "keyElapsedMs": 0.10000002384185791
+          },
+          {
+            "target": 20.13,
+            "packet": 20.1,
+            "key": 20,
+            "packetElapsedMs": 0.09999999403953552,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 0.13,
+            "packet": 0.1,
+            "key": 0,
+            "packetElapsedMs": 0,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 40.23,
+            "packet": 40.2,
+            "key": 40,
+            "packetElapsedMs": 0,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 58.13,
+            "packet": 58.1,
+            "key": 40,
+            "packetElapsedMs": 0,
+            "keyElapsedMs": 0.09999999403953552
+          }
+        ],
+        "scrub": [
+          {
+            "target": 59.83,
+            "actual": 59.8,
+            "elapsedMs": 169
+          },
+          {
+            "target": 59.93,
+            "actual": 59.9,
+            "elapsedMs": 0.29999998211860657
+          },
+          {
+            "target": 20.13,
+            "actual": 20.1,
+            "elapsedMs": 3.100000023841858
+          },
+          {
+            "target": 0.13,
+            "actual": 0.1,
+            "elapsedMs": 2.0999999940395355
+          },
+          {
+            "target": 40.23,
+            "actual": 40.2,
+            "elapsedMs": 0.19999998807907104
+          },
+          {
+            "target": 58.13,
+            "actual": 58.1,
+            "elapsedMs": 0.09999999403953552
+          }
+        ],
+        "strip": [
+          {
+            "timestampUs": 59830000,
+            "bytes": 2048
+          },
+          {
+            "timestampUs": 59930000,
+            "bytes": 2069
+          },
+          {
+            "timestampUs": 20130000,
+            "bytes": 2131
+          },
+          {
+            "timestampUs": 130000,
+            "bytes": 2018
+          },
+          {
+            "timestampUs": 40230000,
+            "bytes": 2165
+          },
+          {
+            "timestampUs": 58130000,
+            "bytes": 2258
+          }
+        ]
+      }
+    },
+    {
+      "name": "sparse-cues.mkv",
+      "cuePoints": 1,
+      "originalCuePoints": 4,
+      "sha256": "131ab8a57d311fe02ecfef53e3a91cbf0c162da4c614887e3768875aed3c1664",
+      "bytes": 1027745,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "Main",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 160,
+            "height": 90,
+            "coded_width": 160,
+            "coded_height": 90,
+            "closed_captions": 0,
+            "film_grain": 0,
+            "has_b_frames": 2,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 10,
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "refs": 1,
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "r_frame_rate": "10/1",
+            "avg_frame_rate": "10/1",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "bits_per_raw_sample": "8",
+            "nb_read_packets": "610",
+            "extradata_size": 38,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "HANDLER_NAME": "VideoHandler",
+              "VENDOR_ID": "[0][0][0][0]",
+              "ENCODER": "Lavc61.19.101 libx264",
+              "DURATION": "00:01:01.000000000"
+            }
+          }
+        ],
+        "firstPacket": 0,
+        "lastPacket": 60.9,
+        "maxPacketGap": 0.4000000000000057
+      },
+      "observed": {
+        "lookup": [
+          {
+            "target": 59.83,
+            "packet": 59.8,
+            "key": 40,
+            "packetElapsedMs": 2.399999976158142,
+            "keyElapsedMs": 0.30000001192092896
+          },
+          {
+            "target": 59.93,
+            "packet": 59.9,
+            "key": 40,
+            "packetElapsedMs": 0.09999999403953552,
+            "keyElapsedMs": 0.09999999403953552
+          },
+          {
+            "target": 20.13,
+            "packet": 20.1,
+            "key": 20,
+            "packetElapsedMs": 0.10000002384185791,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 0.13,
+            "packet": 0.1,
+            "key": 0,
+            "packetElapsedMs": 0.09999999403953552,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 40.23,
+            "packet": 40.2,
+            "key": 40,
+            "packetElapsedMs": 0,
+            "keyElapsedMs": 0
+          },
+          {
+            "target": 58.13,
+            "packet": 58.1,
+            "key": 40,
+            "packetElapsedMs": 0.09999999403953552,
+            "keyElapsedMs": 0.19999998807907104
+          }
+        ],
+        "scrub": [
+          {
+            "target": 59.83,
+            "actual": 59.8,
+            "elapsedMs": 50.599999994039536
+          },
+          {
+            "target": 59.93,
+            "actual": 59.9,
+            "elapsedMs": 0.4000000059604645
+          },
+          {
+            "target": 20.13,
+            "actual": 20.1,
+            "elapsedMs": 2.199999988079071
+          },
+          {
+            "target": 0.13,
+            "actual": 0.1,
+            "elapsedMs": 2.300000011920929
+          },
+          {
+            "target": 40.23,
+            "actual": 40.2,
+            "elapsedMs": 0.5
+          },
+          {
+            "target": 58.13,
+            "actual": 58.1,
+            "elapsedMs": 0.09999999403953552
+          }
+        ],
+        "strip": [
+          {
+            "timestampUs": 59830000,
+            "bytes": 2048
+          },
+          {
+            "timestampUs": 59930000,
+            "bytes": 2069
+          },
+          {
+            "timestampUs": 20130000,
+            "bytes": 2131
+          },
+          {
+            "timestampUs": 130000,
+            "bytes": 2018
+          },
+          {
+            "timestampUs": 40230000,
+            "bytes": 2165
+          },
+          {
+            "timestampUs": 58130000,
+            "bytes": 2258
+          }
+        ]
+      }
+    },
+    {
+      "name": "sync-two-audio.mkv",
+      "sha256": "4d95beb4af8a178602b3e150cc8c642320b7d1b20321a29152d7b03a16706d87",
+      "bytes": 62744,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "Constrained Baseline",
+            "codec_type": "video",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "width": 160,
+            "height": 90,
+            "coded_width": 160,
+            "coded_height": 90,
+            "closed_captions": 0,
+            "film_grain": 0,
+            "has_b_frames": 0,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 30,
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "refs": 1,
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "r_frame_rate": "50/1",
+            "avg_frame_rate": "50/1",
+            "time_base": "1/1000",
+            "start_pts": 21,
+            "start_time": "0.021000",
+            "bits_per_raw_sample": "8",
+            "nb_read_packets": "500",
+            "extradata_size": 40,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "HANDLER_NAME": "VideoHandler",
+              "VENDOR_ID": "[0][0][0][0]",
+              "ENCODER": "Lavc61.19.101 libx264",
+              "DURATION": "00:00:10.021000000"
+            }
+          },
+          {
+            "index": 1,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 2,
+            "channel_layout": "stereo",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "nb_read_packets": "470",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "HANDLER_NAME": "SoundHandler",
+              "VENDOR_ID": "[0][0][0][0]",
+              "DURATION": "00:00:10.021000000"
+            }
+          },
+          {
+            "index": 2,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 2,
+            "channel_layout": "stereo",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "nb_read_packets": "470",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "HANDLER_NAME": "SoundHandler",
+              "VENDOR_ID": "[0][0][0][0]",
+              "DURATION": "00:00:10.021000000"
+            }
+          }
+        ],
+        "firstPacket": 0,
+        "lastPacket": 10.005,
+        "maxPacketGap": 0.021
+      },
+      "observed": {
+        "firstPacketTimestamp": 0,
+        "results": [
+          {
+            "start": 0,
+            "mixOnsets": [
+              1.0200000000000002,
+              2.019999999999979,
+              3.019999999999958,
+              4.0199999999999365,
+              5.019999999999915,
+              6.019999999999894,
+              7.019999999999873,
+              8.019999999999854,
+              9.02000000000001
+            ],
+            "previewOnsets": [
+              1.0200000000000002,
+              2.019999999999979,
+              3.019999999999958,
+              4.0199999999999365,
+              5.019999999999915,
+              6.019999999999894,
+              7.019999999999873,
+              8.019999999999854,
+              9.02000000000001
+            ],
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 4,
+                "mixRms": 0.002325537994353392,
+                "previewRms": 0.002687353595341405
+              }
+            ]
+          },
+          {
+            "start": 2.005,
+            "mixOnsets": [
+              2.02,
+              3.0200000000000005,
+              4.019999999999979,
+              5.019999999999958,
+              6.0199999999999365,
+              7.019999999999915,
+              8.019999999999893,
+              9.019999999999872
+            ],
+            "previewOnsets": [
+              2.02,
+              3.0200000000000005,
+              4.019999999999979,
+              5.019999999999958,
+              6.0199999999999365,
+              7.019999999999915,
+              8.019999999999893,
+              9.019999999999872
+            ],
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0029721211034161254,
+                "previewRms": 0.0034345105461205646
+              }
+            ]
+          },
+          {
+            "start": 2.01,
+            "mixOnsets": [
+              2.0199999999999996,
+              3.0200000000000005,
+              4.019999999999979,
+              5.019999999999958,
+              6.0199999999999365,
+              7.019999999999915,
+              8.019999999999893,
+              9.019999999999872
+            ],
+            "previewOnsets": [
+              2.0199999999999996,
+              3.0200000000000005,
+              4.019999999999979,
+              5.019999999999958,
+              6.0199999999999365,
+              7.019999999999915,
+              8.019999999999893,
+              9.019999999999872
+            ],
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0029739111906938484,
+                "previewRms": 0.0034365791275384077
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "libopus-continuous.webm",
+      "sha256": "79d67fa8295013c77aeb9bcdabaaa2a82f697f1b24d6891576cb3ecec4c91407",
+      "bytes": 51456,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "opus",
+            "codec_long_name": "Opus (Opus Interactive Audio Codec)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 312,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": -7,
+            "start_time": "-0.007000",
+            "nb_read_packets": "251",
+            "extradata_size": 19,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 libopus",
+              "DURATION": "00:00:05.008000000"
+            }
+          }
+        ],
+        "firstPacket": -0.007,
+        "lastPacket": 4.994,
+        "maxPacketGap": 0.021
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.007,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07743048223611199,
+                "previewRms": 0.08718987844952687
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08073879128776036,
+                "previewRms": 0.08739950133013567
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0.08315820725726579,
+                "previewRms": 0.08761217524633651
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08564872190347463,
+                "previewRms": 0.087823976991848
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08691848392474073,
+                "previewRms": 0.08795309175792486
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0.08325637542917504,
+                "previewRms": 0.08777072984581823
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08574917049162499,
+                "previewRms": 0.08798223892817085
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08702028114411456,
+                "previewRms": 0.08805840084844622
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08580081660759716,
+                "previewRms": 0.08798223892817085
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08707269283802187,
+                "previewRms": 0.0881114377924094
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "libopus-gap.webm",
+      "sha256": "c86912f6bfe0817733d52ae17aa177d5ed23502e261994eb4bcbda7d5463ce9c",
+      "bytes": 40732,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "opus",
+            "codec_long_name": "Opus (Opus Interactive Audio Codec)",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 312,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": -7,
+            "start_time": "-0.007000",
+            "nb_read_packets": "201",
+            "extradata_size": 19,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 libopus",
+              "DURATION": "00:00:05.007000000"
+            }
+          }
+        ],
+        "firstPacket": -0.007,
+        "lastPacket": 4.996,
+        "maxPacketGap": 1.0220000000000002
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.007,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07979701487466527,
+                "previewRms": 0.08740012372590371
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08320643716140194,
+                "previewRms": 0.08761025196219485
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08562778763272363,
+                "previewRms": 0.08781054328931062
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08686177500412122,
+                "previewRms": 0.08788461710917018
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08573096469413764,
+                "previewRms": 0.08791635042547355
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0869664389071569,
+                "previewRms": 0.08799051358082217
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08578259983762629,
+                "previewRms": 0.08796930183212902
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08701881820422211,
+                "previewRms": 0.08806276810733059
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "aac-continuous.mkv",
+      "sha256": "55fd4797680923e596717f2c280d8d402733ddadde4befcf916c2534535ef3c7",
+      "bytes": 45838,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 1024,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": -21,
+            "start_time": "-0.021000",
+            "nb_read_packets": "236",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 aac",
+              "DURATION": "00:00:05.021000000"
+            }
+          }
+        ],
+        "firstPacket": -0.021,
+        "lastPacket": 4.992,
+        "maxPacketGap": 0.02200000000000024
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.021,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07741600270531991,
+                "previewRms": 0.0864253092038132
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08065066820539807,
+                "previewRms": 0.08679047420737106
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0.08398099993686671,
+                "previewRms": 0.08812502546048946
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08612801549333322,
+                "previewRms": 0.08812544477773471
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0869339573898718,
+                "previewRms": 0.08786363589553736
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0.08380328244931522,
+                "previewRms": 0.08799098261658646
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08569357370278052,
+                "previewRms": 0.08773378028687318
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08748238650724197,
+                "previewRms": 0.08841745735089111
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08574518736114557,
+                "previewRms": 0.08773378114738101
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08753507576839983,
+                "previewRms": 0.08847071001472089
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "aac-gap.mkv",
+      "sha256": "fb9fc30848f1c089316a11d2688701ace6813376391ca86fbfd78a2b00044181",
+      "bytes": 36846,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 1024,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": -21,
+            "start_time": "-0.021000",
+            "nb_read_packets": "189",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 aac",
+              "DURATION": "00:00:05.021000000"
+            }
+          }
+        ],
+        "firstPacket": -0.021,
+        "lastPacket": 4.992,
+        "maxPacketGap": 1.024
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.021,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07963811001815001,
+                "previewRms": 0.0866337107840823
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08296562121897362,
+                "previewRms": 0.0869997561323843
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08554323477420123,
+                "previewRms": 0.08752565277135227
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08645719406270189,
+                "previewRms": 0.08737779744260915
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08560075430375955,
+                "previewRms": 0.08758560574435942
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0870075065061815,
+                "previewRms": 0.087932846337182
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08565231087526641,
+                "previewRms": 0.08763835814266209
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08705991040860718,
+                "previewRms": 0.08799004677991525
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "libvorbis-continuous.webm",
+      "sha256": "446d87cd5ea36beb0c4e8321c4823a1b302ceadfc5050d8ea5a0ba7dbf58cb69",
+      "bytes": 14884,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "vorbis",
+            "codec_long_name": "Vorbis",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "nb_read_packets": "236",
+            "extradata_size": 3315,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 libvorbis",
+              "DURATION": "00:00:05.003000000"
+            }
+          }
+        ],
+        "firstPacket": 0,
+        "lastPacket": 4.986,
+        "maxPacketGap": 0.02200000000000024
+      },
+      "observed": {
+        "firstPacketTimestamp": 0,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07884429410622268,
+                "previewRms": 0.08804804147358263
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08161920342189163,
+                "previewRms": 0.08786168129865772
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0.0841651090697758,
+                "previewRms": 0.08834666001758187
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08658331552743749,
+                "previewRms": 0.08862225769691522
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08767018230080285,
+                "previewRms": 0.08863622569703863
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0.08425618897107316,
+                "previewRms": 0.08850423178306083
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.0867755261383858,
+                "previewRms": 0.08888143755599831
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08751687687699508,
+                "previewRms": 0.08848977144534263
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08682779040230615,
+                "previewRms": 0.08888143755599831
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08756958759359991,
+                "previewRms": 0.08854306822558719
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "libvorbis-gap.webm",
+      "sha256": "7bec9640229b43869d7771bdc7fa354844b9ca19d142e1f07049f3050d139cf4",
+      "bytes": 12991,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "vorbis",
+            "codec_long_name": "Vorbis",
+            "codec_type": "audio",
+            "codec_tag_string": "[0][0][0][0]",
+            "codec_tag": "0x0000",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/1000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "nb_read_packets": "197",
+            "extradata_size": 3315,
+            "disposition": {
+              "default": 0,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "ENCODER": "Lavc61.19.101 libvorbis",
+              "DURATION": "00:00:05.003000000"
+            }
+          }
+        ],
+        "firstPacket": 0,
+        "lastPacket": 4.988,
+        "maxPacketGap": 1.0050000000000003
+      },
+      "observed": {
+        "firstPacketTimestamp": 0,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.08071765230757101,
+                "previewRms": 0.08826035594979133
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.0835584942649467,
+                "previewRms": 0.08807354637854699
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08661885532088186,
+                "previewRms": 0.08863584174032
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08747483662841947,
+                "previewRms": 0.08841284700235408
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08672322652133649,
+                "previewRms": 0.08874264324374727
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08758023927401841,
+                "previewRms": 0.08851937985663043
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.0866883511688097,
+                "previewRms": 0.08874509806862345
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08759094898499273,
+                "previewRms": 0.08857177931632147
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "aac-continuous.mp4",
+      "sha256": "1f32f5c101f8c1be4a94f26f66921b8ff3ff5d6fcd08051ba7e5791e71cb63da",
+      "bytes": 45362,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "mp4a",
+            "codec_tag": "0x6134706d",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "id": "0x1",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 240000,
+            "duration": "5.000000",
+            "bit_rate": "69450",
+            "nb_frames": "236",
+            "nb_read_packets": "236",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "SoundHandler",
+              "vendor_id": "[0][0][0][0]"
+            }
+          }
+        ],
+        "firstPacket": -0.021333,
+        "lastPacket": 4.992,
+        "maxPacketGap": 0.021334000000000408
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.021333333333333333,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07717799872297594,
+                "previewRms": 0.0861589088719254
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.0808304160866444,
+                "previewRms": 0.08698288031068908
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0.08370242488206248,
+                "previewRms": 0.08783218500488654
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.085590442686585,
+                "previewRms": 0.08757544792714998
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08737710075075095,
+                "previewRms": 0.08831104653679286
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0.08380328232483614,
+                "previewRms": 0.08799098278413162
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.08569357400968808,
+                "previewRms": 0.08773378052620819
+              },
+              {
+                "time": 4,
+                "mixRms": 0.0874823864216856,
+                "previewRms": 0.0884174574718557
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.0857451872013328,
+                "previewRms": 0.08773378127630839
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08753507563205291,
+                "previewRms": 0.08847070987171517
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "aac-gap.mp4",
+      "sha256": "005b7207de8b47a6915a5a5ed81e3711534e6f057b2486275a212e9dc0d29303",
+      "bytes": 36527,
+      "ffprobe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "mp4a",
+            "codec_tag": "0x6134706d",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 0,
+            "id": "0x1",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 240000,
+            "duration": "5.000000",
+            "bit_rate": "55648",
+            "nb_frames": "189",
+            "nb_read_packets": "189",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "SoundHandler",
+              "vendor_id": "[0][0][0][0]"
+            }
+          }
+        ],
+        "firstPacket": -0.021333,
+        "lastPacket": 4.992,
+        "maxPacketGap": 1.024
+      },
+      "observed": {
+        "firstPacketTimestamp": -0.021333333333333333,
+        "results": [
+          {
+            "start": 0,
+            "probes": [
+              {
+                "time": 0.05,
+                "mixRms": 0.07939327462831137,
+                "previewRms": 0.08636666801909638
+              },
+              {
+                "time": 1.5,
+                "mixRms": 0.08315052862198609,
+                "previewRms": 0.08719262624820376
+              },
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.0854977335932656,
+                "previewRms": 0.08748019646045532
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08690279410280191,
+                "previewRms": 0.08782702013539194
+              }
+            ]
+          },
+          {
+            "start": 2.5,
+            "probes": [
+              {
+                "time": 2.5,
+                "mixRms": 0,
+                "previewRms": 0
+              },
+              {
+                "time": 3.5,
+                "mixRms": 0.0856007540836093,
+                "previewRms": 0.08758560574855116
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08700750639336603,
+                "previewRms": 0.087932846090361
+              }
+            ]
+          },
+          {
+            "start": 3.2,
+            "probes": [
+              {
+                "time": 3.5,
+                "mixRms": 0.08565231116649054,
+                "previewRms": 0.08763835806055204
+              },
+              {
+                "time": 4,
+                "mixRms": 0.08705991118266926,
+                "previewRms": 0.08799004737645123
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "Synthetic Chromium decoder and adapter evidence; no physical playback or Firefox/Safari claims.",
+    "Video strip asserts nonempty extraction at requested timestamps; exact decoded packet timestamps are asserted through production scrub.",
+    "Audio buffer decoder is the production generated-mix source decoder; final muxed export is covered separately.",
+    "Audio fixtures include encoder priming/negative packet starts where generated by ffmpeg; all user ranges remain nonnegative."
+  ]
+}

@@ -1,0 +1,397 @@
+{
+  "recordedAt": "2026-11-05T22:03:00.509Z",
+  "origin": "http://127.0.0.1:3000",
+  "browser": "155.0.8059.85",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "node": "v25.9.0",
+  "mediabunny": "1.65.2",
+  "ffmpeg": "ffmpeg version 7.1.1 Copyright (c) 2000-2025 the FFmpeg developers",
+  "ffprobe": "ffprobe version 7.1.1 Copyright (c) 2007-2025 the FFmpeg developers",
+  "results": [
+    {
+      "name": "fractional-cfr",
+      "sha256": "00396e1e6a88b067ee35c26050653acff63920ef44744f44405dfb461c65f29b",
+      "sizeBytes": 535698,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "0.000000",
+          "avg_frame_rate": "30000/1001",
+          "r_frame_rate": "30000/1001",
+          "nb_frames": "360"
+        },
+        "packetCount": 360,
+        "firstTimestamp": 0,
+        "lastTimestamp": 11.978633,
+        "minGap": 0.03336599999999912,
+        "maxGap": 0.03336700000000015
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": 29.97002997002997,
+        "bestGuessFrameRate": 29.97002997002997,
+        "minFrameRate": 29.97002997002997,
+        "maxFrameRate": 29.97002997002997,
+        "averageFrameRate": 29.97002997002997,
+        "medianFrameRate": 29.97002997002997,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": 29.97002997002997,
+        "bestGuessFrameRate": 29.97002997002997,
+        "minFrameRate": 29.97002997002997,
+        "maxFrameRate": 29.97002997002997,
+        "averageFrameRate": 29.97002997002997,
+        "medianFrameRate": 29.97002997002997,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": 29.97002997002997,
+        "bestGuessFrameRate": 29.97002997002997,
+        "minFrameRate": 29.97002997002997,
+        "maxFrameRate": 29.97002997002997,
+        "averageFrameRate": 29.970029970029973,
+        "medianFrameRate": 29.97002997002997,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 360
+      },
+      "frameTiming": {
+        "analysis": {
+          "averageFrameRate": 29.97002997002997,
+          "frameRateIsConstant": true,
+          "maxFrameRate": 29.97002997002997,
+          "medianFrameRate": 29.97002997002997,
+          "minFrameRate": 29.97002997002997,
+          "probedPacketCount": 256,
+          "underlyingFrameRate": 29.97002997002997
+        },
+        "fps": 29.97002997002997,
+        "frameDurationUs": 33367,
+        "source": "known"
+      },
+      "durationUs": 12012000
+    },
+    {
+      "name": "dropped-cfr",
+      "sha256": "ec4e8bfc272095c7ff882f19553b7bf8a544ed5165e62019edfcb76a65fb9210",
+      "sizeBytes": 546980,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "0.000000",
+          "avg_frame_rate": "360000000/13333333",
+          "r_frame_rate": "30/1",
+          "nb_frames": "360"
+        },
+        "packetCount": 360,
+        "firstTimestamp": 0,
+        "lastTimestamp": 13.3,
+        "minGap": 0.03333299999999895,
+        "maxGap": 0.0666670000000007
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 15,
+        "maxFrameRate": 30,
+        "averageFrameRate": 27.031802120141343,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 256
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 15,
+        "maxFrameRate": 30,
+        "averageFrameRate": 27.031802120141343,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 256
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 15,
+        "maxFrameRate": 30,
+        "averageFrameRate": 26.992481203007518,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 360
+      },
+      "frameTiming": {
+        "analysis": {
+          "averageFrameRate": 27.031802120141343,
+          "frameRateIsConstant": false,
+          "maxFrameRate": 30,
+          "medianFrameRate": 30,
+          "minFrameRate": 15,
+          "probedPacketCount": 256,
+          "underlyingFrameRate": 30
+        },
+        "fps": 30,
+        "frameDurationUs": 33333,
+        "source": "known"
+      },
+      "durationUs": 13333333
+    },
+    {
+      "name": "vfr",
+      "sha256": "54aa0b826ffe1e28c7cc2c6d99904cc300e7bd040640898d71bcfb6edd7529a5",
+      "sizeBytes": 541961,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "0.000000",
+          "avg_frame_rate": "12000000/442939",
+          "r_frame_rate": "1000000/1",
+          "nb_frames": "360"
+        },
+        "packetCount": 360,
+        "firstTimestamp": 0,
+        "lastTimestamp": 13.28817,
+        "minGap": 0.026482000000000117,
+        "maxGap": 0.04751800000000017
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 27.030679821597513,
+        "minFrameRate": 21.045099648546834,
+        "maxFrameRate": 37.76149837625557,
+        "averageFrameRate": 27.02782626004521,
+        "medianFrameRate": 27.030679821597513,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 256
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 27.030679821597513,
+        "minFrameRate": 21.045099648546834,
+        "maxFrameRate": 37.76149837625557,
+        "averageFrameRate": 27.02782626004521,
+        "medianFrameRate": 27.030679821597513,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 256
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 27.0160745643658,
+        "minFrameRate": 21.044656761648216,
+        "maxFrameRate": 37.76149837625557,
+        "averageFrameRate": 27.01651167918532,
+        "medianFrameRate": 27.0160745643658,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 360
+      },
+      "frameTiming": {
+        "analysis": {
+          "averageFrameRate": 27.02782626004521,
+          "frameRateIsConstant": false,
+          "maxFrameRate": 37.76149837625557,
+          "medianFrameRate": 27.030679821597513,
+          "minFrameRate": 21.045099648546834,
+          "probedPacketCount": 256,
+          "underlyingFrameRate": null
+        },
+        "fps": 27.030679821597513,
+        "frameDurationUs": 36995,
+        "reason": "No consistent underlying frame rate was detected in the packet sample; frame actions use the estimated rate.",
+        "source": "estimated"
+      },
+      "durationUs": 13288170
+    },
+    {
+      "name": "single-frame",
+      "sha256": "bffa6e4766d989e00aa64ad4cac5a5e88a2acf8aabbb3253ea615dc8f0c26b52",
+      "sizeBytes": 5173,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "0.000000",
+          "avg_frame_rate": "1000000/33333",
+          "r_frame_rate": "1000000/33333",
+          "nb_frames": "1"
+        },
+        "packetCount": 1,
+        "firstTimestamp": 0,
+        "lastTimestamp": 0,
+        "minGap": null,
+        "maxGap": null
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 1000000,
+        "minFrameRate": 1000000,
+        "maxFrameRate": 1000000,
+        "averageFrameRate": 1000000,
+        "medianFrameRate": 1000000,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 1
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 1000000,
+        "minFrameRate": 1000000,
+        "maxFrameRate": 1000000,
+        "averageFrameRate": 1000000,
+        "medianFrameRate": 1000000,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 1
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 1000000,
+        "minFrameRate": 1000000,
+        "maxFrameRate": 1000000,
+        "averageFrameRate": 1000000,
+        "medianFrameRate": 1000000,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 1
+      },
+      "frameTiming": {
+        "analysis": null,
+        "fps": 30,
+        "frameDurationUs": 33333,
+        "reason": "Exact frame timing was unavailable during local asset analysis.",
+        "source": "estimated"
+      },
+      "durationUs": 33333
+    },
+    {
+      "name": "nonzero-start",
+      "sha256": "fc07fc66ac47b2ec731b3ac7930401e070eba96d13db6bdf4461c5d1e6f37176",
+      "sizeBytes": 533113,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "2.000000",
+          "avg_frame_rate": "120000000/3988889",
+          "r_frame_rate": "30/1",
+          "nb_frames": "360"
+        },
+        "packetCount": 360,
+        "firstTimestamp": 2,
+        "lastTimestamp": 13.966667,
+        "minGap": 0.03333299999999895,
+        "maxGap": 0.033333999999999975
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 30,
+        "maxFrameRate": 30,
+        "averageFrameRate": 30,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 30,
+        "maxFrameRate": 30,
+        "averageFrameRate": 30,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": 30,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 30,
+        "maxFrameRate": 30,
+        "averageFrameRate": 30,
+        "medianFrameRate": 30,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 360
+      },
+      "frameTiming": {
+        "analysis": {
+          "averageFrameRate": 30,
+          "frameRateIsConstant": true,
+          "maxFrameRate": 30,
+          "medianFrameRate": 30,
+          "minFrameRate": 30,
+          "probedPacketCount": 256,
+          "underlyingFrameRate": 30
+        },
+        "fps": 30,
+        "frameDurationUs": 33333,
+        "source": "known"
+      },
+      "durationUs": 13966667
+    },
+    {
+      "name": "late-vfr",
+      "sha256": "7574b4d89dcf45497e3954e50e207e2d2456d0f26c3461087e9ba06259087507",
+      "sizeBytes": 890200,
+      "ffprobe": {
+        "stream": {
+          "time_base": "1/1000000",
+          "start_time": "0.000000",
+          "avg_frame_rate": "200000000/6654099",
+          "r_frame_rate": "1000000/33333",
+          "nb_frames": "600"
+        },
+        "packetCount": 600,
+        "firstTimestamp": 0,
+        "lastTimestamp": 19.962297,
+        "minGap": 0.022814999999999586,
+        "maxGap": 0.043851000000000084
+      },
+      "nodeMetrics": {
+        "underlyingFrameRate": 30.00030000300003,
+        "bestGuessFrameRate": 30.00030000300003,
+        "minFrameRate": 30.00030000300003,
+        "maxFrameRate": 30.00030000300003,
+        "averageFrameRate": 30.00030000300003,
+        "medianFrameRate": 30.00030000300003,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "boundedMetrics": {
+        "underlyingFrameRate": 30.00030000300003,
+        "bestGuessFrameRate": 30.00030000300003,
+        "minFrameRate": 30.00030000300003,
+        "maxFrameRate": 30.00030000300003,
+        "averageFrameRate": 30.00030000300003,
+        "medianFrameRate": 30.00030000300003,
+        "frameRateIsConstant": true,
+        "probedPacketCount": 256
+      },
+      "wholeFileMetrics": {
+        "underlyingFrameRate": null,
+        "bestGuessFrameRate": 30,
+        "minFrameRate": 22.804497046817634,
+        "maxFrameRate": 43.83081306158229,
+        "averageFrameRate": 30.006566879552988,
+        "medianFrameRate": 30.00030000300003,
+        "frameRateIsConstant": false,
+        "probedPacketCount": 600
+      },
+      "frameTiming": {
+        "analysis": {
+          "averageFrameRate": 30.00030000300003,
+          "frameRateIsConstant": true,
+          "maxFrameRate": 30.00030000300003,
+          "medianFrameRate": 30.00030000300003,
+          "minFrameRate": 30.00030000300003,
+          "probedPacketCount": 256,
+          "underlyingFrameRate": 30.00030000300003
+        },
+        "fps": 30.00030000300003,
+        "frameDurationUs": 33333,
+        "source": "known"
+      },
+      "durationUs": 19962297
+    }
+  ],
+  "browserErrors": [],
+  "limitations": [
+    "Headless Chromium analysis and actual packet timestamps are verified; physical playback, decoding quality and exact visual frame stepping are not.",
+    "Bounded metrics describe the inspected timestamp sample, not a whole-file CFR guarantee. The late-vfr fixture intentionally demonstrates the difference.",
+    "These synthetic H.264 MP4 fixtures have no B-frames or audio; packet reorder, additional containers/codecs and multi-track media are not covered.",
+    "Fixture byte hashes identify this run; ffmpeg/libx264 versions can change generated bytes. Assertions target timestamp semantics rather than byte identity."
+  ]
+}

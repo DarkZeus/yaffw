@@ -21,7 +21,7 @@ const packageJson = JSON.parse(
 );
 assert.equal(
 	packageJson.version,
-	"1.65.0",
+	"1.65.2",
 	"This proof targets the pinned dependency; upgrade verification is separate",
 );
 generateFixtures();

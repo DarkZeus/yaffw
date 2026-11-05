@@ -48,6 +48,7 @@ describe("useNativePreviewTransport", () => {
 		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
 		fireEvent.click(screen.getByText("Toggle playback"));
 		await waitFor(() => expect(readState()).toContain("playing:true"));
+		await waitFor(() => expect(frameCallbacks).toHaveLength(1));
 		engine.setCurrentTimeSeconds(5);
 		engine.getPresentationTime.mockReturnValue(4.6);
 		engine.setTime.mockClear();
@@ -94,6 +95,7 @@ describe("useNativePreviewTransport", () => {
 		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);
 		fireEvent.click(screen.getByText("Toggle playback"));
 		await waitFor(() => expect(readState()).toContain("playing:true"));
+		await waitFor(() => expect(frameCallbacks).toHaveLength(1));
 		engine.pause.mockClear();
 		engine.setCurrentTimeSeconds(11.9);
 		engine.getPresentationTime.mockReturnValue(11.5);
@@ -1206,7 +1208,7 @@ describe("useNativePreviewTransport", () => {
 				expect(readState()).toContain("playing:false");
 				expect(engine.getCurrentTime()).toBe(12);
 			}
-			expect(frameCallbacks.length).toBeGreaterThan(0);
+			expect(frameCallbacks).toHaveLength(loop ? 1 : 0);
 		},
 	);
 
@@ -1396,11 +1398,25 @@ const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
 
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];
+	const pendingCallbacks = new Map<number, FrameRequestCallback>();
+	let nextFrameId = 0;
 	const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-		frameCallbacks.push(callback);
-		return frameCallbacks.length;
+		const frameId = ++nextFrameId;
+		const pendingCallback: FrameRequestCallback = (timestampMs) => {
+			pendingCallbacks.delete(frameId);
+			callback(timestampMs);
+		};
+		pendingCallbacks.set(frameId, pendingCallback);
+		frameCallbacks.push(pendingCallback);
+		return frameId;
 	});
-	const cancelAnimationFrame = vi.fn();
+	const cancelAnimationFrame = vi.fn((frameId: number) => {
+		const callback = pendingCallbacks.get(frameId);
+		if (!callback) return;
+		pendingCallbacks.delete(frameId);
+		const index = frameCallbacks.indexOf(callback);
+		if (index !== -1) frameCallbacks.splice(index, 1);
+	});
 	vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
 	vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
 

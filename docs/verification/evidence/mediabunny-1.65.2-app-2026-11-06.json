@@ -1,0 +1,233 @@
+{
+  "browser": "155.0.8059.85",
+  "mediabunny": "1.65.2",
+  "origin": "http://127.0.0.1:3000",
+  "runs": [
+    {
+      "source": "public/export-correctness-fixtures/sync-flash-click-two-audio.mp4",
+      "selectionUs": [
+        2000000,
+        8000000
+      ],
+      "latePlayhead": "00:00:09.980",
+      "waveformLanes": 2,
+      "explicitDelivery": true,
+      "reimport": true,
+      "duration": "6.036000",
+      "streams": [
+        {
+          "type": "video",
+          "codec": "h264"
+        },
+        {
+          "type": "audio",
+          "codec": "aac"
+        }
+      ],
+      "alignment": {
+        "audioOnsetsSeconds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "videoOnsetsSeconds": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "pairs": [
+          {
+            "videoSeconds": 1,
+            "audioSeconds": 1,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 2,
+            "audioSeconds": 2,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 3,
+            "audioSeconds": 3,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 4,
+            "audioSeconds": 4,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 5,
+            "audioSeconds": 5,
+            "deltaSeconds": 0
+          }
+        ],
+        "audioProbeResolutionSeconds": 0.005
+      },
+      "events": [
+        {
+          "time": 1.05,
+          "peak": 0.030661912634968758,
+          "luma": 255
+        },
+        {
+          "time": 2.05,
+          "peak": 0.036153003573417664,
+          "luma": 255
+        },
+        {
+          "time": 3.05,
+          "peak": 0.04456264153122902,
+          "luma": 255
+        },
+        {
+          "time": 4.05,
+          "peak": 0.05433366075158119,
+          "luma": 255
+        },
+        {
+          "time": 5.05,
+          "peak": 0.06877459585666656,
+          "luma": 255
+        }
+      ],
+      "quiet": {
+        "time": 1.5,
+        "peak": 0,
+        "luma": 0
+      },
+      "audioEncoderInputFormats": [
+        "f32-planar"
+      ],
+      "workers": [
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/video-strip/selection-video-strip.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/video-strip/selection-video-strip.worker.ts?worker_file&type=module"
+      ],
+      "errors": []
+    },
+    {
+      "source": "tmp/mediabunny-app/sync-two-audio.mkv",
+      "selectionUs": [
+        2000000,
+        8000000
+      ],
+      "latePlayhead": "00:00:10.001",
+      "waveformLanes": 2,
+      "explicitDelivery": true,
+      "reimport": true,
+      "duration": "6.036000",
+      "streams": [
+        {
+          "type": "video",
+          "codec": "h264"
+        },
+        {
+          "type": "audio",
+          "codec": "aac"
+        }
+      ],
+      "alignment": {
+        "audioOnsetsSeconds": [
+          0.02,
+          1.02,
+          2.02,
+          3.02,
+          4.02,
+          5.02
+        ],
+        "videoOnsetsSeconds": [
+          0.02,
+          1.02,
+          2.02,
+          3.02,
+          4.02,
+          5.02
+        ],
+        "pairs": [
+          {
+            "videoSeconds": 1.02,
+            "audioSeconds": 1.02,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 2.02,
+            "audioSeconds": 2.02,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 3.02,
+            "audioSeconds": 3.02,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 4.02,
+            "audioSeconds": 4.02,
+            "deltaSeconds": 0
+          },
+          {
+            "videoSeconds": 5.02,
+            "audioSeconds": 5.02,
+            "deltaSeconds": 0
+          }
+        ],
+        "audioProbeResolutionSeconds": 0.005
+      },
+      "events": [
+        {
+          "time": 1.05,
+          "peak": 0.03214911371469498,
+          "luma": 255
+        },
+        {
+          "time": 2.05,
+          "peak": 0.03756320849061012,
+          "luma": 255
+        },
+        {
+          "time": 3.05,
+          "peak": 0.044478267431259155,
+          "luma": 255
+        },
+        {
+          "time": 4.05,
+          "peak": 0.05471916124224663,
+          "luma": 255
+        },
+        {
+          "time": 5.05,
+          "peak": 0.06913814693689346,
+          "luma": 255
+        }
+      ],
+      "quiet": {
+        "time": 1.5,
+        "peak": 0,
+        "luma": 0
+      },
+      "audioEncoderInputFormats": [
+        "f32-planar"
+      ],
+      "workers": [
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/video-strip/selection-video-strip.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/waveform/selection-waveform-lanes.worker.ts?worker_file&type=module",
+        "http://127.0.0.1:3000/src/editor-next/selection/video-strip/selection-video-strip.worker.ts?worker_file&type=module"
+      ],
+      "errors": []
+    }
+  ],
+  "limitations": [
+    "Synthetic short sync inputs; signal samples prove representative event alignment, not exact selected boundary frames.",
+    "Encoder input format is observed; this path does not naturally change format midstream."
+  ]
+}

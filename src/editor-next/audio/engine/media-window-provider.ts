@@ -655,7 +655,7 @@ class TrackWindowCursor {
 		if (
 			Number.isFinite(packet.timestamp) &&
 			Number.isFinite(packet.duration) &&
-			packet.duration > 0
+			packet.duration >= 0
 		) {
 			this.packetTimeline.add({
 				endSeconds: packet.timestamp + packet.duration,
