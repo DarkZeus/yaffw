@@ -492,6 +492,15 @@ const supportedInspection = {
 	audioTracks: [],
 	durationUs: 2_000_000,
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 25,
+			frameRateIsConstant: true,
+			maxFrameRate: 25,
+			medianFrameRate: 25,
+			minFrameRate: 25,
+			probedPacketCount: 256,
+			underlyingFrameRate: 25,
+		},
 		fps: 25,
 		frameDurationUs: 40_000,
 		source: "known",

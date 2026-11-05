@@ -218,6 +218,7 @@ function toAudioTrack(track: AudioTrackInspection): AudioMediaTrack {
 
 function estimatedFrameTiming(): FrameTiming {
 	return {
+		analysis: null,
 		fps: 30,
 		frameDurationUs: 33_333,
 		reason: "Exact frame timing was unavailable during local asset analysis.",

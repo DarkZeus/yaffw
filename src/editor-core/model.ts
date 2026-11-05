@@ -27,13 +27,34 @@ export type MediaAssetDraft = {
 	source: LocalFileSource;
 };
 
+/** Timestamp-derived statistics for the bounded packet sample, not the whole asset. */
+export type FrameTimingAnalysis = {
+	averageFrameRate: number;
+	frameRateIsConstant: boolean;
+	maxFrameRate: number;
+	medianFrameRate: number;
+	minFrameRate: number;
+	probedPacketCount: number;
+	underlyingFrameRate: number | null;
+};
+
 export type FrameTiming =
 	| {
+			analysis: FrameTimingAnalysis & { underlyingFrameRate: number };
 			fps: number;
 			frameDurationUs: MediaTimeUs;
+			/** A confident underlying rate; does not imply constant frame spacing. */
 			source: "known";
 	  }
 	| {
+			analysis: FrameTimingAnalysis & { underlyingFrameRate: null };
+			fps: number;
+			frameDurationUs: MediaTimeUs;
+			reason: string;
+			source: "estimated";
+	  }
+	| {
+			analysis: null;
 			fps: 30;
 			frameDurationUs: MediaTimeUs;
 			reason: string;

@@ -11,7 +11,14 @@ export const shellAsset: ReadyMediaAsset = {
 		supported: false,
 		reason: "Sequence rendering is outside this timeline prototype.",
 	},
-	frameTiming: { fps: 30, frameDurationUs: 33_333, source: "known" },
+	frameTiming: {
+		analysis: null,
+		fps: 30,
+		frameDurationUs: 33_333,
+		reason:
+			"This prototype uses a nominal 30 fps sequence without asset timing analysis.",
+		source: "estimated",
+	},
 	provenance: {
 		fileName: "S.T.A.L.K.E.R. — Patch 1.5.mp4",
 		mimeType: "video/mp4",

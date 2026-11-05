@@ -4,6 +4,7 @@ import { type ReactElement, type ReactNode, cloneElement } from "react";
 import { Button } from "@/components/ui/button";
 import type {
 	AudioMediaTrack,
+	FrameTiming,
 	ReadyMediaAsset,
 	Selection,
 	VideoMediaTrack,
@@ -141,6 +142,10 @@ export function MediaAssetContextPanel({
 								frameTiming,
 							),
 							title: "Video facts",
+						},
+						{
+							facts: frameTimingAnalysisFacts(asset.frameTiming),
+							title: "Frame timing analysis",
 						},
 						{
 							facts: audioAnalysisFactsForAsset(primaryAudioTrack, asset),
@@ -412,11 +417,65 @@ function formatNumber(value: number): string {
 }
 
 function formatFrameTiming(asset: ReadyMediaAsset): string {
-	const fps = formatNumber(asset.frameTiming.fps);
+	const { analysis, fps, source } = asset.frameTiming;
+	const rate = `${formatNumber(fps)} fps`;
+	if (!analysis) return `${rate} fallback`;
+	if (source === "estimated") return `${rate} estimated`;
+	return analysis.frameRateIsConstant ? rate : `${rate} · variable`;
+}
 
-	return asset.frameTiming.source === "estimated"
-		? `${fps} fps estimated`
-		: `${fps} fps`;
+function frameTimingAnalysisFacts(
+	timing: FrameTiming,
+): MediaAssetContextFact[] {
+	if (timing.analysis === null) {
+		return [
+			{ label: "Frame timing", value: "30 fps fallback; analysis unavailable" },
+			{
+				label: "Reason",
+				value: timing.reason,
+			},
+		];
+	}
+	const { analysis } = timing;
+
+	return [
+		{
+			label: "Underlying rate",
+			value:
+				analysis.underlyingFrameRate === null
+					? "Not detected"
+					: `${formatNumber(analysis.underlyingFrameRate)} fps detected`,
+		},
+		{
+			label: "Frame spacing",
+			value: analysis.frameRateIsConstant
+				? "Constant in probe"
+				: "Variable in probe",
+		},
+		{
+			label: "Sample coverage",
+			value: `${analysis.probedPacketCount} packets (${analysis.probedPacketCount < 256 ? "limited; " : ""}target 256)`,
+		},
+		{
+			label: "Observed rates",
+			value: `${formatNumber(analysis.minFrameRate)}–${formatNumber(analysis.maxFrameRate)} fps`,
+		},
+		{
+			label: "Average / median",
+			value: `${formatNumber(analysis.averageFrameRate)} / ${formatNumber(analysis.medianFrameRate)} fps`,
+		},
+		...(timing.source === "estimated"
+			? [{ label: "Estimate", value: timing.reason }]
+			: []),
+		{
+			label: "Scope",
+			value: "Sampled timestamps; whole-file timing may differ.",
+		},
+		{
+			label: "Frame stepping",
+			value: "Nominal time steps; variable spacing may skip or repeat frames.",
+		},
+	];
 }
 
 function formatFileSize(bytes: number): string {

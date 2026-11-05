@@ -133,8 +133,10 @@ function ExistingShell({ editor }: { editor: Editor }) {
 						}
 						transport={
 							<PreviewTransportRegion
-								isPlaying={editor.playing}
+								audioPlaybackState={editor.playing ? "playing" : "paused"}
+								playbackRequested={editor.playing}
 								muted={editor.muted}
+								onRecoverAudio={() => editor.setPlaying(true)}
 								onPlaybackRateChange={editor.setSpeed}
 								onSeekByUs={(delta) => editor.seek(editor.playhead + delta)}
 								onStepFrame={(d) => editor.seek(editor.playhead + d * FRAME)}

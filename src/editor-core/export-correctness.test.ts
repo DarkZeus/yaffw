@@ -61,7 +61,7 @@ describe("export range accuracy classification", () => {
 			selection: selectedRange,
 		},
 		{
-			expectedReason: "Exact frame timing is unavailable",
+			expectedReason: "Frame timing analysis is unavailable",
 			expectedToleranceUs: 33_333,
 			frameTiming: estimatedFrameTiming,
 			generatedDurationUs: 1_000_000,
@@ -131,18 +131,83 @@ describe("export range accuracy classification", () => {
 		expect(imprecise.reason).toContain("outside the current frame tolerance");
 	});
 
+	it.each([false, true])(
+		"retains approximate measured tolerance without implying boundary proof (duration evidence %s)",
+		(hasDuration) => {
+			const report = classifyExportRangeAccuracy({
+				frameTiming: measuredEstimatedFrameTiming,
+				generatedMedia: hasDuration ? { durationUs: 1_000_000 } : undefined,
+				selection: selectedRange,
+				sourceDurationUs: 2_000_000,
+			});
+
+			expect(report.toleranceUs).toBe(42_553);
+			expect(report.precisionProven).toBe(false);
+			expect(report.reason).toContain("no confident underlying frame rate");
+			expect(report.reason).toContain("approximate rate");
+		},
+	);
+
+	it.each([false, true])(
+		"does not infer boundary proof from a confident dropped-frame sample (duration evidence %s)",
+		(hasDuration) => {
+			const report = classifyExportRangeAccuracy({
+				frameTiming: {
+					...knownFrameTiming,
+					analysis: {
+						...knownFrameTiming.analysis,
+						frameRateIsConstant: false,
+						minFrameRate: 12.5,
+					},
+				},
+				generatedMedia: hasDuration ? { durationUs: 1_000_000 } : undefined,
+				selection: selectedRange,
+				sourceDurationUs: 2_000_000,
+			});
+
+			expect(report.precisionProven).toBe(false);
+			expect(report.reason).toContain("variable frame spacing");
+			expect(report.reason).toContain("precision has not been proven");
+		},
+	);
+
+	it("uses a measured estimated rate when evaluating real boundary evidence", () => {
+		const report = classifyExportRangeAccuracy({
+			boundaryEvidence: {
+				kind: "start-and-end",
+				startDeltaUs: 40_000,
+				endDeltaUs: -40_000,
+			},
+			frameTiming: measuredEstimatedFrameTiming,
+			selection: selectedRange,
+			sourceDurationUs: 2_000_000,
+		});
+		expect(report.toleranceUs).toBe(42_553);
+		expect(report.precisionProven).toBe(true);
+	});
+
 	it("uses estimated frame timing as the conservative fallback tolerance", () => {
 		expect(rangeAccuracyToleranceUs(estimatedFrameTiming)).toBe(33_333);
 	});
 });
 
 const knownFrameTiming = {
+	analysis: {
+		averageFrameRate: 25,
+		frameRateIsConstant: true,
+		maxFrameRate: 25,
+		medianFrameRate: 25,
+		minFrameRate: 25,
+		probedPacketCount: 256,
+		underlyingFrameRate: 25,
+	},
 	fps: 25,
 	frameDurationUs: 40_000,
 	source: "known",
 } satisfies FrameTiming;
 
 const estimatedFrameTiming = {
+	analysis: null,
 	fps: 30,
 	frameDurationUs: 33_333,
 	reason: "Exact frame timing was unavailable.",
@@ -153,3 +218,19 @@ const selectedRange = {
 	endUs: 1_500_000,
 	startUs: 500_000,
 } satisfies Selection;
+
+const measuredEstimatedFrameTiming = {
+	analysis: {
+		averageFrameRate: 22,
+		frameRateIsConstant: false,
+		maxFrameRate: 40,
+		medianFrameRate: 23.5,
+		minFrameRate: 12,
+		probedPacketCount: 256,
+		underlyingFrameRate: null,
+	},
+	fps: 23.5,
+	frameDurationUs: 42_553,
+	reason: "No consistent underlying frame rate was detected.",
+	source: "estimated",
+} satisfies FrameTiming;

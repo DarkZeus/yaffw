@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -68,7 +69,9 @@ describe("editor-next export recovery", () => {
 		});
 
 		openExportTab();
-		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
+		await act(async () => {
+			fireEvent.click(screen.getByRole("button", { name: "Start export" }));
+		});
 
 		await waitFor(() => {
 			expect(screen.getByText("Default export failed.")).toBeTruthy();
@@ -184,6 +187,15 @@ const supportedInspection = {
 	],
 	durationUs: 2_000_000,
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",

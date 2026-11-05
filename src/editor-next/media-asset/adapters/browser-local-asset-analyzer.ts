@@ -4,7 +4,7 @@ import type {
 	LocalMediaAssetInspection,
 	LocalMediaAssetInspector,
 } from "@/editor-core/local-file-analysis";
-import type { FrameTiming } from "@/editor-core/model";
+import type { FrameTiming, FrameTimingAnalysis } from "@/editor-core/model";
 import { resolveMediabunnyInputTrackCodec } from "../../media-work/adapters/mediabunny-input-track-metadata";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 
@@ -100,6 +100,7 @@ async function inspectInput(
 			}),
 		),
 	]);
+	throwIfAborted(signal);
 	const frameTiming = await computeFrameTiming(videoTracks[0]);
 	throwIfAborted(signal);
 
@@ -119,23 +120,67 @@ async function computeFrameTiming(
 	}
 
 	try {
-		const { bestGuessFrameRate } = await track.computeFrameRateMetrics();
+		const metrics = await track.computeFrameRateMetrics({
+			targetPacketCount: 256,
+		});
+		const { bestGuessFrameRate, underlyingFrameRate } = metrics;
+		// A single packet has no timestamp interval. The library returns the time
+		// resolution as its rate in this case, which is not usable frame timing.
+		if (
+			!Number.isSafeInteger(metrics.probedPacketCount) ||
+			metrics.probedPacketCount < 2 ||
+			!isUsableFrameRate(bestGuessFrameRate) ||
+			!isUsableFrameRate(metrics.averageFrameRate) ||
+			!isUsableFrameRate(metrics.medianFrameRate) ||
+			!isUsableFrameRate(metrics.minFrameRate) ||
+			!isUsableFrameRate(metrics.maxFrameRate) ||
+			typeof metrics.frameRateIsConstant !== "boolean" ||
+			(underlyingFrameRate === null && metrics.frameRateIsConstant) ||
+			(underlyingFrameRate !== null && !isUsableFrameRate(underlyingFrameRate))
+		) {
+			return undefined;
+		}
 
-		if (Number.isFinite(bestGuessFrameRate) && bestGuessFrameRate > 0) {
+		const analysis: FrameTimingAnalysis = {
+			averageFrameRate: metrics.averageFrameRate,
+			frameRateIsConstant: metrics.frameRateIsConstant,
+			maxFrameRate: metrics.maxFrameRate,
+			medianFrameRate: metrics.medianFrameRate,
+			minFrameRate: metrics.minFrameRate,
+			probedPacketCount: metrics.probedPacketCount,
+			underlyingFrameRate,
+		};
+		const fps = underlyingFrameRate ?? bestGuessFrameRate;
+		const frameDurationUs = Math.max(1, Math.round(1_000_000 / fps));
+
+		if (underlyingFrameRate !== null) {
 			return {
-				fps: bestGuessFrameRate,
-				frameDurationUs: Math.max(
-					1,
-					Math.round(1_000_000 / bestGuessFrameRate),
-				),
+				analysis: { ...analysis, underlyingFrameRate },
+				fps,
+				frameDurationUs,
 				source: "known",
 			};
 		}
+
+		return {
+			analysis: { ...analysis, underlyingFrameRate: null },
+			fps,
+			frameDurationUs,
+			reason:
+				"No consistent underlying frame rate was detected in the packet sample; frame actions use the estimated rate.",
+			source: "estimated",
+		};
 	} catch {
 		return undefined;
 	}
+}
 
-	return undefined;
+function isUsableFrameRate(value: number): boolean {
+	return (
+		Number.isFinite(value) &&
+		value > 0 &&
+		Number.isSafeInteger(Math.round(1_000_000 / value))
+	);
 }
 
 async function resolveTrackBitrate(

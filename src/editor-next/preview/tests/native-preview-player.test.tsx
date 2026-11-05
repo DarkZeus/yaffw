@@ -517,6 +517,48 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
+	it("steps by the measured estimated frame duration instead of the unavailable 30 fps fallback", () => {
+		renderPlayer({
+			asset: {
+				...readyAsset,
+				frameTiming: {
+					analysis: {
+						averageFrameRate: 22,
+						frameRateIsConstant: false,
+						maxFrameRate: 40,
+						medianFrameRate: 23.5,
+						minFrameRate: 12,
+						probedPacketCount: 256,
+						underlyingFrameRate: null,
+					},
+					fps: 23.5,
+					frameDurationUs: 42_553,
+					reason: "No consistent underlying frame rate was detected.",
+					source: "estimated",
+				},
+			},
+		});
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Step forward one frame" }),
+		);
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenLastCalledWith(42_553, { priority: "final" });
+		fireEvent.click(
+			screen.getByRole("button", { name: "Step forward one frame" }),
+		);
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenLastCalledWith(85_106, { priority: "final" });
+		fireEvent.click(
+			screen.getByRole("button", { name: "Step backward one frame" }),
+		);
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenLastCalledWith(42_553, { priority: "final" });
+	});
+
 	it("retains the displayed scrub frame through a pending seek and native playback handoff", async () => {
 		const context = {
 			clearRect: vi.fn(),
@@ -1702,6 +1744,15 @@ const readyAsset = {
 		supported: true,
 	},
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",

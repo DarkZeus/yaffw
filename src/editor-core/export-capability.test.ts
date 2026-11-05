@@ -111,6 +111,15 @@ describe("default export capability planning", () => {
 			asset: {
 				...readyAsset,
 				frameTiming: {
+					analysis: {
+						averageFrameRate: 25,
+						frameRateIsConstant: true,
+						maxFrameRate: 25,
+						medianFrameRate: 25,
+						minFrameRate: 25,
+						probedPacketCount: 256,
+						underlyingFrameRate: 25,
+					},
 					fps: 25,
 					frameDurationUs: 40_000,
 					source: "known",
@@ -145,6 +154,15 @@ describe("default export capability planning", () => {
 				startDeltaUs: 0,
 			},
 			frameTiming: {
+				analysis: {
+					averageFrameRate: 25,
+					frameRateIsConstant: true,
+					maxFrameRate: 25,
+					medianFrameRate: 25,
+					minFrameRate: 25,
+					probedPacketCount: 256,
+					underlyingFrameRate: 25,
+				},
 				fps: 25,
 				frameDurationUs: 40_000,
 				source: "known",
@@ -181,6 +199,15 @@ describe("default export capability planning", () => {
 				startDeltaUs: 41_000,
 			},
 			frameTiming: {
+				analysis: {
+					averageFrameRate: 25,
+					frameRateIsConstant: true,
+					maxFrameRate: 25,
+					medianFrameRate: 25,
+					minFrameRate: 25,
+					probedPacketCount: 256,
+					underlyingFrameRate: 25,
+				},
 				fps: 25,
 				frameDurationUs: 40_000,
 				source: "known",
@@ -210,6 +237,7 @@ describe("default export capability planning", () => {
 			asset: {
 				...readyAsset,
 				frameTiming: {
+					analysis: null,
 					fps: 30,
 					frameDurationUs: 33_333,
 					reason: "Exact frame timing was unavailable.",
@@ -230,7 +258,7 @@ describe("default export capability planning", () => {
 
 		expect(review.method.label).toBe("Standard export");
 		expect(review.precision.label).toBe("Boundaries unverified");
-		expect(review.reason).toContain("Exact frame timing is unavailable");
+		expect(review.reason).toContain("Frame timing analysis is unavailable");
 	});
 });
 
@@ -249,6 +277,15 @@ const readyAsset = {
 		supported: true,
 	},
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",

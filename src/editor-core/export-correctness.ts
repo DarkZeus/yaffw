@@ -92,7 +92,8 @@ export function classifyExportRangeAccuracy({
 }: ClassifyExportRangeAccuracyOptions): ExportRangeAccuracyReport {
 	const requestedDurationUs = selection.endUs - selection.startUs;
 	const generatedDurationUs =
-		generatedMedia?.durationUs ?? durationFromBoundaryEvidence(boundaryEvidence);
+		generatedMedia?.durationUs ??
+		durationFromBoundaryEvidence(boundaryEvidence);
 	const durationDeltaUs =
 		generatedDurationUs === undefined
 			? undefined
@@ -193,7 +194,10 @@ function durationFromBoundaryEvidence(
 
 function measuredDurationOnlyReason(frameTiming: FrameTiming): string {
 	if (frameTiming.source === "estimated") {
-		return "Exact frame timing is unavailable, and generated duration is measured without start and end boundary evidence, so selected-range precision has not been proven.";
+		return `${estimatedTimingReason(frameTiming)} Generated duration is measured without start and end boundary evidence, so selected-range precision has not been proven.`;
+	}
+	if (!frameTiming.analysis.frameRateIsConstant) {
+		return "The packet sample has variable frame spacing despite a confident underlying rate. Generated duration is measured, but start and end boundary evidence is unavailable, so selected-range precision has not been proven.";
 	}
 
 	return "Generated duration is measured, but start and end boundary evidence is unavailable, so selected-range precision has not been proven.";
@@ -201,8 +205,17 @@ function measuredDurationOnlyReason(frameTiming: FrameTiming): string {
 
 function noGeneratedEvidenceReason(frameTiming: FrameTiming): string {
 	if (frameTiming.source === "estimated") {
-		return "Exact frame timing is unavailable, and generated-media evidence is unavailable, so selected-range precision has not been proven.";
+		return `${estimatedTimingReason(frameTiming)} Generated-media evidence is unavailable, so selected-range precision has not been proven.`;
+	}
+	if (!frameTiming.analysis.frameRateIsConstant) {
+		return "The packet sample has variable frame spacing despite a confident underlying rate. Generated-media evidence is unavailable, so selected-range precision has not been proven.";
 	}
 
 	return "Generated-media evidence is unavailable, so selected-range precision has not been proven.";
+}
+
+function estimatedTimingReason(frameTiming: FrameTiming): string {
+	return frameTiming.analysis === null
+		? "Frame timing analysis is unavailable; frame actions and tolerance use a fallback estimate."
+		: "The packet sample has no confident underlying frame rate; frame actions and tolerance use an approximate rate.";
 }

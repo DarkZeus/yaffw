@@ -93,7 +93,7 @@ A timestamp in the media asset's own time coordinate system, represented interna
 _Avoid_: wall-clock time, UI frame number, floating-point seconds
 
 **Frame timing**:
-Known or estimated information for mapping between media time and frame-oriented UI actions.
+A detected underlying frame rate or an estimated intended rate for mapping between media time and frame-oriented UI actions, accompanied by sampled confidence and frame-spacing evidence when analysis is available.
 _Avoid_: guaranteed FPS, frame identity
 
 **Playhead**:
@@ -334,8 +334,10 @@ _Avoid_: first-slice requirement, automatic fallback
 - When **Selection loop** is enabled, playback outside the current **Selection** continues normally until it enters the selection; once playback has entered the selection, reaching the selection end seeks playback back to the selection start and continues preview playback.
 - Changing **Selection** while **Selection loop** is enabled keeps the loop enabled and re-evaluates whether playback has entered the new selection.
 - A **Selection** must be inside the media asset duration and last at least one known or estimated frame.
-- **Frame timing** may be known from metadata or analysis, or estimated when exact frame timing is not yet available.
-- When **Frame timing** is unknown, frame stepping and minimum **Selection** duration may use an estimated 30 FPS until better metadata or frame analysis is available.
+- **Frame timing** distinguishes a confidently detected underlying rate from a heuristic intended-rate estimate. A detected rate does not imply constant frame spacing: dropped frames may retain a consistent underlying rate while sampled spacing varies.
+- Browser **Asset analysis** retains average, median, minimum and maximum sampled rates, underlying-rate detection, constant-spacing evidence, and probed-packet count from a bounded 256-packet target (reordered packets may slightly exceed the target). **Media** shows those facts under Analysis; a short sample is identified as limited, and constant spacing in the probe never proves whole-file constant frame rate.
+- Frame stepping, minimum **Selection** duration, decoded scrubbing and export-accuracy tolerance use the same nominal known or estimated frame duration, including non-30 estimates. With variable spacing, nominal steps may skip or repeat presented frames; they are not timestamp-indexed adjacent-frame stepping. Changing that behavior requires a separately justified transport decision under ADR-0013.
+- When **Frame timing** analysis is unavailable or has fewer than two packets, frame actions use the established estimated 30 FPS fallback. The Media panel identifies the fallback and analysis reason separately from a measured estimate. Selection and Playhead remain integer media-time timestamps; no timing confidence or sampled constant-rate evidence proves export boundary precision.
 - A **Ready media asset** starts with a **Selection** covering the full asset duration, represented as `[0, durationUs)`.
 - A **Ready media asset** starts with default **Audio mix decisions**: every audio track included, every **Track volume** at 100%, and no preview solo state.
 - Resetting **Selection** restores `[0, durationUs)` and does not move the **Playhead**.

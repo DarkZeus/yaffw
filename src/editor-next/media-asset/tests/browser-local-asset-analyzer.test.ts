@@ -1,6 +1,10 @@
 /* @vitest-environment jsdom */
 
+import type { FrameRateMetrics } from "mediabunny";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
+import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 
@@ -33,6 +37,199 @@ afterEach(() => {
 });
 
 describe("inspectBrowserLocalMediaAssetDraft", () => {
+	it.each([24, 25, 30_000 / 1_001, 60_000 / 1_001])(
+		"preserves a confident %s fps underlying rate and bounded sample statistics",
+		async (fps) => {
+			const metrics = frameMetrics({
+				averageFrameRate: fps,
+				bestGuessFrameRate: fps,
+				maxFrameRate: fps,
+				medianFrameRate: fps,
+				minFrameRate: fps,
+				underlyingFrameRate: fps,
+			});
+			const { draft, track } = prepareFrameTimingInspection(metrics);
+			const inspection = await inspectBrowserLocalMediaAssetDraft(draft, {});
+
+			expect(inspection.frameTiming).toEqual({
+				analysis: timingAnalysis(metrics),
+				fps,
+				frameDurationUs: Math.round(1_000_000 / fps),
+				source: "known",
+			});
+			expect(track.computeFrameRateMetrics).toHaveBeenCalledExactlyOnceWith({
+				targetPacketCount: 256,
+			});
+			expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+		},
+	);
+
+	it("keeps dropped-frame variation separate from a confident underlying rate", async () => {
+		const metrics = frameMetrics({
+			averageFrameRate: 25,
+			frameRateIsConstant: false,
+			minFrameRate: 15,
+		});
+		const { draft } = prepareFrameTimingInspection(metrics);
+
+		expect(
+			(await inspectBrowserLocalMediaAssetDraft(draft, {})).frameTiming,
+		).toEqual({
+			analysis: timingAnalysis(metrics),
+			fps: 30,
+			frameDurationUs: 33_333,
+			source: "known",
+		});
+	});
+
+	it("retains VFR statistics and a useful non-30 estimated rate", async () => {
+		const metrics = frameMetrics({
+			averageFrameRate: 22,
+			bestGuessFrameRate: 23.5,
+			frameRateIsConstant: false,
+			maxFrameRate: 40,
+			medianFrameRate: 23.5,
+			minFrameRate: 12,
+			underlyingFrameRate: null,
+		});
+		const { draft } = prepareFrameTimingInspection(metrics);
+		const result = await analyzeLocalMediaAssetDraft(draft, {
+			inspect: inspectBrowserLocalMediaAssetDraft,
+			runtime: supportedRuntime,
+		});
+
+		expect(result.status).toBe("ready");
+		if (result.status !== "ready") throw new Error("Expected ready asset");
+		expect(result.asset.frameTiming).toEqual({
+			analysis: timingAnalysis(metrics),
+			fps: 23.5,
+			frameDurationUs: 42_553,
+			reason: expect.stringContaining("No consistent underlying frame rate"),
+			source: "estimated",
+		});
+	});
+
+	it("accepts a short usable sample without requiring the full probe target", async () => {
+		const metrics = frameMetrics({ probedPacketCount: 2 });
+		const { draft } = prepareFrameTimingInspection(metrics);
+
+		expect(
+			(await inspectBrowserLocalMediaAssetDraft(draft, {})).frameTiming,
+		).toMatchObject({
+			analysis: { probedPacketCount: 2 },
+			source: "known",
+		});
+	});
+
+	it.each([
+		{ underlyingFrameRate: null, frameRateIsConstant: true },
+		...[0, 1, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY].map(
+			(probedPacketCount) => ({ probedPacketCount }),
+		),
+		...(
+			[
+				"bestGuessFrameRate",
+				"underlyingFrameRate",
+				"averageFrameRate",
+				"medianFrameRate",
+				"minFrameRate",
+				"maxFrameRate",
+			] as const
+		).flatMap((field) =>
+			[0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MIN_VALUE].map(
+				(value) => ({ [field]: value }),
+			),
+		),
+	])(
+		"uses explicit unavailable fallback for unusable metrics %o",
+		async (overrides) => {
+			const { draft } = prepareFrameTimingInspection(frameMetrics(overrides));
+			const result = await analyzeLocalMediaAssetDraft(draft, {
+				inspect: inspectBrowserLocalMediaAssetDraft,
+				runtime: supportedRuntime,
+			});
+
+			expect(result.status).toBe("ready");
+			if (result.status !== "ready") throw new Error("Expected ready asset");
+			expect(result.asset.frameTiming).toEqual({
+				analysis: null,
+				fps: 30,
+				frameDurationUs: 33_333,
+				reason: expect.any(String),
+				source: "estimated",
+			});
+			expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+		},
+	);
+
+	it("keeps an asset ready with unavailable analysis when frame metrics fail", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		track.computeFrameRateMetrics.mockRejectedValueOnce(
+			new Error("Unreadable timestamps"),
+		);
+		const result = await analyzeLocalMediaAssetDraft(draft, {
+			inspect: inspectBrowserLocalMediaAssetDraft,
+			runtime: supportedRuntime,
+		});
+
+		expect(result.status).toBe("ready");
+		if (result.status !== "ready") throw new Error("Expected ready asset");
+		expect(result.asset.frameTiming).toMatchObject({
+			analysis: null,
+			fps: 30,
+			source: "estimated",
+		});
+		expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+	});
+
+	it("removes the abort listener after a successful bounded frame probe", async () => {
+		const { draft } = prepareFrameTimingInspection(frameMetrics());
+		const abortController = new AbortController();
+		await inspectBrowserLocalMediaAssetDraft(draft, {
+			signal: abortController.signal,
+		});
+		expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+		abortController.abort();
+		expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+	});
+
+	it("does not start a frame probe when track metadata completes after cancellation", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		const width = createDeferred<number>();
+		track.getDisplayWidth.mockReturnValueOnce(width.promise);
+		const abortController = new AbortController();
+		const inspection = inspectBrowserLocalMediaAssetDraft(draft, {
+			signal: abortController.signal,
+		});
+		await vi.waitFor(() =>
+			expect(track.getDisplayWidth).toHaveBeenCalledOnce(),
+		);
+		abortController.abort();
+		width.resolve(1920);
+
+		await expect(inspection).rejects.toMatchObject({ name: "AbortError" });
+		expect(track.computeFrameRateMetrics).not.toHaveBeenCalled();
+		expect(mediabunnyMock.dispose).toHaveBeenCalled();
+	});
+
+	it("cancels and cleans up a pending bounded frame probe without accepting fallback timing", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		const metrics = createDeferred<FrameRateMetrics>();
+		track.computeFrameRateMetrics.mockReturnValueOnce(metrics.promise);
+		const abortController = new AbortController();
+		const inspection = inspectBrowserLocalMediaAssetDraft(draft, {
+			signal: abortController.signal,
+		});
+		await vi.waitFor(() =>
+			expect(track.computeFrameRateMetrics).toHaveBeenCalledOnce(),
+		);
+		abortController.abort();
+		expect(mediabunnyMock.dispose).toHaveBeenCalledOnce();
+		metrics.reject(new Error("Input disposed."));
+
+		await expect(inspection).rejects.toMatchObject({ name: "AbortError" });
+	});
+
 	it("rejects a Blob that Mediabunny cannot read", async () => {
 		mediabunnyMock.canRead.mockResolvedValueOnce(false);
 		const draft = createLocalMediaAssetDraft(
@@ -249,6 +446,15 @@ describe("inspectBrowserLocalMediaAssetDraft", () => {
 			],
 			durationUs: 2_500_000,
 			frameTiming: {
+				analysis: {
+					averageFrameRate: 30,
+					frameRateIsConstant: true,
+					maxFrameRate: 30,
+					medianFrameRate: 30,
+					minFrameRate: 30,
+					probedPacketCount: 256,
+					underlyingFrameRate: 30,
+				},
 				fps: 30,
 				frameDurationUs: 33_333,
 				source: "known",
@@ -367,7 +573,7 @@ function createVideoTrack({
 	peakBitrate?: number | null;
 }) {
 	return {
-		computeFrameRateMetrics: vi.fn(async () => ({ bestGuessFrameRate: 30 })),
+		computeFrameRateMetrics: vi.fn(async () => frameMetrics()),
 		getAverageBitrate: vi.fn(async () => averageBitrate),
 		getBitrate: vi.fn(async () => peakBitrate),
 		getCodec: vi.fn(async () => codec),
@@ -426,4 +632,57 @@ function createDeferred<T>() {
 	});
 
 	return { promise, reject, resolve };
+}
+
+const supportedRuntime = evaluateRuntimeSupport({
+	fileApi: true,
+	mediaSource: true,
+	objectUrl: true,
+	videoDecoder: true,
+	videoEncoder: true,
+});
+
+function frameMetrics(
+	overrides: Partial<FrameRateMetrics> = {},
+): FrameRateMetrics {
+	return {
+		averageFrameRate: 30,
+		bestGuessFrameRate: 30,
+		frameRateIsConstant: true,
+		maxFrameRate: 30,
+		medianFrameRate: 30,
+		minFrameRate: 30,
+		probedPacketCount: 256,
+		underlyingFrameRate: 30,
+		...overrides,
+	};
+}
+
+function timingAnalysis({
+	bestGuessFrameRate: _,
+	...analysis
+}: FrameRateMetrics) {
+	return analysis;
+}
+
+function prepareFrameTimingInspection(metrics: FrameRateMetrics) {
+	mediabunnyMock.canRead.mockResolvedValueOnce(true);
+	mediabunnyMock.getDurationFromMetadata.mockResolvedValueOnce(2.5);
+	mediabunnyMock.getAudioTracks.mockResolvedValueOnce([]);
+	const track = createVideoTrack({
+		codec: "avc",
+		codecParameterString: "avc1.640028",
+		displayHeight: 1080,
+		displayWidth: 1920,
+		id: 1,
+		internalCodecId: "avc1",
+		name: "Camera",
+	});
+	track.computeFrameRateMetrics.mockResolvedValue(metrics);
+	mediabunnyMock.getVideoTracks.mockResolvedValueOnce([track]);
+	const draft = createLocalMediaAssetDraft(
+		new File(["media"], "timing.mp4", { type: "video/mp4" }),
+		{ createDraftId: () => "draft-timing" },
+	);
+	return { draft, track };
 }

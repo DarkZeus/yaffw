@@ -37,6 +37,15 @@ describe("local media asset analysis", () => {
 				],
 				durationUs: 12_000_000,
 				frameTiming: {
+					analysis: {
+						averageFrameRate: 30,
+						frameRateIsConstant: true,
+						maxFrameRate: 30,
+						medianFrameRate: 30,
+						minFrameRate: 30,
+						probedPacketCount: 256,
+						underlyingFrameRate: 30,
+					},
 					fps: 30,
 					frameDurationUs: 33_333,
 					source: "known",
@@ -263,6 +272,15 @@ const supportedInspection = {
 	],
 	durationUs: 12_000_000,
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",

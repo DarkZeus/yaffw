@@ -149,7 +149,20 @@ const readyAsset = {
 		profile: { audioCodec: "aac", container: "mp4", videoCodec: "h264" },
 		supported: true,
 	},
-	frameTiming: { fps: 30, frameDurationUs: 33_333, source: "known" },
+	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
+		fps: 30,
+		frameDurationUs: 33_333,
+		source: "known",
+	},
 	id: "asset-1",
 	label: "clip.mp4",
 	provenance: {

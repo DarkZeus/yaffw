@@ -197,6 +197,54 @@ describe("editor-next session runtime gate", () => {
 		expect("playheadUs" in endFromPlayhead).toBe(false);
 	});
 
+	it("preserves a measured non-30 estimated frame as the minimum selection duration", () => {
+		const ready = createReadySession({ startUs: 200_000, endUs: 800_000 });
+		if (ready.status !== "ready") throw new Error("Expected ready session");
+		const estimated = {
+			...ready,
+			asset: {
+				...ready.asset,
+				frameTiming: {
+					analysis: {
+						averageFrameRate: 22,
+						frameRateIsConstant: false,
+						maxFrameRate: 40,
+						medianFrameRate: 23.5,
+						minFrameRate: 12,
+						probedPacketCount: 256,
+						underlyingFrameRate: null,
+					},
+					fps: 23.5,
+					frameDurationUs: 42_553,
+					reason: "No consistent underlying frame rate was detected.",
+					source: "estimated" as const,
+				},
+			},
+		};
+		const start = editorSessionReducer(estimated, {
+			playheadUs: 790_000,
+			type: "selection.start.setFromPlayhead",
+		});
+		expect(start.status).toBe("ready");
+		if (start.status !== "ready") throw new Error("Expected ready session");
+		expect(start.selection).toEqual({ startUs: 790_000, endUs: 832_553 });
+		const end = editorSessionReducer(start, {
+			playheadUs: 0,
+			type: "selection.end.setFromPlayhead",
+		});
+		expect(end.status).toBe("ready");
+		if (end.status !== "ready") throw new Error("Expected ready session");
+		expect(end.selection).toEqual({ startUs: 0, endUs: 42_553 });
+		const replacement = editorSessionReducer(estimated, {
+			selection: { startUs: 0, endUs: 1 },
+			type: "selection.replaced",
+		});
+		expect(replacement.status).toBe("ready");
+		if (replacement.status !== "ready")
+			throw new Error("Expected ready session");
+		expect(replacement.selection).toEqual({ startUs: 0, endUs: 42_553 });
+	});
+
 	it("moves and resets the committed selection without introducing preview state", () => {
 		const runtime = evaluateRuntimeSupport({
 			fileApi: true,
@@ -733,6 +781,15 @@ const readyAsset = {
 		supported: true,
 	},
 	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
 		fps: 30,
 		frameDurationUs: 33_333,
 		source: "known",

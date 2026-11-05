@@ -85,7 +85,20 @@ it("applies the production default audio mix before exposing a ready trial engin
 const asset: ReadyMediaAsset = {
 	durationUs: 120_000_000,
 	exportCapability: { supported: true, profile: DEFAULT_OUTPUT_PROFILE },
-	frameTiming: { source: "known", fps: 30, frameDurationUs: 33_333 },
+	frameTiming: {
+		analysis: {
+			averageFrameRate: 30,
+			frameRateIsConstant: true,
+			maxFrameRate: 30,
+			medianFrameRate: 30,
+			minFrameRate: 30,
+			probedPacketCount: 256,
+			underlyingFrameRate: 30,
+		},
+		source: "known",
+		fps: 30,
+		frameDurationUs: 33_333,
+	},
 	id: "fixture",
 	label: "Fixture",
 	provenance: { fileName: "fixture.mp4", sizeBytes: 0 },
