@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
+	canDecode: true,
+	packetError: null as Error | null,
+	sampleError: null as Error | null,
+	onYield: null as (() => void) | null,
 	codec: "aac" as string,
 	packets: [] as Array<{ duration: number; timestamp: number }>,
 	samples: [] as MockAudioSample[],
@@ -11,14 +15,21 @@ vi.mock("mediabunny", () => ({
 	AudioSampleSink: class AudioSampleSink {
 		async *samples(startSeconds?: number, endSeconds?: number) {
 			mediabunnyMock.samplesArguments.push([startSeconds, endSeconds]);
+			if (!mediabunnyMock.canDecode)
+				throw new Error(
+					"This audio track cannot be decoded in this environment.",
+				);
 
 			for (const sample of mediabunnyMock.samples) {
+				mediabunnyMock.onYield?.();
 				yield sample;
 			}
+			if (mediabunnyMock.sampleError) throw mediabunnyMock.sampleError;
 		}
 	},
 	EncodedPacketSink: class EncodedPacketSink {
 		async *packets() {
+			if (mediabunnyMock.packetError) throw mediabunnyMock.packetError;
 			for (const packet of mediabunnyMock.packets) {
 				yield packet;
 			}
@@ -29,11 +40,16 @@ vi.mock("mediabunny", () => ({
 import { decodeMediabunnyAudioTrackRange } from "../adapters/mediabunny-audio-buffer";
 
 const track = {
+	canDecode: async () => mediabunnyMock.canDecode,
 	getCodec: async () => mediabunnyMock.codec,
 	getPreRollDuration: async () => 0,
 } as never;
 
 beforeEach(() => {
+	mediabunnyMock.canDecode = true;
+	mediabunnyMock.packetError = null;
+	mediabunnyMock.sampleError = null;
+	mediabunnyMock.onYield = null;
 	mediabunnyMock.codec = "aac";
 	mediabunnyMock.samples = [];
 	mediabunnyMock.packets = [];
@@ -42,6 +58,191 @@ beforeEach(() => {
 });
 
 describe("decodeMediabunnyAudioTrackRange", () => {
+	it("does not accept a zero-frame sample as evidence of an ambiguous tail ending", async () => {
+		mediabunnyMock.packets = [{ timestamp: 0.4, duration: 0 }];
+		mediabunnyMock.samples = [
+			createAudioSample({ channels: [[]], sampleRate: 10, timestamp: 0.6 }),
+		];
+		await expect(
+			decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 1,
+				endSeconds: 2,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: new AbortController().signal,
+			}),
+		).rejects.toThrow("no presentable samples");
+	});
+
+	it("proves silence after an unknown-duration predecessor with a following packet beyond the Selection", async () => {
+		mediabunnyMock.packets = [
+			{ timestamp: 0.2, duration: 0.2 },
+			{ timestamp: 0.4, duration: 0 },
+			{ timestamp: 2.4, duration: 0.2 },
+		];
+		mediabunnyMock.samples = [
+			createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0.4 }),
+		];
+		const decoded = await decodeMediabunnyAudioTrackRange({
+			track,
+			startSeconds: 1,
+			endSeconds: 2,
+			format: { numberOfChannels: 1, sampleRate: 10 },
+			signal: new AbortController().signal,
+		});
+		expect(Array.from(decoded.getChannelData(0))).toEqual(Array(10).fill(0));
+	});
+	it.each([0, 3])(
+		"decodes an ambiguous predecessor tail with declared duration %s before proving silence",
+		async (duration) => {
+			mediabunnyMock.packets = [{ timestamp: 0.4, duration }];
+			const sample = createAudioSample({
+				channels: [[1, 2]],
+				sampleRate: 10,
+				timestamp: 0.4,
+			});
+			mediabunnyMock.samples = [sample];
+			const decoded = await decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 1,
+				endSeconds: 2,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: new AbortController().signal,
+			});
+			expect(mediabunnyMock.samplesArguments).toEqual([[0.4, 2]]);
+			expect(Array.from(decoded.getChannelData(0))).toEqual(Array(10).fill(0));
+			expect(sample.close).toHaveBeenCalledOnce();
+		},
+	);
+
+	it("does not use an earlier decoded tail to excuse an undecoded packet inside the Selection", async () => {
+		mediabunnyMock.packets = [
+			{ timestamp: 0.4, duration: 0 },
+			{ timestamp: 1.5, duration: 0.2 },
+		];
+		const sample = createAudioSample({
+			channels: [[1, 2]],
+			sampleRate: 10,
+			timestamp: 0.4,
+		});
+		mediabunnyMock.samples = [sample];
+		await expect(
+			decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 1,
+				endSeconds: 2,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: new AbortController().signal,
+			}),
+		).rejects.toThrow("no presentable samples");
+		expect(sample.close).toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		{ name: "before audio begins", packets: [{ timestamp: 2, duration: 1 }] },
+		{ name: "after audio ends", packets: [{ timestamp: 0, duration: 0.5 }] },
+		{
+			name: "inside a packet gap",
+			packets: [
+				{ timestamp: 0, duration: 0.5 },
+				{ timestamp: 2, duration: 0.5 },
+			],
+		},
+	])("returns Selection-length silence $name", async ({ packets }) => {
+		mediabunnyMock.packets = packets;
+		const decoded = await decodeMediabunnyAudioTrackRange({
+			track,
+			startSeconds: 1,
+			endSeconds: 2,
+			format: { numberOfChannels: 2, sampleRate: 44_100 },
+			signal: new AbortController().signal,
+		});
+		expect(decoded.length).toBe(44_100);
+		expect(decoded.numberOfChannels).toBe(2);
+		expect(decoded.getChannelData(0).every((sample) => sample === 0)).toBe(
+			true,
+		);
+		expect(decoded.getChannelData(1).every((sample) => sample === 0)).toBe(
+			true,
+		);
+	});
+
+	it.each([
+		[],
+		[{ timestamp: 0, duration: 0 }],
+		[{ timestamp: 1, duration: 0.5 }],
+		[{ timestamp: 0, duration: 3 }],
+		[{ timestamp: Number.NaN, duration: 1 }],
+		[{ timestamp: 0, duration: -1 }],
+		[
+			{ timestamp: 0.5, duration: 0 },
+			{ timestamp: 0, duration: 0.1 },
+		],
+	])("rejects uncertain or occupied empty decoding: %j", async (...packets) => {
+		mediabunnyMock.packets = packets;
+		await expect(
+			decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 1,
+				endSeconds: 2,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: new AbortController().signal,
+			}),
+		).rejects.toThrow("no presentable samples");
+	});
+
+	it("keeps unsupported decoding explicit even for a packet-proven silent range", async () => {
+		mediabunnyMock.canDecode = false;
+		mediabunnyMock.packets = [{ timestamp: 3, duration: 1 }];
+		await expect(
+			decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 1,
+				endSeconds: 2,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: new AbortController().signal,
+			}),
+		).rejects.toThrow("cannot be decoded");
+	});
+
+	it.each(["packetError", "sampleError"] as const)(
+		"propagates %s instead of returning silence",
+		async (key) => {
+			const failure = new Error("Unreadable audio data");
+			mediabunnyMock[key] = failure;
+			mediabunnyMock.packets = [{ timestamp: 3, duration: 1 }];
+			await expect(
+				decodeMediabunnyAudioTrackRange({
+					track,
+					startSeconds: 1,
+					endSeconds: 2,
+					format: { numberOfChannels: 1, sampleRate: 10 },
+					signal: new AbortController().signal,
+				}),
+			).rejects.toBe(failure);
+		},
+	);
+
+	it("closes a sample delivered after cancellation before copying it", async () => {
+		const controller = new AbortController();
+		const sample = createAudioSample({
+			channels: [[1]],
+			sampleRate: 10,
+			timestamp: 0,
+		});
+		mediabunnyMock.samples = [sample];
+		mediabunnyMock.onYield = () => controller.abort();
+		await expect(
+			decodeMediabunnyAudioTrackRange({
+				track,
+				startSeconds: 0,
+				endSeconds: 1,
+				format: { numberOfChannels: 1, sampleRate: 10 },
+				signal: controller.signal,
+			}),
+		).rejects.toMatchObject({ name: "AbortError" });
+		expect(sample.close).toHaveBeenCalledOnce();
+	});
 	it.each([0, 0.2, 0.25])(
 		"does not shift decoded events past a zero-duration encoded packet from %s",
 		async (startSeconds) => {

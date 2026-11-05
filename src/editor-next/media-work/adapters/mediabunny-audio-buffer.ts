@@ -45,27 +45,32 @@ export async function decodeMediabunnyAudioTrackRange({
 		sampleRate: format.sampleRate,
 	});
 	const preRollSeconds = (await track.getPreRollDuration()) ?? 0;
-	const packetTimeline = await readAudioPacketTimeline({
+	const {
+		timeline: packetTimeline,
+		silenceProven,
+		silentTailStart,
+	} = await readAudioPacketTimeline({
 		endSeconds,
+		selectionStartSeconds: startSeconds,
 		sampleRate: format.sampleRate,
 		signal,
 		startSeconds: startSeconds - preRollSeconds,
 		track,
 	});
-	const decodeStartSeconds = packetTimeline.decodeStartFor(
-		startSeconds,
-		preRollSeconds,
-	);
+	throwIfAborted(signal);
+	const decodeStartSeconds =
+		silentTailStart ??
+		packetTimeline.decodeStartFor(startSeconds, preRollSeconds);
 	const timestampProjector = new DecodedAudioTimestampProjector(
 		decodeStartSeconds,
 	);
 	const sink = new AudioSampleSink(track);
 	let copiedFrameCount = 0;
+	let decodedTailEndedBeforeSelection = false;
 
 	for await (const sample of sink.samples(decodeStartSeconds, endSeconds)) {
-		throwIfAborted(signal);
-
 		try {
+			throwIfAborted(signal);
 			if (
 				sample.sampleRate !== format.sampleRate ||
 				sample.numberOfChannels !== format.numberOfChannels
@@ -80,6 +85,16 @@ export async function decodeMediabunnyAudioTrackRange({
 				sample.numberOfFrames / sample.sampleRate,
 				packetTimeline,
 			);
+			if (
+				silentTailStart !== null &&
+				sample.numberOfFrames > 0 &&
+				projectedTimestamp + sample.numberOfFrames / sample.sampleRate >
+					silentTailStart &&
+				projectedTimestamp + sample.numberOfFrames / sample.sampleRate <=
+					startSeconds
+			) {
+				decodedTailEndedBeforeSelection = true;
+			}
 			const projectedStartFrame = Math.round(
 				(projectedTimestamp - startSeconds) * format.sampleRate,
 			);
@@ -117,7 +132,11 @@ export async function decodeMediabunnyAudioTrackRange({
 	}
 
 	throwIfAborted(signal);
-	if (copiedFrameCount === 0) {
+	if (
+		copiedFrameCount === 0 &&
+		!silenceProven &&
+		!decodedTailEndedBeforeSelection
+	) {
 		throw new Error("The audio track decoded no presentable samples.");
 	}
 
@@ -126,17 +145,23 @@ export async function decodeMediabunnyAudioTrackRange({
 
 async function readAudioPacketTimeline({
 	endSeconds,
+	selectionStartSeconds,
 	sampleRate,
 	signal,
 	startSeconds,
 	track,
 }: {
 	endSeconds: number;
+	selectionStartSeconds: number;
 	sampleRate: number;
 	signal: AbortSignal;
 	startSeconds: number;
 	track: ConstructorParameters<typeof EncodedPacketSink>[0];
-}): Promise<AudioPacketTimeline> {
+}): Promise<{
+	timeline: AudioPacketTimeline;
+	silenceProven: boolean;
+	silentTailStart: number | null;
+}> {
 	const timeline = new AudioPacketTimeline({
 		packetDurationsMaySpanGaps: audioPacketDurationsMaySpanGaps(
 			await track.getCodec(),
@@ -144,6 +169,13 @@ async function readAudioPacketTimeline({
 		sampleRate,
 	});
 	const sink = new EncodedPacketSink(track);
+	let sawPacket = false;
+	let uncertainTiming = false;
+	let overlapsSelection = false;
+	let unknownEnd = false;
+	let previousTimestamp = Number.NEGATIVE_INFINITY;
+	let predecessorTimestamp: number | null = null;
+	let packetStartsInSelection = false;
 	let precedingUnknownPacket: { timestamp: number } | null = null;
 	let precedingKnownRange: { startSeconds: number; endSeconds: number } | null =
 		null;
@@ -157,7 +189,27 @@ async function readAudioPacketTimeline({
 			!Number.isFinite(packet.duration) ||
 			packet.duration < 0
 		) {
+			uncertainTiming = true;
 			continue;
+		}
+		sawPacket = true;
+		if (packet.timestamp < previousTimestamp) uncertainTiming = true;
+		previousTimestamp = packet.timestamp;
+		if (packet.timestamp < selectionStartSeconds)
+			predecessorTimestamp = packet.timestamp;
+		else if (packet.timestamp < endSeconds) packetStartsInSelection = true;
+		// Unknown duration may extend up to the next packet. At EOF it has no
+		// proven endpoint. Do not use typical compressed-frame durations to prove
+		// silence: those are a projection heuristic, not an absence guarantee.
+		if (unknownEnd && packet.timestamp > selectionStartSeconds) {
+			overlapsSelection = true;
+		}
+		unknownEnd = packet.duration === 0 && packet.timestamp < endSeconds;
+		if (
+			packet.timestamp < endSeconds &&
+			packet.timestamp + packet.duration > selectionStartSeconds
+		) {
+			overlapsSelection = true;
 		}
 		// A zero duration means unknown, so it can overlap the requested start.
 		// Keep only the immediate predecessor until its next timestamp is known.
@@ -201,7 +253,20 @@ async function readAudioPacketTimeline({
 	}
 
 	timeline.sort();
-	return timeline;
+	return {
+		timeline,
+		silenceProven:
+			sawPacket && !uncertainTiming && !overlapsSelection && !unknownEnd,
+		// Resolve an unknown or gap-spanning predecessor by decoding its actual
+		// tail. Packet duration heuristics alone cannot establish that it ended.
+		silentTailStart:
+			sawPacket &&
+			!uncertainTiming &&
+			!packetStartsInSelection &&
+			(overlapsSelection || unknownEnd)
+				? predecessorTimestamp
+				: null,
+	};
 }
 
 export function createBrowserAudioBuffer({
