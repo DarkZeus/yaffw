@@ -516,6 +516,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - The first slice disables editing changes while an **Export job** is running.
 - The **Output settings modal** and **Export preset** mutations are blocked while an **Export job** is running.
 - **Runtime capability** determines which import, preview, analysis, and export paths are available; it does not create a separate editor model.
+- Selected-range browser export retains preferred copying with expanded copy regions and zero additional timestamp shift. The #121 comparison did not justify a finite copy-start tolerance: MP4/MOV edit lists hide encoded preroll, finite tolerance can force transcoding, and tolerance does not constrain trim ends or the independently encoded **Generated audio mix** tail. Fixture-level presented-boundary evidence may refine an artifact harness report; unmeasured product exports remain best effort. See [the copy boundary comparison](docs/verification/copy-boundaries.md).
 - **Export capability** is checked before an **Export job** starts and should expose the planned export strategy, expected precision, and user-facing reason without using codec/container preflight guesses to block otherwise valid media.
 - If the default output runner cannot convert or mux the active asset, the asset remains ready and the failure is reported on the **Export job**.
 - The v1 Export tab should keep **Output settings**, **Export review**, **Export progress**, and **Generated media** status together while keeping their meanings distinct.

@@ -1,5 +1,11 @@
 # Export correctness browser baseline
 
+The later [#121 boundary comparison](verification/copy-boundaries.md) supersedes
+this note's original unmeasured selected-range follow-up. It records real
+presented-frame, packet-preroll, A/V and endpoint evidence across all five output
+containers. Production keeps preferred copying, expand and zero additional
+shift; no finite copy-start tolerance or blanket transcoding is adopted.
+
 This note records the conservative browser/WebCodecs baseline restored for
 issue #28 and published as the final baseline decision in issue #33 under the
 parent export-correctness PRD in issue #11.
@@ -186,9 +192,13 @@ The next implementation direction is to replace the selected-range fake-runner
 conclusion with real Mediabunny export evidence. Run the default browser export
 runner against selected-range fixtures, inspect the resulting duration, add
 start/end boundary measurement and audio/video alignment checks, then feed those
-facts through the existing conservative classifier. If selected-range conversion
-can still take a packet-copy path in some case, selected-range precision export
-should explicitly set `forceTranscode: true` for video and audio.
+facts through the existing conservative classifier. The #121 comparison now
+supplies real boundary evidence through an optional artifact-harness measurement
+hook. Its finite copy-start tolerances can force
+transcoding without constraining trim ends; the measured decision retains the
+current policy. A copied MP4/MOV may hide preroll with edit lists, while VFR
+endpoints and independently generated audio tails still need separate evidence.
+Do not infer precision from transcoding or matching container duration alone.
 
 Do not add server fallback, native FFmpeg, smart rendering, or Generated media
 preview as the next step. Native FFmpeg should be a future runtime capability

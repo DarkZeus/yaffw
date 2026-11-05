@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import type { ExportBoundaryEvidence } from "@/editor-core/export-correctness";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
@@ -466,6 +467,111 @@ describe("selected-range export artifact harness", () => {
 		expect(result.report.exportReview.reason).toContain(
 			"boundary evidence is unavailable",
 		);
+		expect(result.report.boundaryEvidence).toEqual({ kind: "none" });
+	});
+
+	it.each<{
+		evidence: ExportBoundaryEvidence;
+		precision: string;
+	}>([
+		{ evidence: { kind: "none" }, precision: "Boundaries unverified" },
+		{
+			evidence: { generatedDurationUs: 1_000_000, kind: "duration-only" },
+			precision: "Boundaries unverified",
+		},
+		{
+			evidence: { endDeltaUs: 10_000, kind: "start-and-end", startDeltaUs: 0 },
+			precision: "Boundaries verified",
+		},
+		{
+			evidence: { endDeltaUs: 50_000, kind: "start-and-end", startDeltaUs: 0 },
+			precision: "Boundaries unverified",
+		},
+	])(
+		"feeds measured $evidence.kind evidence into artifact accuracy and review ($precision)",
+		async ({ evidence, precision }) => {
+			const fixture = requiredFixture("mp4-video-only");
+			const sourceBlob = await readFixtureBlob(
+				fixture.publicPath,
+				fixture.expected.mimeTypePrefix,
+			);
+			const generatedBlob = sourceBlob.slice(
+				0,
+				sourceBlob.size,
+				sourceBlob.type,
+			);
+			const signal = new AbortController().signal;
+			const measureBoundaryEvidence = vi.fn(async (request) => {
+				expect(request).toEqual({
+					fixture,
+					generatedBlob,
+					selection: fixture.selections.selectedRange,
+					signal,
+					sourceBlob,
+				});
+				return evidence;
+			});
+			const result = await runSelectedRangeExportArtifactHarness({
+				fetchFixtureBlob: async () => sourceBlob,
+				fixture,
+				inspectGeneratedMedia: async (blob) => ({
+					...(await inspectGeneratedMediaBlob(blob)),
+					durationUs: 1_000_000,
+				}),
+				inspectLocalAsset: async () => supportedInspection,
+				measureBoundaryEvidence,
+				runner: {
+					cancelSupported: true,
+					run: async () => ({
+						blob: generatedBlob,
+						mimeType: generatedBlob.type,
+					}),
+				},
+				runtime: supportedRuntime,
+				signal,
+			});
+			expect(measureBoundaryEvidence).toHaveBeenCalledTimes(1);
+			expect(result.report.boundaryEvidence).toEqual(evidence);
+			expect(result.report.rangeAccuracy.kind).toBe(
+				precision === "Boundaries verified" ? "proven-precise" : "best-effort",
+			);
+			expect(result.report.exportReview).toMatchObject({
+				precision: { label: precision },
+				supported: true,
+			});
+		},
+	);
+
+	it("records a boundary measurement failure explicitly in the fixture catalog", async () => {
+		const fixture = requiredFixture("mp4-video-only");
+		const blob = await readFixtureBlob(
+			fixture.publicPath,
+			fixture.expected.mimeTypePrefix,
+		);
+		const result = await runFixtureCatalogExportArtifactHarness({
+			fetchFixtureBlob: async () => blob,
+			fixtures: [fixture],
+			inspectLocalAsset: async () => supportedInspection,
+			measureBoundaryEvidence: async () => {
+				throw new Error("Presented frames could not be decoded.");
+			},
+			runner: {
+				cancelSupported: true,
+				run: async () => ({ blob, mimeType: blob.type }),
+			},
+			runtime: supportedRuntime,
+			selectionKind: "selectedRange",
+		});
+		expect(result.results).toMatchObject([
+			{
+				failure: {
+					reason: "Generated media boundary measurement failed.",
+					stage: "boundary-measurement",
+					technicalDetails: "Presented frames could not be decoded.",
+				},
+				status: "unsupported",
+			},
+		]);
 	});
 });
 

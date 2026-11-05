@@ -4,6 +4,7 @@ import {
 	planDefaultExportCapability,
 } from "@/editor-core/export-capability";
 import {
+	type ExportBoundaryEvidence,
 	type ExportRangeAccuracyReport,
 	type GeneratedMediaInspection,
 	classifyExportRangeAccuracy,
@@ -56,6 +57,13 @@ export type ExportArtifactHarnessOptions = {
 	fixture?: ExportCorrectnessFixture;
 	inspectGeneratedMedia?: (blob: Blob) => Promise<GeneratedMediaInspection>;
 	inspectLocalAsset?: LocalMediaAssetInspector;
+	measureBoundaryEvidence?: (request: {
+		fixture: ExportCorrectnessFixture;
+		generatedBlob: Blob;
+		selection: Selection;
+		signal: AbortSignal;
+		sourceBlob: Blob;
+	}) => Promise<ExportBoundaryEvidence>;
 	now?: () => number;
 	outputSettings?: OutputSettings;
 	outputSupport?: BrowserLocalOutputSupport;
@@ -80,6 +88,7 @@ export type ExportArtifactHarnessResult = {
 
 export type ExportArtifactHarnessFailureStage =
 	| "asset-capability"
+	| "boundary-measurement"
 	| "export-runner"
 	| "fixture-source"
 	| "generated-media-inspection"
@@ -125,6 +134,7 @@ export type ExportFixtureCatalogResult =
 	  };
 
 export type ExportArtifactHarnessReport = {
+	boundaryEvidence: ExportBoundaryEvidence;
 	delivery: {
 		performed: false;
 		reason: string;
@@ -248,6 +258,7 @@ async function runExportArtifactHarness({
 	fixture = defaultFullAssetFixture(),
 	inspectGeneratedMedia = inspectGeneratedMediaBlob,
 	inspectLocalAsset = inspectBrowserLocalMediaAssetDraft,
+	measureBoundaryEvidence,
 	now = () => 0,
 	outputSettings = createDefaultOutputSettings(),
 	outputSupport = MEDIABUNNY_OUTPUT_SUPPORT,
@@ -386,7 +397,27 @@ async function runExportArtifactHarness({
 		);
 	}
 
+	let boundaryEvidence: ExportBoundaryEvidence = { kind: "none" };
+	if (measureBoundaryEvidence) {
+		try {
+			boundaryEvidence = await measureBoundaryEvidence({
+				fixture,
+				generatedBlob,
+				selection,
+				signal: exportSignal,
+				sourceBlob,
+			});
+		} catch (error) {
+			throw new ExportArtifactHarnessFailure(
+				"boundary-measurement",
+				"Generated media boundary measurement failed.",
+				errorToTechnicalDetails(error),
+			);
+		}
+	}
+
 	const rangeAccuracy = classifyExportRangeAccuracy({
+		boundaryEvidence,
 		frameTiming: analysis.asset.frameTiming,
 		generatedMedia: inspection,
 		selection,
@@ -421,6 +452,7 @@ async function runExportArtifactHarness({
 			sizeBytes: generatedBlob.size,
 		},
 		report: {
+			boundaryEvidence,
 			delivery: {
 				performed: false,
 				reason:
