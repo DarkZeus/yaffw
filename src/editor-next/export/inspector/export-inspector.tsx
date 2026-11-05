@@ -519,7 +519,8 @@ function progressPercent(progress: ExportProgress): number {
 function formatExportProgressPhase(phase: ExportProgress["phase"]): string {
 	switch (phase) {
 		case "encoding":
-			return "Encoding";
+			// Conversion progress does not distinguish packet copying from transcoding.
+			return "Processing";
 		case "finalizing":
 			return "Finalizing";
 		case "muxing":

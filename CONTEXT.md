@@ -506,7 +506,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - The first slice includes minimal **Timeline zoom** with horizontal scrolling while keeping waveform lanes, selection, and playhead aligned.
 - An **Export job** consumes one **Media asset** and the session's **Editing decisions**.
 - An **Export job** runs from a snapshot of the **Media asset** and **Editing decisions** captured when the job starts.
-- A running **Export job** reports minimal **Export progress** such as preparing, encoding, muxing, or finalizing.
+- A running **Export job** reports minimal **Export progress** such as preparing, processing, muxing, or finalizing. Conversion progress uses neutral Processing wording because it does not establish whether video is copied or transcoded, and the **Generated audio mix** is encoded independently.
 - **Export cancellation** is available only when the active export runner can stop safely; the UI should not imply cancellation when it is unsupported.
 - The first slice disables editing changes while an **Export job** is running.
 - The **Output settings modal** and **Export preset** mutations are blocked while an **Export job** is running.

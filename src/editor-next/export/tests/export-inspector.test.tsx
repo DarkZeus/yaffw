@@ -755,7 +755,7 @@ describe("ExportInspectorPanel", () => {
 			/>,
 		);
 
-		expect(screen.getByText("Encoding")).toBeTruthy();
+		expect(screen.getByText("Processing")).toBeTruthy();
 		expect(screen.getByText("export-job")).toBeTruthy();
 		expect(screen.getByLabelText("Export progress")).toBeTruthy();
 
