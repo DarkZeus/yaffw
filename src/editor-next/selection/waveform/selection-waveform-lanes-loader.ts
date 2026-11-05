@@ -3,9 +3,15 @@ import {
 	type AudioSample,
 	AudioSampleSink,
 	BlobSource,
+	EncodedPacketSink,
 	Input,
 } from "mediabunny";
 
+import {
+	AudioPacketTimeline,
+	DecodedAudioTimestampProjector,
+	audioPacketDurationsMaySpanGaps,
+} from "../../media-work/adapters/audio-packet-timeline";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 import type {
 	WaveformLaneRequest,
@@ -98,6 +104,24 @@ async function decodeWaveformLane({
 		};
 	}
 
+	// PCM decoders preserve input timestamps and derive duration from frame
+	// bytes. Unknown metadata duration must never turn those frames into gaps.
+	const needsTimestampProjection = audioPacketDurationsMaySpanGaps(
+		await track.getCodec(),
+	);
+	const packetTimeline = new AudioPacketTimeline({
+		packetDurationsMaySpanGaps: needsTimestampProjection,
+		sampleRate: await track.getSampleRate(),
+	});
+	const timestampProjector = new DecodedAudioTimestampProjector(0);
+	const packetIterator = needsTimestampProjection
+		? new EncodedPacketSink(track)
+				.packets(undefined, undefined, { metadataOnly: true })
+				[Symbol.asyncIterator]()
+		: null;
+	let packetLookaheadSeconds = Number.NEGATIVE_INFINITY;
+	let packetsEnded = false;
+	let projectedThroughSeconds = 0;
 	const sink = new AudioSampleSink(track);
 	const buckets = new Float32Array(WAVEFORM_SAMPLE_COUNT);
 	let framesRead = 0;
@@ -115,26 +139,70 @@ async function decodeWaveformLane({
 				break;
 			}
 
-			throwIfAborted(signal);
-
 			const sample = value;
 			try {
 				throwIfAborted(signal);
+				const durationSeconds = sample.numberOfFrames / sample.sampleRate;
+				// Read metadata only through this sample's media-time horizon plus
+				// one packet. That lookahead exposes a gap after the preceding packet;
+				// prune consumed ranges so long recordings never retain a full index.
+				const horizon =
+					Math.max(projectedThroughSeconds, sample.timestamp) + durationSeconds;
+				while (
+					packetIterator &&
+					!packetsEnded &&
+					packetLookaheadSeconds <= horizon
+				) {
+					throwIfAborted(signal);
+					const packetResult = await packetIterator.next();
+					throwIfAborted(signal);
+					if (packetResult.done) {
+						packetsEnded = true;
+						break;
+					}
+					const packet = packetResult.value;
+					if (
+						!Number.isFinite(packet.timestamp) ||
+						!Number.isFinite(packet.duration) ||
+						packet.duration < 0
+					)
+						continue;
+					packetLookaheadSeconds = packet.timestamp;
+					packetTimeline.add({
+						startSeconds: packet.timestamp,
+						endSeconds: packet.timestamp + packet.duration,
+					});
+				}
+				const timestampSeconds = needsTimestampProjection
+					? timestampProjector.project(
+							sample.timestamp,
+							durationSeconds,
+							packetTimeline,
+						)
+					: sample.timestamp;
+				projectedThroughSeconds = timestampSeconds + durationSeconds;
 				sampleRate = sample.sampleRate;
 				addAudioSampleToBuckets({
 					buckets,
 					mediaDurationSeconds: assetDurationSeconds,
 					sample,
+					timestampSeconds,
 				});
+				packetTimeline.prune(timestampSeconds);
 				framesRead += sample.numberOfFrames;
 			} finally {
 				sample.close();
 			}
 		}
 	} finally {
-		await iterator.return?.();
+		try {
+			await iterator.return?.();
+		} finally {
+			await packetIterator?.return?.();
+		}
 	}
 
+	throwIfAborted(signal);
 	if (framesRead === 0 || sampleRate === 0) {
 		return {
 			reason: "No audio samples were decoded for this track.",
@@ -152,9 +220,11 @@ export function addAudioSampleToBuckets({
 	buckets,
 	mediaDurationSeconds,
 	sample,
+	timestampSeconds = sample.timestamp,
 }: {
 	buckets: MutableWaveformBuckets;
 	mediaDurationSeconds: number;
+	timestampSeconds?: number;
 	sample: Pick<
 		AudioSample,
 		| "copyTo"
@@ -196,7 +266,7 @@ export function addAudioSampleToBuckets({
 		frameIndex += 1
 	) {
 		const sampleTimestampSeconds =
-			sample.timestamp + frameIndex / sample.sampleRate;
+			timestampSeconds + frameIndex / sample.sampleRate;
 
 		if (
 			sampleTimestampSeconds < 0 ||

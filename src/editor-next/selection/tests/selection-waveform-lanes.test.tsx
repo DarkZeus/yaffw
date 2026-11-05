@@ -14,6 +14,13 @@ const mediabunnyMock = vi.hoisted(() => ({
 		next: ReturnType<typeof vi.fn>;
 		return: ReturnType<typeof vi.fn>;
 	}>,
+	packetsByTrack: new Map<
+		object,
+		Array<{ timestamp: number; duration: number }>
+	>(),
+	packetsError: undefined as Error | undefined,
+	sampleReadHook: undefined as (() => Promise<void>) | undefined,
+	packetIterators: [] as Array<{ return: ReturnType<typeof vi.fn> }>,
 	samplesByTrack: new Map<
 		object,
 		Array<ReturnType<typeof createAudioSampleLike>>
@@ -50,6 +57,7 @@ vi.mock("mediabunny", () => {
 			let index = 0;
 			const iterator = {
 				next: vi.fn(async () => {
+					await mediabunnyMock.sampleReadHook?.();
 					const value = samples[index];
 					index += 1;
 
@@ -67,6 +75,26 @@ vi.mock("mediabunny", () => {
 			return {
 				[Symbol.asyncIterator]: () => iterator,
 			};
+		}
+	}
+
+	class EncodedPacketSink {
+		constructor(readonly track: object) {}
+		packets() {
+			const packets = mediabunnyMock.packetsByTrack.get(this.track) ?? [];
+			let index = 0;
+			const iterator = {
+				next: vi.fn(async () => {
+					if (mediabunnyMock.packetsError) throw mediabunnyMock.packetsError;
+					const value = packets[index++];
+					return value
+						? { done: false as const, value }
+						: { done: true as const, value: undefined };
+				}),
+				return: vi.fn(async () => ({ done: true as const, value: undefined })),
+			};
+			mediabunnyMock.packetIterators.push(iterator);
+			return { [Symbol.asyncIterator]: () => iterator };
 		}
 	}
 
@@ -89,6 +117,7 @@ vi.mock("mediabunny", () => {
 	return {
 		ALL_FORMATS: {},
 		AudioSampleSink,
+		EncodedPacketSink,
 		BlobSource,
 		Input,
 	};
@@ -174,6 +203,10 @@ import {
 
 beforeEach(() => {
 	clearWaveformLaneCache();
+	mediabunnyMock.packetsByTrack = new Map();
+	mediabunnyMock.packetsError = undefined;
+	mediabunnyMock.sampleReadHook = undefined;
+	mediabunnyMock.packetIterators = [];
 	mediabunnyMock.audioTracks = [];
 	mediabunnyMock.getAudioTracksError = undefined;
 	mediabunnyMock.inputInstances = [];
@@ -197,6 +230,37 @@ afterEach(() => {
 });
 
 describe("useWaveformLaneStates", () => {
+	it("ignores obsolete lane completion after asset replacement", async () => {
+		const stale = createDeferred<WaveformLaneResult>();
+		const current = createDeferred<WaveformLaneResult>();
+		const replacement = new Blob(["replacement"]);
+		const loader: WaveformLaneLoader = vi.fn((request) =>
+			request.source === source ? stale.promise : current.promise,
+		);
+		const view = render(<WaveformLaneStateProbe waveformLaneLoader={loader} />);
+		view.rerender(
+			<WaveformLaneStateProbe
+				waveformLaneLoader={loader}
+				laneSource={replacement}
+			/>,
+		);
+		await act(async () => {
+			current.resolve({ status: "ready", samples: [1] });
+			await current.promise;
+		});
+		await act(async () => {
+			stale.resolve({ status: "unavailable", reason: "obsolete" });
+			await stale.promise;
+		});
+		expect(readLaneStates()["audio-voice"]).toMatchObject({
+			status: "ready",
+			samples: [1],
+		});
+		expect(vi.mocked(loader).mock.calls[0][0].signal?.aborted).toBe(true);
+		view.unmount();
+		expect(vi.mocked(loader).mock.calls[2][0].signal?.aborted).toBe(true);
+	});
+
 	it("starts lanes as loading and records loader results by track identity", async () => {
 		const voiceLane = createDeferred<WaveformLaneResult>();
 		const desktopLane = createDeferred<WaveformLaneResult>();
@@ -261,6 +325,167 @@ describe("useWaveformLaneStates", () => {
 });
 
 describe("loadBrowserWaveformLane", () => {
+	it.each([
+		{
+			timestamps: [1, 1.1, 1.2, 1.3, 1.4],
+			packetDuration: 1.8,
+			kind: "collapsed",
+		},
+		{
+			timestamps: [1, 1.1, 1.2, 3, 3.1],
+			packetDuration: 1.8,
+			kind: "already media-timed",
+		},
+		{
+			timestamps: [1, 1.1, 1.2, 1.3, 1.4],
+			packetDuration: 0,
+			kind: "unknown packet duration",
+		},
+	])(
+		"places $kind decoded timestamps after a packet gap and preserves leading silence",
+		async ({ timestamps, packetDuration }) => {
+			const track = createMockAudioTrack({ sampleRate: 100 });
+			mediabunnyMock.audioTracks = [track];
+			// Leading offset 1s; compressed packet before the gap has inferred duration.
+			mediabunnyMock.packetsByTrack.set(track, [
+				{ timestamp: 1, duration: 0.1 },
+				{ timestamp: 1.1, duration: 0.1 },
+				{ timestamp: 1.2, duration: packetDuration },
+				{ timestamp: 3, duration: 0.1 },
+				{ timestamp: 3.1, duration: 0.1 },
+			]);
+			const samples = timestamps.map((time) =>
+				createAudioSampleLike([new Array(10).fill(1)], 100, time),
+			);
+			mediabunnyMock.samplesByTrack.set(track, samples);
+			const result = await loadBrowserWaveformLane({
+				assetDurationUs: 4_000_000,
+				source,
+				track: readyAsset.tracks.audio[0],
+				trackIndex: 0,
+			});
+			expect(result.status).toBe("ready");
+			if (result.status !== "ready")
+				throw new Error("Expected ready waveform.");
+			const at = (seconds: number) =>
+				result.samples[Math.floor((seconds / 4) * 8192)];
+			expect(at(0.5)).toBe(0);
+			expect(at(1.11)).toBe(1);
+			expect(at(1.31)).toBe(0);
+			expect(at(2.5)).toBe(0);
+			expect(at(3.01)).toBe(1);
+			expect(at(3.11)).toBe(1);
+			for (const sample of samples)
+				expect(sample.close).toHaveBeenCalledTimes(1);
+			expect(mediabunnyMock.packetIterators[0]?.return).toHaveBeenCalledTimes(
+				1,
+			);
+		},
+	);
+
+	it("preserves repeated gaps after pruning consumed packet metadata", async () => {
+		const track = createMockAudioTrack({ sampleRate: 100 });
+		mediabunnyMock.audioTracks = [track];
+		const presented = [0, 0.1, 0.2, 1, 1.1, 1.2, 3, 3.1, 3.2];
+		mediabunnyMock.packetsByTrack.set(
+			track,
+			presented.map((timestamp) => ({ timestamp, duration: 0.1 })),
+		);
+		mediabunnyMock.samplesByTrack.set(
+			track,
+			presented.map((_, index) =>
+				createAudioSampleLike([new Array(10).fill(1)], 100, index / 10),
+			),
+		);
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: 4_000_000,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+		if (result.status !== "ready") throw new Error("Expected ready waveform.");
+		for (const time of [0.5, 1.5, 2.5, 3.5])
+			expect(result.samples[Math.floor((time / 4) * 8192)]).toBe(0);
+		for (const time of [0.01, 1.01, 3.01])
+			expect(result.samples[Math.floor((time / 4) * 8192)]).toBe(1);
+	});
+
+	it.each(["pcm-s16", "ulaw", "alaw"])(
+		"preserves variable and unknown-duration %s packets instead of inventing gaps",
+		async (codec) => {
+			const track = createMockAudioTrack({ codec, sampleRate: 100 });
+			mediabunnyMock.audioTracks = [track];
+			mediabunnyMock.packetsByTrack.set(track, [
+				{ timestamp: 0, duration: 0.1 },
+				{ timestamp: 0.1, duration: 0 },
+				{ timestamp: 0.2, duration: 1.8 },
+				{ timestamp: 2, duration: 0.1 },
+			]);
+			mediabunnyMock.samplesByTrack.set(track, [
+				createAudioSampleLike([new Array(10).fill(1)], 100),
+				createAudioSampleLike([new Array(10).fill(1)], 100, 0.1),
+				createAudioSampleLike([new Array(180).fill(1)], 100, 0.2),
+				createAudioSampleLike([new Array(10).fill(1)], 100, 2),
+			]);
+			const result = await loadBrowserWaveformLane({
+				assetDurationUs: 3_000_000,
+				source,
+				track: readyAsset.tracks.audio[0],
+				trackIndex: 0,
+			});
+			expect(result.status).toBe("ready");
+			if (result.status !== "ready")
+				throw new Error("Expected ready waveform.");
+			expect(result.samples[Math.floor((1 / 3) * 8192)]).toBe(1);
+			expect(result.samples[Math.floor((0.11 / 3) * 8192)]).toBe(1);
+		},
+	);
+
+	it("closes a sample delivered after cancellation and returns its iterator", async () => {
+		const controller = new AbortController();
+		const track = createMockAudioTrack();
+		const sample = createAudioSampleLike([[1]], 100);
+		mediabunnyMock.audioTracks = [track];
+		mediabunnyMock.samplesByTrack.set(track, [sample]);
+		mediabunnyMock.sampleReadHook = async () => {
+			controller.abort();
+		};
+		await expect(
+			loadBrowserWaveformLane({
+				assetDurationUs: readyAsset.durationUs,
+				signal: controller.signal,
+				source,
+				track: readyAsset.tracks.audio[0],
+				trackIndex: 0,
+			}),
+		).rejects.toMatchObject({ name: "AbortError" });
+		expect(sample.close).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
+	it("fails explicitly and closes both iterators when packet metadata cannot be read", async () => {
+		const track = createMockAudioTrack();
+		const sample = createAudioSampleLike([[1]], 100);
+		mediabunnyMock.audioTracks = [track];
+		mediabunnyMock.samplesByTrack.set(track, [sample]);
+		mediabunnyMock.packetsError = new Error("Packet read failed");
+		const result = await loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+		expect(result).toEqual({
+			status: "unavailable",
+			reason: "Packet read failed",
+		});
+		expect(sample.close).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
+		expect(mediabunnyMock.packetIterators[0]?.return).toHaveBeenCalledTimes(1);
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+	});
+
 	it("disposes the media input after loading a ready waveform lane", async () => {
 		const audioTrack = createMockAudioTrack();
 		mediabunnyMock.audioTracks = [audioTrack];
@@ -534,12 +759,14 @@ const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
 
 function WaveformLaneStateProbe({
 	waveformLaneLoader,
+	laneSource = source,
 }: {
 	waveformLaneLoader: WaveformLaneLoader;
+	laneSource?: Blob;
 }) {
 	const laneStates = useWaveformLaneStates({
 		asset: readyAsset,
-		source,
+		source: laneSource,
 		waveformLaneLoader,
 	});
 
@@ -615,12 +842,18 @@ function lastMediaInput() {
 function createMockAudioTrack({
 	canDecode = true,
 	durationSeconds = 12,
+	codec = "aac",
+	sampleRate = 48_000,
 }: {
 	canDecode?: boolean;
 	durationSeconds?: number;
+	codec?: string;
+	sampleRate?: number;
 } = {}) {
 	return {
 		canDecode: vi.fn(async () => canDecode),
+		getCodec: vi.fn(async () => codec),
+		getSampleRate: vi.fn(async () => sampleRate),
 		computeDuration: vi.fn(async () => durationSeconds),
 	};
 }
