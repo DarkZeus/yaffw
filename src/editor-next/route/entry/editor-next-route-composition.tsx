@@ -1,8 +1,4 @@
 import { type ChangeEvent, useMemo, useRef } from "react";
-import {
-	WorkbenchInspectorTabs,
-	useWorkbenchInspector,
-} from "../../workbench/frame/workbench-inspector";
 
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
@@ -36,7 +32,6 @@ export function EditorNextRouteComposition({
 	runtime: RuntimeSupport;
 }) {
 	const stableCommands = useStableEditorCommands(commands);
-	const inspector = useWorkbenchInspector();
 
 	function handleLocalFileSelected(event: ChangeEvent<HTMLInputElement>) {
 		const file = event.currentTarget.files?.[0];
@@ -98,22 +93,14 @@ export function EditorNextRouteComposition({
 				/>
 			) : null;
 
-		return session.status === "ready" ? (
-			<WorkbenchInspectorTabs
-				activeTab={inspector.activeTab}
-				onTabChange={inspector.selectTab}
-				audioPanel={readyAudioPanel}
-				exportInspector={readyExportInspector}
-				mediaAssetContext={readyMediaAssetContext}
-			/>
-		) : null;
-	}, [
-		session,
-		stableCommands,
-		selectionEditingDisabled,
-		inspector.activeTab,
-		inspector.selectTab,
-	]);
+		return session.status === "ready"
+			? {
+					media: readyMediaAssetContext,
+					audio: readyAudioPanel,
+					export: readyExportInspector,
+				}
+			: undefined;
+	}, [session, stableCommands, selectionEditingDisabled]);
 	const readyPreviewPlayer =
 		session.status === "ready" && previewSource ? (
 			<NativePreviewPlayer

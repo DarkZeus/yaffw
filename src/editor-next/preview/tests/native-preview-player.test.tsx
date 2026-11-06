@@ -379,6 +379,32 @@ afterEach(() => {
 });
 
 describe("NativePreviewPlayer", () => {
+	it("measures the preview aperture after Workspace mounts its panel portal", async () => {
+		const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
+		const measure = vi
+			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+			.mockImplementation(function (this: HTMLElement) {
+				return this.getAttribute("aria-label") === "Preview viewer surface"
+					? createTestDomRect({ width: 800, height: 200 })
+					: originalMeasure.call(this);
+			});
+		const observe = vi.spyOn(ResizeObserver.prototype, "observe");
+		try {
+			renderPlayer();
+			await waitFor(() => {
+				expect(screen.getByLabelText("Preview aperture").style.height).toBe(
+					"200px",
+				);
+			});
+			expect(observe).toHaveBeenCalledWith(
+				screen.getByLabelText("Preview viewer surface"),
+			);
+		} finally {
+			measure.mockRestore();
+			observe.mockRestore();
+		}
+	});
+
 	it("keeps paused seek commands on the scrub preview and synchronizes native video on play", async () => {
 		renderPlayer();
 

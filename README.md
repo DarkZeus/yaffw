@@ -12,7 +12,8 @@ The product is no longer an FFmpeg-wrapper UI. Browser-local editor processing i
 ## Editor-Next Capabilities
 
 - Local file import into a Ready media asset.
-- Cinema workbench with resizable preview/inspector and Selection areas, plus Media, Audio, and Export inspector tabs.
+- Customizable Cinema workbench powered by react-resizable-panels Workspace: resize, drag panels to split or share tabs, and maximize panel groups. Preview, Transport, Selection, Media, Audio, and Export remain inside the editor frame.
+- Browser-local layout restoration. Single-panel groups have no tab row or floating controls. Alt-drag panel content to rearrange it; right-click a panel for maximize, restore, and Reset workbench layout. Shared groups retain tabs. Narrow screens stack Preview, Transport, Selection, then the inspector without replacing the saved desktop arrangement.
 - Runtime gate for browser media APIs, with Chromium/WebCodecs as the primary target.
 - Native video preview with playhead, frame stepping, playback speed, volume, fullscreen, and keyboard controls.
 - Web Audio preview engine for audio monitoring and playback timing when active; native video follows that clock. Includes per-track preview solo and level meters.

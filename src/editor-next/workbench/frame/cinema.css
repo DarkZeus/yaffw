@@ -69,102 +69,210 @@
 	font-size: 11px;
 	color: var(--muted-foreground);
 }
-.cinema-layout,
-.cinema-top-layout,
-.cinema-top-pane,
-.cinema-viewer-pane {
+.workbench-workspace {
+	/* Keep Workspace's internal maximized/drag layers below application menus. */
+	isolation: isolate;
 	height: 100%;
 	min-height: 0;
 	min-width: 0;
 }
-.cinema-viewer-pane {
+.workbench-tabset {
+	position: relative;
+	isolation: isolate;
 	display: flex;
 	flex-direction: column;
+	height: 100%;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	background: var(--workbench);
 }
-.cinema-viewer {
+@media (hover: hover) and (pointer: fine) {
+	.workbench-tabset::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		z-index: 101;
+		pointer-events: none;
+		border: 1px solid
+			color-mix(in oklch, var(--workbench-selected) 70%, transparent);
+		background: color-mix(in oklch, var(--workbench-selected) 10%, transparent);
+		opacity: 0;
+		transition: opacity 200ms ease;
+	}
+	.workbench-tabset:has(
+			.workbench-panel-body[data-layout-drag-ready]:hover
+		)::after {
+		opacity: 1;
+		transition-duration: 125ms;
+	}
+}
+.workbench-tabset-header {
+	display: flex;
+	align-items: center;
+	flex: none;
+	min-height: 32px;
+	border-bottom: 1px solid var(--workbench-border);
+	padding-inline: 12px 4px;
+	gap: 8px;
+}
+.workbench-tab-list {
+	display: flex;
 	flex: 1;
+	min-width: 0;
+	overflow: auto;
+	gap: 6px;
+}
+.workbench-panel-tab {
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: none;
+	padding: 6px 8px;
+	font-size: 12px;
+	color: var(--muted-foreground);
+	cursor: grab;
+	user-select: none;
+}
+/* Workspace marks insertion targets separately from its panel drop overlay. */
+.workbench-panel-tab::before,
+.workbench-panel-tab::after {
+	content: "";
+	position: absolute;
+	inset: 3px 0;
+	border-radius: 3px;
+	background: color-mix(in oklch, var(--workbench-selected) 10%, transparent);
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 125ms ease;
+}
+.workbench-panel-tab::before {
+	border-inline-start: 2px solid var(--workbench-selected);
+}
+.workbench-panel-tab::after {
+	border-inline-end: 2px solid var(--workbench-selected);
+}
+.workbench-panel-tab[data-drop-before]::before,
+.workbench-panel-tab[data-drop-after]::after {
+	opacity: 1;
+}
+.workbench-panel-tab[data-tab-selected] {
+	color: var(--workbench-foreground);
+	box-shadow: inset 0 -2px 0 currentColor;
+}
+.workbench-panel-tab:focus-visible {
+	outline: 2px solid var(--workbench-focus);
+	outline-offset: -2px;
+}
+/* Single panels use their existing content; shared groups keep their tab strip. */
+.workbench-tabset:has(
+		> .workbench-tabset-header > .workbench-tab-list > [data-tab]:only-child
+	)
+	> .workbench-tabset-header {
+	display: none;
+}
+.workbench-layout-menu {
+	min-width: 220px;
+	padding: 4px;
+	border: 1px solid var(--workbench-border-strong);
+	border-radius: 6px;
+	background: var(--workbench);
+	color: var(--workbench-foreground);
+	font-size: 12px;
+}
+.workbench-layout-menu-label,
+.workbench-layout-menu-hint {
+	padding: 6px 8px;
+	color: var(--muted-foreground);
+}
+.workbench-layout-menu-label {
+	font-weight: 500;
+}
+.workbench-layout-menu-item {
+	padding: 6px 8px;
+	border-radius: 3px;
+	cursor: default;
+	outline: none;
+	user-select: none;
+}
+.workbench-layout-menu-item[data-highlighted] {
+	background: var(--workbench-hover);
+}
+.workbench-layout-menu-item[data-disabled] {
+	color: var(--muted-foreground);
+}
+.workbench-layout-menu-separator {
+	height: 1px;
+	margin: 4px;
+	background: var(--workbench-border);
+}
+.workbench-panel-content,
+.workbench-panel-body {
+	height: 100%;
 	min-height: 0;
 	min-width: 0;
 }
-.cinema-transport {
-	flex: none;
-}
-.cinema-inspector-pane {
-	padding: 0 12px;
-	min-width: 0;
-}
-.cinema-inspector {
-	height: 100%;
+.workbench-tab-panels {
+	flex: 1;
 	min-height: 0;
 	min-width: 0;
 	overflow: hidden;
 }
-.cinema-tabs {
-	height: 46px;
-	width: 100%;
-	justify-content: flex-start;
-	gap: 20px;
-	padding: 0;
-	background: transparent;
-	border-radius: 0;
-	border-bottom: 1px solid var(--workbench-border);
-}
-.cinema-tabs .cinema-tab {
-	height: 46px;
-	flex: 0 1 auto;
-	padding: 0 1px;
-	font-size: 13px;
-	font-weight: 400;
-	color: var(--muted-foreground);
-	background: transparent;
-	border: 0;
-	border-radius: 0;
-	box-shadow: none;
-}
-.cinema-tabs .cinema-tab[data-state="active"] {
-	font-weight: 500;
-	color: var(--workbench-foreground);
-	background: transparent;
-	box-shadow: inset 0 -2px 0 currentColor;
-}
-.cinema-tab-content {
-	flex: 1;
-	min-height: 0;
+.workbench-panel-content {
 	overflow: auto;
-	margin: 0;
-	padding: 20px 0 0;
 	overscroll-behavior: contain;
 }
-.cinema-selection {
-	min-height: 0;
-	min-width: 0;
-	overflow: auto;
+.workbench-panel-body:is(
+		[data-workbench-panel="media"],
+		[data-workbench-panel="audio"],
+		[data-workbench-panel="export"]
+	) {
+	padding: 20px 12px 12px;
 }
-.cinema-resizer {
-	background: transparent;
-	flex-shrink: 0;
+.workbench-panel-separator {
+	position: relative;
+	flex: none;
+	background: var(--workbench);
 }
-.cinema-inspector-resizer {
-	width: 24px;
-}
-.cinema-selection-resizer[data-panel-group-direction="vertical"] {
-	height: var(--cinema-selection-resizer-size);
-}
-.cinema-resizer::before {
+/* Keep the 6px resize target while drawing a centered 3px divider. */
+.workbench-panel-separator::after {
 	content: "";
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	pointer-events: none;
 	background: var(--workbench-border);
 }
-.cinema-inspector-resizer::before {
-	width: 1px;
-	height: 100%;
+.workbench-panel-separator[aria-orientation="vertical"] {
+	width: 6px;
 }
-.cinema-selection-resizer::before {
-	width: 100%;
-	height: 1px;
+.workbench-panel-separator[aria-orientation="vertical"]::after {
+	width: 3px;
 }
-.cinema-resizer:focus-visible {
+.workbench-panel-separator[aria-orientation="horizontal"] {
+	height: 6px;
+}
+.workbench-panel-separator[aria-orientation="horizontal"]::after {
+	height: 3px;
+}
+.workbench-panel-separator:hover::after,
+.workbench-panel-separator[data-separator="active"]::after {
+	background: var(--workbench-border-strong);
+}
+.workbench-panel-separator:focus-visible {
 	outline: 2px solid var(--workbench-focus);
 	outline-offset: -2px;
+}
+.workbench-drop-indicator {
+	border: 1px solid var(--workbench-focus);
+	background: color-mix(in oklch, var(--workbench-focus) 18%, transparent);
+}
+.workbench-drag-preview {
+	padding: 6px 12px;
+	border: 1px solid var(--workbench-border-strong);
+	background: var(--workbench-hover);
+	color: var(--workbench-foreground);
+	font-size: 12px;
 }
 .cinema-import {
 	min-height: 100%;
@@ -230,12 +338,6 @@
 		background: var(--workbench-hover);
 		filter: none;
 	}
-	.cinema-tabs .cinema-tab:hover {
-		color: var(--workbench-foreground);
-	}
-	.cinema-resizer:hover::before {
-		background: var(--workbench-border-strong);
-	}
 }
 @media (max-width: 760px) {
 	.cinema-workbench {
@@ -263,50 +365,56 @@
 		height: auto;
 		overflow: visible;
 	}
-	.cinema-layout {
+	.workbench-workspace {
 		display: flex !important;
 		flex-direction: column;
 		gap: 12px;
 		height: auto !important;
 		overflow: visible !important;
 	}
-	/* Flatten the existing panel tree instead of remounting the playing video. */
-	.cinema-top-pane,
-	.cinema-top-layout,
-	.cinema-viewer-pane,
-	.cinema-inspector-pane {
+	.workbench-workspace [data-split] {
 		display: contents !important;
 	}
-	.cinema-resizer {
+	.workbench-workspace [data-panel] {
+		flex: none !important;
+		overflow: visible !important;
+	}
+	.workbench-tabset {
+		overflow: visible;
+	}
+	.workbench-tabset[data-tabset-id="narrow-preview"] {
+		height: 320px !important;
+	}
+	.workbench-tabset[data-tabset-id="narrow-transport"] {
+		height: auto !important;
+	}
+	.workbench-tabset[data-tabset-id="narrow-selection"] {
+		height: 350px !important;
+	}
+	.workbench-tabset[data-tabset-id="narrow-inspector"] {
+		min-height: 400px;
+		height: auto !important;
+		padding-bottom: 28px;
+	}
+	.workbench-panel-separator {
 		display: none;
 	}
-	.cinema-viewer {
-		order: 0;
-		height: 290px;
-		flex: none;
+	.workbench-panel-tab {
+		min-height: 44px;
+		font-size: 14px;
+		cursor: default;
 	}
-	.cinema-transport {
-		order: 1;
-	}
-	.cinema-selection {
-		order: 2;
-		flex: none !important;
-		height: 350px;
-	}
-	.cinema-inspector {
-		order: 3;
+	.workbench-tabset:is(
+			[data-tabset-id="narrow-transport"],
+			[data-tabset-id="narrow-inspector"]
+		)
+		:is(
+			.workbench-tab-panels,
+			.workbench-panel-content,
+			.workbench-panel-body
+		) {
 		height: auto;
 		overflow: visible;
-		padding: 12px 0 28px;
-	}
-	.cinema-tab-content {
-		overflow: visible;
-	}
-	.cinema-tabs {
-		gap: 28px;
-	}
-	.cinema-tabs .cinema-tab {
-		font-size: 14px;
 	}
 	.cinema-viewer-surface {
 		padding: 0 8px 8px;

@@ -1,13 +1,5 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
-import {
-	type ReactNode,
-	memo,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
@@ -27,8 +19,8 @@ import { usePreviewMeteringSource } from "../../audio/meters/preview-metering-pr
 import type { PreviewAudioEngine } from "../../audio/types/preview-audio-engine.types";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { EditorWorkbenchLayout } from "../../workbench/frame/editor-workbench-layout";
+import type { WorkbenchInspectorPanels } from "../../workbench/frame/workbench-layout-model";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";
-import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { PreviewSelectionWaveformRegion } from "../regions/preview-selection-waveform-region";
 import { PreviewTransportRegion } from "../regions/preview-transport-region";
 import { PreviewViewerRegion } from "../regions/preview-viewer-region";
@@ -42,7 +34,7 @@ const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 export type NativePreviewPlayerProps = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
-	inspector?: ReactNode;
+	inspector?: WorkbenchInspectorPanels;
 	audioMix?: AudioMix;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
 	onPreviewPlayheadChange?: (playheadUs: MediaTimeUs) => void;
@@ -116,8 +108,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const [audioMonitoringStatus, setAudioMonitoringStatus] =
 		useState<PreviewAudioMonitoringStatus>("idle");
 	const [previewUrl, setPreviewUrl] = useState("");
-	const { previewApertureStyle, previewDisplayAspectRatio, previewSurfaceRef } =
-		usePreviewApertureLayout(asset);
 	audioMixRef.current = audioMix;
 	audioMonitoringStatusRef.current = audioMonitoringStatus;
 
@@ -372,9 +362,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onSyncPlayhead={syncPlayheadWithNativeVideo}
 					playbackRate={playbackRate}
 					playheadUs={playheadUs}
-					previewApertureStyle={previewApertureStyle}
-					previewDisplayAspectRatio={previewDisplayAspectRatio}
-					previewSurfaceRef={previewSurfaceRef}
 					previewUrl={previewUrl}
 					scrubCanvasRef={scrubPreview.canvasRef}
 					scrubFrameVisible={scrubPreview.visible}

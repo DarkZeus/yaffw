@@ -1,5 +1,5 @@
 import { CircleDot, Maximize2 } from "lucide-react";
-import { type CSSProperties, type RefObject, memo, useMemo } from "react";
+import { type RefObject, memo, useMemo } from "react";
 
 import {
 	type ChapterOption,
@@ -29,6 +29,7 @@ import type {
 } from "@/editor-core/model";
 
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
+import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { localVideoProviderLoaders } from "../player/local-video-provider-loader";
 
 export type PreviewViewerRegionProps = {
@@ -46,9 +47,6 @@ export type PreviewViewerRegionProps = {
 	onSyncPlayhead: () => void;
 	playbackRate: number;
 	playheadUs: MediaTimeUs;
-	previewApertureStyle: CSSProperties;
-	previewDisplayAspectRatio: number;
-	previewSurfaceRef: RefObject<HTMLElement | null>;
 	previewUrl: string;
 	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
 	scrubFrameVisible: boolean;
@@ -70,9 +68,6 @@ export function PreviewViewerRegion({
 	onSyncPlayhead,
 	playbackRate,
 	playheadUs,
-	previewApertureStyle,
-	previewDisplayAspectRatio,
-	previewSurfaceRef,
 	previewUrl,
 	scrubCanvasRef,
 	scrubFrameVisible,
@@ -141,9 +136,6 @@ export function PreviewViewerRegion({
 					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
 					playerSrc={playerSrc}
-					previewApertureStyle={previewApertureStyle}
-					previewDisplayAspectRatio={previewDisplayAspectRatio}
-					previewSurfaceRef={previewSurfaceRef}
 					scrubCanvasRef={scrubCanvasRef}
 					scrubFrameVisible={scrubFrameVisible}
 					videoRef={videoRef}
@@ -164,9 +156,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativeSeeked,
 	onSyncPlayhead,
 	playerSrc,
-	previewApertureStyle,
-	previewDisplayAspectRatio,
-	previewSurfaceRef,
 	scrubCanvasRef,
 	scrubFrameVisible,
 	videoRef,
@@ -181,13 +170,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativeSeeked: () => void;
 	onSyncPlayhead: () => void;
 	playerSrc: PlayerSrc | undefined;
-	previewApertureStyle: PreviewViewerRegionProps["previewApertureStyle"];
-	previewDisplayAspectRatio: PreviewViewerRegionProps["previewDisplayAspectRatio"];
-	previewSurfaceRef: PreviewViewerRegionProps["previewSurfaceRef"];
 	scrubCanvasRef: PreviewViewerRegionProps["scrubCanvasRef"];
 	scrubFrameVisible: boolean;
 	videoRef: PreviewViewerRegionProps["videoRef"];
 }) {
+	const { previewApertureStyle, previewDisplayAspectRatio, previewSurfaceRef } =
+		usePreviewApertureLayout(asset);
 	return (
 		<section
 			aria-label="Preview viewer surface"

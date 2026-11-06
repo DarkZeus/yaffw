@@ -12,6 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
+import type { WorkbenchInspectorPanels } from "../../workbench/frame/workbench-layout-model";
+
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
@@ -24,11 +26,14 @@ const previewRenderStats = vi.hoisted(() => ({
 
 vi.mock("../../preview/player/native-preview-player", async () => {
 	const React = await import("react");
+	const { EditorWorkbenchLayout } = await import(
+		"../../workbench/frame/editor-workbench-layout"
+	);
 
 	return {
 		NativePreviewPlayer: React.memo(function MockNativePreviewPlayer(props: {
 			asset: { label: string };
-			inspector?: import("react").ReactNode;
+			inspector?: WorkbenchInspectorPanels;
 			onPreviewPlayheadChange?: (playheadUs: number) => void;
 		}) {
 			previewRenderStats.nativePreviewRenderCount += 1;
@@ -37,7 +42,12 @@ vi.mock("../../preview/player/native-preview-player", async () => {
 			return React.createElement(
 				"section",
 				{ "aria-label": `Preview for ${props.asset.label}` },
-				props.inspector,
+				React.createElement(EditorWorkbenchLayout, {
+					viewer: null,
+					transport: null,
+					selection: null,
+					inspector: props.inspector,
+				}),
 				React.createElement(
 					"output",
 					{ "aria-label": "Preview playhead" },
