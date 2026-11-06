@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import {
 	ALL_FORMATS,
 	type AudioSample,
@@ -49,7 +50,7 @@ export async function loadDecodedWaveformLane({
 		}
 
 		return {
-			reason: errorToMessage(error),
+			reason: errorMessage(error),
 			status: "unavailable",
 		};
 	} finally {
@@ -318,12 +319,4 @@ function throwIfAborted(signal: AbortSignal | undefined) {
 	if (signal?.aborted) {
 		throw createWaveformAbortError();
 	}
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

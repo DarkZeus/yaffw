@@ -1,6 +1,5 @@
 import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
 import { analyzeLocalMediaAssetDraft } from "../../src/editor-core/local-file-analysis";
-import { detectRuntimeSupport } from "../../src/editor-core/runtime-capabilities";
 import { inspectBrowserLocalMediaAssetDraft } from "../../src/editor-next/media-asset/adapters/browser-local-asset-analyzer";
 
 // Loaded through Vite so both production imports and the pinned dependency use
@@ -38,7 +37,6 @@ export async function analyzeFixture(name: string, base64: string) {
 			},
 			{
 				inspect: inspectBrowserLocalMediaAssetDraft,
-				runtime: detectRuntimeSupport(),
 			},
 		);
 		if (result.status !== "ready") throw new Error(JSON.stringify(result));

@@ -1,4 +1,5 @@
 import type { MediaTimeUs } from "@/editor-core/model";
+import { clamp } from "@/lib/clamp";
 
 export const MINIMUM_TIMELINE_ZOOM = 1;
 export const MAXIMUM_TIMELINE_ZOOM = 4;
@@ -52,11 +53,8 @@ export function clientXToMediaTime({
 	}
 
 	return Math.round(
-		clampNumber(
-			(clientX - trackGeometry.leftPx) / trackGeometry.widthPx,
-			0,
-			1,
-		) * durationUs,
+		clamp((clientX - trackGeometry.leftPx) / trackGeometry.widthPx, 0, 1) *
+			durationUs,
 	);
 }
 
@@ -93,11 +91,11 @@ export function mediaTimeToPercent(
 		return 0;
 	}
 
-	return clampNumber((timeUs / durationUs) * 100, 0, 100);
+	return clamp((timeUs / durationUs) * 100, 0, 100);
 }
 
 export function clampTimelineZoom(zoom: number) {
-	return clampNumber(zoom, MINIMUM_TIMELINE_ZOOM, MAXIMUM_TIMELINE_ZOOM);
+	return clamp(zoom, MINIMUM_TIMELINE_ZOOM, MAXIMUM_TIMELINE_ZOOM);
 }
 
 export function centeredTimelineScrollLeft({
@@ -119,9 +117,8 @@ export function centeredTimelineScrollLeft({
 		return null;
 	}
 
-	const playheadCenterX =
-		(clampNumber(playheadPercent, 0, 100) / 100) * trackWidthPx;
-	const nextScrollLeft = clampNumber(
+	const playheadCenterX = (clamp(playheadPercent, 0, 100) / 100) * trackWidthPx;
+	const nextScrollLeft = clamp(
 		playheadCenterX - viewportWidthPx / 2,
 		0,
 		maxScrollLeft,
@@ -132,8 +129,4 @@ export function centeredTimelineScrollLeft({
 	}
 
 	return nextScrollLeft;
-}
-
-function clampNumber(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
 }

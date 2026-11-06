@@ -1,10 +1,15 @@
+import {
+	cancelBrowserFrame,
+	requestBrowserFrame,
+} from "@/lib/browser-animation-frame";
+import { clamp } from "@/lib/clamp";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
 import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
-import { createPreviewAdapterLifecycle } from "../../preview/lifecycle/preview-adapter-lifecycle";
+import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
 import type { WaveformSamples } from "../types/selection-waveform-lanes.types";
 import type {
 	WaveformRegionSelectionChange,
@@ -144,7 +149,7 @@ function useWavesurferWaveform({
 
 	useEffect(() => {
 		const container = containerRef.current;
-		const lifecycle = createPreviewAdapterLifecycle();
+		const lifecycle = createSynchronousMediaWorkScope();
 		let regionPreviewFrameCleanup: { dispose: () => void } | null = null;
 
 		if (!container) {
@@ -153,7 +158,8 @@ function useWavesurferWaveform({
 		}
 
 		setRendererStatus("loading");
-		lifecycle.registerContainerClear(container);
+		container.replaceChildren();
+		lifecycle.registerCleanup(() => container.replaceChildren());
 		lifecycle.registerCleanup(() => {
 			clearScheduledRegionPreviewFrame();
 			pendingRegionChangeRef.current = null;
@@ -179,50 +185,48 @@ function useWavesurferWaveform({
 					}
 				});
 
-				const wavesurfer = lifecycle.registerDestroyable(
-					WaveSurferFactory.create({
-						barGap: 0,
-						barRadius: 0,
-						barWidth: 1,
-						backend:
-							typeof AudioContext === "undefined" ? "WebAudio" : undefined,
-						container,
-						cursorWidth: 0,
-						duration: durationSeconds,
-						fillParent: true,
-						height: WAVEFORM_HEIGHT_PX,
-						hideScrollbar: true,
-						interact: true,
-						normalize: true,
-						peaks: [peaks],
-						plugins: [regions],
-						progressColor: cssTokenColor(
-							style,
-							"--workbench-waveform",
-							WAVEFORM_COLOR_FALLBACK,
-						),
-						waveColor: cssTokenColor(
-							style,
-							"--workbench-waveform",
-							WAVEFORM_COLOR_FALLBACK,
-						),
-					}),
-				);
-				lifecycle.registerUnsubscribe(
+				const wavesurfer = WaveSurferFactory.create({
+					barGap: 0,
+					barRadius: 0,
+					barWidth: 1,
+					backend: typeof AudioContext === "undefined" ? "WebAudio" : undefined,
+					container,
+					cursorWidth: 0,
+					duration: durationSeconds,
+					fillParent: true,
+					height: WAVEFORM_HEIGHT_PX,
+					hideScrollbar: true,
+					interact: true,
+					normalize: true,
+					peaks: [peaks],
+					plugins: [regions],
+					progressColor: cssTokenColor(
+						style,
+						"--workbench-waveform",
+						WAVEFORM_COLOR_FALLBACK,
+					),
+					waveColor: cssTokenColor(
+						style,
+						"--workbench-waveform",
+						WAVEFORM_COLOR_FALLBACK,
+					),
+				});
+				lifecycle.registerCleanup(() => wavesurfer.destroy());
+				lifecycle.registerCleanup(
 					wavesurfer.on("error", () => {
 						if (!lifecycle.isDisposed()) {
 							setRendererStatus("fallback");
 						}
 					}),
 				);
-				lifecycle.registerUnsubscribe(
+				lifecycle.registerCleanup(
 					wavesurfer.on("redrawcomplete", () => {
 						if (!lifecycle.isDisposed()) {
 							setRendererStatus("wavesurfer");
 						}
 					}),
 				);
-				lifecycle.registerUnsubscribe(
+				lifecycle.registerCleanup(
 					wavesurfer.on("click", (relativeX) => {
 						if (!lifecycle.isDisposed()) {
 							callLatestCallback(
@@ -232,12 +236,12 @@ function useWavesurferWaveform({
 						}
 					}),
 				);
-				lifecycle.registerUnsubscribe(
+				lifecycle.registerCleanup(
 					regions.on("region-clicked", (_, event) => {
 						event.stopPropagation();
 					}),
 				);
-				lifecycle.registerUnsubscribe(
+				lifecycle.registerCleanup(
 					regions.on("region-update", (region, side) => {
 						if (lifecycle.isDisposed() || syncingRegionRef.current) {
 							return;
@@ -257,7 +261,7 @@ function useWavesurferWaveform({
 						scheduleRegionPreview(change);
 					}),
 				);
-				lifecycle.registerUnsubscribe(
+				lifecycle.registerCleanup(
 					regions.on("region-updated", (region, side) => {
 						if (lifecycle.isDisposed() || syncingRegionRef.current) {
 							return;
@@ -296,7 +300,7 @@ function useWavesurferWaveform({
 
 			let frameFired = false;
 			let frameId: number | null = null;
-			frameId = requestWaveformFrame(() => {
+			frameId = requestBrowserFrame(() => {
 				frameFired = true;
 				regionPreviewFrameCleanup?.dispose();
 				regionPreviewFrameCleanup = null;
@@ -312,9 +316,8 @@ function useWavesurferWaveform({
 			const scheduledFrameId = frameId;
 			if (!frameFired && scheduledFrameId !== null) {
 				regionPreviewFrameRef.current = scheduledFrameId;
-				regionPreviewFrameCleanup = lifecycle.registerAnimationFrame(
-					scheduledFrameId,
-					cancelWaveformFrame,
+				regionPreviewFrameCleanup = lifecycle.registerCleanup(() =>
+					cancelBrowserFrame(scheduledFrameId),
 				);
 			}
 		}
@@ -334,7 +337,7 @@ function useWavesurferWaveform({
 			}
 
 			if (regionPreviewFrameRef.current !== null) {
-				cancelWaveformFrame(regionPreviewFrameRef.current);
+				cancelBrowserFrame(regionPreviewFrameRef.current);
 				regionPreviewFrameRef.current = null;
 			}
 		}
@@ -512,12 +515,12 @@ function createSelectionRegionOptions({
 		minimumSelectionDurationSeconds,
 		durationSeconds,
 	);
-	const start = clampTimeSeconds(
+	const start = clamp(
 		selection.startUs / 1_000_000,
 		0,
 		Math.max(0, durationSeconds - minimumDurationSeconds),
 	);
-	const end = clampTimeSeconds(
+	const end = clamp(
 		selection.endUs / 1_000_000,
 		start + minimumDurationSeconds,
 		durationSeconds,
@@ -532,10 +535,6 @@ function createSelectionRegionOptions({
 		resizeStart: !selectionEditingDisabled,
 		start,
 	};
-}
-
-function clampTimeSeconds(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
 }
 
 function createRegionSelectionChange({
@@ -565,23 +564,6 @@ function regionUpdateSide(
 	}
 
 	return "range";
-}
-
-function requestWaveformFrame(callback: () => void): number {
-	if (typeof window.requestAnimationFrame === "function") {
-		return window.requestAnimationFrame(callback);
-	}
-
-	return window.setTimeout(callback, 16);
-}
-
-function cancelWaveformFrame(frameId: number) {
-	if (typeof window.cancelAnimationFrame === "function") {
-		window.cancelAnimationFrame(frameId);
-		return;
-	}
-
-	window.clearTimeout(frameId);
 }
 
 function cssTokenColor(

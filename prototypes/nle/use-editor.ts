@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { initialAssets } from "./assets";
 import {
 	type Asset,
 	type Clip,
@@ -10,7 +9,6 @@ import {
 	duration,
 	end,
 	frame,
-	initialSequence,
 	isLocked,
 	makeClip,
 	makeTrack,
@@ -19,6 +17,13 @@ import {
 	selection,
 	splitClips,
 } from "./model";
+import {
+	initialAssets,
+	initialSequence,
+	sampleDestinations,
+	sampleSelection,
+	sampleSourceId,
+} from "./sample-sequence";
 
 export function useEditor() {
 	const [history, setHistory] = useState<{
@@ -28,9 +33,9 @@ export function useEditor() {
 	}>({ past: [], present: initialSequence, future: [] });
 	const [draft, setDraft] = useState<Sequence | null>(null);
 	const [assets, setAssets] = useState(initialAssets);
-	const [selectedIds, setSelectedIds] = useState(["detail-insert"]);
-	const [sourceId, setSourceId] = useState("encounter");
-	const [targetTrack, setTargetTrack] = useState("v1");
+	const [selectedIds, setSelectedIds] = useState(sampleSelection);
+	const [sourceId, setSourceId] = useState(sampleSourceId);
+	const [targetTrack, setTargetTrack] = useState(sampleDestinations.video);
 	const [playhead, setPlayhead] = useState(8 * SECOND);
 	const [masterGain, setMasterGain] = useState(1);
 	const [playing, setPlaying] = useState(false);
@@ -110,9 +115,6 @@ export function useEditor() {
 		);
 		setTargetTrack(c.trackId);
 	}
-	function selectSource(id: string) {
-		setSourceId(id);
-	}
 	function editable(clips = picked) {
 		if (isLocked(state, clips)) {
 			setMessage("Unlock the selected tracks to edit these clips");
@@ -174,7 +176,7 @@ export function useEditor() {
 			state.tracks.find(
 				(t) => t.id === (trackOverride ?? targetTrack) && t.kind === kind,
 			) ??
-			state.tracks.find((t) => t.id === (kind === "audio" ? "a2" : "v1")) ??
+			state.tracks.find((t) => t.id === sampleDestinations[kind]) ??
 			state.tracks.find((t) => t.kind === kind);
 		if (!track || track.locked) {
 			setMessage("Choose an unlocked destination track");
@@ -214,7 +216,7 @@ export function useEditor() {
 		const additions = [clip];
 		if (group) {
 			const audio =
-				state.tracks.find((t) => t.id === "a1") ??
+				state.tracks.find((t) => t.id === sampleDestinations.linkedAudio) ??
 				state.tracks.find((t) => t.kind === "audio");
 			if (audio) {
 				if (audio.locked) {
@@ -540,7 +542,7 @@ export function useEditor() {
 		selectedIds,
 		setSelectedIds,
 		source,
-		selectSource,
+		setSourceId,
 		targetTrack,
 		setTargetTrack,
 		playhead,

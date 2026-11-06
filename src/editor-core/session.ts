@@ -1,8 +1,8 @@
-import { createDefaultAudioMix } from "./audio-mix";
 import {
-	type ExportCapabilityReview,
-	planDefaultExportCapability,
-} from "./export-capability";
+	createDefaultAudioMix,
+	normalizeAudioTrackVolumePercent,
+} from "./audio-mix";
+import type { ExportCapabilityReview } from "./export-capability";
 import {
 	type AudioMix,
 	type AudioTrackChannelMode,
@@ -12,7 +12,6 @@ import {
 	type MediaTimeUs,
 	type OutputSettings,
 	type ReadyMediaAsset,
-	type ResolvedOutputPlan,
 	type Selection,
 	areOutputSettingsEqual,
 	createDefaultOutputSettings,
@@ -47,20 +46,10 @@ export type LoadingSession = {
 	status: "loading";
 } & BaseSessionState;
 
-export type ExportJobSnapshot = {
-	asset: ReadyMediaAsset;
-	audioMix: AudioMix;
-	outputSettings: OutputSettings;
-	review: Extract<ExportCapabilityReview, { supported: true }>;
-	resolvedOutput?: ResolvedOutputPlan;
-	selection: Selection;
-};
-
 export type ExportJob = {
 	cancelSupported: boolean;
 	id: string;
 	progress: ExportProgress;
-	snapshot: ExportJobSnapshot;
 };
 
 export type ExportSessionState =
@@ -105,13 +94,7 @@ export type FailureSession = {
 	technicalDetails?: string;
 } & BaseSessionState;
 
-export type ClosedSession = {
-	importEnabled: false;
-	status: "closed";
-} & BaseSessionState;
-
 export type EditorSessionState =
-	| ClosedSession
 	| EmptySession
 	| FailureSession
 	| LoadingSession
@@ -119,10 +102,6 @@ export type EditorSessionState =
 	| UnsupportedRuntimeSession;
 
 export type EditorSessionAction =
-	| {
-			runtime: RuntimeSupport;
-			type: "runtime.checked";
-	  }
 	| {
 			draft: MediaAssetDraft;
 			type: "import.started";
@@ -178,7 +157,7 @@ export type EditorSessionAction =
 	| {
 			cancelSupported: boolean;
 			jobId: string;
-			review?: Extract<ExportCapabilityReview, { supported: true }>;
+			review: ExportCapabilityReview;
 			type: "export.started";
 	  }
 	| {
@@ -233,8 +212,6 @@ export function editorSessionReducer(
 	action: EditorSessionAction,
 ): EditorSessionState {
 	switch (action.type) {
-		case "runtime.checked":
-			return createInitialEditorSession(action.runtime);
 		case "import.started":
 			if (state.status !== "empty" && state.status !== "failure") {
 				return state;
@@ -264,7 +241,7 @@ export function editorSessionReducer(
 				status: "ready",
 			};
 		case "session.failed":
-			if (state.status === "unsupported-runtime" || state.status === "closed") {
+			if (state.status === "unsupported-runtime") {
 				return state;
 			}
 
@@ -411,7 +388,9 @@ export function editorSessionReducer(
 						...state.audioMix.tracks,
 						[action.trackId]: {
 							...state.audioMix.tracks[action.trackId],
-							volumePercent: clampAudioTrackVolumePercent(action.volumePercent),
+							volumePercent: normalizeAudioTrackVolumePercent(
+								action.volumePercent,
+							),
 						},
 					},
 				},
@@ -436,15 +415,7 @@ export function editorSessionReducer(
 				return state;
 			}
 
-			const review =
-				action.review ??
-				planDefaultExportCapability({
-					asset: state.asset,
-					runtime: state.runtime,
-					selection: state.selection,
-				});
-
-			if (!review.supported) {
+			if (!action.review.supported) {
 				return state;
 			}
 
@@ -456,14 +427,6 @@ export function editorSessionReducer(
 						id: action.jobId,
 						progress: {
 							phase: "preparing",
-						},
-						snapshot: {
-							asset: state.asset,
-							audioMix: state.audioMix,
-							outputSettings: state.outputSettings,
-							review,
-							resolvedOutput: review.resolvedOutput,
-							selection: { ...state.selection },
 						},
 					},
 					status: "running",
@@ -606,12 +569,4 @@ function resetExportReviewAfterEditingDecision(
 	return {
 		status: "reviewing",
 	};
-}
-
-function clampAudioTrackVolumePercent(volumePercent: number) {
-	if (!Number.isFinite(volumePercent)) {
-		return 100;
-	}
-
-	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }

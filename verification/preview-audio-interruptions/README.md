@@ -41,6 +41,10 @@ record its hash and metadata. The new 40-second fixture is distinct from #109's
 unavailable historical controlled fixture; the existing numerical gates are
 reused unchanged. The browser runner uses the production observer/profiler and
 evaluator, includes all three renderer stalls, and retains raw trial evidence.
+The shared `verification/bounded-audio-trials.cjs` collector also runs the output
+timing candidate's bounded checks; that caller enables presentation-time polling.
+Both use the production evidence harness's trial runner, preserving the separate
+controlled fixture hash requirement for historical performance evidence.
 Do not edit source during measurement because Vite reloads invalidate trials.
 
 See [results and limitations](../../docs/verification/preview-audio-interruptions.md).

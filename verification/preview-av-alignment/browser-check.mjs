@@ -1,49 +1,24 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { writeFile } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const { build } = createRequire(require.resolve("vite"))("esbuild");
-const directory = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(directory, "../..");
-const fixture = JSON.parse(
-	await readFile(path.join(directory, "fixture-manifest.json"), "utf8"),
-);
-const fixturePath = path.join(root, "public", fixture.url);
-assert.equal(
-	createHash("sha256")
-		.update(await readFile(fixturePath))
-		.digest("hex"),
-	fixture.sha256,
-);
-const bundle = async (file, format) =>
-	(
-		await build({
-			entryPoints: [path.join(directory, file)],
-			bundle: true,
-			write: false,
-			platform: "browser",
-			format,
-		})
-	).outputFiles[0].text;
-const collector = await bundle("collector.ts", "iife");
-const analysis = await bundle("report.ts", "esm");
-const { reportTrial, summarizeBaseline } = await import(
-	`data:text/javascript;base64,${Buffer.from(analysis).toString("base64")}`
-);
-const headless = process.env.YAFFW_HEADED !== "1";
-const pilot = process.env.YAFFW_AV_PILOT === "1";
-const repetitions = Number(process.env.YAFFW_AV_REPETITIONS || (pilot ? 1 : 5));
-assert.ok(Number.isInteger(repetitions) && repetitions > 0);
-const browser = await chromium.launch({
+import { launchBrowser } from "../browser.cjs";
+import { prepareAlignmentMeasurement } from "./prepare.mjs";
+
+const {
+	root,
+	fixture,
+	fixturePath,
+	collector,
+	report,
 	headless,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
+	pilot,
+	repetitions,
+} = await prepareAlignmentMeasurement();
+const { reportTrial, summarizeBaseline } = report;
+const browser = await launchBrowser({
+	headless,
 });
 const trials = [];
 const errors = [];

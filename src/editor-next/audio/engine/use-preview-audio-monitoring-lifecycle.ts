@@ -7,10 +7,12 @@ import {
 } from "react";
 
 import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
-import { createPreviewAdapterLifecycle } from "../../preview/lifecycle/preview-adapter-lifecycle";
+import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
+import type {
+	CreatePreviewAudioEngineOptions,
+	PreviewAudioEngine,
+} from "../types/preview-audio-engine.types";
 import {
-	type CreatePreviewAudioEngineOptions,
-	type PreviewAudioEngine,
 	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine as createDefaultPreviewAudioEngine,
 } from "./preview-audio-engine";
@@ -33,18 +35,11 @@ export type UsePreviewAudioMonitoringLifecycleOptions = {
 	createPreviewAudioEngine?: PreviewAudioEngineFactory;
 	getPlaybackRate: () => number;
 	getPlayheadUs: () => MediaTimeUs;
-	previewAudioEngineRef?: RefObject<PreviewAudioEngine | null>;
+	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	muted: boolean;
-	onReadyChange?: (ready: boolean) => void;
 	onStatusChange?: (status: PreviewAudioMonitoringStatus) => void;
 	soloedAudioTrackId?: string | null;
 	volume: number;
-};
-
-export type PreviewAudioMonitoringLifecycle = {
-	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
-	ready: boolean;
-	status: PreviewAudioMonitoringStatus;
 };
 
 export function usePreviewAudioMonitoringLifecycle({
@@ -54,15 +49,11 @@ export function usePreviewAudioMonitoringLifecycle({
 	getPlaybackRate,
 	getPlayheadUs,
 	muted,
-	onReadyChange,
 	onStatusChange,
-	previewAudioEngineRef: providedPreviewAudioEngineRef,
+	previewAudioEngineRef,
 	soloedAudioTrackId = null,
 	volume,
-}: UsePreviewAudioMonitoringLifecycleOptions): PreviewAudioMonitoringLifecycle {
-	const ownedPreviewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
-	const previewAudioEngineRef =
-		providedPreviewAudioEngineRef ?? ownedPreviewAudioEngineRef;
+}: UsePreviewAudioMonitoringLifecycleOptions) {
 	const [status, setStatus] = useState<PreviewAudioMonitoringStatus>("idle");
 	const audioControlsRef = useRef({
 		audioMix,
@@ -73,10 +64,9 @@ export function usePreviewAudioMonitoringLifecycle({
 	const setMonitoringStatus = useCallback(
 		(nextStatus: PreviewAudioMonitoringStatus) => {
 			setStatus(nextStatus);
-			onReadyChange?.(previewAudioMonitoringStatusIsReady(nextStatus));
 			onStatusChange?.(nextStatus);
 		},
-		[onReadyChange, onStatusChange],
+		[onStatusChange],
 	);
 	audioControlsRef.current = {
 		audioMix,
@@ -86,7 +76,7 @@ export function usePreviewAudioMonitoringLifecycle({
 	};
 
 	useEffect(() => {
-		const lifecycle = createPreviewAdapterLifecycle();
+		const lifecycle = createSynchronousMediaWorkScope();
 		const abortController = new AbortController();
 		lifecycle.registerCleanup(() => abortController.abort());
 
@@ -117,7 +107,7 @@ export function usePreviewAudioMonitoringLifecycle({
 					return;
 				}
 
-				lifecycle.registerDestroyable(previewAudioEngine);
+				lifecycle.registerCleanup(() => previewAudioEngine.destroy());
 				previewAudioEngineRef.current = previewAudioEngine;
 				lifecycle.registerCleanup(() => {
 					if (previewAudioEngineRef.current === previewAudioEngine) {
@@ -185,12 +175,6 @@ export function usePreviewAudioMonitoringLifecycle({
 		status,
 		volume,
 	]);
-
-	return {
-		previewAudioEngineRef,
-		ready: previewAudioMonitoringStatusIsReady(status),
-		status,
-	};
 }
 
 function previewAudioMonitoringStatusIsReady(

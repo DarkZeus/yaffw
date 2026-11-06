@@ -1,13 +1,10 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { launchBrowser } from "../browser.cjs";
+import { prepareFixtures } from "./fixtures.mjs";
 import { instrument } from "./instrument.mjs";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+prepareFixtures();
+const browser = await launchBrowser();
 const results = [];
 try {
 	for (const scenario of ["cancel", "quota", "unavailable"]) {

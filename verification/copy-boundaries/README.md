@@ -15,6 +15,10 @@ pnpm exec biome check --config-path verification/copy-boundaries verification/co
 pnpm exec vitest run verification/copy-boundaries/tests/artifact.test.mjs
 ```
 
+Both `check.mjs` and `app-check.mjs` call `generateFixtures()` from `fixtures.mjs`
+before opening a browser. Either can run directly; the app check does not require a
+prior comparison run.
+
 `YAFFW_ORIGIN` optionally overrides the origin. ffmpeg/ffprobe must be on PATH.
 Mediabunny must be exactly 1.65.2. `YAFFW_REPEATS` defaults to two; the second
 repetition reverses policy order. Fixtures are reused byte-for-byte; explicitly

@@ -117,7 +117,6 @@ type RetainedChunk = {
 	cacheRetained: boolean;
 	chunk: MediaWindowChunk;
 	gapStartSeconds: number | null;
-	id: number;
 	scheduledSource: ScheduledSource | null;
 };
 
@@ -184,7 +183,6 @@ export function createScheduledWindowEngine({
 	let currentTimeSeconds = 0;
 	let destroyed = false;
 	let generationId: number | null = null;
-	let nextChunkId = 1;
 	let playbackRate = 1;
 	let playbackEndSeconds: number | null = null;
 	let playbackStartContextTimeSeconds = audioContext.currentTime;
@@ -281,14 +279,18 @@ export function createScheduledWindowEngine({
 					continue;
 				}
 
-				try {
-					scheduled.source.stop();
-				} catch {
-					// A one-shot source may already have completed.
-				}
-				releaseScheduledSource(scheduled, "stopped");
+				stopScheduledSource(scheduled);
 			}
 		}
+	}
+
+	function stopScheduledSource(scheduled: ScheduledSource) {
+		try {
+			scheduled.source.stop();
+		} catch {
+			// A one-shot source may already have completed.
+		}
+		releaseScheduledSource(scheduled, "stopped");
 	}
 
 	function scheduleRetainedChunks() {
@@ -435,12 +437,7 @@ export function createScheduledWindowEngine({
 			retained.cacheRetained = false;
 			const scheduled = retained.scheduledSource;
 			if (scheduled && !scheduled.released) {
-				try {
-					scheduled.source.stop();
-				} catch {
-					// A one-shot source may already have completed.
-				}
-				releaseScheduledSource(scheduled, "stopped");
+				stopScheduledSource(scheduled);
 			}
 		}
 		compactReleasedChunks();
@@ -488,10 +485,8 @@ export function createScheduledWindowEngine({
 						cacheRetained: true,
 						chunk: nextChunk,
 						gapStartSeconds: null,
-						id: nextChunkId,
 						scheduledSource: null,
 					});
-					nextChunkId += 1;
 				}
 			}
 			activeUnderrunTrackIds.delete(track.trackId);

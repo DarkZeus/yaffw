@@ -26,6 +26,10 @@ Chromium executable when needed. Set `YAFFW_OUTPUT_DESCRIPTION` and
 description remains explicitly unverified. Headed Chromium is preferred for
 display observations. Default headless runs must remain labeled headless.
 
+The baseline and comparison runners share `prepare.mjs` for fixture hash checks,
+observer/report bundling, and run settings. Trial collection and each runner's
+coverage assertions remain in their respective entry points.
+
 The runner opens disposable browser contexts, imports the fixture through the
 actual file input, waits for the Audio master meter to be ready, sets Playback
 speed and Preview volume, uses the real Play button, measures to 9.5 seconds,

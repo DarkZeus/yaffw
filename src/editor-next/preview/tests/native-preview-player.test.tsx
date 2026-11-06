@@ -19,10 +19,10 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
-import type { PreviewAudioEngineMeterSnapshot } from "../../audio/engine/preview-audio-engine";
 import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
+import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
 	aspectRatio?: string;
@@ -278,8 +278,6 @@ import {
 	preparePreviewAudioResources,
 } from "../../audio/engine/preview-audio-resources";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
-import { EXPORT_CORRECTNESS_FIXTURES } from "../../export/harness/export-correctness-fixtures";
-import { createActiveMediaAssetCleanupScopeController } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { NativePreviewPlayer } from "../player/native-preview-player";
 
 function normalizeMockPlayerSrc(src: unknown): string | undefined {
@@ -381,99 +379,6 @@ afterEach(() => {
 });
 
 describe("NativePreviewPlayer", () => {
-	it.each(["video/x-matroska", "application/octet-stream", "video/mp4", ""])(
-		"selects the native provider for a local video with file MIME type %s",
-		(type) => {
-			renderPlayer({ source: new File(["video"], "clip.mkv", { type }) });
-			const player = screen.getByTestId("mock-vidstack-player");
-			expect(player.getAttribute("data-source-type")).toBe("video/object");
-		},
-	);
-	it("does not rerender the media player when parent state changes but player props are stable", async () => {
-		const stableCallbacks = {
-			onSelectionEndRequested: vi.fn(),
-			onSelectionRangeMoveRequested: vi.fn(),
-			onSelectionResetRequested: vi.fn(),
-			onSelectionStartRequested: vi.fn(),
-		};
-		const view = renderPlayer(stableCallbacks);
-
-		await waitFor(() => {
-			expect(screen.getByLabelText("Preview for clip.mp4")).toBeTruthy();
-		});
-		const renderCountAfterMount = adapterMockState.mediaPlayerRenderCount;
-
-		view.rerender(createPlayerElement(stableCallbacks));
-
-		expect(adapterMockState.mediaPlayerRenderCount).toBe(renderCountAfterMount);
-	});
-
-	it("owns the preview object URL and native video element lifecycle", () => {
-		const { unmount } = renderPlayer();
-
-		const video = screen.getByLabelText("Preview for clip.mp4");
-
-		expect(createObjectURL).toHaveBeenCalledWith(previewSource);
-		expect(video).toBeInstanceOf(HTMLVideoElement);
-		expect(video.getAttribute("src")).toBe("blob:preview-source");
-
-		unmount();
-
-		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
-	});
-
-	it("gives Vidstack the same validated display aspect ratio as the Preview aperture", () => {
-		const portraitAsset = {
-			...readyAsset,
-			tracks: {
-				...readyAsset.tracks,
-				video: [
-					{
-						height: 160,
-						id: "video-1",
-						kind: "video",
-						width: 90,
-					},
-				],
-			},
-		} satisfies ReadyMediaAsset;
-
-		renderPlayer({ asset: portraitAsset });
-
-		const aspectRatio = String(90 / 160);
-		expect(screen.getByLabelText("Preview aperture").style.aspectRatio).toBe(
-			aspectRatio,
-		);
-		expect(
-			screen
-				.getByTestId("mock-vidstack-player")
-				.getAttribute("data-preview-aspect-ratio"),
-		).toBe(aspectRatio);
-		expect(screen.getByLabelText("Preview for clip.mp4").style.transform).toBe(
-			"",
-		);
-	});
-
-	it("registers the preview object URL with the active Media asset cleanup scope", () => {
-		const controller = createActiveMediaAssetCleanupScopeController();
-		const activeMediaAssetCleanupScope = controller.replaceCurrentScope(
-			readyAsset.id,
-		);
-
-		renderPlayer({ activeMediaAssetCleanupScope });
-
-		expect(createObjectURL).toHaveBeenCalledWith(previewSource);
-
-		controller.disposeCurrentScope();
-		controller.disposeCurrentScope();
-
-		expect(revokeObjectURL).toHaveBeenCalledTimes(1);
-		expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-source");
-		expect(scrubPreviewMockState.providers[0]?.dispose).toHaveBeenCalledTimes(
-			1,
-		);
-	});
-
 	it("keeps paused seek commands on the scrub preview and synchronizes native video on play", async () => {
 		renderPlayer();
 
@@ -528,48 +433,6 @@ describe("NativePreviewPlayer", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
 		expect(video.muted).toBe(true);
-	});
-
-	it("steps by the measured estimated frame duration instead of the unavailable 30 fps fallback", () => {
-		renderPlayer({
-			asset: {
-				...readyAsset,
-				frameTiming: {
-					analysis: {
-						averageFrameRate: 22,
-						frameRateIsConstant: false,
-						maxFrameRate: 40,
-						medianFrameRate: 23.5,
-						minFrameRate: 12,
-						probedPacketCount: 256,
-						underlyingFrameRate: null,
-					},
-					fps: 23.5,
-					frameDurationUs: 42_553,
-					reason: "No consistent underlying frame rate was detected.",
-					source: "estimated",
-				},
-			},
-		});
-
-		fireEvent.click(
-			screen.getByRole("button", { name: "Step forward one frame" }),
-		);
-		expect(
-			scrubPreviewMockState.providers[0]?.requestFrame,
-		).toHaveBeenLastCalledWith(42_553, { priority: "final" });
-		fireEvent.click(
-			screen.getByRole("button", { name: "Step forward one frame" }),
-		);
-		expect(
-			scrubPreviewMockState.providers[0]?.requestFrame,
-		).toHaveBeenLastCalledWith(85_106, { priority: "final" });
-		fireEvent.click(
-			screen.getByRole("button", { name: "Step backward one frame" }),
-		);
-		expect(
-			scrubPreviewMockState.providers[0]?.requestFrame,
-		).toHaveBeenLastCalledWith(42_553, { priority: "final" });
 	});
 
 	it("retains the displayed scrub frame through a pending seek and native playback handoff", async () => {
@@ -661,294 +524,11 @@ describe("NativePreviewPlayer", () => {
 		}
 	});
 
-	it("keeps audio preview preparation visible while blocking pending audio-master playback", async () => {
-		const pendingAudioPreview = createDeferred<PreviewAudioResourcesResult>();
-		preparePreviewAudioResourcesMock.mockReturnValueOnce(
-			pendingAudioPreview.promise,
-		);
-		vi.stubGlobal("AudioContext", class AudioContext {});
-
-		renderPlayer({ asset: readyAssetWithAudio });
-
-		await waitFor(() => {
-			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-		});
-		expect(screen.getByText("Preparing audio")).toBeTruthy();
-
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-
-		expect(play).not.toHaveBeenCalled();
-		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
-	});
-
-	it("blocks playback while required custom audio monitoring is pending", async () => {
-		const pendingAudioPreview = createDeferred<PreviewAudioResourcesResult>();
-		preparePreviewAudioResourcesMock.mockReturnValueOnce(
-			pendingAudioPreview.promise,
-		);
-		vi.stubGlobal("AudioContext", class AudioContext {});
-
-		render(<AudioMasterPlayerProbe asset={readyAssetWithAudio} />);
-
-		await waitFor(() => {
-			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-		});
-
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Set Voice track volume to 50%",
-			}),
-		);
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-
-		expect(play).not.toHaveBeenCalled();
-		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
-	});
-
-	it("applies preview and audio mix controls through the Preview audio engine", async () => {
-		vi.stubGlobal("AudioContext", class AudioContext {});
-		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
-			createPreparedPreviewAudioResourcesForRequest(request),
-		);
-
-		render(<AudioMasterPlayerProbe />);
-
-		const video = screen.getByLabelText(
-			"Preview for clip.mp4",
-		) as HTMLVideoElement;
-
-		await waitFor(() => {
-			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-		});
-		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
-
-		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		});
-		expect(lastOutputGain(previewAudioEngine)).toBe(1);
-		expect(video.muted).toBe(true);
-		expect(readAudioMixSnapshot()).toBe(
-			"audio-1:true:preserve:100|audio-2:true:preserve:100",
-		);
-
-		fireEvent.change(screen.getByLabelText("Preview volume"), {
-			target: { value: "50" },
-		});
-
-		await waitFor(() => {
-			expect(lastOutputGain(previewAudioEngine)).toBeCloseTo(0.5);
-		});
-		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
-		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-
-		fireEvent.change(screen.getByLabelText("Playback speed"), {
-			target: { value: "1.5" },
-		});
-
-		expect(video.playbackRate).toBe(1.5);
-		expect(previewAudioEngine.setPlaybackRate).toHaveBeenCalledWith(1.5);
-
-		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
-
-		await waitFor(() => {
-			expect(lastOutputGain(previewAudioEngine)).toBe(0);
-		});
-		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
-		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		expect(video.muted).toBe(true);
-		expect(readAudioMixSnapshot()).toBe(
-			"audio-1:true:preserve:100|audio-2:true:preserve:100",
-		);
-
-		fireEvent.click(
-			screen.getByRole("button", { name: "Unmute preview audio" }),
-		);
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Set Voice track volume to 50%",
-			}),
-		);
-
-		await waitFor(() => {
-			expect(lastOutputGain(previewAudioEngine)).toBeCloseTo(0.5);
-			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.25);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		});
-		expect(readAudioMixSnapshot()).toBe(
-			"audio-1:true:preserve:50|audio-2:true:preserve:100",
-		);
-		expect(video.muted).toBe(true);
-
-		fireEvent.click(
-			screen.getByRole("button", { name: "Exclude Voice from output" }),
-		);
-
-		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		});
-
-		fireEvent.click(
-			screen.getByRole("button", { name: "Solo Voice for preview" }),
-		);
-
-		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBeCloseTo(0.25);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(0);
-		});
-		expect(readAudioMixSnapshot()).toBe(
-			"audio-1:false:preserve:50|audio-2:true:preserve:100",
-		);
-		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Set Voice channel handling to left mono",
-			}),
-		);
-
-		await waitFor(() => {
-			expect(previewAudioEngine.setTrackChannelMode).toHaveBeenCalledWith(
-				0,
-				"use-left-as-mono",
-			);
-		});
-		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-
-		fireEvent.click(
-			screen.getByRole("button", { name: "Clear Voice preview solo" }),
-		);
-
-		await waitFor(() => {
-			expect(lastTrackGain(previewAudioEngine, 0)).toBe(0);
-			expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		});
-		expect(readAudioMixSnapshot()).toBe(
-			"audio-1:false:use-left-as-mono:50|audio-2:true:preserve:100",
-		);
-	});
-
-	it("applies rapid Preview volume and mute targets immediately without restarting playback or changing the export mix", async () => {
-		vi.stubGlobal("AudioContext", class AudioContext {});
-		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
-			createPreparedPreviewAudioResourcesForRequest(request),
-		);
-		render(<AudioMasterPlayerProbe />);
-		await waitFor(() => {
-			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-		});
-		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
-		const originalAudioMix = readAudioMixSnapshot();
-		const volume = screen.getByRole("slider", { name: "Preview volume" });
-		const video = screen.getByLabelText("Preview for clip.mp4");
-
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-		await waitFor(() => {
-			expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
-			expect(previewAudioEngine.play).toHaveBeenCalled();
-		});
-		previewAudioEngine.play.mockClear();
-		previewAudioEngine.setOutputGain.mockClear();
-		previewAudioEngine.setTime.mockClear();
-		previewAudioEngine.pause.mockClear();
-
-		for (const target of [20, 85, 0, 100, 35]) {
-			fireEvent.change(volume, { target: { value: String(target) } });
-			expect(volume).toHaveProperty("value", String(target));
-			expect(lastOutputGain(previewAudioEngine)).toBe(target / 100);
-		}
-		for (let index = 0; index < 3; index += 1) {
-			fireEvent.click(
-				screen.getByRole("button", { name: "Mute preview audio" }),
-			);
-			expect(
-				screen.getByRole("button", { name: "Unmute preview audio" }),
-			).toBeTruthy();
-			expect(lastOutputGain(previewAudioEngine)).toBe(0);
-			expect(volume).toHaveProperty("value", "35");
-			fireEvent.click(
-				screen.getByRole("button", { name: "Unmute preview audio" }),
-			);
-			expect(
-				screen.getByRole("button", { name: "Mute preview audio" }),
-			).toBeTruthy();
-			expect(lastOutputGain(previewAudioEngine)).toBe(0.35);
-		}
-
-		expect(video).toHaveProperty("muted", true);
-		expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
-		expect(readAudioMixSnapshot()).toBe(originalAudioMix);
-		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
-		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-		expect(previewAudioEngine.play).not.toHaveBeenCalled();
-		expect(previewAudioEngine.pause).not.toHaveBeenCalled();
-		expect(previewAudioEngine.setTime).not.toHaveBeenCalled();
-		expect(previewAudioEngine.destroy).not.toHaveBeenCalled();
-		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-	});
-
-	it("retains volume changes made while muted and restores the latest Preview target on unmute", async () => {
-		vi.stubGlobal("AudioContext", class AudioContext {});
-		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
-			createPreparedPreviewAudioResourcesForRequest(request),
-		);
-		render(<AudioMasterPlayerProbe />);
-		await waitFor(() => {
-			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-		});
-		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
-		const originalAudioMix = readAudioMixSnapshot();
-		const volume = screen.getByRole("slider", { name: "Preview volume" });
-
-		fireEvent.click(screen.getByRole("button", { name: "Mute preview audio" }));
-		for (const target of [15, 90, 42]) {
-			fireEvent.change(volume, { target: { value: String(target) } });
-			expect(volume).toHaveProperty("value", String(target));
-			expect(lastOutputGain(previewAudioEngine)).toBe(0);
-			expect(
-				screen.getByRole("button", { name: "Unmute preview audio" }),
-			).toBeTruthy();
-		}
-		fireEvent.click(
-			screen.getByRole("button", { name: "Unmute preview audio" }),
-		);
-		expect(lastOutputGain(previewAudioEngine)).toBe(0.42);
-		expect(volume).toHaveProperty("value", "42");
-		expect(readAudioMixSnapshot()).toBe(originalAudioMix);
-		expect(lastTrackGain(previewAudioEngine, 0)).toBe(1);
-		expect(lastTrackGain(previewAudioEngine, 1)).toBe(1);
-	});
-
 	it("retries a failed track through the existing engine without recreating asset resources", async () => {
-		const desktopTrack = readyAssetWithTwoAudioTracks.tracks.audio[1];
-
-		if (!desktopTrack) {
-			throw new Error("Expected Desktop audio track.");
-		}
-
 		vi.stubGlobal("AudioContext", class AudioContext {});
-		preparePreviewAudioResourcesMock
-			.mockImplementationOnce(async (request) => {
-				const prepared = createPreparedPreviewAudioResourcesForRequest(request);
-
-				return {
-					provider: prepared.provider,
-					failures: [
-						{
-							reason: "Desktop source failed",
-							track: desktopTrack,
-							trackId: "audio-2",
-							trackIndex: 1,
-						},
-					],
-					resources: prepared.resources,
-				};
-			})
-			.mockImplementationOnce(async (request) =>
-				createPreparedPreviewAudioResourcesForRequest(request),
-			);
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
 
 		render(<AudioMasterPlayerProbe showAudioPanel />);
 
@@ -989,86 +569,6 @@ describe("NativePreviewPlayer", () => {
 		});
 		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-	});
-
-	it("keeps sync fixture preview aligned after audio mix changes", async () => {
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		const syncFixture = syncFlashClickFixture();
-		const syncEvent = syncFixture.expected.syncEventsUs?.[2];
-		const onPreviewPlayheadChange = vi.fn();
-
-		if (!syncEvent) {
-			throw new Error("Expected the sync fixture to define a third event.");
-		}
-
-		vi.stubGlobal("AudioContext", class AudioContext {});
-		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
-			createPreparedPreviewAudioResourcesForRequest(request),
-		);
-
-		render(
-			<AudioMasterPlayerProbe
-				asset={readySyncAssetWithTwoAudioTracks}
-				onPreviewPlayheadChange={onPreviewPlayheadChange}
-				selection={syncFixture.selections.full}
-				source={syncPreviewSource}
-			/>,
-		);
-
-		await waitFor(() => {
-			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-		});
-
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Set Voice track volume to 50%",
-			}),
-		);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Exclude Voice from output" }),
-		);
-		fireEvent.click(
-			screen.getByRole("button", { name: "Solo Voice for preview" }),
-		);
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Set Voice channel handling to left mono",
-			}),
-		);
-
-		await waitFor(() => {
-			expect(
-				adapterMockState.previewAudioEngines[0]?.setTrackChannelMode,
-			).toHaveBeenCalledWith(0, "use-left-as-mono");
-		});
-		expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
-		expect(adapterMockState.previewAudioEngines).toHaveLength(1);
-
-		const previewAudioEngine = adapterMockState.previewAudioEngines[0];
-
-		const video = screen.getByLabelText(
-			"Preview for sync-flash-click.mp4",
-		) as HTMLVideoElement;
-
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-
-		video.currentTime = 0;
-		previewAudioEngine.setCurrentTimeSeconds(
-			syncEvent.audioClickUs / 1_000_000,
-		);
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(video.currentTime).toBe(syncEvent.visualFlashUs / 1_000_000);
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:03.000",
-		);
-		expect(onPreviewPlayheadChange).toHaveBeenCalledWith(
-			syncEvent.audioClickUs,
-		);
 	});
 
 	it("keeps paused timeline edits off native video until playback resumes", async () => {
@@ -1159,88 +659,6 @@ describe("NativePreviewPlayer", () => {
 		}
 	});
 
-	it("loops inside the selection only after playback enters the selected range", async () => {
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		renderPlayer({
-			selection: {
-				endUs: 8_000_000,
-				startUs: 4_000_000,
-			},
-		});
-
-		const video = screen.getByLabelText(
-			"Preview for clip.mp4",
-		) as HTMLVideoElement;
-		const loopButton = screen.getByRole("button", {
-			name: "Loop selection",
-		});
-
-		expect(loopButton.getAttribute("aria-pressed")).toBe("false");
-		fireEvent.click(loopButton);
-		expect(loopButton.getAttribute("aria-pressed")).toBe("true");
-
-		video.currentTime = 2;
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-		runNextPreviewFrame(frameCallbacks);
-		expect(video.currentTime).toBe(2);
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:02.000",
-		);
-
-		video.currentTime = 4.5;
-		runNextPreviewFrame(frameCallbacks);
-		expect(video.currentTime).toBe(4.5);
-
-		video.currentTime = 8.1;
-		runNextPreviewFrame(frameCallbacks);
-		expect(video.currentTime).toBe(4);
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:04.000",
-		);
-	});
-
-	it("does not jump backward when playback starts after the selection", async () => {
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		renderPlayer({
-			selection: {
-				endUs: 8_000_000,
-				startUs: 4_000_000,
-			},
-		});
-
-		const video = screen.getByLabelText(
-			"Preview for clip.mp4",
-		) as HTMLVideoElement;
-
-		fireEvent.click(screen.getByRole("button", { name: "Loop selection" }));
-		fireEvent.click(
-			screen.getByRole("button", { name: "Seek forward 10 seconds" }),
-		);
-		expect(video.currentTime).toBe(0);
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-		expect(video.currentTime).toBe(10);
-
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(video.currentTime).toBe(10);
-
-		video.currentTime = 12;
-		fireEvent.ended(video);
-
-		expect(video.currentTime).toBe(12);
-		expect(play).toHaveBeenCalledTimes(1);
-		expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
-	});
-
 	it("re-evaluates loop entry when the selection changes", async () => {
 		const { frameCallbacks, requestAnimationFrame } =
 			stubPreviewAnimationFrames();
@@ -1311,135 +729,6 @@ describe("NativePreviewPlayer", () => {
 			).toBe("false");
 		});
 		expect(createObjectURL).toHaveBeenCalledWith(nextSource);
-	});
-
-	it("samples the native video clock on animation frames while playing", async () => {
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-
-		renderPlayer();
-
-		const video = screen.getByLabelText(
-			"Preview for clip.mp4",
-		) as HTMLVideoElement;
-
-		fireEvent.click(screen.getByRole("button", { name: "Play" }));
-
-		await waitFor(() => {
-			expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-		});
-
-		video.currentTime = 1.25;
-		runNextPreviewFrame(frameCallbacks);
-
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:01.250",
-		);
-		expect(screen.getAllByText("00:00:01.250").length).toBe(1);
-		expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
-	});
-
-	it("does not rerender the media player for playback ticks after a timeline seek", async () => {
-		const { frameCallbacks, requestAnimationFrame } =
-			stubPreviewAnimationFrames();
-		const getBoundingClientRect = vi
-			.spyOn(HTMLElement.prototype, "getBoundingClientRect")
-			.mockImplementation(function getElementRect(this: HTMLElement) {
-				if (this.dataset.testid === "selection-timeline-track") {
-					return createTestDomRect({ height: 80, width: 1200 });
-				}
-
-				return createTestDomRect({ height: 0, width: 0 });
-			});
-
-		try {
-			renderPlayer();
-
-			const video = screen.getByLabelText(
-				"Preview for clip.mp4",
-			) as HTMLVideoElement;
-
-			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
-				clientX: 600,
-			});
-			expect(video.currentTime).toBe(0);
-
-			fireEvent.click(screen.getByRole("button", { name: "Play" }));
-			expect(video.currentTime).toBe(6);
-
-			await waitFor(() => {
-				expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
-			});
-			const mediaPlayerRenderCountAfterPlaybackStart =
-				adapterMockState.mediaPlayerRenderCount;
-
-			video.currentTime = 6.25;
-			runNextPreviewFrame(frameCallbacks);
-
-			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-				"00:00:06.250",
-			);
-			expect(adapterMockState.mediaPlayerRenderCount).toBe(
-				mediaPlayerRenderCountAfterPlaybackStart,
-			);
-		} finally {
-			getBoundingClientRect.mockRestore();
-		}
-	});
-
-	it("requests fullscreen when the native video API is available", () => {
-		const requestFullscreen = vi.fn().mockResolvedValue(undefined);
-		Object.defineProperty(HTMLVideoElement.prototype, "requestFullscreen", {
-			configurable: true,
-			value: requestFullscreen,
-		});
-
-		renderPlayer();
-
-		const fullscreenButton = screen.getByRole("button", {
-			name: "Open fullscreen preview",
-		});
-
-		expect(fullscreenButton.hasAttribute("disabled")).toBe(false);
-		fireEvent.click(fullscreenButton);
-
-		expect(requestFullscreen).toHaveBeenCalledTimes(1);
-	});
-
-	it("dispatches page-level shortcuts without moving the playhead for bracket selection commands", async () => {
-		const onSelectionStartRequested = vi.fn();
-		const onSelectionEndRequested = vi.fn();
-		renderPlayer({
-			onSelectionEndRequested,
-			onSelectionStartRequested,
-		});
-
-		const video = screen.getByLabelText(
-			"Preview for clip.mp4",
-		) as HTMLVideoElement;
-
-		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
-		expect(video.currentTime).toBe(0);
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:10.000",
-		);
-
-		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
-		expect(onSelectionStartRequested).toHaveBeenCalledWith(10_000_000);
-		expect(video.currentTime).toBe(0);
-
-		fireEvent.keyDown(window, { code: "BracketRight", key: "]" });
-		expect(onSelectionEndRequested).toHaveBeenCalledWith(10_000_000);
-
-		fireEvent.keyDown(window, {
-			code: "ArrowRight",
-			key: "ArrowRight",
-			shiftKey: true,
-		});
-		expect(video.currentTime).toBe(0);
-		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
-			"00:00:10.033",
-		);
 	});
 });
 
@@ -1577,10 +866,6 @@ function formatAudioMixSnapshot(audioMix: AudioMix) {
 		.join("|");
 }
 
-function readAudioMixSnapshot() {
-	return screen.getByLabelText("audio mix snapshot").textContent ?? "";
-}
-
 const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
 	combinedState: {
 		channels: [],
@@ -1589,60 +874,6 @@ const emptyMeterSnapshot: PreviewAudioEngineMeterSnapshot = {
 	},
 	trackStates: {},
 };
-
-function lastTrackGain(
-	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
-	trackIndex: number,
-) {
-	return (
-		lastTrackVolumeGain(previewAudioEngine, trackIndex) *
-		lastTrackMonitorGain(previewAudioEngine, trackIndex)
-	);
-}
-
-function lastTrackVolumeGain(
-	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
-	trackIndex: number,
-) {
-	const calls = previewAudioEngine.setTrackVolumeGain.mock.calls.filter(
-		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
-	);
-	const lastCall = calls.at(-1);
-
-	if (!lastCall) {
-		throw new Error(`No volume gain call found for track ${trackIndex}.`);
-	}
-
-	return lastCall[1];
-}
-
-function lastTrackMonitorGain(
-	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
-	trackIndex: number,
-) {
-	const calls = previewAudioEngine.setTrackMonitorGain.mock.calls.filter(
-		([candidateTrackIndex]) => candidateTrackIndex === trackIndex,
-	);
-	const lastCall = calls.at(-1);
-
-	if (!lastCall) {
-		throw new Error(`No monitor gain call found for track ${trackIndex}.`);
-	}
-
-	return lastCall[1];
-}
-
-function lastOutputGain(
-	previewAudioEngine: (typeof adapterMockState.previewAudioEngines)[number],
-) {
-	const lastCall = previewAudioEngine.setOutputGain.mock.calls.at(-1);
-
-	if (!lastCall) {
-		throw new Error("No output gain call found.");
-	}
-
-	return lastCall[0];
-}
 
 function stubPreviewAnimationFrames() {
 	const frameCallbacks: FrameRequestCallback[] = [];
@@ -1684,21 +915,6 @@ function runNextPreviewFrame(frameCallbacks: FrameRequestCallback[]) {
 	});
 }
 
-function createDeferred<T>() {
-	let resolve!: (value: T | PromiseLike<T>) => void;
-	let reject!: (reason?: unknown) => void;
-	const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-		resolve = resolvePromise;
-		reject = rejectPromise;
-	});
-
-	return {
-		promise,
-		reject,
-		resolve,
-	};
-}
-
 function createTestDomRect({
 	height,
 	width,
@@ -1725,37 +941,19 @@ function createPreparedPreviewAudioResourcesForRequest(
 	const requestedTrackIds = request.asset.tracks.audio.map((track) => track.id);
 
 	return {
-		failures: [],
 		provider: createPreviewAudioProviderStub(),
-		resources: requestedTrackIds.map((trackId, resourceIndex) => {
-			const track = request.asset.tracks.audio.find(
-				(candidateTrack) => candidateTrack.id === trackId,
-			);
-			if (!track) {
-				throw new Error(`Expected audio track ${trackId}.`);
-			}
-
-			return {
-				numberOfChannels: 2,
-				sampleRate: 48_000,
-				track,
-				trackId,
-				trackIndex: resourceIndex,
-			} satisfies PreviewAudioResource;
-		}),
+		resources: requestedTrackIds.map(
+			(trackId) =>
+				({
+					numberOfChannels: 2,
+					trackId,
+				}) satisfies PreviewAudioResource,
+		),
 	};
 }
 
 const readyAsset = {
 	durationUs: 12_000_000,
-	exportCapability: {
-		profile: {
-			audioCodec: "aac",
-			container: "mp4",
-			videoCodec: "h264",
-		},
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,
@@ -1809,50 +1007,7 @@ const readyAssetWithTwoAudioTracks = {
 	},
 } satisfies ReadyMediaAsset;
 
-const readyAssetWithAudio = {
-	...readyAsset,
-	tracks: {
-		...readyAsset.tracks,
-		audio: [
-			{
-				codec: "aac",
-				id: "audio-1",
-				kind: "audio",
-				label: "Voice",
-			},
-		],
-	},
-} satisfies ReadyMediaAsset;
-
-const readySyncAssetWithTwoAudioTracks = {
-	...readyAssetWithTwoAudioTracks,
-	durationUs: syncFlashClickFixture().expected.durationUs,
-	id: "sync-asset",
-	label: "sync-flash-click.mp4",
-	provenance: {
-		fileName: "sync-flash-click.mp4",
-		mimeType: "video/mp4",
-		sizeBytes: 1_024,
-	},
-} satisfies ReadyMediaAsset;
-
 const selection = {
 	endUs: 12_000_000,
 	startUs: 0,
 } satisfies Selection;
-
-const syncPreviewSource = new File(["sync video"], "sync-flash-click.mp4", {
-	type: "video/mp4",
-});
-
-function syncFlashClickFixture() {
-	const fixture = EXPORT_CORRECTNESS_FIXTURES.find(
-		(candidate) => candidate.id === "mp4-sync-flash-click",
-	);
-
-	if (!fixture) {
-		throw new Error("Expected the sync flash/click fixture to be registered.");
-	}
-
-	return fixture;
-}

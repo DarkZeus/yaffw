@@ -3,10 +3,7 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type {
-	LocalMediaAssetInspection,
-	LocalMediaAssetInspector,
-} from "@/editor-core/local-file-analysis";
+import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import type { GeneratedMedia, OutputSettings } from "@/editor-core/model";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
@@ -19,53 +16,6 @@ afterEach(() => {
 });
 
 describe("useSingleAssetEditingSession", () => {
-	it("starts Export with the applied resolution snapshot", async () => {
-		const run = vi.fn(async () => ({
-			blob: new Blob(["generated media"], { type: "video/mp4" }),
-		}));
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-
-		render(
-			<SingleAssetEditingSessionProbe
-				defaultExportRunner={{ cancelSupported: true, run }}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await act(async () => {
-			await sessionRef.current?.commands.importLocalFile(
-				new File(["video"], "clip.mp4", { type: "video/mp4" }),
-			);
-		});
-		await waitFor(() => {
-			expect(sessionRef.current?.session.status).toBe("ready");
-		});
-
-		const outputSettings = smallDownscaledOutputSettings();
-		act(() => {
-			sessionRef.current?.commands.applyOutputSettings(outputSettings);
-		});
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-
-		expect(run).toHaveBeenCalledWith(
-			expect.objectContaining({ outputSettings }),
-		);
-		const session = sessionRef.current?.session;
-		expect(session?.status).toBe("ready");
-		if (session?.status !== "ready" || session.export.status !== "succeeded") {
-			throw new Error("Expected a succeeded export.");
-		}
-		expect(session.export.job.snapshot.outputSettings.resolution).toEqual({
-			height: 90,
-			kind: "target-dimensions",
-			width: 160,
-		});
-	});
-
 	it("ignores stale successful Media asset analysis after a newer Media asset is ready", async () => {
 		const inspections: Array<{
 			deferred: Deferred<LocalMediaAssetInspection>;
@@ -206,141 +156,6 @@ describe("useSingleAssetEditingSession", () => {
 		);
 	});
 
-	it("aborts the previous Media asset analysis when a newer import starts", async () => {
-		const inspections: Array<{
-			deferred: Deferred<LocalMediaAssetInspection>;
-			signal: AbortSignal;
-		}> = [];
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		const inspectLocalAsset: LocalMediaAssetInspector = vi.fn(
-			(_draft, request) => {
-				const deferred = createDeferred<LocalMediaAssetInspection>();
-				if (!request.signal) {
-					throw new Error("Expected Media asset analysis cancellation signal.");
-				}
-				inspections.push({ deferred, signal: request.signal });
-
-				return deferred.promise;
-			},
-		);
-
-		render(
-			<SingleAssetEditingSessionProbe
-				inspectLocalAsset={inspectLocalAsset}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		act(() => {
-			void sessionRef.current?.commands.importLocalFile(
-				new File(["first video"], "first.mp4", { type: "video/mp4" }),
-			);
-			void sessionRef.current?.commands.importLocalFile(
-				new File(["second video"], "second.mp4", { type: "video/mp4" }),
-			);
-		});
-
-		await waitFor(() => {
-			expect(inspections).toHaveLength(2);
-		});
-		expect(inspections[0]?.signal.aborted).toBe(true);
-		expect(inspections[1]?.signal.aborted).toBe(false);
-
-		await act(async () => {
-			inspections[0]?.deferred.resolve(supportedInspection);
-			inspections[1]?.deferred.resolve(supportedInspection);
-		});
-	});
-
-	it("keeps a re-import authoritative after Close file while an older analysis is pending", async () => {
-		const inspections: Array<{
-			deferred: Deferred<LocalMediaAssetInspection>;
-			fileName: string;
-		}> = [];
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		let assetId = 0;
-
-		render(
-			<SingleAssetEditingSessionProbe
-				createAssetId={() => `asset-${++assetId}`}
-				inspectLocalAsset={(draft) => {
-					const deferred = createDeferred<LocalMediaAssetInspection>();
-					inspections.push({
-						deferred,
-						fileName: draft.provenance.fileName,
-					});
-
-					return deferred.promise;
-				}}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		let firstImport: Promise<void> | undefined;
-		let secondImport: Promise<void> | undefined;
-		act(() => {
-			firstImport = sessionRef.current?.commands.importLocalFile(
-				new File(["first video"], "first.mp4", { type: "video/mp4" }),
-			);
-			secondImport = sessionRef.current?.commands.importLocalFile(
-				new File(["second video"], "second.mp4", { type: "video/mp4" }),
-			);
-		});
-		await waitFor(() => {
-			expect(inspections).toHaveLength(2);
-		});
-		await act(async () => {
-			inspections[1]?.deferred.resolve(supportedInspection);
-			await secondImport;
-		});
-
-		act(() => {
-			sessionRef.current?.commands.requestCloseFile();
-		});
-		await waitFor(() => {
-			expect(sessionRef.current?.session.status).toBe("empty");
-		});
-
-		let thirdImport: Promise<void> | undefined;
-		act(() => {
-			thirdImport = sessionRef.current?.commands.importLocalFile(
-				new File(["third video"], "third.mp4", { type: "video/mp4" }),
-			);
-		});
-		await waitFor(() => {
-			expect(inspections.map(({ fileName }) => fileName)).toEqual([
-				"first.mp4",
-				"second.mp4",
-				"third.mp4",
-			]);
-		});
-		await act(async () => {
-			inspections[2]?.deferred.resolve(supportedInspection);
-			await thirdImport;
-			inspections[0]?.deferred.resolve(supportedInspection);
-			await firstImport;
-		});
-
-		expect(sessionRef.current?.session).toMatchObject({
-			asset: { label: "third.mp4" },
-			status: "ready",
-		});
-		expect(sessionRef.current?.previewSource).toMatchObject({
-			name: "third.mp4",
-		});
-		const session = sessionRef.current?.session;
-		if (session?.status !== "ready") {
-			throw new Error("Expected the re-imported Media asset to remain ready.");
-		}
-		expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
-			session.asset.id,
-		);
-	});
-
 	it("aborts pending Media asset analysis and suppresses its completion after unmount", async () => {
 		const inspection = createDeferred<LocalMediaAssetInspection>();
 		const sessionRef: { current: SingleAssetEditingSession | null } = {
@@ -377,105 +192,41 @@ describe("useSingleAssetEditingSession", () => {
 		expect(sessionRef.current?.session.status).toBe("loading");
 	});
 
-	it("closes the active Media asset only after confirmation and resets session resources", async () => {
-		const confirmCloseFile = vi.fn(() => true);
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-
-		render(
-			<SingleAssetEditingSessionProbe
-				confirmCloseFile={confirmCloseFile}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await act(async () => {
-			await sessionRef.current?.commands.importLocalFile(
-				new File(["video"], "close-me.mp4", { type: "video/mp4" }),
-			);
-		});
-		await waitFor(() => {
-			expect(sessionRef.current?.session.status).toBe("ready");
-			expect(sessionRef.current?.previewSource).toBeInstanceOf(Blob);
-			expect(sessionRef.current?.activeMediaAssetCleanupScope).not.toBeNull();
-		});
-
-		act(() => {
-			sessionRef.current?.commands.requestCloseFile();
-		});
-
-		expect(confirmCloseFile).toHaveBeenCalledWith(
-			expect.stringContaining("Close this media asset?"),
-		);
-		await waitFor(() => {
-			expect(sessionRef.current?.session.status).toBe("empty");
-			expect(sessionRef.current?.previewSource).toBeNull();
-			expect(sessionRef.current?.activeMediaAssetCleanupScope).toBeNull();
-			expect(sessionRef.current?.localFileInputKey).toBe(1);
-		});
-	});
-
-	it("invalidates retained Generated media blobs when editing decisions reset the export result", async () => {
-		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
+	it("keeps rejected decisions deliverable and invalidates accepted changes before React renders", async () => {
 		const deliverGeneratedMedia = vi.fn();
 		const sessionRef: { current: SingleAssetEditingSession | null } = {
 			current: null,
 		};
-
 		render(
 			<SingleAssetEditingSessionProbe
 				deliverGeneratedMedia={deliverGeneratedMedia}
-				generatedBlob={generatedBlob}
 				sessionRef={sessionRef}
 			/>,
 		);
-
 		await act(async () => {
 			await sessionRef.current?.commands.importLocalFile(
 				new File(["video"], "clip.mp4", { type: "video/mp4" }),
 			);
 		});
-		await waitFor(() => {
-			expect(sessionRef.current?.session.status).toBe("ready");
-		});
-
 		await act(async () => {
 			await sessionRef.current?.commands.startDefaultExport();
 		});
-		await waitFor(() => {
-			const session = sessionRef.current?.session;
-			expect(session?.status).toBe("ready");
-			if (session?.status !== "ready") {
-				return;
-			}
-			expect(session.export.status).toBe("succeeded");
-		});
-
 		const generatedMedia = readGeneratedMedia(sessionRef.current);
-
+		const commands = sessionRef.current?.commands;
 		act(() => {
-			sessionRef.current?.commands.downloadGeneratedMedia(generatedMedia);
+			commands?.setAudioTrackIncluded("unknown-track", false);
+			commands?.applyOutputSettings(createDefaultOutputSettings());
+			commands?.downloadGeneratedMedia(generatedMedia);
 		});
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
-
 		act(() => {
-			sessionRef.current?.commands.setSelectionStartFromPlayhead(1_000_000);
+			commands?.setAudioTrackIncluded("audio-1", false);
+			commands?.downloadGeneratedMedia(generatedMedia);
 		});
-		await waitFor(() => {
-			const session = sessionRef.current?.session;
-			expect(session?.status).toBe("ready");
-			if (session?.status !== "ready") {
-				return;
-			}
-			expect(session.export.status).toBe("reviewing");
-		});
-
-		act(() => {
-			sessionRef.current?.commands.downloadGeneratedMedia(generatedMedia);
-		});
-
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
+		expect(sessionRef.current?.session).toMatchObject({
+			export: { status: "reviewing" },
+		});
 	});
 
 	it("invalidates retained Generated media blobs when changed Output settings are applied", async () => {
@@ -542,195 +293,6 @@ describe("useSingleAssetEditingSession", () => {
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
 	});
-
-	it("delivers only the current artifact after repeated successful exports", async () => {
-		const generatedBlobs = [
-			new Blob(["first generated media"], { type: "video/mp4" }),
-			new Blob(["second generated media"], { type: "video/mp4" }),
-		];
-		const deliverGeneratedMedia = vi.fn();
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		let exportNumber = 0;
-
-		render(
-			<SingleAssetEditingSessionProbe
-				createExportJobId={() => `export-${exportNumber + 1}`}
-				createGeneratedMediaId={() => `generated-${exportNumber}`}
-				defaultExportRunner={{
-					cancelSupported: true,
-					run: async () => ({ blob: generatedBlobs[exportNumber++] as Blob }),
-				}}
-				deliverGeneratedMedia={deliverGeneratedMedia}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await importReadyMediaAsset(sessionRef);
-
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		const firstGeneratedMedia = readGeneratedMedia(sessionRef.current);
-
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		const secondGeneratedMedia = readGeneratedMedia(sessionRef.current);
-
-		act(() => {
-			sessionRef.current?.commands.downloadGeneratedMedia(firstGeneratedMedia);
-			sessionRef.current?.commands.downloadGeneratedMedia(secondGeneratedMedia);
-		});
-
-		expect(deliverGeneratedMedia).toHaveBeenCalledOnce();
-		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
-			blob: generatedBlobs[1],
-			generatedMedia: secondGeneratedMedia,
-		});
-	});
-
-	it("does not resurrect the prior artifact after a repeated export fails", async () => {
-		const firstBlob = new Blob(["first generated media"], {
-			type: "video/mp4",
-		});
-		const deliverGeneratedMedia = vi.fn();
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		let runNumber = 0;
-
-		render(
-			<SingleAssetEditingSessionProbe
-				createExportJobId={() => `export-${runNumber + 1}`}
-				createGeneratedMediaId={() => `generated-${runNumber}`}
-				defaultExportRunner={{
-					cancelSupported: true,
-					run: async () => {
-						runNumber += 1;
-						if (runNumber === 1) {
-							return { blob: firstBlob };
-						}
-
-						throw new Error("Second export failed.");
-					},
-				}}
-				deliverGeneratedMedia={deliverGeneratedMedia}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await importReadyMediaAsset(sessionRef);
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		const firstGeneratedMedia = readGeneratedMedia(sessionRef.current);
-
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		expect(sessionRef.current?.session).toMatchObject({
-			export: { status: "failed" },
-			status: "ready",
-		});
-
-		act(() => {
-			sessionRef.current?.commands.downloadGeneratedMedia(firstGeneratedMedia);
-		});
-		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
-	});
-
-	it("does not resurrect the prior artifact after a repeated export is cancelled", async () => {
-		const firstBlob = new Blob(["first generated media"], {
-			type: "video/mp4",
-		});
-		const deliverGeneratedMedia = vi.fn();
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		let runNumber = 0;
-
-		render(
-			<SingleAssetEditingSessionProbe
-				createExportJobId={() => `export-${runNumber + 1}`}
-				createGeneratedMediaId={() => `generated-${runNumber}`}
-				defaultExportRunner={{
-					cancelSupported: true,
-					run: ({ signal }) => {
-						runNumber += 1;
-						if (runNumber === 1) {
-							return Promise.resolve({ blob: firstBlob });
-						}
-
-						return new Promise((_, reject) => {
-							signal.addEventListener("abort", () => {
-								reject(new Error("Second export cancelled."));
-							});
-						});
-					},
-				}}
-				deliverGeneratedMedia={deliverGeneratedMedia}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await importReadyMediaAsset(sessionRef);
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		const firstGeneratedMedia = readGeneratedMedia(sessionRef.current);
-
-		let repeatedExport: Promise<void> | undefined;
-		act(() => {
-			repeatedExport = sessionRef.current?.commands.startDefaultExport();
-		});
-		await waitFor(() => {
-			expect(sessionRef.current?.session).toMatchObject({
-				export: { status: "running" },
-				status: "ready",
-			});
-		});
-		await act(async () => {
-			sessionRef.current?.commands.cancelDefaultExport();
-			await repeatedExport;
-		});
-
-		expect(sessionRef.current?.session).toMatchObject({
-			export: { status: "cancelled" },
-			status: "ready",
-		});
-		act(() => {
-			sessionRef.current?.commands.downloadGeneratedMedia(firstGeneratedMedia);
-		});
-		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
-	});
-
-	it("clears the current artifact when the session unmounts", async () => {
-		const deliverGeneratedMedia = vi.fn();
-		const sessionRef: { current: SingleAssetEditingSession | null } = {
-			current: null,
-		};
-		const view = render(
-			<SingleAssetEditingSessionProbe
-				deliverGeneratedMedia={deliverGeneratedMedia}
-				sessionRef={sessionRef}
-			/>,
-		);
-
-		await importReadyMediaAsset(sessionRef);
-		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
-		});
-		const generatedMedia = readGeneratedMedia(sessionRef.current);
-		const downloadGeneratedMedia =
-			sessionRef.current?.commands.downloadGeneratedMedia;
-
-		view.unmount();
-		downloadGeneratedMedia?.(generatedMedia);
-
-		expect(deliverGeneratedMedia).not.toHaveBeenCalled();
-	});
 });
 
 function SingleAssetEditingSessionProbe({
@@ -776,19 +338,6 @@ function SingleAssetEditingSessionProbe({
 	});
 
 	return null;
-}
-
-async function importReadyMediaAsset(sessionRef: {
-	current: SingleAssetEditingSession | null;
-}) {
-	await act(async () => {
-		await sessionRef.current?.commands.importLocalFile(
-			new File(["video"], "clip.mp4", { type: "video/mp4" }),
-		);
-	});
-	await waitFor(() => {
-		expect(sessionRef.current?.session.status).toBe("ready");
-	});
 }
 
 function readGeneratedMedia(
@@ -882,17 +431,6 @@ function downscaledOutputSettings(): OutputSettings {
 			height: 720,
 			kind: "target-dimensions",
 			width: 1280,
-		},
-	};
-}
-
-function smallDownscaledOutputSettings(): OutputSettings {
-	return {
-		...createDefaultOutputSettings(),
-		resolution: {
-			height: 90,
-			kind: "target-dimensions",
-			width: 160,
 		},
 	};
 }

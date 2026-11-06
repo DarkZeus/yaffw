@@ -17,6 +17,9 @@ YAFFW_PLAYWRIGHT_PATH=/absolute/path/to/playwright \
   node verification/frame-timing/app-check.cjs
 ```
 
+Both `check.mjs` and `app-check.cjs` invoke `generateFixtures()` before opening a
+browser, so the app check can run directly without a prior analysis run.
+
 The first command is optional; `check.mjs` always regenerates fixtures. Set
 `YAFFW_BROWSER_EXECUTABLE` to use a particular installed Chromium executable and
 `YAFFW_ORIGIN` to use another already-running app origin. Without an executable

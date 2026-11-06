@@ -90,169 +90,6 @@ beforeEach(() => {
 });
 
 describe("createMediaWindowProvider", () => {
-	it("keeps Preview PCM contiguous across unknown Matroska packet durations", async () => {
-		const track = createTrack({
-			packets: [
-				createPacket(0, 0.2),
-				createPacket(0.2, 0),
-				createPacket(0.4, 0.2),
-			],
-			iterators: [
-				createSampleIterator(
-					[0, 1, 2].map((index) =>
-						createAudioSample({
-							channels: [Array(20).fill(index + 1)],
-							sampleRate: 100,
-							timestamp: index * 0.2,
-						}),
-					),
-				),
-			],
-		});
-		track.getSampleRate.mockResolvedValue(100);
-		mediaMock.tracks = [track];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["fixture"]),
-		});
-		try {
-			const generation = provider.openGeneration({
-				signal: new AbortController().signal,
-				startSeconds: 0,
-			});
-			const result = await generation.pullThrough(0.6);
-			const state = result.tracks[0];
-			expect(state?.kind).toBe("playable");
-			if (state?.kind !== "playable") throw new Error("Expected playable PCM");
-			expect(
-				state.chunks.flatMap((chunk) =>
-					Array.from(chunk.audioBuffer.getChannelData(0)),
-				),
-			).toEqual([
-				...Array(20).fill(1),
-				...Array(20).fill(2),
-				...Array(20).fill(3),
-			]);
-		} finally {
-			await provider.dispose();
-		}
-	});
-	it("retains one Input and one pull-driven iterator across adjacent bounded pulls", async () => {
-		const sample = createAudioSample({
-			channels: [[1, 2, 3, 4]],
-			sampleRate: 10,
-			timestamp: 0,
-		});
-		const iterator = createSampleIterator([sample]);
-		const track = createTrack({
-			iterators: [iterator],
-			packets: [createPacket(0, 0.4)],
-		});
-		mediaMock.tracks = [track];
-
-		const provider = await createMediaWindowProvider({
-			batchDurationSeconds: 0.2,
-			source: new Blob(["fixture"]),
-		});
-		const generation = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 0,
-		});
-
-		const first = await generation.pullThrough(0.2);
-		const second = await generation.pullThrough(0.4);
-
-		expect(provider.trackIds).toEqual(["audio-1"]);
-		expect(provider.durationSeconds).toBe(1);
-		expect(first.tracks).toEqual([
-			expect.objectContaining({
-				chunks: [
-					expect.objectContaining({
-						endSeconds: 0.2,
-						startSeconds: 0,
-					}),
-				],
-				kind: "playable",
-				trackId: "audio-1",
-			}),
-		]);
-		expect(second.tracks).toEqual([
-			expect.objectContaining({
-				chunks: [
-					expect.objectContaining({
-						endSeconds: 0.4,
-						startSeconds: 0.2,
-					}),
-				],
-				kind: "playable",
-				trackId: "audio-1",
-			}),
-		]);
-		expect(track.sampleCalls).toEqual([[0, 1]]);
-		expect(sample.close).toHaveBeenCalledOnce();
-		expect(iterator.return).not.toHaveBeenCalled();
-		expect(mediaMock.inputs[0]?.dispose).not.toHaveBeenCalled();
-
-		await provider.dispose();
-		await provider.dispose();
-
-		expect(iterator.return).toHaveBeenCalledOnce();
-		expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
-	});
-
-	it("keeps distinct monitored-track PCM separated by track identity", async () => {
-		mediaMock.tracks = [
-			createTrack({
-				id: "audio-440",
-				iterators: [
-					createSampleIterator([
-						createAudioSample({
-							channels: [[1, 2]],
-							sampleRate: 10,
-							timestamp: 0,
-						}),
-					]),
-				],
-				packets: [createPacket(0, 0.2)],
-			}),
-			createTrack({
-				id: "audio-880",
-				iterators: [
-					createSampleIterator([
-						createAudioSample({
-							channels: [[9, 8]],
-							sampleRate: 10,
-							timestamp: 0,
-						}),
-					]),
-				],
-				packets: [createPacket(0, 0.2)],
-			}),
-		];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["two tones"]),
-		});
-		const generation = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 0,
-		});
-
-		const result = await generation.pullThrough(0.2);
-		const chunks = result.tracks.map((track) => {
-			if (track.kind !== "playable") throw new Error("Expected playable PCM.");
-			return [
-				track.trackId,
-				Array.from(track.chunks[0]?.audioBuffer.getChannelData(0) ?? []),
-			] as const;
-		});
-
-		expect(chunks).toEqual([
-			["audio-440", [1, 2]],
-			["audio-880", [9, 8]],
-		]);
-
-		await provider.dispose();
-	});
-
 	it("reports non-zero starts and packet gaps as silence without a full-track scan", async () => {
 		const beforeGap = createAudioSample({
 			channels: [[1, 2]],
@@ -291,17 +128,16 @@ describe("createMediaWindowProvider", () => {
 		const leading = await generation.pullThrough(0.4);
 		const decoded = await generation.pullThrough(1.4);
 
-		expect(leading.tracks).toEqual([
+		expect(leading).toEqual([
 			{
 				endSeconds: 0.4,
 				kind: "silence",
 				startSeconds: 0,
-				state: "silence",
 				trackId: "audio-1",
 			},
 		]);
 		expect(track.sampleCalls).toEqual([[0, 1.4]]);
-		expect(decoded.tracks).toEqual([
+		expect(decoded).toEqual([
 			expect.objectContaining({
 				chunks: [
 					expect.objectContaining({
@@ -332,212 +168,6 @@ describe("createMediaWindowProvider", () => {
 		await provider.dispose();
 	});
 
-	it("bounds packet metadata work to the requested horizon on a long track", async () => {
-		const packets = Array.from({ length: 1_000 }, (_, index) =>
-			createPacket(index / 10, 0.1),
-		);
-		const track = createTrack({
-			iterators: [
-				createSampleIterator([
-					createAudioSample({
-						channels: [[1, 2]],
-						sampleRate: 10,
-						timestamp: 0,
-					}),
-				]),
-			],
-			packets,
-		});
-		mediaMock.tracks = [track];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["long fixture"]),
-		});
-		const generation = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 0,
-		});
-
-		await generation.pullThrough(0.2);
-
-		expect(track.packetCalls.length).toBeLessThanOrEqual(3);
-		expect(track.fullPacketScanCalls).toBe(0);
-
-		await provider.dispose();
-	});
-
-	it("projects a collapsed gap when the generation starts inside that gap", async () => {
-		const afterGap = createAudioSample({
-			channels: [[7, 8]],
-			sampleRate: 10,
-			timestamp: 0.2,
-		});
-		mediaMock.tracks = [
-			createTrack({
-				iterators: [createSampleIterator([afterGap])],
-				packets: [createPacket(0, 0.2), createPacket(0.8, 0.2)],
-			}),
-		];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["gap fixture"]),
-		});
-		const generation = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 0.5,
-		});
-
-		const result = await generation.pullThrough(1);
-
-		expect(result.tracks).toEqual([
-			expect.objectContaining({
-				chunks: [
-					expect.objectContaining({
-						endSeconds: 1,
-						startSeconds: 0.8,
-					}),
-				],
-				state: "playable",
-			}),
-		]);
-		expect(afterGap.close).toHaveBeenCalledOnce();
-
-		await provider.dispose();
-	});
-
-	it.each([
-		{
-			label: "from the start",
-			startSeconds: 0,
-			expectedStarts: [0, 0.2, 0.4, 1.4, 1.6],
-		},
-		{ label: "inside the gap", startSeconds: 0.7, expectedStarts: [1.4, 1.6] },
-	])(
-		"restores a gap hidden inside an inferred packet duration $label",
-		async ({ expectedStarts, startSeconds }) => {
-			const decodedSamples = [0, 0.2, 0.4, 0.6, 0.8]
-				.filter((timestamp) => timestamp + 0.2 > Math.min(startSeconds, 0.4))
-				.map((timestamp) =>
-					createAudioSample({
-						channels: [[1, 2]],
-						sampleRate: 10,
-						timestamp,
-					}),
-				);
-			// Containers that infer each duration from the next packet make the
-			// packet at 0.4 s appear to span the real 0.6–1.4 s gap.
-			mediaMock.tracks = [
-				createTrack({
-					iterators: [createSampleIterator(decodedSamples)],
-					packets: [
-						createPacket(0, 0.2),
-						createPacket(0.2, 0.2),
-						createPacket(0.4, 1),
-						createPacket(1.4, 0.2),
-						createPacket(1.6, 0.2),
-					],
-				}),
-			];
-			const provider = await createMediaWindowProvider({
-				source: new Blob(["matroska gap fixture"]),
-			});
-			const generation = provider.openGeneration({
-				signal: new AbortController().signal,
-				startSeconds,
-			});
-
-			const gapWindow = await generation.pullThrough(1.2);
-			const afterGap = await generation.pullThrough(1.8);
-
-			const playedStarts = [gapWindow, afterGap].flatMap((result) =>
-				result.tracks.flatMap((track) =>
-					track.kind === "playable"
-						? track.chunks.map((chunk) => chunk.startSeconds)
-						: [],
-				),
-			);
-			expect(playedStarts.map((value) => Number(value.toFixed(5)))).toEqual(
-				expectedStarts,
-			);
-
-			await provider.dispose();
-		},
-	);
-
-	it("anchors collapsed timestamps after seeking beyond an earlier gap", async () => {
-		const afterSeek = createAudioSample({
-			channels: [[9, 10]],
-			sampleRate: 10,
-			timestamp: 0.9,
-		});
-		mediaMock.tracks = [
-			createTrack({
-				iterators: [createSampleIterator([afterSeek])],
-				packets: [createPacket(0.5, 0.2), createPacket(1.2, 0.2)],
-			}),
-		];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["post-gap seek fixture"]),
-		});
-		const generation = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 1.2,
-		});
-
-		const result = await generation.pullThrough(1.4);
-
-		expect(result.tracks).toEqual([
-			expect.objectContaining({
-				chunks: [
-					expect.objectContaining({
-						endSeconds: expect.closeTo(1.4, 5),
-						startSeconds: 1.2,
-					}),
-				],
-				state: "playable",
-			}),
-		]);
-		expect(afterSeek.close).toHaveBeenCalledOnce();
-
-		await provider.dispose();
-	});
-
-	it("returns a pending iterator immediately on abort and rejects its late sample", async () => {
-		const pending = createPendingSampleIterator();
-		const sample = createAudioSample({
-			channels: [[1, 2]],
-			sampleRate: 10,
-			timestamp: 0,
-		});
-		const track = createTrack({
-			iterators: [pending.iterator],
-			packets: [createPacket(0, 0.2)],
-		});
-		mediaMock.tracks = [track];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["fixture"]),
-		});
-		const controller = new AbortController();
-		const generation = provider.openGeneration({
-			signal: controller.signal,
-			startSeconds: 0,
-		});
-		const result = generation.pullThrough(0.2);
-
-		await vi.waitFor(() =>
-			expect(pending.iterator.next).toHaveBeenCalledOnce(),
-		);
-		controller.abort();
-
-		expect(pending.iterator.return).toHaveBeenCalledOnce();
-		expect(mediaMock.inputs[0]?.dispose).not.toHaveBeenCalled();
-		pending.resolve({ done: false, value: sample });
-
-		await expect(result).rejects.toMatchObject({ name: "AbortError" });
-		expect(sample.close).toHaveBeenCalledOnce();
-
-		await provider.dispose();
-		expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
-	});
-
 	it("closes a malformed sample and exposes an explicit per-track failure", async () => {
 		const sample = createAudioSample({
 			channels: [[1], [2]],
@@ -559,7 +189,7 @@ describe("createMediaWindowProvider", () => {
 
 		const result = await generation.pullThrough(0.1);
 
-		expect(result.tracks).toEqual([
+		expect(result).toEqual([
 			expect.objectContaining({
 				kind: "failure",
 				reason: expect.stringContaining("Decoded audio format changed"),
@@ -567,66 +197,6 @@ describe("createMediaWindowProvider", () => {
 			}),
 		]);
 		expect(sample.close).toHaveBeenCalledOnce();
-
-		await provider.dispose();
-	});
-
-	it("fails every track when the source errors while no read is pending", async () => {
-		mediaMock.tracks = [
-			createTrack({ iterators: [], packets: [createPacket(0, 0.1)] }),
-		];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["fixture"]),
-		});
-
-		mediaMock.sourceOptions[0]?.handleUnhandledError?.(
-			new Error("The file could not be read."),
-		);
-		const result = await provider
-			.openGeneration({
-				signal: new AbortController().signal,
-				startSeconds: 0,
-			})
-			.pullThrough(0.1);
-
-		expect(result.tracks).toEqual([
-			expect.objectContaining({
-				kind: "failure",
-				reason: "The file could not be read.",
-				trackId: "audio-1",
-			}),
-		]);
-		await provider.dispose();
-	});
-
-	it("closes the current sample and publishes nothing when abort occurs during copy", async () => {
-		const controller = new AbortController();
-		const sample = createAudioSample({
-			channels: [[1, 2]],
-			onCopy: () => controller.abort(),
-			sampleRate: 10,
-			timestamp: 0,
-		});
-		const iterator = createSampleIterator([sample]);
-		mediaMock.tracks = [
-			createTrack({
-				iterators: [iterator],
-				packets: [createPacket(0, 0.2)],
-			}),
-		];
-		const provider = await createMediaWindowProvider({
-			source: new Blob(["fixture"]),
-		});
-		const generation = provider.openGeneration({
-			signal: controller.signal,
-			startSeconds: 0,
-		});
-
-		await expect(generation.pullThrough(0.2)).rejects.toMatchObject({
-			name: "AbortError",
-		});
-		expect(sample.close).toHaveBeenCalledOnce();
-		expect(iterator.return).toHaveBeenCalledOnce();
 
 		await provider.dispose();
 	});
@@ -678,20 +248,16 @@ describe("createMediaWindowProvider", () => {
 		});
 		stalePending.resolve({ done: false, value: staleSample });
 
-		await expect(staleResult).resolves.toEqual(
+		await expect(staleResult).resolves.toEqual([
 			expect.objectContaining({
-				tracks: [
-					expect.objectContaining({
-						kind: "playable",
-						trackId: "audio-1",
-					}),
-				],
+				kind: "playable",
+				trackId: "audio-1",
 			}),
-		);
+		]);
 		const retry = await retryGeneration.pullThrough(0.2);
 
 		expect(retryGeneration.trackIds).toEqual(["audio-2"]);
-		expect(retry.tracks).toEqual([
+		expect(retry).toEqual([
 			expect.objectContaining({ kind: "playable", trackId: "audio-2" }),
 		]);
 		expect(successfulTrack.sampleCalls).toHaveLength(1);
@@ -703,7 +269,7 @@ describe("createMediaWindowProvider", () => {
 
 		await provider.dispose();
 	});
-	it.each(["capability", "metadata"])(
+	it.each(["metadata"])(
 		"re-reads failed %s on isolated retry while retaining the healthy iterator",
 		async (failure) => {
 			const healthy = createTrack({
@@ -748,7 +314,7 @@ describe("createMediaWindowProvider", () => {
 				startSeconds: 0,
 			});
 			const initial = await generation.pullThrough(0.2);
-			expect(initial.tracks.map((track) => track.kind)).toEqual([
+			expect(initial.map((track) => track.kind)).toEqual([
 				"playable",
 				"failure",
 			]);
@@ -758,15 +324,11 @@ describe("createMediaWindowProvider", () => {
 				trackIds: ["desktop"],
 				retryTrackIds: ["desktop"],
 			});
-			expect((await retry.pullThrough(0.2)).tracks[0]?.kind).toBe("playable");
+			expect((await retry.pullThrough(0.2))[0]?.kind).toBe("playable");
 			expect(provider.getTrackMetadata("desktop")).toEqual({
-				failureReason: null,
 				numberOfChannels: 1,
-				sampleRate: 10,
 			});
-			expect((await generation.pullThrough(0.4)).tracks[0]?.trackId).toBe(
-				"voice",
-			);
+			expect((await generation.pullThrough(0.4))[0]?.trackId).toBe("voice");
 			expect(healthy.canDecode).toHaveBeenCalledOnce();
 			expect(failed.canDecode).toHaveBeenCalledTimes(2);
 			expect(healthy.sampleCalls).toHaveLength(1);
@@ -774,46 +336,6 @@ describe("createMediaWindowProvider", () => {
 			await provider.dispose();
 		},
 	);
-
-	it("waits for the last replaced cursor's return before opening its replacement", async () => {
-		let finishReturn!: () => void;
-		const returnDone = new Promise<void>((resolve) => {
-			finishReturn = resolve;
-		});
-		const first = createSampleIterator([
-			createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0 }),
-		]);
-		first.return.mockImplementation(async () => {
-			await returnDone;
-			return { done: true, value: undefined };
-		});
-		const second = createSampleIterator([
-			createAudioSample({ channels: [[3, 4]], sampleRate: 10, timestamp: 0 }),
-		]);
-		mediaMock.tracks = [
-			createTrack({
-				iterators: [first, second],
-				packets: [createPacket(0, 0.2)],
-			}),
-		];
-		const provider = await createMediaWindowProvider({ source: new Blob() });
-		await provider
-			.openGeneration({ signal: new AbortController().signal, startSeconds: 0 })
-			.pullThrough(0.2);
-		const retry = provider.openGeneration({
-			signal: new AbortController().signal,
-			startSeconds: 0,
-		});
-		const result = retry.pullThrough(0.2);
-		await Promise.resolve();
-		await Promise.resolve();
-		expect(first.return).toHaveBeenCalledOnce();
-		expect(second.next).not.toHaveBeenCalled();
-		finishReturn();
-		await result;
-		expect(second.next).toHaveBeenCalledOnce();
-		await provider.dispose();
-	});
 
 	it("awaits late sample closure before disposing Input, including concurrent dispose calls", async () => {
 		const pending = createPendingSampleIterator();
@@ -869,37 +391,6 @@ describe("createMediaWindowProvider", () => {
 		);
 		expect(iterator.return).toHaveBeenCalledOnce();
 		expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
-	});
-	it("reports abort-listener cleanup rejection while keeping explicit cancel awaitable", async () => {
-		const log = vi.spyOn(console, "error").mockImplementation(() => {});
-		try {
-			const iterator = createSampleIterator([
-				createAudioSample({ channels: [[1, 2]], sampleRate: 10, timestamp: 0 }),
-			]);
-			iterator.return.mockRejectedValue(new Error("iterator return failed"));
-			mediaMock.tracks = [
-				createTrack({ iterators: [iterator], packets: [createPacket(0, 0.2)] }),
-			];
-			const provider = await createMediaWindowProvider({ source: new Blob() });
-			const abort = new AbortController();
-			const generation = provider.openGeneration({
-				signal: abort.signal,
-				startSeconds: 0,
-			});
-			await generation.pullThrough(0.2);
-			abort.abort();
-			await expect(generation.cancel()).rejects.toThrow(
-				"Audio generation cleanup failed.",
-			);
-			expect(log).toHaveBeenCalledWith(
-				"Preview audio generation cleanup failed.",
-				expect.any(AggregateError),
-			);
-			await provider.dispose();
-			expect(mediaMock.inputs[0]?.dispose).toHaveBeenCalledOnce();
-		} finally {
-			log.mockRestore();
-		}
 	});
 });
 

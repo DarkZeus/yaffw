@@ -1,8 +1,9 @@
-type ActiveMediaAssetCleanup = () => void;
+import {
+	type MediaCleanupRegistration,
+	createSynchronousMediaWorkScope,
+} from "./synchronous-media-work-scope";
 
-export type ActiveMediaAssetCleanupRegistration = {
-	dispose: () => void;
-};
+type ActiveMediaAssetCleanup = () => void;
 
 export type ActiveMediaAssetCleanupScope = {
 	assetId: string;
@@ -10,7 +11,7 @@ export type ActiveMediaAssetCleanupScope = {
 	isCurrent: () => boolean;
 	registerCleanup: (
 		cleanup: ActiveMediaAssetCleanup,
-	) => ActiveMediaAssetCleanupRegistration;
+	) => MediaCleanupRegistration;
 };
 
 export type ActiveMediaAssetCleanupScopeController = {
@@ -58,82 +59,18 @@ function createActiveMediaAssetCleanupScope({
 	clearCurrentScope: (scope: ActiveMediaAssetCleanupScope) => void;
 	isCurrent: (scope: ActiveMediaAssetCleanupScope) => boolean;
 }): ActiveMediaAssetCleanupScope {
-	const registrations = new Set<ActiveMediaAssetCleanupRegistration>();
-	let disposed = false;
-
+	const lifetime = createSynchronousMediaWorkScope();
 	const scope: ActiveMediaAssetCleanupScope = {
 		assetId,
 		dispose() {
-			if (disposed) {
-				return;
-			}
-
-			disposed = true;
-			const cleanupErrors: unknown[] = [];
-			const activeRegistrations = Array.from(registrations).reverse();
-			registrations.clear();
-
-			for (const registration of activeRegistrations) {
-				try {
-					registration.dispose();
-				} catch (error) {
-					cleanupErrors.push(error);
-				}
-			}
-
-			clearCurrentScope(scope);
-
-			if (cleanupErrors.length === 1) {
-				throw cleanupErrors[0];
-			}
-
-			if (cleanupErrors.length > 1) {
-				throw new AggregateError(
-					cleanupErrors,
-					"Multiple active Media asset cleanup callbacks failed.",
-				);
+			try {
+				lifetime.dispose();
+			} finally {
+				clearCurrentScope(scope);
 			}
 		},
-		isCurrent() {
-			return !disposed && isCurrent(scope);
-		},
-		registerCleanup(cleanup: ActiveMediaAssetCleanup) {
-			const registration = createActiveMediaAssetCleanupRegistration(
-				cleanup,
-				registrations,
-			);
-
-			if (disposed) {
-				registration.dispose();
-				return registration;
-			}
-
-			registrations.add(registration);
-
-			return registration;
-		},
+		isCurrent: () => !lifetime.isDisposed() && isCurrent(scope),
+		registerCleanup: lifetime.registerCleanup,
 	};
-
 	return scope;
-}
-
-function createActiveMediaAssetCleanupRegistration(
-	cleanup: ActiveMediaAssetCleanup,
-	registrations: Set<ActiveMediaAssetCleanupRegistration>,
-): ActiveMediaAssetCleanupRegistration {
-	let disposed = false;
-
-	const registration = {
-		dispose() {
-			if (disposed) {
-				return;
-			}
-
-			disposed = true;
-			registrations.delete(registration);
-			cleanup();
-		},
-	};
-
-	return registration;
 }

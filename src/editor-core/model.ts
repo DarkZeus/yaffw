@@ -106,17 +106,11 @@ export type AudioMix = {
 	tracks: Record<string, AudioMixTrackDecision>;
 };
 
-export type DefaultOutputProfile = {
-	audioCodec: "aac";
-	container: "mp4";
-	videoCodec: "h264";
-};
-
-export const DEFAULT_OUTPUT_PROFILE: DefaultOutputProfile = {
+export const DEFAULT_OUTPUT_PROFILE = {
 	audioCodec: "aac",
 	container: "mp4",
 	videoCodec: "h264",
-};
+} as const;
 
 export type OutputContainerSetting =
 	| {
@@ -190,6 +184,7 @@ export type ResolvedOutputPlan = {
 	includedAudioTrackCount: number;
 	resolution?: {
 		height: number;
+		kind: OutputResolutionSetting["kind"];
 		width: number;
 	};
 	videoCodec: string;
@@ -303,18 +298,6 @@ function areOutputQualitySettingsEqual(
 	return true;
 }
 
-export type ExportCapability =
-	| {
-			profile: DefaultOutputProfile;
-			supported: true;
-	  }
-	| {
-			profile: DefaultOutputProfile;
-			reason: string;
-			supported: false;
-			technicalDetails?: string;
-	  };
-
 export type ExportProgressPhase =
 	| "encoding"
 	| "finalizing"
@@ -333,16 +316,14 @@ export type GeneratedMedia = {
 	fileName: string;
 	id: string;
 	mimeType: string;
-	outputSettings?: OutputSettings;
-	profile: DefaultOutputProfile;
-	resolvedOutput?: ResolvedOutputPlan;
+	outputSettings: OutputSettings;
+	resolvedOutput: ResolvedOutputPlan;
 	selection: Selection;
 	sizeBytes: number;
 };
 
 export type ReadyMediaAsset = {
 	durationUs: MediaTimeUs;
-	exportCapability: ExportCapability;
 	frameTiming: FrameTiming;
 	id: string;
 	label: string;

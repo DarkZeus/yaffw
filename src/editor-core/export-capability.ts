@@ -3,9 +3,6 @@ import {
 	classifyExportRangeAccuracy,
 } from "./export-correctness";
 import {
-	type AudioMix,
-	DEFAULT_OUTPUT_PROFILE,
-	type DefaultOutputProfile,
 	type OutputSettings,
 	type ReadyMediaAsset,
 	type ResolvedOutputPlan,
@@ -13,10 +10,8 @@ import {
 	areOutputSettingsEqual,
 	createDefaultOutputSettings,
 } from "./model";
-import {
-	type BrowserLocalOutputSupport,
-	resolveOutputPlan,
-} from "./output-settings";
+import { formatOutputVideoCodec } from "./output-settings";
+import type { ResolvedOutputPlanResult } from "./output-settings";
 import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type PlannedOutput = {
@@ -48,75 +43,55 @@ export type ExportCapabilityReview =
 			method: ExportMethod;
 			plannedOutput: PlannedOutput;
 			precision: ExportPrecision;
-			profile: DefaultOutputProfile;
 			reason: string;
-			resolvedOutput?: ResolvedOutputPlan;
+			resolvedOutput: ResolvedOutputPlan;
 			supported: true;
 	  }
 	| {
-			plannedOutput: PlannedOutput;
-			profile: DefaultOutputProfile;
+			plannedOutput?: PlannedOutput;
 			reason: string;
-			resolvedOutput?: ResolvedOutputPlan;
 			supported: false;
 			technicalDetails: string;
 	  };
 
 type ExportCapabilityPlanningAsset = Pick<
 	ReadyMediaAsset,
-	"durationUs" | "frameTiming" | "tracks"
+	"durationUs" | "frameTiming"
 >;
 
 type PlanDefaultExportCapabilityOptions = {
 	asset: ExportCapabilityPlanningAsset;
-	audioMix?: AudioMix;
-	outputSettings?: OutputSettings;
-	profile?: DefaultOutputProfile;
+	outputSettings: OutputSettings;
+	output: ResolvedOutputPlanResult;
 	rangeAccuracy?: ExportRangeAccuracyReport;
 	runtime: RuntimeSupport;
 	selection: Selection;
-	support?: BrowserLocalOutputSupport;
 };
 
 export function planDefaultExportCapability({
 	asset,
-	audioMix,
 	outputSettings,
-	profile = DEFAULT_OUTPUT_PROFILE,
+	output,
 	rangeAccuracy,
 	runtime,
 	selection,
-	support,
 }: PlanDefaultExportCapabilityOptions): ExportCapabilityReview {
-	const resolved =
-		audioMix && outputSettings && support
-			? resolveOutputPlan({ asset, audioMix, outputSettings, support })
-			: undefined;
-	const resolvedOutput =
-		resolved?.kind === "resolved" ? resolved.plan : undefined;
-	const usingDefaultOutputSettings =
-		!outputSettings ||
-		areOutputSettingsEqual(outputSettings, createDefaultOutputSettings());
-	const plannedOutput = resolvedOutput
-		? plannedOutputForResolvedPlan(resolvedOutput)
-		: plannedOutputForProfile(profile);
-
-	if (resolved?.kind === "invalid") {
+	if (output.kind === "invalid") {
 		return unsupportedReview({
-			plannedOutput: {
-				...plannedOutput,
-				label: "Invalid Output settings",
-			},
-			profile,
 			reason: "The current Output settings cannot be applied.",
-			technicalDetails: resolved.error,
+			technicalDetails: output.error,
 		});
 	}
+	const resolvedOutput = output.plan;
+	const usingDefaultOutputSettings = areOutputSettingsEqual(
+		outputSettings,
+		createDefaultOutputSettings(),
+	);
+	const plannedOutput = plannedOutputForResolvedPlan(resolvedOutput);
 
 	if (!runtime.supported) {
 		return unsupportedReview({
 			plannedOutput,
-			profile,
 			reason:
 				"This runtime cannot export with the selected documented output profile.",
 			technicalDetails: runtime.reason,
@@ -126,7 +101,6 @@ export function planDefaultExportCapability({
 	if (!selectionIsInsideAsset(selection, asset.durationUs)) {
 		return unsupportedReview({
 			plannedOutput,
-			profile,
 			reason: "The current selection is outside the active media asset.",
 			technicalDetails: `Expected selection inside [0, ${asset.durationUs}], got [${selection.startUs}, ${selection.endUs}].`,
 		});
@@ -143,7 +117,6 @@ export function planDefaultExportCapability({
 				key: "full-asset",
 				label: "Whole file",
 			},
-			profile,
 			reason: usingDefaultOutputSettings
 				? "The current selection covers the full asset, so export can use the default output profile without boundary trimming."
 				: "The current selection covers the full asset, so export can use the selected output plan without boundary trimming.",
@@ -171,7 +144,6 @@ export function planDefaultExportCapability({
 				key: "proven-precise",
 				label: "Boundaries verified",
 			},
-			profile,
 			reason: selectedRangeAccuracy.reason,
 			resolvedOutput,
 			supported: true,
@@ -188,60 +160,32 @@ export function planDefaultExportCapability({
 			key: "best-effort",
 			label: "Boundaries unverified",
 		},
-		profile,
 		reason: selectedRangeAccuracy.reason,
 		resolvedOutput,
 		supported: true,
 	};
 }
 
-export function plannedOutputForResolvedPlan(
-	plan: ResolvedOutputPlan,
-): PlannedOutput {
+function plannedOutputForResolvedPlan(plan: ResolvedOutputPlan): PlannedOutput {
 	return {
 		audioCodec: plan.audioCodec,
 		container: plan.container.id,
-		label: `${plan.container.label} / ${formatVideoCodec(plan.videoCodec)} video / ${plan.audioCodec ? `${plan.audioCodec.toUpperCase()} audio` : "No audio"}`,
+		label: `${plan.container.label} / ${formatOutputVideoCodec(plan.videoCodec)} video / ${plan.audioCodec ? `${plan.audioCodec.toUpperCase()} audio` : "No audio"}`,
 		videoCodec: plan.videoCodec,
 	};
 }
 
-export function plannedOutputForProfile(
-	profile: DefaultOutputProfile = DEFAULT_OUTPUT_PROFILE,
-): PlannedOutput {
-	return {
-		audioCodec: profile.audioCodec,
-		container: profile.container,
-		label: "MP4 / H.264 video / AAC audio",
-		videoCodec: profile.videoCodec,
-	};
-}
-
-function formatVideoCodec(codec: string): string {
-	if (codec === "avc") {
-		return "H.264";
-	}
-	if (codec === "hevc") {
-		return "H.265";
-	}
-
-	return codec.toUpperCase();
-}
-
 function unsupportedReview({
 	plannedOutput,
-	profile,
 	reason,
 	technicalDetails,
 }: {
-	plannedOutput: PlannedOutput;
-	profile: DefaultOutputProfile;
+	plannedOutput?: PlannedOutput;
 	reason: string;
 	technicalDetails: string;
 }): ExportCapabilityReview {
 	return {
 		plannedOutput,
-		profile,
 		reason,
 		supported: false,
 		technicalDetails,

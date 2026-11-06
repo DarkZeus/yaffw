@@ -1,6 +1,9 @@
+import { clamp } from "@/lib/clamp";
+import { errorMessage } from "@/lib/error-message";
 import { useEffect, useRef, useState } from "react";
 
 import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import { runWorkerJob } from "../../media-work/workers/worker-job";
 import type {
 	VideoStripThumbnailFrame,
 	VideoStripThumbnailLoader,
@@ -10,13 +13,13 @@ import type {
 	VideoStripThumbnailState,
 	VideoStripThumbnailViewFrame,
 	VideoStripThumbnailViewport,
+	VideoStripWorkerRequest,
 } from "../types/selection-video-strip.types";
 import {
 	VIDEO_STRIP_THUMBNAIL_COUNT,
 	VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
 	createAbortError,
 	createVideoStripThumbnailDimensions,
-	createVideoStripThumbnailTimestamps,
 	isAbortError,
 	loadVideoStripThumbnailsOnCurrentThread,
 } from "./selection-video-strip-loader";
@@ -26,7 +29,6 @@ export {
 	VIDEO_STRIP_THUMBNAIL_COUNT,
 	VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
 	createVideoStripThumbnailDimensions,
-	createVideoStripThumbnailTimestamps,
 	loadVideoStripThumbnailsOnCurrentThread,
 };
 
@@ -62,8 +64,6 @@ let thumbnailFrameCache = new WeakMap<
 	Blob,
 	Map<string, CachedVideoStripThumbnailFrame>
 >();
-
-let nextWorkerRequestId = 0;
 
 export function useVideoStripThumbnails({
 	asset,
@@ -159,7 +159,7 @@ export function useVideoStripThumbnails({
 			} catch (error) {
 				revokeObjectUrls();
 				setState({
-					reason: errorToMessage(error),
+					reason: errorMessage(error),
 					status: "unavailable",
 				});
 			}
@@ -246,7 +246,7 @@ export function useVideoStripThumbnails({
 				} catch (error) {
 					revokeObjectUrls();
 					setState({
-						reason: errorToMessage(error),
+						reason: errorMessage(error),
 						status: "unavailable",
 					});
 				}
@@ -258,7 +258,7 @@ export function useVideoStripThumbnails({
 
 				revokeObjectUrls();
 				setState({
-					reason: errorToMessage(error),
+					reason: errorMessage(error),
 					status: "unavailable",
 				});
 			});
@@ -469,7 +469,7 @@ export function createVideoStripThumbnailWindow({
 		1,
 		Number.isFinite(viewport.trackWidthPx) ? viewport.trackWidthPx : 1,
 	);
-	const viewportWidthPx = clampNumber(
+	const viewportWidthPx = clamp(
 		Number.isFinite(viewport.viewportWidthPx)
 			? viewport.viewportWidthPx
 			: trackWidthPx,
@@ -477,26 +477,22 @@ export function createVideoStripThumbnailWindow({
 		trackWidthPx,
 	);
 	const maxScrollLeftPx = Math.max(0, trackWidthPx - viewportWidthPx);
-	const scrollLeftPx = clampNumber(
+	const scrollLeftPx = clamp(
 		Number.isFinite(viewport.scrollLeftPx) ? viewport.scrollLeftPx : 0,
 		0,
 		maxScrollLeftPx,
 	);
 	const visibleStartPx = scrollLeftPx;
-	const visibleEndPx = clampNumber(
-		scrollLeftPx + viewportWidthPx,
-		0,
-		trackWidthPx,
-	);
+	const visibleEndPx = clamp(scrollLeftPx + viewportWidthPx, 0, trackWidthPx);
 	const overscanWidthPx = Math.max(0, viewportWidthPx * overscanViewportCount);
 	const bucketWidthPx = viewportWidthPx;
-	const windowStartPx = clampNumber(
+	const windowStartPx = clamp(
 		Math.floor((visibleStartPx - overscanWidthPx) / bucketWidthPx) *
 			bucketWidthPx,
 		0,
 		trackWidthPx,
 	);
-	const windowEndPx = clampNumber(
+	const windowEndPx = clamp(
 		Math.ceil((visibleEndPx + overscanWidthPx) / bucketWidthPx) * bucketWidthPx,
 		0,
 		trackWidthPx,
@@ -566,96 +562,19 @@ function loadWorkerVideoStripThumbnails({
 	signal,
 	...request
 }: VideoStripThumbnailRequest): Promise<VideoStripThumbnailResult> {
-	if (signal?.aborted) {
-		return Promise.reject(createAbortError());
-	}
-
-	return new Promise((resolve, reject) => {
-		const requestId = nextWorkerRequestId++;
-		const worker = new VideoStripThumbnailWorker();
-
-		let settled = false;
-
-		function cleanup() {
-			signal?.removeEventListener("abort", handleAbort);
-			worker.removeEventListener("error", handleError);
-			worker.removeEventListener("message", handleMessage);
-			worker.terminate();
-		}
-
-		function resolveSettled(value: VideoStripThumbnailResult) {
-			if (settled) {
-				return;
-			}
-
-			settled = true;
-			cleanup();
-			resolve(value);
-		}
-
-		function rejectSettled(error: Error) {
-			if (settled) {
-				return;
-			}
-
-			settled = true;
-			cleanup();
-			reject(error);
-		}
-
-		function handleAbort() {
-			rejectSettled(createAbortError());
-		}
-
-		function handleError(event: ErrorEvent) {
-			rejectSettled(
-				new Error(event.message || "Video thumbnail worker failed."),
-			);
-		}
-
-		function handleMessage(
-			event: MessageEvent<VideoStripWorkerResponseMessage>,
-		) {
-			if (event.data.requestId !== requestId) {
-				return;
-			}
-
-			if (event.data.type === "frame") {
-				onFrame?.(event.data.progress);
-				return;
-			}
-
-			resolveSettled(event.data.result);
-		}
-
-		signal?.addEventListener("abort", handleAbort, { once: true });
-		worker.addEventListener("error", handleError);
-		worker.addEventListener("message", handleMessage);
-		worker.postMessage({
-			request,
-			requestId,
-			type: "generate",
-		} satisfies VideoStripWorkerRequestMessage);
+	return runWorkerJob<
+		VideoStripWorkerRequest,
+		VideoStripThumbnailResult,
+		VideoStripThumbnailProgress
+	>({
+		createWorker: () => new VideoStripThumbnailWorker(),
+		request,
+		signal,
+		onProgress: onFrame,
+		createAbortError,
+		failureMessage: "Video thumbnail worker failed.",
 	});
 }
-
-type VideoStripWorkerRequestMessage = {
-	request: Omit<VideoStripThumbnailRequest, "onFrame" | "signal">;
-	requestId: number;
-	type: "generate";
-};
-
-type VideoStripWorkerResponseMessage =
-	| {
-			progress: VideoStripThumbnailProgress;
-			requestId: number;
-			type: "frame";
-	  }
-	| {
-			requestId: number;
-			result: VideoStripThumbnailResult;
-			type: "done";
-	  };
 
 function readCachedVideoStripThumbnailFrames(
 	request: VideoStripThumbnailRequest,
@@ -768,7 +687,7 @@ function pixelsToMediaTimeUs({
 	trackWidthPx: number;
 }) {
 	return Math.round(
-		(clampNumber(pixel, 0, trackWidthPx) / trackWidthPx) * assetDurationUs,
+		(clamp(pixel, 0, trackWidthPx) / trackWidthPx) * assetDurationUs,
 	);
 }
 
@@ -857,22 +776,10 @@ function normalizeCacheNumber(value: number) {
 	return Number.isFinite(value) ? value : "NaN";
 }
 
-function clampNumber(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
-}
-
 function browserDevicePixelRatio() {
 	if (typeof window === "undefined") {
 		return 1;
 	}
 
 	return window.devicePixelRatio || 1;
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

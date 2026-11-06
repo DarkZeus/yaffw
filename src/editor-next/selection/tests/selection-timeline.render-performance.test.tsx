@@ -235,14 +235,6 @@ const waveformLaneLoader: ComponentProps<
 
 const readyAsset = {
 	durationUs: 12_000_000,
-	exportCapability: {
-		profile: {
-			audioCodec: "aac",
-			container: "mp4",
-			videoCodec: "h264",
-		},
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,

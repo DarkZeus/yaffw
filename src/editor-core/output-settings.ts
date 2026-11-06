@@ -26,22 +26,12 @@ export const OUTPUT_SUBJECTIVE_QUALITY_CHOICES: ReadonlyArray<{
 	{ label: "Very high", value: "very-high" },
 ];
 
-const OUTPUT_SUBJECTIVE_QUALITIES = new Set<OutputSubjectiveQuality>(
+const OUTPUT_SUBJECTIVE_QUALITIES = new Set<unknown>(
 	OUTPUT_SUBJECTIVE_QUALITY_CHOICES.map(({ value }) => value),
 );
 
 export type ResolvedOutputQuality =
-	| {
-			kind: "preserve-source";
-	  }
-	| {
-			kind: "subjective-quality";
-			quality: OutputSubjectiveQuality;
-	  }
-	| {
-			bitrateBps: number;
-			kind: "custom-bitrate";
-	  }
+	| OutputQualitySetting
 	| {
 			error: string;
 			kind: "invalid";
@@ -67,7 +57,7 @@ export function resolveOutputQuality({
 				};
 	}
 
-	if (Number.isInteger(setting.bitrateBps) && setting.bitrateBps > 0) {
+	if (isPositiveInteger(setting.bitrateBps)) {
 		return setting;
 	}
 
@@ -114,10 +104,6 @@ export type OutputResolutionChoice = {
 
 export type ResolvedOutputResolution =
 	| {
-			conversionDimensions?: {
-				height: number;
-				width: number;
-			};
 			dimensions?: {
 				height: number;
 				width: number;
@@ -160,7 +146,6 @@ export function resolveOutputResolution({
 		};
 
 		return {
-			conversionDimensions: dimensions,
 			dimensions,
 			kind: "resolved",
 		};
@@ -250,15 +235,14 @@ export function resolveOutputAudioProfile({
 	outputSettings: OutputSettings;
 	support: BrowserLocalOutputSupport;
 }): ResolvedOutputAudioProfile {
-	const containerId =
-		outputSettings.container.kind === "default-output-profile"
-			? DEFAULT_OUTPUT_PROFILE.container
-			: outputSettings.container.container;
-	const container = support.containers.find(({ id }) => id === containerId);
+	const container = outputContainerForSetting(
+		outputSettings.container,
+		support,
+	);
 
 	if (!container) {
 		return {
-			error: `The selected ${containerId} container is not documented by the browser-local media writer.`,
+			error: undocumentedOutputContainerMessage(outputSettings.container),
 			kind: "invalid",
 		};
 	}
@@ -328,6 +312,27 @@ export function resolveOutputAudioProfile({
 export type BrowserLocalOutputSupport = {
 	containers: DocumentedOutputContainer[];
 };
+
+export function outputContainerForSetting(
+	setting: OutputSettings["container"],
+	support: BrowserLocalOutputSupport,
+): DocumentedOutputContainer | undefined {
+	const id =
+		setting.kind === "default-output-profile"
+			? DEFAULT_OUTPUT_PROFILE.container
+			: setting.container;
+	return support.containers.find((container) => container.id === id);
+}
+
+function undocumentedOutputContainerMessage(
+	setting: OutputSettings["container"],
+): string {
+	const id =
+		setting.kind === "default-output-profile"
+			? DEFAULT_OUTPUT_PROFILE.container
+			: setting.container;
+	return `The selected ${id} container is not documented by the browser-local media writer.`;
+}
 
 export type ResolvedOutputPlanResult =
 	| {
@@ -402,7 +407,7 @@ export function resolveOutputPlan({
 			},
 			includedAudioTrackCount: audio.includedTrackCount,
 			resolution: resolution.dimensions
-				? { ...resolution.dimensions }
+				? { ...resolution.dimensions, kind: outputSettings.resolution.kind }
 				: undefined,
 			videoCodec: video.videoCodec,
 			videoQuality: { ...outputSettings.videoQuality },
@@ -436,15 +441,14 @@ export function resolveOutputVideoProfile({
 	outputSettings,
 	support,
 }: ResolveOutputVideoProfileOptions): ResolvedOutputVideoProfile {
-	const containerId =
-		outputSettings.container.kind === "default-output-profile"
-			? DEFAULT_OUTPUT_PROFILE.container
-			: outputSettings.container.container;
-	const container = support.containers.find(({ id }) => id === containerId);
+	const container = outputContainerForSetting(
+		outputSettings.container,
+		support,
+	);
 
 	if (!container) {
 		return {
-			error: `The selected ${containerId} container is not documented by the browser-local media writer.`,
+			error: undocumentedOutputContainerMessage(outputSettings.container),
 			kind: "invalid",
 		};
 	}
@@ -552,4 +556,79 @@ function sourceVideoDimensions(
 
 function roundToEven(value: number): number {
 	return Math.max(2, Math.round(value / 2) * 2);
+}
+
+export function cloneOutputSettings(
+	outputSettings: OutputSettings,
+): OutputSettings {
+	return {
+		audioCodec: { ...outputSettings.audioCodec },
+		audioQuality: { ...outputSettings.audioQuality },
+		container: { ...outputSettings.container },
+		resolution: { ...outputSettings.resolution },
+		videoCodec: { ...outputSettings.videoCodec },
+		videoQuality: { ...outputSettings.videoQuality },
+	};
+}
+
+export function isOutputSettings(value: unknown): value is OutputSettings {
+	return (
+		isRecord(value) &&
+		isContainerSetting(value.container) &&
+		isCodecSetting(value.videoCodec) &&
+		(isCodecSetting(value.audioCodec) ||
+			(isRecord(value.audioCodec) && value.audioCodec.kind === "no-audio")) &&
+		isResolutionSetting(value.resolution) &&
+		isQualitySetting(value.videoQuality) &&
+		isQualitySetting(value.audioQuality)
+	);
+}
+function isContainerSetting(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		(value.kind === "default-output-profile" ||
+			(value.kind === "documented-container" &&
+				typeof value.container === "string" &&
+				value.container.length > 0))
+	);
+}
+function isCodecSetting(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		(value.kind === "default-output-profile" ||
+			value.kind === "preserve-source" ||
+			(value.kind === "documented-codec" &&
+				typeof value.codec === "string" &&
+				value.codec.length > 0))
+	);
+}
+function isResolutionSetting(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		(value.kind === "preserve-source" ||
+			(value.kind === "target-dimensions" &&
+				isPositiveInteger(value.width) &&
+				isPositiveInteger(value.height)))
+	);
+}
+function isQualitySetting(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		(value.kind === "preserve-source" ||
+			(value.kind === "subjective-quality" &&
+				OUTPUT_SUBJECTIVE_QUALITIES.has(value.quality)) ||
+			(value.kind === "custom-bitrate" && isPositiveInteger(value.bitrateBps)))
+	);
+}
+function isPositiveInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function formatOutputVideoCodec(codec: string): string {
+	if (codec === "avc") return "H.264";
+	if (codec === "hevc") return "H.265";
+	return codec.toUpperCase();
 }

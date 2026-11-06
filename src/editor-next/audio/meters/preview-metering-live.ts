@@ -1,4 +1,4 @@
-import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
+import type { PreviewAudioEngineMeterSnapshot } from "../types/preview-audio-engine.types";
 import type { PreviewLevelMeterChannel } from "../types/preview-level-meter.types";
 import { previewPeakMeterVisualRange } from "./preview-level-meter.constants";
 

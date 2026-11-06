@@ -4,11 +4,7 @@ import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
-import {
-	DEFAULT_OUTPUT_PROFILE,
-	type ReadyMediaAsset,
-} from "@/editor-core/model";
-import type { PreviewAudioEngineMeterSnapshot } from "../engine/preview-audio-engine";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import { PreviewAudioMonitoringProvider } from "../engine/preview-audio-monitoring-provider";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
 import {
@@ -17,6 +13,7 @@ import {
 	usePreviewMeteringSource,
 } from "../meters/preview-metering-provider";
 import { AudioPanel } from "../panel/audio-panel";
+import type { PreviewAudioEngineMeterSnapshot } from "../types/preview-audio-engine.types";
 
 const buttonRenderStats = vi.hoisted(() => ({
 	renderCount: 0,
@@ -118,10 +115,6 @@ describe("AudioPanel live meter render isolation", () => {
 
 const readyAsset = {
 	durationUs: 12_000_000,
-	exportCapability: {
-		profile: DEFAULT_OUTPUT_PROFILE,
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,

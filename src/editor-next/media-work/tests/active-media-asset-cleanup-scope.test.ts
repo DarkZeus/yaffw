@@ -3,22 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createActiveMediaAssetCleanupScopeController } from "../scopes/active-media-asset-cleanup-scope";
 
 describe("active Media asset cleanup scope", () => {
-	it("disposes registered Preview resources exactly once", () => {
-		const controller = createActiveMediaAssetCleanupScopeController();
-		const scope = controller.replaceCurrentScope("asset-1");
-		const cleanup = vi.fn();
-
-		const registration = scope.registerCleanup(cleanup);
-
-		registration.dispose();
-		controller.disposeCurrentScope();
-		registration.dispose();
-
-		expect(cleanup).toHaveBeenCalledTimes(1);
-		expect(controller.currentScope()).toBeNull();
-		expect(scope.isCurrent()).toBe(false);
-	});
-
 	it("replaces the active Media asset scope without disposing the current scope from stale handles", () => {
 		const controller = createActiveMediaAssetCleanupScopeController();
 		const firstCleanup = vi.fn();

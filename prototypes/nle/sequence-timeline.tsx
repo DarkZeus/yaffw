@@ -28,7 +28,7 @@ import {
 } from "./model";
 import { TrackResizeHandle, defaultTrackHeight } from "./track-resize-handle";
 import type { Editor } from "./use-editor";
-export function Waveform({ clip, editor }: { clip: Clip; editor: Editor }) {
+function Waveform({ clip, editor }: { clip: Clip; editor: Editor }) {
 	const asset = editor.assets.find((a) => a.id === clip.assetId);
 	if (!asset?.peaks)
 		return (

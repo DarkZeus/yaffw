@@ -1,52 +1,33 @@
+import type {
+	WorkerJobRequest,
+	WorkerJobResponse,
+	WorkerJobScope,
+} from "../../media-work/workers/worker-job";
+import type {
+	WaveformLaneResult,
+	WaveformWorkerRequest,
+} from "../types/selection-waveform-lanes.types";
 import { loadDecodedWaveformLane } from "./selection-waveform-lanes-loader";
 
-import type {
-	WaveformLaneRequest,
-	WaveformLaneResult,
-} from "../types/selection-waveform-lanes.types";
-
-type WorkerWaveformLaneRequest = Omit<WaveformLaneRequest, "signal" | "track">;
-
-type WorkerRequestMessage = {
-	request: WorkerWaveformLaneRequest;
-	requestId: number;
-	type: "generate";
-};
-
-type WorkerResponseMessage = {
-	requestId: number;
-	result: WaveformLaneResult;
-	type: "done";
-};
-
-type WaveformWorkerScope = {
-	addEventListener: (
-		type: "message",
-		listener: (event: MessageEvent<WorkerRequestMessage>) => void,
-	) => void;
-	postMessage: (
-		message: WorkerResponseMessage,
-		transfer?: Transferable[],
-	) => void;
-};
-
-const workerScope = self as unknown as WaveformWorkerScope;
+const workerScope = self as unknown as WorkerJobScope<
+	WaveformWorkerRequest,
+	WaveformLaneResult
+>;
 
 workerScope.addEventListener("message", (event) => {
-	if (event.data.type !== "generate") {
-		return;
+	if (event.data.type === "generate") {
+		void generateWaveform(event.data);
 	}
-
-	void generateWaveform(event.data);
 });
 
-async function generateWaveform({ request, requestId }: WorkerRequestMessage) {
+async function generateWaveform({
+	request,
+}: WorkerJobRequest<WaveformWorkerRequest>) {
 	const result = await loadDecodedWaveformLane(request);
 	const message = {
-		requestId,
 		result,
 		type: "done",
-	} satisfies WorkerResponseMessage;
+	} satisfies WorkerJobResponse<WaveformLaneResult>;
 
 	if (result.status === "ready" && result.samples instanceof Float32Array) {
 		workerScope.postMessage(message, [result.samples.buffer as ArrayBuffer]);

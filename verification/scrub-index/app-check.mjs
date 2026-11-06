@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+import { launchBrowser } from "../browser.cjs";
+import { generateFixtures } from "./fixtures.mjs";
+const fixtures = generateFixtures();
+const browser = await launchBrowser();
+function fixturePath(name) {
+	const fixture = fixtures.find((fixture) => fixture.name === name);
+	if (!fixture) throw new Error(`Missing ${name} fixture`);
+	return fixture.path;
+}
 const results = [];
 try {
 	for (const file of [
@@ -31,7 +33,7 @@ try {
 		await page
 			.locator("input[type=file]")
 			.first()
-			.setInputFiles(resolve("tmp/scrub-index", file));
+			.setInputFiles(fixturePath(file));
 		await page.getByRole("tab", { name: "Media", exact: true }).click();
 		const controls = page.getByRole("region", {
 			name: "Workbench transport region",
@@ -70,14 +72,14 @@ try {
 				);
 				return harness.checkDisplayedFrame(base64);
 			},
-			readFileSync(resolve("tmp/scrub-index", file)).toString("base64"),
+			readFileSync(fixturePath(file)).toString("base64"),
 		);
 		page.once("dialog", (dialog) => dialog.accept());
 		await page.getByRole("button", { name: "Close file", exact: true }).click();
 		await page
 			.locator("input[type=file]")
 			.first()
-			.setInputFiles(resolve("tmp/scrub-index/short-long-gop.mp4"));
+			.setInputFiles(fixturePath("short-long-gop.mp4"));
 		await button("Seek forward 10 seconds").click();
 		await button("Step forward one frame").click();
 		await page.waitForFunction(() => {
@@ -93,9 +95,7 @@ try {
 				);
 				return harness.checkDisplayedFrame(base64);
 			},
-			readFileSync(resolve("tmp/scrub-index/short-long-gop.mp4")).toString(
-				"base64",
-			),
+			readFileSync(fixturePath("short-long-gop.mp4")).toString("base64"),
 		);
 		assert.deepEqual(errors, []);
 		results.push({

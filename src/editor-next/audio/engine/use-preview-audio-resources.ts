@@ -1,10 +1,7 @@
 import type { ReadyMediaAsset } from "@/editor-core/model";
 import { useEffect, useRef, useState } from "react";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
-import type {
-	PreviewAudioResource,
-	PreviewAudioResourceFailure,
-} from "../types/preview-audio-resources.types";
+import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import type { MediaWindowProvider } from "./media-window-provider";
 import { preparePreviewAudioResources } from "./preview-audio-resources";
 
@@ -13,20 +10,13 @@ export type PreviewAudioResourcesState =
 	| {
 			status: "loading";
 			preparingTrackIds: ReadonlySet<string>;
-			resources: PreviewAudioResource[];
 	  }
 	| {
 			status: "ready";
 			provider: MediaWindowProvider;
 			resources: PreviewAudioResource[];
-			failures: PreviewAudioResourceFailure[];
 	  }
-	| {
-			status: "failed";
-			failures: PreviewAudioResourceFailure[];
-			reason: string;
-	  };
-export type PreviewAudioResourcesLifecycle = PreviewAudioResourcesState;
+	| { status: "failed" };
 export type UsePreviewAudioResourcesOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
@@ -39,7 +29,7 @@ export function usePreviewAudioResources({
 	asset,
 	enabled,
 	source,
-}: UsePreviewAudioResourcesOptions): PreviewAudioResourcesLifecycle {
+}: UsePreviewAudioResourcesOptions): PreviewAudioResourcesState {
 	const assetRef = useRef(asset);
 	assetRef.current = asset;
 	const assetId = asset.id;
@@ -67,7 +57,6 @@ export function usePreviewAudioResources({
 		setState({
 			status: "loading",
 			preparingTrackIds: new Set(asset.tracks.audio.map((track) => track.id)),
-			resources: [],
 		});
 		void preparePreviewAudioResources({
 			asset,
@@ -86,19 +75,9 @@ export function usePreviewAudioResources({
 				provider = result.provider;
 				setState({ status: "ready", ...result });
 			})
-			.catch((error: unknown) => {
+			.catch(() => {
 				if (released) return;
-				const reason = error instanceof Error ? error.message : String(error);
-				setState({
-					status: "failed",
-					reason,
-					failures: asset.tracks.audio.map((track, trackIndex) => ({
-						reason,
-						track,
-						trackIndex,
-						trackId: track.id,
-					})),
-				});
+				setState({ status: "failed" });
 			});
 		return () => {
 			registration?.dispose();

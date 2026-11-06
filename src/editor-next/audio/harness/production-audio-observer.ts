@@ -1,5 +1,5 @@
 import type { MediaWindowProvider } from "../engine/media-window-provider";
-import type { PreviewAudioContextLike } from "../engine/preview-audio-engine";
+import type { PreviewAudioContextLike } from "../types/preview-audio-engine.types";
 
 /** Wraps public ownership calls; never reads decoder internals or retains PCM. */
 export function observeProductionProvider(source: MediaWindowProvider) {
@@ -33,7 +33,6 @@ export function observeProductionProvider(source: MediaWindowProvider) {
 			metrics.activeGenerations = active.size;
 			return {
 				id: generation.id,
-				startSeconds: generation.startSeconds,
 				trackIds: generation.trackIds,
 				async cancel() {
 					await generation.cancel();
@@ -43,7 +42,7 @@ export function observeProductionProvider(source: MediaWindowProvider) {
 				async pullThrough(endSeconds) {
 					const result = await generation.pullThrough(endSeconds);
 					metrics.pulls++;
-					for (const track of result.tracks) {
+					for (const track of result) {
 						metrics.initialTrackStates[track.trackId] ??= track.kind;
 						if (track.kind === "playable") {
 							for (const chunk of track.chunks) {
@@ -60,24 +59,20 @@ export function observeProductionProvider(source: MediaWindowProvider) {
 					const failedTrack = failTrackOnce;
 					if (
 						failedTrack &&
-						result.tracks.some((track) => track.trackId === failedTrack)
+						result.some((track) => track.trackId === failedTrack)
 					) {
 						failTrackOnce = null;
-						return {
-							...result,
-							tracks: result.tracks.map((track) =>
-								track.trackId === failedTrack
-									? {
-											trackId: track.trackId,
-											startSeconds: track.startSeconds,
-											endSeconds: track.endSeconds,
-											kind: "failure" as const,
-											state: "failure" as const,
-											reason: "Harness-injected per-track failure",
-										}
-									: track,
-							),
-						};
+						return result.map((track) =>
+							track.trackId === failedTrack
+								? {
+										trackId: track.trackId,
+										startSeconds: track.startSeconds,
+										endSeconds: track.endSeconds,
+										kind: "failure" as const,
+										reason: "Harness-injected per-track failure",
+									}
+								: track,
+						);
 					}
 					return result;
 				},

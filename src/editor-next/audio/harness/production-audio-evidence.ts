@@ -2,15 +2,17 @@ import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type { ReadyMediaAsset } from "@/editor-core/model";
-import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import { errorMessage } from "@/lib/error-message";
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import {
-	type PreviewAudioEngine,
-	type PreviewAudioEngineMeterSnapshot,
 	applyPreviewAudioEngineMix,
 	createPreviewAudioEngine,
 } from "../engine/preview-audio-engine";
 import { preparePreviewAudioResources } from "../engine/preview-audio-resources";
+import type {
+	PreviewAudioEngine,
+	PreviewAudioEngineMeterSnapshot,
+} from "../types/preview-audio-engine.types";
 import {
 	observeProductionContext,
 	observeProductionProvider,
@@ -43,7 +45,6 @@ export async function inspectProductionAudioFixture(file: File) {
 		createLocalMediaAssetDraft(file),
 		{
 			inspect: inspectBrowserLocalMediaAssetDraft,
-			runtime: detectRuntimeSupport(),
 		},
 	);
 	if (analysis.status !== "ready") throw new Error(analysis.failure.message);
@@ -119,11 +120,17 @@ export async function prepareProductionAudioRun(
 	}
 }
 
-async function runTrial(
-	file: File,
-	asset: ReadyMediaAsset,
-	trialNumber: number,
-) {
+export async function runProductionAudioTrial({
+	file,
+	asset,
+	trialNumber,
+	pollPresentation = false,
+}: {
+	file: File;
+	asset: ReadyMediaAsset;
+	trialNumber: number;
+	pollPresentation?: boolean;
+}) {
 	const profiler = createProductionAudioProfiler();
 	const run = await prepareProductionAudioRun(file, asset).catch((error) => {
 		profiler.stop();
@@ -147,12 +154,13 @@ async function runTrial(
 				profiler.stall(stall.durationMs);
 				stallIndex++;
 			}
+			if (pollPresentation) run.engine.getPresentationTime();
 			await delay(20);
 		}
 		observedPlaybackSeconds = (performance.now() - start) / 1_000;
 		beforeCleanup = run.engine.getMetrics();
 	} catch (error) {
-		errors.push(error instanceof Error ? error.message : String(error));
+		errors.push(errorMessage(error));
 	} finally {
 		run.engine.pause();
 	}
@@ -171,7 +179,9 @@ async function runTrial(
 	};
 }
 
-export type ProductionAudioTrial = Awaited<ReturnType<typeof runTrial>>;
+export type ProductionAudioTrial = Awaited<
+	ReturnType<typeof runProductionAudioTrial>
+>;
 
 export function evaluateProductionAudioTrials(trials: ProductionAudioTrial[]) {
 	const readiness = distribution(trials.map((trial) => trial.readinessMs));
@@ -239,7 +249,7 @@ export async function runProductionAudioEvidence({
 		);
 	const trials: ProductionAudioTrial[] = [];
 	for (let trialNumber = 1; trialNumber <= 5; trialNumber++) {
-		const trial = await runTrial(file, asset, trialNumber);
+		const trial = await runProductionAudioTrial({ file, asset, trialNumber });
 		trials.push(trial);
 		onTrial?.(trial);
 	}
@@ -327,7 +337,7 @@ export async function runProductionAudioFunctionalChecks(
 			operations.push({
 				name,
 				passed: false,
-				evidence: error instanceof Error ? error.message : String(error),
+				evidence: errorMessage(error),
 			});
 		}
 	}

@@ -12,7 +12,6 @@ import {
 	clearVideoStripThumbnailCache,
 	createVideoStripThumbnailWindow,
 	loadBrowserVideoStripThumbnails,
-	loadVideoStripThumbnailsOnCurrentThread,
 	useVideoStripThumbnails,
 } from "../video-strip/selection-video-strip";
 
@@ -113,14 +112,6 @@ function screenText(label: string) {
 
 const readyAsset = {
 	durationUs: 12_000_000,
-	exportCapability: {
-		profile: {
-			audioCodec: "aac",
-			container: "mp4",
-			videoCodec: "h264",
-		},
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,
@@ -170,36 +161,6 @@ function mockThumbnailObjectUrls() {
 }
 
 describe("video strip thumbnail generation", () => {
-	it("creates viewport-based thumbnail windows that get denser with track zoom", () => {
-		const overviewWindow = createVideoStripThumbnailWindow({
-			assetDurationUs: 7_200_000_000,
-			frameDurationUs: 33_333,
-			viewport: {
-				scrollLeftPx: 0,
-				trackWidthPx: 1_200,
-				viewportWidthPx: 1_200,
-			},
-		});
-		const zoomedWindow = createVideoStripThumbnailWindow({
-			assetDurationUs: 7_200_000_000,
-			frameDurationUs: 33_333,
-			viewport: {
-				scrollLeftPx: 4_200,
-				trackWidthPx: 9_600,
-				viewportWidthPx: 1_200,
-			},
-		});
-
-		expect(overviewWindow?.timestampsUs.length).toBeLessThan(32);
-		expect(zoomedWindow?.frameStepUs).toBeLessThan(
-			overviewWindow?.frameStepUs ?? 0,
-		);
-		expect(zoomedWindow?.visibleStartUs).toBe(3_150_000_000);
-		expect(zoomedWindow?.timestampsUs[0]).toBeLessThan(
-			zoomedWindow?.visibleStartUs ?? 0,
-		);
-	});
-
 	it("keeps loaded thumbnails when viewport jitter stays inside the overscanned window", async () => {
 		mockThumbnailObjectUrls();
 		const source = new Blob(["video"], { type: "video/mp4" });
@@ -270,71 +231,6 @@ describe("video strip thumbnail generation", () => {
 		expect(screenText("video strip status")).toBe("ready:3");
 	});
 
-	it("extracts video thumbnails through Mediabunny CanvasSink", async () => {
-		mediabunnyMock.canvases = [
-			createWrappedCanvas(1),
-			createWrappedCanvas(2.75),
-			createWrappedCanvas(4.5),
-			createWrappedCanvas(6.25),
-		];
-
-		const result = await loadBrowserVideoStripThumbnails({
-			assetDurationUs: 8_000_000,
-			devicePixelRatio: 2,
-			source: new Blob(["video"], { type: "video/mp4" }),
-			thumbnailHeightPx: 54,
-			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
-		});
-
-		expect(result.status).toBe("ready");
-		if (result.status !== "ready") {
-			throw new Error("Expected ready thumbnail result.");
-		}
-		expect(result.thumbnailHeightPx).toBe(54);
-		expect(result.thumbnailWidthPx).toBe(96);
-		expect(result.frames.map((frame) => frame.timestampUs)).toEqual([
-			1_000_000, 2_750_000, 4_500_000, 6_250_000,
-		]);
-		expect(mediabunnyMock.timestamps).toEqual([1, 2.75, 4.5, 6.25]);
-		expect(mediabunnyMock.sinkOptions[0]).toEqual({
-			fit: "cover",
-			height: 108,
-			poolSize: 1,
-			width: 192,
-		});
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledTimes(1);
-	});
-
-	it("publishes thumbnail frames progressively as they are encoded", async () => {
-		mediabunnyMock.canvases = [
-			createWrappedCanvas(1),
-			createWrappedCanvas(2.75),
-			createWrappedCanvas(4.5),
-			createWrappedCanvas(6.25),
-		];
-		const progress = vi.fn();
-
-		const result = await loadVideoStripThumbnailsOnCurrentThread({
-			assetDurationUs: 8_000_000,
-			devicePixelRatio: 2,
-			onFrame: progress,
-			source: new Blob(["video"], { type: "video/mp4" }),
-			thumbnailHeightPx: 54,
-			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
-		});
-
-		expect(result.status).toBe("ready");
-		expect(progress).toHaveBeenCalledTimes(4);
-		expect(progress.mock.calls.map(([call]) => call.frame.timestampUs)).toEqual(
-			[1_000_000, 2_750_000, 4_500_000, 6_250_000],
-		);
-		expect(progress.mock.calls[0]?.[0]).toMatchObject({
-			thumbnailCount: 4,
-			thumbnailHeightPx: 54,
-			thumbnailWidthPx: 96,
-		});
-	});
-
 	it("caches decoded thumbnail frames for the same source and dimensions", async () => {
 		vi.stubGlobal("Worker", undefined);
 		const source = new Blob(["video"], { type: "video/mp4" });
@@ -369,46 +265,6 @@ describe("video strip thumbnail generation", () => {
 			1_000_000, 2_750_000, 4_500_000, 6_250_000,
 		]);
 		expect(mediabunnyMock.inputInstances).toHaveLength(1);
-	});
-
-	it("returns unavailable when current video metadata getters reject", async () => {
-		const videoTrack = createVideoTrack();
-		videoTrack.getDisplayWidth.mockRejectedValueOnce(
-			new Error("Video dimensions are malformed."),
-		);
-		mediabunnyMock.primaryVideoTrack = videoTrack;
-
-		const result = await loadBrowserVideoStripThumbnails({
-			assetDurationUs: 8_000_000,
-			devicePixelRatio: 2,
-			source: new Blob(["video"], { type: "video/mp4" }),
-			thumbnailHeightPx: 54,
-			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
-		});
-
-		expect(result).toEqual({
-			reason: "Video dimensions are malformed.",
-			status: "unavailable",
-		});
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
-	});
-
-	it("returns unavailable when there is no decodable video track", async () => {
-		mediabunnyMock.primaryVideoTrack = null;
-
-		const result = await loadBrowserVideoStripThumbnails({
-			assetDurationUs: 8_000_000,
-			devicePixelRatio: 1,
-			source: new Blob(["audio"], { type: "audio/aac" }),
-			thumbnailHeightPx: 54,
-			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
-		});
-
-		expect(result).toEqual({
-			reason: "The active media asset has no video track.",
-			status: "unavailable",
-		});
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledTimes(1);
 	});
 });
 

@@ -1,17 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { launchBrowser } from "../browser.cjs";
 import { inspect } from "./artifact.mjs";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const directory = resolve("tmp/silent-audio-ranges");
-const source = resolve(directory, "silent-ranges.mkv");
-readFileSync(source);
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+import { prepareFixture } from "./fixtures.mjs";
+const { directory, source } = prepareFixture();
+const browser = await launchBrowser();
 const results = [];
 try {
 	for (const mode of ["mixed", "silent"]) {

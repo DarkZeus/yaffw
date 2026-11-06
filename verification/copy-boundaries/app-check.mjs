@@ -1,22 +1,20 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { launchBrowser } from "../browser.cjs";
 import { inspectArtifact, inspectSource } from "./artifact.mjs";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+import { generateFixtures } from "./fixtures.mjs";
 const directory = resolve("tmp/copy-boundaries");
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+const fixtures = generateFixtures();
+const browser = await launchBrowser();
 const results = [];
 try {
 	for (const kind of ["cfr", "vfr", "no-audio"]) {
-		const source = resolve(
-			directory,
-			`${kind === "no-audio" ? "cfr" : kind}.mp4`,
+		const fixture = fixtures.find(
+			(fixture) => fixture.kind === (kind === "no-audio" ? "cfr" : kind),
 		);
+		if (!fixture) throw new Error(`Missing ${kind} fixture`);
+		const source = fixture.file;
 		const sourceInfo = await inspectSource(source);
 		const page = await browser.newPage({
 			viewport: { width: 1440, height: 1000 },

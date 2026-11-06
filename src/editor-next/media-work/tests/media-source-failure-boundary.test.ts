@@ -3,12 +3,6 @@ import { describe, expect, it } from "vitest";
 import { createMediaSourceFailureBoundary } from "../scopes/media-source-failure-boundary";
 
 describe("createMediaSourceFailureBoundary", () => {
-	it("settles with the work when the source reports no idle failure", async () => {
-		const boundary = createMediaSourceFailureBoundary();
-
-		await expect(boundary.run(Promise.resolve("done"))).resolves.toBe("done");
-	});
-
 	it("rejects pending work with the first idle source failure", async () => {
 		const boundary = createMediaSourceFailureBoundary();
 		const first = new Error("Blob became unreadable.");

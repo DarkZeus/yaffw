@@ -1,11 +1,9 @@
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+const { launchBrowser } = require("../browser.cjs");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const liveApp = process.env.YAFFW_LIVE_APP === "1";
 (async () => {
-	const browser = await chromium.launch({
-		headless: true,
-		executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
+	const browser = await launchBrowser({
 		args: ["--autoplay-policy=no-user-gesture-required"],
 	});
 	const page = await browser.newPage({
@@ -140,7 +138,6 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 		);
 		await page.getByRole("tab", { name: "Audio", exact: true }).click();
 		const audioText = await page.getByRole("tabpanel").innerText();
-		// Exercise the real Audio panel while the native context is running.
 		const trackVolumes = page.getByRole("slider", { name: /track volume$/ });
 		assert.equal(await trackVolumes.count(), 2);
 		const strips = page.locator('section[aria-label^="Audio track strip "]');
@@ -358,7 +355,7 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 		assert.deepEqual(errors, []);
 		await fs.writeFile(
 			process.env.YAFFW_BROWSER_RESULT_PATH || "/tmp/yaffw-115-browser.json",
-			JSON.stringify(result, null, 2) + "\n",
+			`${JSON.stringify(result, null, 2)}\n`,
 		);
 		console.log(JSON.stringify(result, null, 2));
 	} finally {

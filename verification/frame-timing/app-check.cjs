@@ -2,9 +2,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+const { launchBrowser } = require("../browser.cjs");
 const baseUrl = process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000";
-const fixtureDirectory = path.resolve("tmp/frame-timing");
 const names = [
 	"fractional-cfr",
 	"dropped-cfr",
@@ -20,6 +19,7 @@ const seconds = (time) =>
 async function run(browser, name) {
 	console.log(`Checking ${name}`);
 	const { ALL_FORMATS, BufferSource, Input } = await import("mediabunny");
+	const { fixtureDirectory } = await import("./fixtures.mjs");
 	const file = path.join(fixtureDirectory, `${name}.mp4`);
 	const bytes = await fs.readFile(file);
 	const input = new Input({
@@ -219,10 +219,9 @@ async function run(browser, name) {
 }
 
 (async () => {
-	const browser = await chromium.launch({
-		headless: true,
-		executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-	});
+	const { generateFixtures } = await import("./fixtures.mjs");
+	generateFixtures();
+	const browser = await launchBrowser();
 	try {
 		const runs = [];
 		for (const name of names) runs.push(await run(browser, name));

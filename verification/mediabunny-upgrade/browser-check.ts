@@ -145,7 +145,7 @@ export async function checkAudio(base64: string, sync = false) {
 			});
 			try {
 				const pulled = await generation.pullThrough(endSeconds);
-				const state = pulled.tracks[0];
+				const state = pulled[0];
 				if (!state || state.kind === "failure")
 					throw new Error(JSON.stringify(state));
 				const preview = new AudioBuffer({

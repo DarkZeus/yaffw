@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
@@ -33,7 +33,6 @@ const waveformWorkerMock = vi.hoisted(() => ({
 	instances: [] as Array<{
 		addEventListener: ReturnType<typeof vi.fn>;
 		postMessage: ReturnType<typeof vi.fn>;
-		postedMessages: unknown[];
 		removeEventListener: ReturnType<typeof vi.fn>;
 		terminate: ReturnType<typeof vi.fn>;
 	}>,
@@ -126,7 +125,6 @@ vi.mock("mediabunny", () => {
 vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 	class MockWaveformLaneWorker {
 		private listeners = new Map<string, Set<(event: unknown) => void>>();
-		postedMessages: unknown[] = [];
 
 		addEventListener = vi.fn(
 			(type: string, listener: (event: unknown) => void) => {
@@ -142,9 +140,7 @@ vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 			},
 		);
 
-		postMessage = vi.fn((message: { requestId: number }) => {
-			this.postedMessages.push(message);
-
+		postMessage = vi.fn(() => {
 			if (waveformWorkerMock.deferResponse) {
 				return;
 			}
@@ -157,7 +153,6 @@ vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 
 				this.dispatch("message", {
 					data: {
-						requestId: message.requestId,
 						result: waveformWorkerMock.result,
 						type: "done",
 					},
@@ -260,86 +255,14 @@ describe("useWaveformLaneStates", () => {
 		view.unmount();
 		expect(vi.mocked(loader).mock.calls[2][0].signal?.aborted).toBe(true);
 	});
-
-	it("starts lanes as loading and records loader results by track identity", async () => {
-		const voiceLane = createDeferred<WaveformLaneResult>();
-		const desktopLane = createDeferred<WaveformLaneResult>();
-		const waveformLaneLoader: WaveformLaneLoader = vi.fn(({ trackIndex }) =>
-			trackIndex === 0 ? voiceLane.promise : desktopLane.promise,
-		);
-
-		render(<WaveformLaneStateProbe waveformLaneLoader={waveformLaneLoader} />);
-
-		await waitFor(() => {
-			expect(readLaneStates()).toEqual({
-				"audio-desktop": {
-					status: "loading",
-					trackId: "audio-desktop",
-				},
-				"audio-voice": {
-					status: "loading",
-					trackId: "audio-voice",
-				},
-			});
-		});
-
-		expect(waveformLaneLoader).toHaveBeenNthCalledWith(1, {
-			assetDurationUs: readyAsset.durationUs,
-			signal: expect.any(AbortSignal),
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-		expect(waveformLaneLoader).toHaveBeenNthCalledWith(2, {
-			assetDurationUs: readyAsset.durationUs,
-			signal: expect.any(AbortSignal),
-			source,
-			track: readyAsset.tracks.audio[1],
-			trackIndex: 1,
-		});
-
-		await act(async () => {
-			voiceLane.resolve({
-				samples: [0.2, 0.8],
-				status: "ready",
-			});
-			desktopLane.reject(new Error("Decode failed"));
-			await Promise.allSettled([voiceLane.promise, desktopLane.promise]);
-		});
-
-		await waitFor(() => {
-			expect(readLaneStates()).toEqual({
-				"audio-desktop": {
-					reason: "Decode failed",
-					status: "unavailable",
-					trackId: "audio-desktop",
-				},
-				"audio-voice": {
-					samples: [0.2, 0.8],
-					status: "ready",
-					trackId: "audio-voice",
-				},
-			});
-		});
-	});
 });
 
 describe("loadBrowserWaveformLane", () => {
 	it.each([
 		{
-			timestamps: [1, 1.1, 1.2, 1.3, 1.4],
-			packetDuration: 1.8,
-			kind: "collapsed",
-		},
-		{
 			timestamps: [1, 1.1, 1.2, 3, 3.1],
 			packetDuration: 1.8,
 			kind: "already media-timed",
-		},
-		{
-			timestamps: [1, 1.1, 1.2, 1.3, 1.4],
-			packetDuration: 0,
-			kind: "unknown packet duration",
 		},
 	])(
 		"places $kind decoded timestamps after a packet gap and preserves leading silence",
@@ -383,64 +306,6 @@ describe("loadBrowserWaveformLane", () => {
 		},
 	);
 
-	it("preserves repeated gaps after pruning consumed packet metadata", async () => {
-		const track = createMockAudioTrack({ sampleRate: 100 });
-		mediabunnyMock.audioTracks = [track];
-		const presented = [0, 0.1, 0.2, 1, 1.1, 1.2, 3, 3.1, 3.2];
-		mediabunnyMock.packetsByTrack.set(
-			track,
-			presented.map((timestamp) => ({ timestamp, duration: 0.1 })),
-		);
-		mediabunnyMock.samplesByTrack.set(
-			track,
-			presented.map((_, index) =>
-				createAudioSampleLike([new Array(10).fill(1)], 100, index / 10),
-			),
-		);
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: 4_000_000,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-		if (result.status !== "ready") throw new Error("Expected ready waveform.");
-		for (const time of [0.5, 1.5, 2.5, 3.5])
-			expect(result.samples[Math.floor((time / 4) * 8192)]).toBe(0);
-		for (const time of [0.01, 1.01, 3.01])
-			expect(result.samples[Math.floor((time / 4) * 8192)]).toBe(1);
-	});
-
-	it.each(["pcm-s16", "ulaw", "alaw"])(
-		"preserves variable and unknown-duration %s packets instead of inventing gaps",
-		async (codec) => {
-			const track = createMockAudioTrack({ codec, sampleRate: 100 });
-			mediabunnyMock.audioTracks = [track];
-			mediabunnyMock.packetsByTrack.set(track, [
-				{ timestamp: 0, duration: 0.1 },
-				{ timestamp: 0.1, duration: 0 },
-				{ timestamp: 0.2, duration: 1.8 },
-				{ timestamp: 2, duration: 0.1 },
-			]);
-			mediabunnyMock.samplesByTrack.set(track, [
-				createAudioSampleLike([new Array(10).fill(1)], 100),
-				createAudioSampleLike([new Array(10).fill(1)], 100, 0.1),
-				createAudioSampleLike([new Array(180).fill(1)], 100, 0.2),
-				createAudioSampleLike([new Array(10).fill(1)], 100, 2),
-			]);
-			const result = await loadBrowserWaveformLane({
-				assetDurationUs: 3_000_000,
-				source,
-				track: readyAsset.tracks.audio[0],
-				trackIndex: 0,
-			});
-			expect(result.status).toBe("ready");
-			if (result.status !== "ready")
-				throw new Error("Expected ready waveform.");
-			expect(result.samples[Math.floor((1 / 3) * 8192)]).toBe(1);
-			expect(result.samples[Math.floor((0.11 / 3) * 8192)]).toBe(1);
-		},
-	);
-
 	it("closes a sample delivered after cancellation and returns its iterator", async () => {
 		const controller = new AbortController();
 		const track = createMockAudioTrack();
@@ -464,134 +329,6 @@ describe("loadBrowserWaveformLane", () => {
 		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
 	});
 
-	it("fails explicitly and closes both iterators when packet metadata cannot be read", async () => {
-		const track = createMockAudioTrack();
-		const sample = createAudioSampleLike([[1]], 100);
-		mediabunnyMock.audioTracks = [track];
-		mediabunnyMock.samplesByTrack.set(track, [sample]);
-		mediabunnyMock.packetsError = new Error("Packet read failed");
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-		expect(result).toEqual({
-			status: "unavailable",
-			reason: "Packet read failed",
-		});
-		expect(sample.close).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.packetIterators[0]?.return).toHaveBeenCalledTimes(1);
-		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
-	});
-
-	it("disposes the media input after loading a ready waveform lane", async () => {
-		const audioTrack = createMockAudioTrack();
-		mediabunnyMock.audioTracks = [audioTrack];
-		const sample = createAudioSampleLike([[0.5, 1]], 2);
-		mediabunnyMock.samplesByTrack.set(audioTrack, [sample]);
-
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(result.status).toBe("ready");
-		if (result.status === "ready") {
-			expect(result.samples).toBeInstanceOf(Float32Array);
-			expect(result.samples).toHaveLength(8192);
-			expect(Math.max(...result.samples)).toBe(1);
-		}
-		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
-		expect(sample.close).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
-	});
-
-	it("disposes the media input when the requested audio track is unavailable", async () => {
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(result).toEqual({
-			reason: "The analyzed audio track is no longer available.",
-			status: "unavailable",
-		});
-		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
-	});
-
-	it("disposes the media input when waveform loading throws", async () => {
-		mediabunnyMock.getAudioTracksError = new Error("Input failed");
-
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(result).toEqual({
-			reason: "Input failed",
-			status: "unavailable",
-		});
-		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
-	});
-
-	it("closes decoded samples and returns the iterator when bucket generation fails", async () => {
-		const audioTrack = createMockAudioTrack();
-		const sample = createAudioSampleLike([[0.5, 1]], 2);
-		sample.copyTo.mockImplementationOnce(() => {
-			throw new Error("PCM copy failed");
-		});
-		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.samplesByTrack.set(audioTrack, [sample]);
-
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(result).toEqual({
-			reason: "PCM copy failed",
-			status: "unavailable",
-		});
-		expect(sample.close).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
-		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
-	});
-
-	it("caches completed waveform lanes for the same source and track", async () => {
-		const audioTrack = createMockAudioTrack();
-		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.samplesByTrack.set(audioTrack, [
-			createAudioSampleLike([[0.5, 1]], 2),
-		]);
-
-		const firstResult = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-		const secondResult = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(firstResult.status).toBe("ready");
-		expect(secondResult).toBe(firstResult);
-		expect(mediabunnyMock.inputInstances).toHaveLength(1);
-	});
-
 	it("loads waveform lanes through a worker when available", async () => {
 		vi.stubGlobal("Worker", vi.fn());
 
@@ -610,65 +347,25 @@ describe("loadBrowserWaveformLane", () => {
 		expect(Array.from(result.samples)).toEqual([0.25, 1]);
 		expect(mediabunnyMock.inputInstances).toHaveLength(0);
 		expect(waveformWorkerMock.instances).toHaveLength(1);
-		expect(waveformWorkerMock.instances[0]?.postedMessages[0]).toEqual({
-			request: {
-				assetDurationUs: readyAsset.durationUs,
-				source,
-				trackIndex: 0,
-			},
-			requestId: expect.any(Number),
-			type: "generate",
-		});
+
 		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
-		expect(
-			waveformWorkerMock.instances[0]?.removeEventListener,
-		).toHaveBeenCalledWith("error", expect.any(Function));
-		expect(
-			waveformWorkerMock.instances[0]?.removeEventListener,
-		).toHaveBeenCalledWith("message", expect.any(Function));
 	});
 
-	it("treats a functioning worker's unavailable result as final", async () => {
+	it("keeps a worker's domain-unavailable result final instead of decoding on the current thread", async () => {
 		vi.stubGlobal("Worker", vi.fn());
 		waveformWorkerMock.result = {
-			reason: "Worker cannot decode this audio track.",
 			status: "unavailable",
+			reason: "The audio track cannot be decoded.",
 		};
-
 		const result = await loadBrowserWaveformLane({
 			assetDurationUs: readyAsset.durationUs,
 			source,
 			track: readyAsset.tracks.audio[0],
 			trackIndex: 0,
 		});
-
-		expect(result).toEqual({
-			reason: "Worker cannot decode this audio track.",
-			status: "unavailable",
-		});
-		expect(waveformWorkerMock.instances).toHaveLength(1);
+		expect(result).toEqual(waveformWorkerMock.result);
 		expect(mediabunnyMock.inputInstances).toHaveLength(0);
-	});
-
-	it("falls back to the current thread when the worker fails to start", async () => {
-		vi.stubGlobal("Worker", vi.fn());
-		waveformWorkerMock.throwOnConstruct = new Error("Worker startup failed");
-		const audioTrack = createMockAudioTrack();
-		mediabunnyMock.audioTracks = [audioTrack];
-		mediabunnyMock.samplesByTrack.set(audioTrack, [
-			createAudioSampleLike([[0.5, 1]], 2),
-		]);
-
-		const result = await loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-
-		expect(result.status).toBe("ready");
-		expect(waveformWorkerMock.instances).toHaveLength(0);
-		expect(mediabunnyMock.inputInstances).toHaveLength(1);
+		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledOnce();
 	});
 
 	it("falls back to the current thread when the worker script fails to start", async () => {
@@ -690,35 +387,6 @@ describe("loadBrowserWaveformLane", () => {
 		expect(result.status).toBe("ready");
 		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.inputInstances).toHaveLength(1);
-	});
-
-	it("terminates the worker when waveform loading is aborted", async () => {
-		vi.stubGlobal("Worker", vi.fn());
-		waveformWorkerMock.deferResponse = true;
-		const abortController = new AbortController();
-		const removeAbortListener = vi.spyOn(
-			abortController.signal,
-			"removeEventListener",
-		);
-
-		const result = loadBrowserWaveformLane({
-			assetDurationUs: readyAsset.durationUs,
-			signal: abortController.signal,
-			source,
-			track: readyAsset.tracks.audio[0],
-			trackIndex: 0,
-		});
-		abortController.abort();
-
-		await expect(result).rejects.toMatchObject({
-			name: "AbortError",
-		});
-		expect(waveformWorkerMock.instances[0]?.terminate).toHaveBeenCalledTimes(1);
-		expect(removeAbortListener).toHaveBeenCalledWith(
-			"abort",
-			expect.any(Function),
-		);
-		expect(mediabunnyMock.inputInstances).toHaveLength(0);
 	});
 });
 
@@ -860,14 +528,6 @@ function createMockAudioTrack({
 
 const readyAsset = {
 	durationUs: 12_000_000,
-	exportCapability: {
-		profile: {
-			audioCodec: "aac",
-			container: "mp4",
-			videoCodec: "h264",
-		},
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import {
 	ALL_FORMATS,
 	type AudioSample,
@@ -8,6 +9,7 @@ import {
 	Input,
 	type InputAudioTrack,
 } from "mediabunny";
+import { PREVIEW_AUDIO_MAX_CHUNK_SECONDS } from "./preview-audio-window-policy";
 
 import {
 	type AudioPacketRange,
@@ -16,14 +18,10 @@ import {
 	audioPacketDurationsMaySpanGaps,
 } from "../../media-work/adapters/audio-packet-timeline";
 
-const DEFAULT_BATCH_DURATION_SECONDS = 0.2;
-const MAX_BATCH_DURATION_SECONDS = 0.2;
-
 export type MediaWindowChunk = {
 	audioBuffer: AudioBuffer;
 	endSeconds: number;
 	startSeconds: number;
-	trackId: string;
 };
 
 export type MediaWindowPlayableTrackState = {
@@ -31,7 +29,6 @@ export type MediaWindowPlayableTrackState = {
 	endSeconds: number;
 	kind: "playable";
 	startSeconds: number;
-	state: "playable";
 	trackId: string;
 };
 
@@ -39,7 +36,6 @@ export type MediaWindowSilentTrackState = {
 	endSeconds: number;
 	kind: "silence";
 	startSeconds: number;
-	state: "silence";
 	trackId: string;
 };
 
@@ -48,7 +44,6 @@ export type MediaWindowFailedTrackState = {
 	kind: "failure";
 	reason: string;
 	startSeconds: number;
-	state: "failure";
 	trackId: string;
 };
 
@@ -57,17 +52,8 @@ export type MediaWindowTrackState =
 	| MediaWindowSilentTrackState
 	| MediaWindowFailedTrackState;
 
-export type MediaWindowPullResult = {
-	endSeconds: number;
-	generationId: number;
-	startSeconds: number;
-	tracks: readonly MediaWindowTrackState[];
-};
-
 export type MediaWindowTrackMetadata = {
-	failureReason: string | null;
 	numberOfChannels: number;
-	sampleRate: number;
 };
 
 export type OpenMediaWindowGenerationOptions = {
@@ -80,8 +66,9 @@ export type OpenMediaWindowGenerationOptions = {
 export type MediaWindowGeneration = {
 	cancel: () => Promise<void>;
 	readonly id: number;
-	pullThrough: (endSeconds: number) => Promise<MediaWindowPullResult>;
-	readonly startSeconds: number;
+	pullThrough: (
+		endSeconds: number,
+	) => Promise<readonly MediaWindowTrackState[]>;
 	readonly trackIds: readonly string[];
 };
 
@@ -105,7 +92,6 @@ export type CreateMediaWindowProviderOptions = {
 
 type TrackDescriptor = {
 	failureReason: string | null;
-	firstTimestampSeconds: number;
 	format: {
 		numberOfChannels: number;
 		sampleRate: number;
@@ -126,7 +112,7 @@ type PcmSegment = {
 };
 
 export async function createMediaWindowProvider({
-	batchDurationSeconds = DEFAULT_BATCH_DURATION_SECONDS,
+	batchDurationSeconds = PREVIEW_AUDIO_MAX_CHUNK_SECONDS,
 	durationSeconds,
 	signal,
 	source,
@@ -140,7 +126,7 @@ export async function createMediaWindowProvider({
 	// re-describes it once the source is readable again.
 	const failTracksOnSourceError = (error: unknown) => {
 		if (inputDisposed) return;
-		sourceFailureReason = errorToMessage(error);
+		sourceFailureReason = errorMessage(error);
 		for (const descriptor of descriptors)
 			descriptor.failureReason = sourceFailureReason;
 	};
@@ -221,7 +207,7 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 			(track) => track.trackId === trackId,
 		);
 		if (!descriptor) throw new Error(`Unknown audio track: ${trackId}.`);
-		return { ...descriptor.format, failureReason: descriptor.failureReason };
+		return { numberOfChannels: descriptor.format.numberOfChannels };
 	}
 
 	openGeneration({
@@ -272,7 +258,7 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 								Object.assign(descriptor, updated);
 						} catch (error) {
 							if (!this.disposed && !signal.aborted)
-								descriptor.failureReason = errorToMessage(error);
+								descriptor.failureReason = errorMessage(error);
 						}
 					}),
 			);
@@ -296,16 +282,11 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 	dispose(): Promise<void> {
 		if (this.disposal) return this.disposal;
 		this.disposed = true;
-		this.disposal = Promise.allSettled(
+		this.disposal = settleCleanup(
 			[...this.activeGenerations].map((generation) => generation.cancel()),
-		).then((results) => {
+		).finally(() => {
 			this.activeGenerations.clear();
 			this.disposeInput();
-			const errors = results.flatMap((result) =>
-				result.status === "rejected" ? [result.reason] : [],
-			);
-			if (errors.length)
-				throw new AggregateError(errors, "Audio generation cleanup failed.");
 		});
 		return this.disposal;
 	}
@@ -357,15 +338,11 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 		return this.options.id;
 	}
 
-	get startSeconds() {
-		return this.options.startSeconds;
-	}
-
 	get trackIds() {
 		return [...this.cursors.keys()];
 	}
 
-	pullThrough(endSeconds: number): Promise<MediaWindowPullResult> {
+	pullThrough(endSeconds: number): Promise<readonly MediaWindowTrackState[]> {
 		const queuedPull = this.pullQueue.then(async () => {
 			this.throwIfCancelled();
 			validateTimestamp(endSeconds, "endSeconds");
@@ -389,12 +366,7 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 			const tracks = trackResults.filter(isMediaWindowTrackState);
 			this.coveredThroughSeconds = endSeconds;
 
-			return {
-				endSeconds,
-				generationId: this.id,
-				startSeconds,
-				tracks,
-			};
+			return tracks;
 		});
 
 		this.pullQueue = queuedPull.then(
@@ -548,7 +520,6 @@ class TrackWindowCursor {
 					endSeconds,
 					kind: "silence",
 					startSeconds,
-					state: "silence",
 					trackId: this.descriptor.trackId,
 				};
 			}
@@ -580,7 +551,6 @@ class TrackWindowCursor {
 				endSeconds,
 				kind: "playable",
 				startSeconds,
-				state: "playable",
 				trackId: this.descriptor.trackId,
 			};
 		} catch (error) {
@@ -591,7 +561,7 @@ class TrackWindowCursor {
 				throw createAbortError();
 			}
 
-			this.failureReason = errorToMessage(error);
+			this.failureReason = errorMessage(error);
 			await this.releaseIterator();
 			this.pcmSegments.length = 0;
 			return this.createFailure(startSeconds, endSeconds);
@@ -770,7 +740,6 @@ class TrackWindowCursor {
 			batchDurationSeconds: this.batchDurationSeconds,
 			format: this.descriptor.format,
 			slices,
-			trackId: this.descriptor.trackId,
 		});
 
 		consumeSegmentsThrough(this.pcmSegments, endSeconds);
@@ -786,7 +755,6 @@ class TrackWindowCursor {
 			kind: "failure",
 			reason: this.failureReason ?? "Audio window preparation failed.",
 			startSeconds,
-			state: "failure",
 			trackId: this.descriptor.trackId,
 		};
 	}
@@ -805,7 +773,6 @@ class TrackCursorCancelledError extends Error {}
 
 type PcmSlice = {
 	channels: Float32Array[];
-	endSeconds: number;
 	startSeconds: number;
 };
 
@@ -848,8 +815,6 @@ function collectPcmSlices(
 			channels: segment.channels.map((channel) =>
 				channel.slice(frameOffset, endFrame),
 			),
-			endSeconds:
-				sliceStartSeconds + (endFrame - frameOffset) / segment.sampleRate,
 			startSeconds: sliceStartSeconds,
 		});
 	}
@@ -884,12 +849,10 @@ function batchPcmSlices({
 	batchDurationSeconds,
 	format,
 	slices,
-	trackId,
 }: {
 	batchDurationSeconds: number;
 	format: TrackDescriptor["format"];
 	slices: readonly PcmSlice[];
-	trackId: string;
 }): MediaWindowChunk[] {
 	const maximumFrames = Math.max(
 		1,
@@ -926,7 +889,6 @@ function batchPcmSlices({
 			audioBuffer,
 			endSeconds: batchStartSeconds + batchFrameCount / format.sampleRate,
 			startSeconds: batchStartSeconds,
-			trackId,
 		});
 		batchStartSeconds = null;
 		batchChannels = Array.from(
@@ -1048,7 +1010,6 @@ async function describeTrack(
 			failureReason: canDecode
 				? null
 				: "Track is not decodable in this browser.",
-			firstTimestampSeconds,
 			format: { numberOfChannels, sampleRate },
 			packetDurationsMaySpanGaps: audioPacketDurationsMaySpanGaps(codec),
 			preRollSeconds: preRollSeconds ?? 0,
@@ -1059,8 +1020,7 @@ async function describeTrack(
 		};
 	} catch (error) {
 		return {
-			failureReason: errorToMessage(error),
-			firstTimestampSeconds: 0,
+			failureReason: errorMessage(error),
 			format: {
 				numberOfChannels: fallback.channels || 1,
 				sampleRate: fallback.sampleRate || 48_000,
@@ -1103,10 +1063,10 @@ function validateBatchDuration(batchDurationSeconds: number) {
 	if (
 		!Number.isFinite(batchDurationSeconds) ||
 		batchDurationSeconds <= 0 ||
-		batchDurationSeconds > MAX_BATCH_DURATION_SECONDS
+		batchDurationSeconds > PREVIEW_AUDIO_MAX_CHUNK_SECONDS
 	) {
 		throw new RangeError(
-			`Audio batch duration must be greater than zero and at most ${MAX_BATCH_DURATION_SECONDS} seconds.`,
+			`Audio batch duration must be greater than zero and at most ${PREVIEW_AUDIO_MAX_CHUNK_SECONDS} seconds.`,
 		);
 	}
 }
@@ -1139,10 +1099,6 @@ function createAbortError() {
 
 function isAbortError(error: unknown) {
 	return error instanceof DOMException && error.name === "AbortError";
-}
-
-function errorToMessage(error: unknown) {
-	return error instanceof Error ? error.message : String(error);
 }
 
 async function settleCleanup(

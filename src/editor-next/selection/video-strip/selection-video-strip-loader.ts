@@ -1,3 +1,5 @@
+import { clamp } from "@/lib/clamp";
+import { errorMessage } from "@/lib/error-message";
 import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
 
 import type { MediaTimeUs } from "@/editor-core/model";
@@ -53,7 +55,7 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 		}
 
 		return {
-			reason: errorToMessage(error),
+			reason: errorMessage(error),
 			status: "unavailable",
 		};
 	} finally {
@@ -208,24 +210,6 @@ async function loadThumbnails(
 	};
 }
 
-export function createVideoStripThumbnailTimestamps({
-	endTimestamp,
-	firstTimestamp,
-	thumbnailCount,
-}: {
-	endTimestamp: number;
-	firstTimestamp: number;
-	thumbnailCount: number;
-}) {
-	const count = Math.max(1, Math.floor(thumbnailCount));
-	const duration = Math.max(0, endTimestamp - firstTimestamp);
-
-	return Array.from(
-		{ length: count },
-		(_, index) => firstTimestamp + (index * duration) / count,
-	);
-}
-
 export function createBoundedVideoStripThumbnailTimestamps({
 	endTimestamp,
 	firstTimestamp,
@@ -256,7 +240,7 @@ export function createBoundedVideoStripThumbnailTimestamps({
 		})
 		.map((timestampUs) =>
 			microsecondsToSeconds(
-				clampNumber(timestampUs, startTimestampUs, endTimestampUs - 1),
+				clamp(timestampUs, startTimestampUs, endTimestampUs - 1),
 			),
 		);
 }
@@ -346,16 +330,4 @@ function secondsToMicroseconds(seconds: number): MediaTimeUs {
 
 function microsecondsToSeconds(microseconds: MediaTimeUs) {
 	return microseconds / 1_000_000;
-}
-
-function clampNumber(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

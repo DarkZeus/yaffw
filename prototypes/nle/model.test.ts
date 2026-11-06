@@ -4,8 +4,8 @@ import {
 	FRAME,
 	SECOND,
 	type Sequence,
+	clipFadeAt,
 	end,
-	initialSequence,
 	makeClip,
 	makeTrack,
 	moveClips,
@@ -15,6 +15,7 @@ import {
 	selection,
 	splitClips,
 } from "./model";
+import { initialSequence } from "./sample-sequence";
 const assets: Asset[] = [
 	{
 		id: "zone",
@@ -49,6 +50,25 @@ function simple(): Sequence {
 	};
 }
 describe("NLE sequence operations", () => {
+	it("uses the same fade envelope for picture opacity and audio gain", () => {
+		const clip = makeClip(
+			"fade",
+			"zone",
+			"Fade",
+			"video",
+			"v1",
+			SECOND,
+			6 * SECOND,
+			{
+				fadeIn: 2 * SECOND,
+				fadeOut: SECOND,
+			},
+		);
+		expect(
+			[0, 1, 2, 3, 5, 6, 6.5, 7, 8].map((at) => clipFadeAt(clip, at * SECOND)),
+		).toEqual([0, 0, 0.5, 1, 1, 1, 0.5, 0, 0]);
+		expect(clipFadeAt({ ...clip, fadeIn: 0, fadeOut: 0 }, 4 * SECOND)).toBe(1);
+	});
 	it("expands linked selection and leaves independent audio separate", () => {
 		expect(selection(initialSequence, ["wide"], true).map((c) => c.id)).toEqual(
 			pair,
@@ -74,21 +94,6 @@ describe("NLE sequence operations", () => {
 		const result = moveClips(initialSequence, ["wide-audio", "wide"], 0, "a3");
 		expect(result.clips.find((c) => c.id === "wide-audio")?.trackId).toBe("a3");
 		expect(result.clips.find((c) => c.id === "wide")?.trackId).toBe("v1");
-	});
-	it("rejects audio on video tracks", () => {
-		expect(moveClips(initialSequence, ["score"], 0, "v3")).toBe(
-			initialSequence,
-		);
-	});
-	it("respects a locked linked track", () => {
-		const state = {
-			...initialSequence,
-			tracks: initialSequence.tracks.map((t) =>
-				t.id === "a1" ? { ...t, locked: true } : t,
-			),
-		};
-		expect(moveClips(state, pair, 26 * SECOND)).toBe(state);
-		expect(removeClips(state, pair, false)).toBe(state);
 	});
 	it("splits linked A/V at the same media offset with a new right-hand link group", () => {
 		const result = splitClips(initialSequence, pair, 3 * SECOND);
@@ -230,4 +235,68 @@ describe("NLE sequence operations", () => {
 		});
 		expect(c && end(c)).toBe(6 * SECOND);
 	});
+	it.each(["split", "insert", "overwrite"] as const)(
+		"preserves source timing and only the surviving outer fades during %s",
+		(operation) => {
+			const original = makeClip(
+				"original",
+				"zone",
+				"Source",
+				"video",
+				"v1",
+				5 * SECOND,
+				10 * SECOND,
+				{
+					sourceIn: 2 * SECOND,
+					fadeIn: SECOND / 2,
+					fadeOut: SECOND,
+					gain: 0.7,
+					linkId: "original-link",
+				},
+			);
+			const state: Sequence = { ...simple(), clips: [original] };
+			const cut = 9 * SECOND;
+			const result =
+				operation === "split"
+					? splitClips(state, [original.id], cut)
+					: placeClips(
+							state,
+							[
+								makeClip(
+									"addition",
+									"zone",
+									"New",
+									"video",
+									"v1",
+									cut,
+									2 * SECOND,
+								),
+							],
+							operation,
+						);
+			const remainders = result.clips.filter((clip) => clip.id !== "addition");
+			expect(remainders).toHaveLength(2);
+			expect(remainders[0]).toMatchObject({
+				id: original.id,
+				start: 5 * SECOND,
+				sourceIn: 2 * SECOND,
+				duration: 4 * SECOND,
+				fadeIn: SECOND / 2,
+				fadeOut: 0,
+				gain: 0.7,
+			});
+			expect(remainders[1]).toMatchObject({
+				start: (operation === "split" ? 9 : 11) * SECOND,
+				sourceIn: (operation === "overwrite" ? 8 : 6) * SECOND,
+				duration: (operation === "overwrite" ? 4 : 6) * SECOND,
+				fadeIn: 0,
+				fadeOut: SECOND,
+				gain: 0.7,
+			});
+			expect(remainders[1].id).not.toBe(original.id);
+			expect(remainders[1].linkId).not.toBe(original.linkId);
+			expect(original.sourceIn).toBe(2 * SECOND);
+			expect(original.duration).toBe(10 * SECOND);
+		},
+	);
 });

@@ -1,6 +1,5 @@
 import {
 	type AudioMix,
-	DEFAULT_OUTPUT_PROFILE,
 	type ExportProgress,
 	type OutputSettings,
 	type ReadyMediaAsset,
@@ -189,6 +188,8 @@ vi.mock("mediabunny", () => {
 	};
 });
 
+import { resolveOutputPlan } from "@/editor-core/output-settings";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import {
 	DefaultExportCancelledError,
 	browserDefaultExportRunner,
@@ -209,374 +210,48 @@ beforeEach(() => {
 });
 
 describe("browserDefaultExportRunner cleanup", () => {
-	it("passes resolved downscale dimensions to Mediabunny conversion", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
-			return Promise.resolve();
-		};
-
-		await browserDefaultExportRunner.run(
-			createExportRequest({
-				outputSettings: downscaledOutputSettings,
-			}),
-		);
-
-		expect(conversionConfig?.video).toEqual({
-			codec: "avc",
-			fit: "fill",
-			height: 720,
-			width: 1280,
-		});
-	});
-
-	it("does not set custom dimensions when resolution preserves the source", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
-			return Promise.resolve();
-		};
-
+	it("preserves source sizing without forcing conversion and applies explicit downscaling", async () => {
 		await browserDefaultExportRunner.run(createExportRequest());
-
-		expect(conversionConfig?.video).toEqual({ codec: "avc" });
-	});
-
-	it("uses the resolved non-default container, codec, and MIME type", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
-			return Promise.resolve();
-		};
-		const outputSettings = createDefaultOutputSettings();
-		outputSettings.container = {
-			container: "webm",
-			kind: "documented-container",
-		};
-		outputSettings.videoCodec = {
-			codec: "vp9",
-			kind: "documented-codec",
-		};
-
-		const result = await browserDefaultExportRunner.run(
-			createExportRequest({ outputSettings }),
+		expect(mediabunnyMock.conversions[0].config.video).not.toHaveProperty(
+			"width",
 		);
-
-		expect(conversionConfig?.video).toEqual({ codec: "vp9" });
-		expect(conversionConfig?.output.format.mimeType).toBe("video/webm");
-		expect(result.mimeType).toBe("video/webm");
-		expect(result.blob.type).toBe("video/webm");
-	});
-
-	it("disposes video-only export resources after successful export", async () => {
-		const onProgress = vi.fn();
-
-		const result = await browserDefaultExportRunner.run(
-			createExportRequest({
-				onProgress,
-			}),
+		expect(mediabunnyMock.conversions[0].config.video).not.toHaveProperty(
+			"height",
 		);
-
-		await expect(result.blob.arrayBuffer()).resolves.toHaveProperty(
-			"byteLength",
-			3,
-		);
-		expect(result.mimeType).toBe("video/mp4");
-		expect(onProgress).toHaveBeenCalledWith({ phase: "preparing" });
-		expect(onProgress).toHaveBeenCalledWith({
-			completedRatio: 0.5,
-			phase: "encoding",
-		});
-		expect(onProgress).toHaveBeenCalledWith({
-			completedRatio: 1,
-			phase: "finalizing",
-		});
-		expect(mediabunnyMock.inputs).toHaveLength(1);
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.conversions[0].cancel).not.toHaveBeenCalled();
-		expect(mediabunnyMock.outputs[0].cancel).not.toHaveBeenCalled();
-	});
-
-	it("cancels partial video-only export work after an abort", async () => {
-		const controller = new AbortController();
-		mediabunnyMock.conversionExecute = () => new Promise(() => {});
-
-		const exportPromise = browserDefaultExportRunner.run(
-			createExportRequest({
-				signal: controller.signal,
-			}),
-		);
-
-		await waitForConversion();
-		controller.abort();
-
-		await expect(exportPromise).rejects.toBeInstanceOf(
-			DefaultExportCancelledError,
-		);
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
-	});
-
-	it("cancels partial video-only export work after encoder failure", async () => {
-		const failure = new Error("Encoder rejected the source video.");
-		mediabunnyMock.conversionExecute = () => Promise.reject(failure);
-
-		await expect(
-			browserDefaultExportRunner.run(createExportRequest()),
-		).rejects.toBe(failure);
-
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
-	});
-
-	it("forbids copy timestamp shifts that would desync the separate audio mix", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			return Promise.resolve();
-		};
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
 		await browserDefaultExportRunner.run(
-			createExportRequest({ audioMix: includedAudioMix }),
-		);
-
-		expect(conversionConfig?.copy).toEqual({ shiftTolerance: 0 });
-	});
-
-	it("drives video conversion and the Generated audio mix into one Output", async () => {
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
-		const result = await browserDefaultExportRunner.run(
 			createExportRequest({
-				audioMix: includedAudioMix,
+				outputSettings: {
+					...createDefaultOutputSettings(),
+					resolution: { kind: "target-dimensions", width: 1280, height: 720 },
+				},
 			}),
 		);
-
-		await expect(result.blob.arrayBuffer()).resolves.toHaveProperty(
-			"byteLength",
-			3,
-		);
-		expect(browserAudioMixMock.renderBrowserAudioMix).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.inputs).toHaveLength(1);
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs).toHaveLength(1);
-		expect(mediabunnyMock.conversions[0]?.config.composable).toBe(true);
-		expect(mediabunnyMock.conversions[0]?.config.output).toBe(
-			mediabunnyMock.outputs[0],
-		);
-		expect(mediabunnyMock.outputs[0].addAudioTrack).toHaveBeenCalledWith(
-			mediabunnyMock.audioBufferSources[0],
-			{ name: "Mixed audio" },
-		);
-		expect(mediabunnyMock.outputs[0].start).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[0].finalize).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[0].cancel).not.toHaveBeenCalled();
-		expect(mediabunnyMock.audioBufferSources[0].add).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			codec: "aac",
-			quality: { options: "medium" },
+		expect(mediabunnyMock.conversions[1].config.video).toMatchObject({
+			width: 1280,
+			height: 720,
+			fit: "fill",
 		});
 	});
-
-	it("encodes the Generated audio mix with the resolved explicit codec", async () => {
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-		const outputSettings = createDefaultOutputSettings();
-		outputSettings.audioCodec = {
-			codec: "flac",
-			kind: "documented-codec",
-		};
-
+	it("skips audio decoding when No audio is selected while tracks remain included", async () => {
 		await browserDefaultExportRunner.run(
 			createExportRequest({
 				audioMix: includedAudioMix,
-				outputSettings,
+				outputSettings: {
+					...createDefaultOutputSettings(),
+					audioCodec: { kind: "no-audio" },
+				},
 			}),
-		);
-
-		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			codec: "flac",
-		});
-		expect(mediabunnyMock.audioBufferSources[0].options).not.toHaveProperty(
-			"quality",
-		);
-	});
-
-	it("passes independent subjective video and custom audio bitrate choices", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
-			return Promise.resolve();
-		};
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-		const outputSettings = createDefaultOutputSettings();
-		outputSettings.videoQuality = {
-			kind: "subjective-quality",
-			quality: "high",
-		};
-		outputSettings.audioQuality = {
-			bitrateBps: 256_000,
-			kind: "custom-bitrate",
-		};
-
-		await browserDefaultExportRunner.run(
-			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
-		);
-
-		expect(conversionConfig?.video.quality).toMatchObject({ options: "high" });
-		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			quality: { options: { bitrate: 256_000 } },
-		});
-	});
-
-	it("passes an exact custom video bitrate and subjective audio Quality", async () => {
-		let conversionConfig: MockConversionConfig | undefined;
-		mediabunnyMock.conversionExecute = (_conversion, config) => {
-			conversionConfig = config;
-			config.output.target.buffer = new Uint8Array([1, 2, 3]).buffer;
-			return Promise.resolve();
-		};
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-		const outputSettings = createDefaultOutputSettings();
-		outputSettings.videoQuality = {
-			bitrateBps: 4_000_000,
-			kind: "custom-bitrate",
-		};
-		outputSettings.audioQuality = {
-			kind: "subjective-quality",
-			quality: "high",
-		};
-
-		await browserDefaultExportRunner.run(
-			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
-		);
-
-		expect(conversionConfig?.video.quality).toMatchObject({
-			options: { bitrate: 4_000_000 },
-		});
-		expect(mediabunnyMock.audioBufferSources[0].options).toMatchObject({
-			quality: { options: "high" },
-		});
-	});
-
-	it("omits audio without changing included mix decisions when No audio is selected", async () => {
-		const outputSettings = {
-			...createDefaultOutputSettings(),
-			audioCodec: { kind: "no-audio" as const },
-		};
-		await browserDefaultExportRunner.run(
-			createExportRequest({ audioMix: includedAudioMix, outputSettings }),
 		);
 		expect(browserAudioMixMock.renderBrowserAudioMix).not.toHaveBeenCalled();
 		expect(mediabunnyMock.outputs[0].addAudioTrack).not.toHaveBeenCalled();
 	});
 
-	it("keeps an all-excluded Audio mix as a valid video-only export", async () => {
-		const result = await browserDefaultExportRunner.run(
-			createExportRequest({
-				audioMix: excludedAudioMix,
-			}),
-		);
-
-		await expect(result.blob.arrayBuffer()).resolves.toHaveProperty(
-			"byteLength",
-			3,
-		);
-		expect(browserAudioMixMock.renderBrowserAudioMix).not.toHaveBeenCalled();
-		expect(mediabunnyMock.inputs).toHaveLength(1);
-	});
-
-	it("renders an included zero-volume track as a silent Generated audio mix", async () => {
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
-		await browserDefaultExportRunner.run(
-			createExportRequest({
-				audioMix: zeroVolumeIncludedAudioMix,
-			}),
-		);
-
-		expect(browserAudioMixMock.renderBrowserAudioMix).toHaveBeenCalledWith(
-			expect.objectContaining({
-				audioMix: zeroVolumeIncludedAudioMix,
-			}),
-		);
-		expect(mediabunnyMock.audioBufferSources).toHaveLength(1);
-	});
-
-	it("cancels and closes mixed-audio resources after audio-source failure", async () => {
-		const failure = new Error("Generated audio mix encoding failed.");
-		mediabunnyMock.audioAddFailure = failure;
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
-		await expect(
-			browserDefaultExportRunner.run(
-				createExportRequest({
-					audioMix: includedAudioMix,
-				}),
-			),
-		).rejects.toBe(failure);
-
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledTimes(1);
-		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledTimes(1);
-	});
-
-	it("cancels and closes mixed-audio resources after Conversion failure", async () => {
-		const failure = new Error("Video conversion failed.");
-		mediabunnyMock.conversionExecute = () => Promise.reject(failure);
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
-		await expect(
-			browserDefaultExportRunner.run(
-				createExportRequest({ audioMix: includedAudioMix }),
-			),
-		).rejects.toBe(failure);
-
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
-	});
-
 	it("cancels composable Conversion and Output after an abort", async () => {
 		const controller = new AbortController();
 		mediabunnyMock.conversionExecute = () => new Promise(() => undefined);
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue(
+			{} as AudioBuffer,
+		);
 		const exportPromise = browserDefaultExportRunner.run(
 			createExportRequest({
 				audioMix: includedAudioMix,
@@ -598,10 +273,9 @@ describe("browserDefaultExportRunner cleanup", () => {
 	it("cancels Output after mixed-audio finalization failure", async () => {
 		const failure = new Error("Output finalization failed.");
 		mediabunnyMock.outputFinalizeFailure = failure;
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue(
+			{} as AudioBuffer,
+		);
 
 		await expect(
 			browserDefaultExportRunner.run(
@@ -613,25 +287,6 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.conversions[0].cancel).not.toHaveBeenCalled();
 		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
-	});
-
-	it("rejects a composable export when Conversion cannot utilize video", async () => {
-		mediabunnyMock.conversionUtilizedTracks = [];
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({
-			audioBuffer: {} as AudioBuffer,
-			includedTrackCount: 1,
-		});
-
-		await expect(
-			browserDefaultExportRunner.run(
-				createExportRequest({ audioMix: includedAudioMix }),
-			),
-		).rejects.toThrow("could not utilize a video track");
-
-		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.conversions[0].cancel).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.audioBufferSources).toEqual([]);
 	});
 });
 
@@ -696,11 +351,17 @@ function createExportRequest({
 	outputSettings?: OutputSettings;
 	signal?: AbortSignal;
 } = {}): DefaultExportRunnerRequest {
-	return {
+	const output = resolveOutputPlan({
 		asset: readyAsset,
 		audioMix,
-		onProgress,
 		outputSettings,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
+	});
+	if (output.kind === "invalid") throw new Error(output.error);
+	return {
+		audioMix,
+		onProgress,
+		resolvedOutput: output.plan,
 		selection: {
 			endUs: 1_000_000,
 			startUs: 0,
@@ -709,15 +370,6 @@ function createExportRequest({
 		source: new Blob(["video"], { type: "video/mp4" }),
 	};
 }
-
-const downscaledOutputSettings = {
-	...createDefaultOutputSettings(),
-	resolution: {
-		height: 720,
-		kind: "target-dimensions",
-		width: 1280,
-	},
-} satisfies OutputSettings;
 
 async function waitForConversion() {
 	for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -733,10 +385,6 @@ async function waitForConversion() {
 
 const readyAsset = {
 	durationUs: 1_000_000,
-	exportCapability: {
-		profile: DEFAULT_OUTPUT_PROFILE,
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,
@@ -791,29 +439,6 @@ const includedAudioMix = {
 		"audio-1": {
 			channelMode: "preserve",
 			include: true,
-			trackId: "audio-1",
-			volumePercent: 100,
-		},
-	},
-} as const;
-
-const zeroVolumeIncludedAudioMix = {
-	...includedAudioMix,
-	tracks: {
-		"audio-1": {
-			...includedAudioMix.tracks["audio-1"],
-			volumePercent: 0,
-		},
-	},
-} as const;
-
-const excludedAudioMix = {
-	finalPeakGuardDb: -1,
-	outputChannels: 2,
-	tracks: {
-		"audio-1": {
-			channelMode: "preserve",
-			include: false,
 			trackId: "audio-1",
 			volumePercent: 100,
 		},

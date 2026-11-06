@@ -9,6 +9,7 @@ import {
 	X,
 } from "lucide-react";
 import { useState } from "react";
+import { sequenceFormatLabel } from "./model";
 import { type Clip, SECOND, moveClips, time } from "./model";
 import type { Editor } from "./use-editor";
 function Numeric({
@@ -77,8 +78,8 @@ export function Inspector({ editor }: { editor: Editor }) {
 			<div className="inspector-scroll">
 				{tab === "sequence" ? (
 					<>
-						<h3>Sequence 01</h3>
-						<p className="subtle">1920 × 1080 · 30 fps</p>
+						<h3>{editor.state.name}</h3>
+						<p className="subtle">{sequenceFormatLabel}</p>
 						<div className="sequence-facts">
 							<span>{editor.state.clips.length} clips</span>
 							<span>{editor.state.tracks.length} tracks</span>

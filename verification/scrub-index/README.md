@@ -13,15 +13,21 @@ pnpm exec tsc --project verification/scrub-index/tsconfig.json
 pnpm exec biome check --config-path verification/scrub-index verification/scrub-index
 ```
 
+Both browser entry points call `generateFixtures()` from `fixtures.mjs` before opening a
+browser. `app-check.mjs` can run directly without a prior `check.mjs` run; it uses the
+fixture paths returned by setup.
+
 `YAFFW_ORIGIN` optionally overrides the origin. Output, generated media and
 instrumented modules go to ignored `tmp/scrub-index/`. Fixtures require ffmpeg and
 ffprobe on PATH. The baseline comes from immutable commit
 `234286135b2c2af3272ec94fc4a4392fd607e792`; that commit must exist locally.
-The runner verifies Mediabunny 1.65.2 and asserts the direct candidate equals the
-adopted production provider before adding observation-only instrumentation.
-It reads the removed index from Git rather than retaining an alternate production
-runner. Both variants share the current production decoded cache, dimensions,
-settle/prefetch policy, packet options, and sample decoder.
+The runner verifies Mediabunny 1.65.2, instruments the actual current production
+provider as the direct candidate, and records its source SHA-256. The indexed
+provider and removed index come from Git rather than a retained alternate
+production runner. Relative imports are resolved to their production owners;
+both variants use the current decoded cache. Observation-only instrumentation
+counts reads and readiness without requiring unrelated source formatting or
+helper extraction to match historical text.
 
 Four deterministic fixtures cover 600-second H.264/B-frame MP4, its Matroska
 remux with 500 ms cluster limit and 60 cues, an equal-length MKV with 59 later cues

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import {
 	inspectArtifact,
@@ -10,8 +9,7 @@ import {
 } from "./artifact.mjs";
 import { generateFixtures } from "./fixtures.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+import { launchBrowser } from "../browser.cjs";
 const directory = resolve("tmp/copy-boundaries");
 mkdirSync(directory, { recursive: true });
 assert.equal(
@@ -22,10 +20,7 @@ assert.equal(
 const fixtures = generateFixtures();
 for (const fixture of fixtures)
 	fixture.source = await inspectSource(fixture.file);
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+const browser = await launchBrowser();
 const results = [];
 const origin = process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000";
 const policies = [

@@ -6,6 +6,9 @@ There is one prototype. Drag a track's bottom border in the sidebar to resize on
 
 Run `npx vite --config prototypes/nle/vite.config.ts` from the repository root. Open [the prototype](http://127.0.0.1:3001/). The existing layout resizers remain available. The variant picker and its shortcuts have been removed.
 
+The prototype owns a separate dependency cache so it can run beside the product
+development server without invalidating the product's optimized modules.
+
 The redesigned timeline separates sequence actions from grouped editing tools, aligns track names and controls, gives clip labels their own solid strip above thumbnails and waveforms, and uses a gap to distinguish picture from audio tracks. Edit feedback stays in a fixed footer. On narrow screens the timeline scrolls horizontally instead of shrinking clip content. The timeline inherits production workbench tokens directly. Its toolbar uses the production Button component and transport button classes; typography and neutral toggle states match the surrounding app. Clip selection and the playhead retain the production semantic colors.
 
 All additions live in the timeline: Add clips opens a media chooser, Title adds a title clip, and Clip properties opens an editing dialog. The common model supports multiple assets; independent video/audio tracks; linked selection; cross-track dragging; insert/overwrite; splitting; normal/ripple deletion; snapping; markers; locking; visibility; mute/solo; undo/redo; and JSON sequence downloads. Existing transport controls drive sequence playback, volume, frame stepping, speed, and looping.
@@ -23,7 +26,7 @@ npx vitest run --config prototypes/nle/vite.config.ts
 npx vite build --config prototypes/nle/vite.config.ts
 ```
 
-Twenty-two tests cover sequence renaming/export, inline track renaming, cancellation, blank-name rejection, rename undo/redo, keyboard steps and limits, drag cancellation/completion, and sequence movement, locks, linked splitting, insert/overwrite remainders, source limits, and ripple behavior. The isolated Vite config includes the production styling pipeline but omits production router generation. Output stays in ignored `dist/`.
+Eighteen model behavior tests cover linked selection and movement, occupied destinations, linked splitting, insert/overwrite remainders, source limits, ripple behavior, preservation of source timing and outer fades during clip slicing, and the shared picture/audio fade envelope. The isolated Vite config includes the production styling pipeline but omits production router generation. Output stays in ignored `dist/`.
 
 ## Timeline controls
 
@@ -37,4 +40,4 @@ Double-click a track name to rename it inline (keyboard: Enter or F2). Enter or 
 
 Double-click the sequence name in the toolbar to rename it with the same inline editing controls. The name is part of sequence history and saved JSON. The arrow beside the name opens Rename and Save sequence.
 
-All authored colors use OKLCH, following the root `AGENTS.md` color rule. The native title color picker converts at its input/output boundary using Culori; sequence state and saved colors remain OKLCH. A regression test covers picker editing and undo.
+All authored colors use OKLCH, following the root `AGENTS.md` color rule. The native title color picker converts at its input/output boundary using Culori; sequence state and saved colors remain OKLCH.

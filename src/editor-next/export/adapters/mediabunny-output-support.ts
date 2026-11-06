@@ -13,7 +13,7 @@ import type {
 } from "@/editor-core/output-settings";
 
 type DocumentedVideoFormat = {
-	format: OutputFormat;
+	create: (options: { fastStart?: boolean }) => OutputFormat;
 	id: string;
 	label: string;
 };
@@ -21,54 +21,45 @@ type DocumentedVideoFormat = {
 const DOCUMENTED_VIDEO_FORMATS: DocumentedVideoFormat[] = [
 	// Standalone video files that can become one Generated media artifact.
 	// Segmented CMAF/HLS outputs and audio-only formats have different product models.
-	{ format: new Mp4OutputFormat(), id: "mp4", label: "MP4" },
-	{ format: new MovOutputFormat(), id: "mov", label: "MOV" },
-	{ format: new MkvOutputFormat(), id: "mkv", label: "Matroska (MKV)" },
-	{ format: new WebMOutputFormat(), id: "webm", label: "WebM" },
 	{
-		format: new MpegTsOutputFormat(),
+		create: ({ fastStart }) =>
+			new Mp4OutputFormat(fastStart ? { fastStart: "in-memory" } : undefined),
+		id: "mp4",
+		label: "MP4",
+	},
+	{ create: () => new MovOutputFormat(), id: "mov", label: "MOV" },
+	{ create: () => new MkvOutputFormat(), id: "mkv", label: "Matroska (MKV)" },
+	{ create: () => new WebMOutputFormat(), id: "webm", label: "WebM" },
+	{
+		create: () => new MpegTsOutputFormat(),
 		id: "mpeg-ts",
 		label: "MPEG transport stream",
 	},
 ];
 
-export const MEDIABUNNY_OUTPUT_SUPPORT = getMediabunnyOutputSupport();
+export const MEDIABUNNY_OUTPUT_SUPPORT: BrowserLocalOutputSupport = {
+	containers: DOCUMENTED_VIDEO_FORMATS.map(toDocumentedOutputContainer),
+};
 
 export function createMediabunnyOutputFormat(
 	containerId: string,
 	options: { fastStart?: boolean } = {},
 ): OutputFormat {
-	switch (containerId) {
-		case "mp4":
-			return new Mp4OutputFormat(
-				options.fastStart ? { fastStart: "in-memory" } : undefined,
-			);
-		case "mov":
-			return new MovOutputFormat();
-		case "mkv":
-			return new MkvOutputFormat();
-		case "webm":
-			return new WebMOutputFormat();
-		case "mpeg-ts":
-			return new MpegTsOutputFormat();
-		default:
-			throw new Error(
-				`The selected ${containerId} container has no browser-local output adapter.`,
-			);
+	const entry = DOCUMENTED_VIDEO_FORMATS.find(({ id }) => id === containerId);
+	if (!entry) {
+		throw new Error(
+			`The selected ${containerId} container has no browser-local output adapter.`,
+		);
 	}
-}
-
-export function getMediabunnyOutputSupport(): BrowserLocalOutputSupport {
-	return {
-		containers: DOCUMENTED_VIDEO_FORMATS.map(toDocumentedOutputContainer),
-	};
+	return entry.create(options);
 }
 
 function toDocumentedOutputContainer({
-	format,
+	create,
 	id,
 	label,
 }: DocumentedVideoFormat): DocumentedOutputContainer {
+	const format = create({});
 	return {
 		audioCodecs: format.getSupportedAudioCodecs(),
 		fileExtension: format.fileExtension,

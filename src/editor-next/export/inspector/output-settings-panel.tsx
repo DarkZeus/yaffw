@@ -1,12 +1,5 @@
-import {
-	Captions,
-	Film,
-	Monitor,
-	Music2,
-	Settings,
-	Sparkles,
-	Zap,
-} from "lucide-react";
+import { cloneOutputSettings } from "@/editor-core/output-settings";
+import { Settings, Sparkles, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 
@@ -22,23 +15,22 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-	type AudioMix,
-	DEFAULT_OUTPUT_PROFILE,
-	type OutputQualitySetting,
-	type OutputSettings,
-	type ReadyMediaAsset,
+import type {
+	AudioMix,
+	OutputQualitySetting,
+	OutputSettings,
+	ReadyMediaAsset,
 } from "@/editor-core/model";
 import {
 	OUTPUT_SUBJECTIVE_QUALITY_CHOICES,
 	type ResolvedOutputAudioProfile,
-	type ResolvedOutputQuality,
 	type ResolvedOutputResolution,
 	type ResolvedOutputVideoProfile,
 	formatOutputQualitySetting,
 	getOutputResolutionChoices,
+	outputContainerForSetting,
 	resolveOutputAudioProfile,
-	resolveOutputQuality,
+	resolveOutputPlan,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
@@ -124,7 +116,7 @@ export function OutputSettingsPanel({
 	const [open, setOpen] = useState(false);
 	const [draft, setDraft] = useState<OutputSettings | null>(null);
 	const openingSnapshotRef = useRef<OutputSettings | null>(null);
-	const visibleDraft = draft ?? outputSettings;
+	const activeDraft = draft ?? outputSettings;
 
 	function openModal() {
 		const snapshot = cloneOutputSettings(outputSettings);
@@ -144,7 +136,7 @@ export function OutputSettingsPanel({
 			return;
 		}
 
-		const appliedOutputSettings = cloneOutputSettings(visibleDraft);
+		const appliedOutputSettings = cloneOutputSettings(activeDraft);
 		onApplyOutputSettings(appliedOutputSettings);
 		try {
 			saveLastUsedSettings(window.localStorage, appliedOutputSettings);
@@ -311,22 +303,16 @@ export function OutputSettingsPanel({
 			: undefined;
 	const [automaticReplacementMessage, setAutomaticReplacementMessage] =
 		useState<string | null>(null);
-	const activeDraft = draft ?? outputSettings;
 	const resolutionChoices = getOutputResolutionChoices(asset);
 	const resolvedResolution = resolveOutputResolution({
 		asset,
 		setting: activeDraft.resolution,
 	});
-	const resolvedVideoQuality = resolveOutputQuality({
-		mediaKind: "video",
-		setting: activeDraft.videoQuality,
-	});
-	const resolvedAudioQuality = resolveOutputQuality({
-		mediaKind: "audio",
-		setting:
-			activeDraft.audioCodec.kind === "no-audio"
-				? { kind: "preserve-source" }
-				: activeDraft.audioQuality,
+	const resolvedPlan = resolveOutputPlan({
+		asset,
+		audioMix,
+		outputSettings: activeDraft,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
 	});
 	const resolvedDraft = resolveOutputVideoProfile({
 		asset,
@@ -342,27 +328,19 @@ export function OutputSettingsPanel({
 	const selectedContainer =
 		resolvedDraft.kind === "resolved"
 			? resolvedDraft.container
-			: containerForSetting(activeDraft.container);
+			: outputContainerForSetting(
+					activeDraft.container,
+					MEDIABUNNY_OUTPUT_SUPPORT,
+				);
 	const compatibleVideoCodecs = selectedContainer?.videoCodecs ?? [];
 	const compatibleAudioCodecs = selectedContainer?.audioCodecs ?? [];
-	const draftIsValid =
-		resolvedDraft.kind !== "invalid" &&
-		resolvedAudio.kind !== "invalid" &&
-		resolvedResolution.kind !== "invalid" &&
-		resolvedVideoQuality.kind !== "invalid" &&
-		resolvedAudioQuality.kind !== "invalid";
+	const draftIsValid = resolvedPlan.kind === "resolved";
+	const validationError =
+		resolvedPlan.kind === "invalid" ? resolvedPlan.error : undefined;
 
 	function openResolvedOutputSettings() {
 		setAutomaticReplacementMessage(null);
 		openModal();
-	}
-
-	function applyResolvedDraft() {
-		if (!draftIsValid) {
-			return;
-		}
-
-		applyDraft();
 	}
 
 	return (
@@ -450,11 +428,7 @@ export function OutputSettingsPanel({
 						<div className="min-w-0 shrink-0 md:min-h-0 md:overflow-y-auto">
 							<div className="px-6 py-2">
 								<TabsContent className="m-0" value="general">
-									<OutputSettingsTabSection
-										description="Default profile and generated-media summary"
-										icon={<Film aria-hidden="true" className="size-4" />}
-										title="General"
-									>
+									<OutputSettingsTabSection title="General">
 										<OutputSettingsChoice
 											label="Container"
 											onChange={changeContainer}
@@ -471,20 +445,12 @@ export function OutputSettingsPanel({
 										</OutputSettingsChoice>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
-											resolvedDraft={resolvedDraft}
-											resolvedAudio={resolvedAudio}
-											resolvedResolution={resolvedResolution}
-											resolvedVideoQuality={resolvedVideoQuality}
-											resolvedAudioQuality={resolvedAudioQuality}
+											error={validationError}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="video">
-									<OutputSettingsTabSection
-										description="Video output decisions for the current media asset"
-										icon={<Monitor aria-hidden="true" className="size-4" />}
-										title="Video"
-									>
+									<OutputSettingsTabSection title="Video">
 										<OutputSettingsChoice
 											label="Video codec"
 											onChange={changeVideoCodec}
@@ -527,20 +493,12 @@ export function OutputSettingsPanel({
 										</OutputSettingsChoice>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
-											resolvedDraft={resolvedDraft}
-											resolvedAudio={resolvedAudio}
-											resolvedResolution={resolvedResolution}
-											resolvedVideoQuality={resolvedVideoQuality}
-											resolvedAudioQuality={resolvedAudioQuality}
+											error={validationError}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
 								<TabsContent className="m-0" value="audio">
-									<OutputSettingsTabSection
-										description="Generated audio mix output decisions"
-										icon={<Music2 aria-hidden="true" className="size-4" />}
-										title="Audio"
-									>
+									<OutputSettingsTabSection title="Audio">
 										<OutputSettingsChoice
 											label="Audio codec"
 											onChange={changeAudioCodec}
@@ -571,11 +529,7 @@ export function OutputSettingsPanel({
 										/>
 										<OutputSettingsValidationMessage
 											automaticReplacementMessage={automaticReplacementMessage}
-											resolvedAudio={resolvedAudio}
-											resolvedDraft={resolvedDraft}
-											resolvedResolution={resolvedResolution}
-											resolvedVideoQuality={resolvedVideoQuality}
-											resolvedAudioQuality={resolvedAudioQuality}
+											error={validationError}
 										/>
 									</OutputSettingsTabSection>
 								</TabsContent>
@@ -583,10 +537,7 @@ export function OutputSettingsPanel({
 									<OutputSettingsAiDeferredSection />
 								</TabsContent>
 								<TabsContent className="m-0" value="subtitles">
-									<OutputSettingsDeferredSection
-										icon={<Captions aria-hidden="true" className="size-4" />}
-										title="Subtitles"
-									/>
+									<OutputSettingsDeferredSection title="Subtitles" />
 								</TabsContent>
 							</div>
 						</div>
@@ -636,7 +587,7 @@ export function OutputSettingsPanel({
 								<Button
 									className="h-10 bg-primary px-5 text-primary-foreground hover:bg-primary/90"
 									disabled={exportRunning || !draftIsValid}
-									onClick={applyResolvedDraft}
+									onClick={applyDraft}
 									type="button"
 								>
 									Apply
@@ -883,32 +834,11 @@ function OutputQualityChoice({
 
 function OutputSettingsValidationMessage({
 	automaticReplacementMessage,
-	resolvedAudio,
-	resolvedDraft,
-	resolvedResolution,
-	resolvedVideoQuality,
-	resolvedAudioQuality,
+	error,
 }: {
 	automaticReplacementMessage: string | null;
-	resolvedAudio: ResolvedOutputAudioProfile;
-	resolvedDraft: ResolvedOutputVideoProfile;
-	resolvedResolution: ResolvedOutputResolution;
-	resolvedVideoQuality: ResolvedOutputQuality;
-	resolvedAudioQuality: ResolvedOutputQuality;
+	error?: string;
 }) {
-	const error =
-		resolvedDraft.kind === "invalid"
-			? resolvedDraft.error
-			: resolvedAudio.kind === "invalid"
-				? resolvedAudio.error
-				: resolvedResolution.kind === "invalid"
-					? resolvedResolution.error
-					: resolvedVideoQuality.kind === "invalid"
-						? resolvedVideoQuality.error
-						: resolvedAudioQuality.kind === "invalid"
-							? resolvedAudioQuality.error
-							: undefined;
-
 	if (error) {
 		return (
 			<p
@@ -940,8 +870,6 @@ function OutputSettingsTabSection({
 	title,
 }: {
 	children: ReactNode;
-	description: string;
-	icon: ReactNode;
 	title: string;
 }) {
 	return (
@@ -952,18 +880,12 @@ function OutputSettingsTabSection({
 }
 
 function OutputSettingsDeferredSection({
-	icon,
 	title,
 }: {
-	icon: ReactNode;
 	title: string;
 }) {
 	return (
-		<OutputSettingsTabSection
-			description="Unavailable for this v1 browser-local output path"
-			icon={icon}
-			title={title}
-		>
+		<OutputSettingsTabSection title={title}>
 			<Separator />
 			<p className="text-xs leading-5 text-muted-foreground">
 				{title} output settings are deferred and cannot be applied to generated
@@ -975,11 +897,7 @@ function OutputSettingsDeferredSection({
 
 function OutputSettingsAiDeferredSection() {
 	return (
-		<OutputSettingsTabSection
-			description="Planned browser-local AI output controls"
-			icon={<Sparkles aria-hidden="true" className="size-4" />}
-			title="AI"
-		>
+		<OutputSettingsTabSection title="AI">
 			<div className="rounded border border-workbench-border bg-workbench-hover/25 p-2.5 text-xs leading-5 text-muted-foreground">
 				<div className="flex items-center justify-between gap-2">
 					<span className="font-medium text-foreground">Deferred controls</span>
@@ -1065,16 +983,6 @@ function OutputSettingsRoadmapFact({
 	);
 }
 
-function containerForSetting(setting: OutputSettings["container"]) {
-	const id =
-		setting.kind === "default-output-profile"
-			? DEFAULT_OUTPUT_PROFILE.container
-			: setting.container;
-	return MEDIABUNNY_OUTPUT_SUPPORT.containers.find(
-		(container) => container.id === id,
-	);
-}
-
 function containerSettingValue(setting: OutputSettings["container"]): string {
 	return setting.kind === "default-output-profile"
 		? "default-output-profile"
@@ -1142,15 +1050,4 @@ function formatFrameInterpolationModelList(
 				`${model.label}: ${model.description}, up to ${model.maxFps} fps`,
 		)
 		.join("; ");
-}
-
-function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {
-	return {
-		audioCodec: { ...outputSettings.audioCodec },
-		audioQuality: { ...outputSettings.audioQuality },
-		container: { ...outputSettings.container },
-		resolution: { ...outputSettings.resolution },
-		videoCodec: { ...outputSettings.videoCodec },
-		videoQuality: { ...outputSettings.videoQuality },
-	};
 }

@@ -1,3 +1,5 @@
+import { errorMessage } from "@/lib/error-message";
+import type { PreviewAudioPlaybackState } from "../types/preview-audio-engine.types";
 import type {
 	MediaWindowGeneration,
 	MediaWindowProvider,
@@ -8,11 +10,12 @@ import {
 	type PreviewAudioContextState,
 	createPreviewAudioContextLifecycle,
 } from "./preview-audio-context-lifecycle";
-import type { PreviewAudioPlaybackState } from "./preview-audio-engine";
+import {
+	PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+	PREVIEW_AUDIO_WINDOW_PULL_INTERVAL_MS,
+} from "./preview-audio-window-policy";
 import type { ScheduledWindowEngine } from "./scheduled-window-engine";
 
-const HORIZON_SECONDS = 2;
-const PULL_INTERVAL_MS = 50;
 type OwnedGeneration = {
 	generation: MediaWindowGeneration;
 	abort: AbortController;
@@ -160,7 +163,7 @@ export function createPreviewAudioWindowController(
 		owned.throughSeconds = through;
 		try {
 			const result = await owned.generation.pullThrough(through);
-			publish(owned, result.tracks);
+			publish(owned, result);
 		} catch (error) {
 			if (!current(owned) || owned.abort.signal.aborted) return;
 			publish(
@@ -168,10 +171,9 @@ export function createPreviewAudioWindowController(
 				owned.generation.trackIds.map((trackId) => ({
 					trackId,
 					kind: "failure",
-					state: "failure",
 					startSeconds: engine.getCurrentTime(),
 					endSeconds: through,
-					reason: error instanceof Error ? error.message : String(error),
+					reason: errorMessage(error),
 				})),
 			);
 		}
@@ -217,7 +219,7 @@ export function createPreviewAudioWindowController(
 			if (timer === null)
 				timer = setInterval(() => {
 					void tick();
-				}, PULL_INTERVAL_MS);
+				}, PREVIEW_AUDIO_WINDOW_PULL_INTERVAL_MS);
 		}
 	}
 	function prepare(timeSeconds: number) {
@@ -245,7 +247,6 @@ export function createPreviewAudioWindowController(
 					provider.trackIds.map((trackId) => ({
 						trackId,
 						kind: "silence",
-						state: "silence",
 						startSeconds,
 						endSeconds: startSeconds,
 					})),
@@ -253,7 +254,10 @@ export function createPreviewAudioWindowController(
 			} else
 				await pull(
 					owned,
-					Math.min(provider.durationSeconds, startSeconds + HORIZON_SECONDS),
+					Math.min(
+						provider.durationSeconds,
+						startSeconds + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+					),
 				);
 			if (current(owned) && desiredPlaying && engine.getStatus() !== "failed")
 				await resume();
@@ -365,7 +369,10 @@ export function createPreviewAudioWindowController(
 			metrics.trackRetries++;
 			await pull(
 				owned,
-				Math.min(provider.durationSeconds, start + HORIZON_SECONDS),
+				Math.min(
+					provider.durationSeconds,
+					start + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+				),
 			);
 		},
 		tick,

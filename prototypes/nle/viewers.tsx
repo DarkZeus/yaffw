@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { type Asset, type Clip, SECOND, clamp, end } from "./model";
+import { sequenceFormatLabel } from "./model";
+import { type Asset, type Clip, SECOND, clamp, clipFadeAt, end } from "./model";
 import type { Editor } from "./use-editor";
 function MediaLayer({
 	clip,
@@ -89,7 +90,7 @@ export function ProgramMonitor({ editor }: { editor: Editor }) {
 				<strong>
 					Program <span>{editor.state.name}</span>
 				</strong>
-				<small>1920 × 1080 · 30 fps</small>
+				<small>{sequenceFormatLabel}</small>
 			</div>
 			<div className="program-room">
 				<div className="program-stage">
@@ -99,10 +100,7 @@ export function ProgramMonitor({ editor }: { editor: Editor }) {
 					{visual.map((clip) => {
 						const asset = editor.assets.find((a) => a.id === clip.assetId);
 						if (!asset) return null;
-						const fade = Math.min(
-							clip.fadeIn ? clamp((at - clip.start) / clip.fadeIn, 0, 1) : 1,
-							clip.fadeOut ? clamp((end(clip) - at) / clip.fadeOut, 0, 1) : 1,
-						);
+						const fade = clipFadeAt(clip, at);
 						return (
 							<div
 								key={clip.id}
@@ -129,10 +127,7 @@ export function ProgramMonitor({ editor }: { editor: Editor }) {
 					})}
 					{sounds.map(({ clip, gain }) => {
 						const asset = editor.assets.find((a) => a.id === clip.assetId);
-						const fade = Math.min(
-							clip.fadeIn ? clamp((at - clip.start) / clip.fadeIn, 0, 1) : 1,
-							clip.fadeOut ? clamp((end(clip) - at) / clip.fadeOut, 0, 1) : 1,
-						);
+						const fade = clipFadeAt(clip, at);
 						return asset ? (
 							<MediaLayer
 								key={clip.id}

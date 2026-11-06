@@ -14,7 +14,6 @@ assert.ok(
 );
 const directory = mkdtempSync(join(tmpdir(), "yaffw-av-fixture-"));
 try {
-	// Raw raster/sample generation: full-frame flashes and a 1 kHz sine burst.
 	const video = Buffer.alloc(160 * 90 * 500);
 	for (let frame = 0; frame < 500; frame++) {
 		if (frame >= 50 && frame % 50 < 5)

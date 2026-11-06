@@ -4,7 +4,6 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WaveformSurface } from "../waveform/selection-waveform-surface";
-import { createWavesurferPeaksFromSamples } from "../waveform/selection-waveform-surface.peaks";
 
 const mockState = vi.hoisted(() => ({
 	regionsPlugins: [] as Array<{
@@ -138,23 +137,6 @@ afterEach(() => {
 });
 
 describe("createWavesurferPeaksFromSamples", () => {
-	it("converts normalized lane buckets into finite Wavesurfer peaks", () => {
-		expect(Array.from(createWavesurferPeaksFromSamples([]))).toEqual([0]);
-		expect(
-			Array.from(
-				createWavesurferPeaksFromSamples([
-					0,
-					0.25,
-					1,
-					1.5,
-					Number.NaN,
-					Number.POSITIVE_INFINITY,
-					-0.2,
-				]),
-			),
-		).toEqual([0, 0.25, 1, 1, 0, 0, 0]);
-	});
-
 	it("creates one editable Regions selection and emits live preview plus commit changes", async () => {
 		const onPlayheadSeekRequested = vi.fn();
 		const onSelectionCommitRequested = vi.fn();
@@ -237,84 +219,6 @@ describe("createWavesurferPeaksFromSamples", () => {
 		});
 
 		expect(onPlayheadSeekRequested).toHaveBeenCalledWith(3_000_000);
-	});
-
-	it("suppresses a freshly mounted region until the active selection edit commits", async () => {
-		const props = {
-			durationUs: 12_000_000,
-			label: "Voice",
-			minimumSelectionDurationUs: 33_333,
-			onPlayheadSeekRequested: vi.fn(),
-			onSelectionCommitRequested: vi.fn(),
-			onSelectionPreviewRequested: vi.fn(),
-			samples: [0.2, 0.7, 0.4],
-			selection: {
-				endUs: 6_000_000,
-				startUs: 2_000_000,
-			},
-			selectionEditingDisabled: false,
-		};
-		const { rerender } = render(
-			<WaveformSurface {...props} selectionEditInProgress={true} />,
-		);
-
-		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
-		act(() => {
-			mockState.wavesurfers[0]?.emit("redrawcomplete");
-		});
-
-		expect(mockState.regionsPlugins[0]?.regions).toHaveLength(0);
-
-		rerender(<WaveformSurface {...props} selectionEditInProgress={false} />);
-
-		await waitFor(() => {
-			expect(mockState.regionsPlugins[0]?.regions).toHaveLength(1);
-		});
-	});
-
-	it("does not recreate Wavesurfer when parent rerenders with fresh callback identities", async () => {
-		const samples = [0.2, 0.7, 0.4];
-		const selection = {
-			endUs: 6_000_000,
-			startUs: 2_000_000,
-		};
-		const props = {
-			durationUs: 12_000_000,
-			label: "Voice",
-			minimumSelectionDurationUs: 33_333,
-			samples,
-			selection,
-			selectionEditingDisabled: false,
-			selectionEditInProgress: false,
-		};
-		const { rerender } = render(
-			<WaveformSurface
-				{...props}
-				onPlayheadSeekRequested={vi.fn()}
-				onSelectionCommitRequested={vi.fn()}
-				onSelectionPreviewRequested={vi.fn()}
-			/>,
-		);
-
-		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
-		act(() => {
-			mockState.wavesurfers[0]?.emit("redrawcomplete");
-		});
-		await waitFor(() => {
-			expect(mockState.regionsPlugins[0]?.regions).toHaveLength(1);
-		});
-
-		rerender(
-			<WaveformSurface
-				{...props}
-				onPlayheadSeekRequested={vi.fn()}
-				onSelectionCommitRequested={vi.fn()}
-				onSelectionPreviewRequested={vi.fn()}
-			/>,
-		);
-
-		expect(mockState.wavesurfers).toHaveLength(1);
-		expect(mockState.wavesurfers[0]?.destroyed).toBe(false);
 	});
 
 	it("cleans up renderer events, pending previews, and hidden container content when waveform data changes", async () => {

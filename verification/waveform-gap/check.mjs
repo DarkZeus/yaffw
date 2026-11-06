@@ -1,92 +1,12 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { generateFixtures } from "../mediabunny-upgrade/fixtures.mjs";
+import { prepareFixtures } from "./fixtures.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const fixtures = generateFixtures().filter(
-	(fixture) => fixture.kind === "audio" || fixture.kind === "sync",
-);
-mkdirSync("tmp/waveform-gap", { recursive: true });
-for (const fixture of [...fixtures].filter(
-	(entry) => !entry.gap && entry.kind === "audio",
-)) {
-	const name = `leading-${fixture.name}.mkv`;
-	const path = resolve("tmp/waveform-gap", name);
-	execFileSync("ffmpeg", [
-		"-hide_banner",
-		"-loglevel",
-		"error",
-		"-y",
-		"-itsoffset",
-		"0.7",
-		"-i",
-		resolve("tmp/mediabunny-upgrade", fixture.name),
-		"-c",
-		"copy",
-		"-copyts",
-		"-avoid_negative_ts",
-		"disabled",
-		path,
-	]);
-	const probe = JSON.parse(
-		execFileSync("ffprobe", [
-			"-v",
-			"error",
-			"-show_packets",
-			"-show_streams",
-			"-of",
-			"json",
-			path,
-		]),
-	);
-	fixtures.push({
-		name,
-		kind: "audio",
-		gap: false,
-		leadingOffset: true,
-		bytes: readFileSync(path),
-		probe,
-	});
-}
-for (const gap of [false, true]) {
-	const name = `pcm-${gap ? "gap" : "continuous"}.mkv`;
-	const path = resolve("tmp/waveform-gap", name);
-	execFileSync("ffmpeg", [
-		"-hide_banner",
-		"-loglevel",
-		"error",
-		"-y",
-		"-f",
-		"lavfi",
-		"-i",
-		"sine=frequency=440:sample_rate=48000:duration=5",
-		...(gap ? ["-af", "aselect=not(between(t\\,2\\,3))"] : []),
-		"-c:a",
-		"pcm_s16le",
-		path,
-	]);
-	const probe = JSON.parse(
-		execFileSync("ffprobe", [
-			"-v",
-			"error",
-			"-show_packets",
-			"-show_streams",
-			"-of",
-			"json",
-			path,
-		]),
-	);
-	fixtures.push({ name, kind: "audio", gap, bytes: readFileSync(path), probe });
-}
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+import { launchBrowser } from "../browser.cjs";
+const fixtures = prepareFixtures();
+const browser = await launchBrowser();
 const output = resolve(process.argv[2] || "tmp/waveform-gap/evidence.json");
 const results = [];
 try {

@@ -73,3 +73,8 @@ export type VideoStripThumbnailViewport = {
 	trackWidthPx: number;
 	viewportWidthPx: number;
 };
+
+export type VideoStripWorkerRequest = Omit<
+	VideoStripThumbnailRequest,
+	"onFrame" | "signal"
+>;

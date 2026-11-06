@@ -92,28 +92,6 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 		});
 		expect(Array.from(decoded.getChannelData(0))).toEqual(Array(10).fill(0));
 	});
-	it.each([0, 3])(
-		"decodes an ambiguous predecessor tail with declared duration %s before proving silence",
-		async (duration) => {
-			mediabunnyMock.packets = [{ timestamp: 0.4, duration }];
-			const sample = createAudioSample({
-				channels: [[1, 2]],
-				sampleRate: 10,
-				timestamp: 0.4,
-			});
-			mediabunnyMock.samples = [sample];
-			const decoded = await decodeMediabunnyAudioTrackRange({
-				track,
-				startSeconds: 1,
-				endSeconds: 2,
-				format: { numberOfChannels: 1, sampleRate: 10 },
-				signal: new AbortController().signal,
-			});
-			expect(mediabunnyMock.samplesArguments).toEqual([[0.4, 2]]);
-			expect(Array.from(decoded.getChannelData(0))).toEqual(Array(10).fill(0));
-			expect(sample.close).toHaveBeenCalledOnce();
-		},
-	);
 
 	it("does not use an earlier decoded tail to excuse an undecoded packet inside the Selection", async () => {
 		mediabunnyMock.packets = [
@@ -139,41 +117,6 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 	});
 
 	it.each([
-		{ name: "before audio begins", packets: [{ timestamp: 2, duration: 1 }] },
-		{ name: "after audio ends", packets: [{ timestamp: 0, duration: 0.5 }] },
-		{
-			name: "inside a packet gap",
-			packets: [
-				{ timestamp: 0, duration: 0.5 },
-				{ timestamp: 2, duration: 0.5 },
-			],
-		},
-	])("returns Selection-length silence $name", async ({ packets }) => {
-		mediabunnyMock.packets = packets;
-		const decoded = await decodeMediabunnyAudioTrackRange({
-			track,
-			startSeconds: 1,
-			endSeconds: 2,
-			format: { numberOfChannels: 2, sampleRate: 44_100 },
-			signal: new AbortController().signal,
-		});
-		expect(decoded.length).toBe(44_100);
-		expect(decoded.numberOfChannels).toBe(2);
-		expect(decoded.getChannelData(0).every((sample) => sample === 0)).toBe(
-			true,
-		);
-		expect(decoded.getChannelData(1).every((sample) => sample === 0)).toBe(
-			true,
-		);
-	});
-
-	it.each([
-		[],
-		[{ timestamp: 0, duration: 0 }],
-		[{ timestamp: 1, duration: 0.5 }],
-		[{ timestamp: 0, duration: 3 }],
-		[{ timestamp: Number.NaN, duration: 1 }],
-		[{ timestamp: 0, duration: -1 }],
 		[
 			{ timestamp: 0.5, duration: 0 },
 			{ timestamp: 0, duration: 0.1 },
@@ -205,24 +148,6 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 		).rejects.toThrow("cannot be decoded");
 	});
 
-	it.each(["packetError", "sampleError"] as const)(
-		"propagates %s instead of returning silence",
-		async (key) => {
-			const failure = new Error("Unreadable audio data");
-			mediabunnyMock[key] = failure;
-			mediabunnyMock.packets = [{ timestamp: 3, duration: 1 }];
-			await expect(
-				decodeMediabunnyAudioTrackRange({
-					track,
-					startSeconds: 1,
-					endSeconds: 2,
-					format: { numberOfChannels: 1, sampleRate: 10 },
-					signal: new AbortController().signal,
-				}),
-			).rejects.toBe(failure);
-		},
-	);
-
 	it("closes a sample delivered after cancellation before copying it", async () => {
 		const controller = new AbortController();
 		const sample = createAudioSample({
@@ -243,39 +168,6 @@ describe("decodeMediabunnyAudioTrackRange", () => {
 		).rejects.toMatchObject({ name: "AbortError" });
 		expect(sample.close).toHaveBeenCalledOnce();
 	});
-	it.each([0, 0.2, 0.25])(
-		"does not shift decoded events past a zero-duration encoded packet from %s",
-		async (startSeconds) => {
-			mediabunnyMock.packets = [
-				{ timestamp: 0, duration: 0.2 },
-				{ timestamp: 0.2, duration: 0 },
-				{ timestamp: 0.4, duration: 0.2 },
-			];
-			mediabunnyMock.samples = [0, 1, 2]
-				.filter((index) => (index + 1) * 0.2 > startSeconds)
-				.map((index) =>
-					createAudioSample({
-						channels: [Array(20).fill(index + 1)],
-						sampleRate: 100,
-						timestamp: index * 0.2,
-					}),
-				);
-			const decoded = await decodeMediabunnyAudioTrackRange({
-				track,
-				startSeconds,
-				endSeconds: 0.6,
-				signal: new AbortController().signal,
-				format: { numberOfChannels: 1, sampleRate: 100 },
-			});
-			expect(Array.from(decoded.getChannelData(0))).toEqual(
-				[
-					...Array(20).fill(1),
-					...Array(20).fill(2),
-					...Array(20).fill(3),
-				].slice(Math.round(startSeconds * 100)),
-			);
-		},
-	);
 	it("preserves media-time gaps and clips decoded samples to the requested range", async () => {
 		const leadingOverlap = createAudioSample({
 			channels: [

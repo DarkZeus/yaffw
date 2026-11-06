@@ -59,12 +59,9 @@ and optionally `YAFFW_BROWSER_EXECUTABLE` as above. This runs the same native
 ```sh
 pnpm exec esbuild verification/preview-gain-transitions/main.ts --bundle --platform=browser --format=iife --outfile=/tmp/yaffw-pcm.js
 node <<'JS'
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+const { launchBrowser } = require("./verification/browser.cjs");
 (async () => {
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-  });
+  const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setContent('<button id="run">Run checks</button><pre id="result"></pre>');

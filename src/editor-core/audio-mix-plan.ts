@@ -40,10 +40,6 @@ export function createAudioMixPlan({
 	};
 }
 
-export function audioMixPlanHasIncludedTracks(plan: AudioMixPlan): boolean {
-	return plan.tracks.some(audioMixPlanTrackIsIncluded);
-}
-
 export function includedAudioMixPlanTracks(
 	plan: AudioMixPlan,
 ): AudioMixPlanTrack[] {

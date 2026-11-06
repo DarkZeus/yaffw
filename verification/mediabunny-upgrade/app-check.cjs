@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+const { launchBrowser } = require("../browser.cjs");
 const origin = process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000";
 const directory = path.resolve("tmp/mediabunny-app");
 const original = path.resolve(
@@ -169,10 +169,7 @@ function eventAlignment(file) {
 		"copy",
 		mkv,
 	]);
-	const browser = await chromium.launch({
-		headless: true,
-		executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-	});
+	const browser = await launchBrowser();
 	const runs = [];
 	try {
 		for (const source of [original, mkv]) {

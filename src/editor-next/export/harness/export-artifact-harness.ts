@@ -31,6 +31,7 @@ import {
 	type RuntimeSupport,
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
+import { errorMessage } from "@/lib/error-message";
 
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
@@ -169,11 +170,6 @@ export type ExportArtifactHarnessReport = {
 	};
 };
 
-export type FullAssetExportArtifactHarnessOptions =
-	ExportArtifactHarnessOptions;
-export type FullAssetExportArtifactHarnessResult = ExportArtifactHarnessResult;
-export type FullAssetExportArtifactHarnessReport = ExportArtifactHarnessReport;
-
 export async function runFixtureCatalogExportArtifactHarness({
 	fixtures = EXPORT_CORRECTNESS_FIXTURES,
 	selectionKind = "full",
@@ -224,8 +220,8 @@ export async function runFixtureCatalogExportArtifactHarness({
 }
 
 export async function runFullAssetExportArtifactHarness(
-	options: FullAssetExportArtifactHarnessOptions = {},
-): Promise<FullAssetExportArtifactHarnessResult> {
+	options: ExportArtifactHarnessOptions = {},
+): Promise<ExportArtifactHarnessResult> {
 	const fixture = options.fixture ?? defaultFullAssetFixture();
 
 	return runExportArtifactHarness({
@@ -285,7 +281,7 @@ async function runExportArtifactHarness({
 		throw new ExportArtifactHarnessFailure(
 			"fixture-source",
 			`Fixture ${fixture.id} could not be loaded.`,
-			errorToTechnicalDetails(error),
+			errorMessage(error),
 		);
 	}
 
@@ -296,7 +292,6 @@ async function runExportArtifactHarness({
 	const analysis = await analyzeLocalMediaAssetDraft(draft, {
 		createAssetId,
 		inspect: inspectLocalAsset,
-		runtime,
 	});
 
 	if (analysis.status !== "ready") {
@@ -325,11 +320,10 @@ async function runExportArtifactHarness({
 
 	const exportReadiness = planDefaultExportCapability({
 		asset: analysis.asset,
-		audioMix,
+		output: resolvedOutput,
 		outputSettings,
 		runtime,
 		selection,
-		support: outputSupport,
 	});
 
 	if (!exportReadiness.supported) {
@@ -346,12 +340,10 @@ async function runExportArtifactHarness({
 
 	try {
 		exportResult = await runner.run({
-			asset: analysis.asset,
 			audioMix,
 			onProgress: (event) => {
 				progress.push(event);
 			},
-			outputSettings,
 			resolvedOutput: resolvedOutput.plan,
 			selection,
 			signal: exportSignal,
@@ -361,7 +353,7 @@ async function runExportArtifactHarness({
 		throw new ExportArtifactHarnessFailure(
 			"export-runner",
 			"Fixture export failed before generated media could be inspected.",
-			errorToTechnicalDetails(error),
+			errorMessage(error),
 		);
 	}
 
@@ -373,7 +365,7 @@ async function runExportArtifactHarness({
 		throw new ExportArtifactHarnessFailure(
 			"export-runner",
 			"Fixture export failed before generated media bytes could be captured.",
-			errorToTechnicalDetails(error),
+			errorMessage(error),
 		);
 	}
 
@@ -393,7 +385,7 @@ async function runExportArtifactHarness({
 		throw new ExportArtifactHarnessFailure(
 			"generated-media-inspection",
 			"Generated media could not be inspected.",
-			errorToTechnicalDetails(error),
+			errorMessage(error),
 		);
 	}
 
@@ -411,7 +403,7 @@ async function runExportArtifactHarness({
 			throw new ExportArtifactHarnessFailure(
 				"boundary-measurement",
 				"Generated media boundary measurement failed.",
-				errorToTechnicalDetails(error),
+				errorMessage(error),
 			);
 		}
 	}
@@ -425,12 +417,11 @@ async function runExportArtifactHarness({
 	});
 	const exportReview = planDefaultExportCapability({
 		asset: analysis.asset,
-		audioMix,
+		output: resolvedOutput,
 		outputSettings,
 		rangeAccuracy,
 		runtime,
 		selection,
-		support: outputSupport,
 	});
 	const generatedMedia = createGeneratedMediaMetadata({
 		asset: analysis.asset,
@@ -523,7 +514,7 @@ function failureFromError(error: unknown): {
 	return {
 		reason: "Fixture export failed before generated media could be inspected.",
 		stage: "export-runner",
-		technicalDetails: errorToTechnicalDetails(error),
+		technicalDetails: errorMessage(error),
 	};
 }
 
@@ -549,14 +540,6 @@ function selectionLabelForCatalogKind(
 		case "selectedRange":
 			return "selected range";
 	}
-}
-
-function errorToTechnicalDetails(error: unknown): string {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }
 
 function defaultFullAssetFixture(): ExportCorrectnessFixture {

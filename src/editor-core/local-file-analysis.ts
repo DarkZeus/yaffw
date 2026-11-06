@@ -1,7 +1,7 @@
-import { planDefaultExportCapability } from "./export-capability";
+import { errorMessage } from "@/lib/error-message";
+import { createEditorId } from "./identity";
 import type {
 	AudioMediaTrack,
-	ExportCapability,
 	FrameTiming,
 	MediaAssetDraft,
 	ReadyMediaAsset,
@@ -9,7 +9,6 @@ import type {
 	UnsupportedMediaFailure,
 	VideoMediaTrack,
 } from "./model";
-import type { RuntimeSupport } from "./runtime-capabilities";
 
 export type VideoTrackInspection = {
 	bitrate?: number;
@@ -60,7 +59,6 @@ export type LocalMediaAssetInspectionRequest = {
 type LocalMediaAssetAnalysisOptions = {
 	createAssetId?: () => string;
 	inspect: LocalMediaAssetInspector;
-	runtime: RuntimeSupport;
 	signal?: AbortSignal;
 };
 
@@ -75,7 +73,7 @@ export async function analyzeLocalMediaAssetDraft(
 	} catch (error) {
 		return unsupported(
 			"The media asset could not be read.",
-			errorToTechnicalDetails(error),
+			errorMessage(error),
 		);
 	}
 
@@ -94,22 +92,11 @@ export async function analyzeLocalMediaAssetDraft(
 		endUs: inspection.durationUs,
 		startUs: 0,
 	};
-	const exportCapabilityReview = planDefaultExportCapability({
-		asset: {
-			durationUs: inspection.durationUs,
-			frameTiming,
-			tracks,
-		},
-		runtime: options.runtime,
-		selection,
-	});
-	const exportCapability = exportCapabilityFromReview(exportCapabilityReview);
 
 	const asset: ReadyMediaAsset = {
 		durationUs: inspection.durationUs,
-		exportCapability,
 		frameTiming,
-		id: (options.createAssetId ?? createMediaAssetId)(),
+		id: options.createAssetId?.() ?? createEditorId("asset"),
 		label: draft.label,
 		provenance: draft.provenance,
 		tracks,
@@ -119,41 +106,6 @@ export async function analyzeLocalMediaAssetDraft(
 		asset,
 		selection,
 		status: "ready",
-	};
-}
-
-function createMediaAssetId(): string {
-	return createOwnedId("asset");
-}
-
-function createOwnedId(prefix: string): string {
-	if (
-		"crypto" in globalThis &&
-		typeof globalThis.crypto.randomUUID === "function"
-	) {
-		return `${prefix}-${globalThis.crypto.randomUUID()}`;
-	}
-
-	return `${prefix}-${Date.now().toString(36)}-${Math.random()
-		.toString(36)
-		.slice(2)}`;
-}
-
-function exportCapabilityFromReview(
-	review: ReturnType<typeof planDefaultExportCapability>,
-): ExportCapability {
-	if (review.supported) {
-		return {
-			profile: review.profile,
-			supported: true,
-		};
-	}
-
-	return {
-		profile: review.profile,
-		reason: review.reason,
-		supported: false,
-		technicalDetails: review.technicalDetails,
 	};
 }
 
@@ -237,12 +189,4 @@ function unsupported(
 		},
 		status: "unsupported",
 	};
-}
-
-function errorToTechnicalDetails(error: unknown): string {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

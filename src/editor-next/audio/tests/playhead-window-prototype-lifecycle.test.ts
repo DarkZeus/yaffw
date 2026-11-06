@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type {
 	MediaWindowProvider,
-	MediaWindowPullResult,
+	MediaWindowTrackState,
 } from "../engine/media-window-provider";
 import {
 	type PlayheadWindowPrototypeAudioContextFactory,
@@ -10,47 +10,6 @@ import {
 } from "../prototype/playhead-window/playhead-window-prototype";
 
 describe("createPlayheadWindowPrototype", () => {
-	it("blocks playback on the all-track readiness barrier", async () => {
-		const context = createAudioContextSpy();
-		const initialPull = createDeferred<MediaWindowPullResult>();
-		const provider = createProviderSpy({
-			pull: () => initialPull.promise,
-		});
-		const prototype = createPlayheadWindowPrototype({
-			createAudioContext: () => context,
-			horizonSeconds: 2,
-			lowWaterSeconds: 0.5,
-			provider,
-		});
-
-		const preparation = prototype.prepare(4);
-		const playback = prototype.play();
-		expect(prototype.getStatus()).toBe("preparing");
-		expect(context.resume).not.toHaveBeenCalled();
-
-		initialPull.resolve({
-			endSeconds: 6,
-			generationId: 1,
-			startSeconds: 4,
-			tracks: [
-				playable("audio-1", 4, 6),
-				{
-					kind: "silence",
-					trackId: "audio-2",
-					startSeconds: 4,
-					endSeconds: 6,
-					state: "silence",
-				},
-			],
-		});
-		await preparation;
-		await playback;
-
-		expect(prototype.getStatus()).toBe("ready");
-		expect(context.resume).toHaveBeenCalledOnce();
-		expect(context.createdSources).toHaveLength(1);
-	});
-
 	it("invalidates generations for seek, rate changes, routing rebuild, and selection looping", async () => {
 		const context = createAudioContextSpy();
 		const provider = createProviderSpy();
@@ -92,21 +51,18 @@ describe("createPlayheadWindowPrototype", () => {
 
 	it("does not let an obsolete lookahead pull suppress the next generation", async () => {
 		const context = createAudioContextSpy();
-		const staleLookahead = createDeferred<MediaWindowPullResult>();
+		const staleLookahead = createDeferred<readonly MediaWindowTrackState[]>();
 		let firstGenerationPulls = 0;
 		const provider = createProviderSpy({
 			pull: ({ generationId, startSeconds, trackIds }) => {
 				if (generationId === 1 && firstGenerationPulls++ > 0) {
 					return staleLookahead.promise;
 				}
-				return Promise.resolve({
-					endSeconds: startSeconds + 2,
-					generationId,
-					startSeconds,
-					tracks: trackIds.map((trackId) =>
+				return Promise.resolve(
+					trackIds.map((trackId) =>
 						playable(trackId, startSeconds, startSeconds + 2),
 					),
-				});
+				);
 			},
 		});
 		const prototype = createPlayheadWindowPrototype({
@@ -125,18 +81,16 @@ describe("createPlayheadWindowPrototype", () => {
 		await prototype.tick();
 
 		expect(provider.generations[1]?.pullThrough).toHaveBeenCalledTimes(2);
-		staleLookahead.resolve({
-			endSeconds: 3.6,
-			generationId: 1,
-			startSeconds: 2,
-			tracks: [playable("audio-1", 2, 3.6), playable("audio-2", 2, 3.6)],
-		});
+		staleLookahead.resolve([
+			playable("audio-1", 2, 3.6),
+			playable("audio-2", 2, 3.6),
+		]);
 		await obsoleteTick;
 	});
 
 	it("drops stale pulls and retries only the failed track", async () => {
 		const context = createAudioContextSpy();
-		const stalePull = createDeferred<MediaWindowPullResult>();
+		const stalePull = createDeferred<readonly MediaWindowTrackState[]>();
 		const provider = createProviderSpy({
 			pull: ({ generationId, startSeconds, trackIds }) => {
 				if (generationId === 1) {
@@ -144,36 +98,21 @@ describe("createPlayheadWindowPrototype", () => {
 				}
 
 				if (trackIds.length === 1) {
-					return Promise.resolve({
-						endSeconds: startSeconds + 2,
-						generationId,
-						startSeconds,
-						tracks: [
-							playable(
-								trackIds[0] ?? "audio-2",
-								startSeconds,
-								startSeconds + 2,
-							),
-						],
-					});
+					return Promise.resolve([
+						playable(trackIds[0] ?? "audio-2", startSeconds, startSeconds + 2),
+					]);
 				}
 
-				return Promise.resolve({
-					endSeconds: startSeconds + 2,
-					generationId,
-					startSeconds,
-					tracks: [
-						playable("audio-1", startSeconds, startSeconds + 2),
-						{
-							kind: "failure",
-							trackId: "audio-2",
-							startSeconds,
-							endSeconds: startSeconds + 2,
-							reason: "decode failed",
-							state: "failure",
-						},
-					],
-				});
+				return Promise.resolve([
+					playable("audio-1", startSeconds, startSeconds + 2),
+					{
+						kind: "failure",
+						trackId: "audio-2",
+						startSeconds,
+						endSeconds: startSeconds + 2,
+						reason: "decode failed",
+					},
+				]);
 			},
 		});
 		const prototype = createPlayheadWindowPrototype({
@@ -185,12 +124,7 @@ describe("createPlayheadWindowPrototype", () => {
 
 		const obsoletePreparation = prototype.prepare(0);
 		await prototype.seek(5);
-		stalePull.resolve({
-			endSeconds: 2,
-			generationId: 1,
-			startSeconds: 0,
-			tracks: [playable("audio-1", 0, 2), playable("audio-2", 0, 2)],
-		});
+		stalePull.resolve([playable("audio-1", 0, 2), playable("audio-2", 0, 2)]);
 		await obsoletePreparation;
 
 		expect(prototype.getCurrentTime()).toBe(5);
@@ -243,13 +177,11 @@ function playable(trackId: string, startSeconds: number, endSeconds: number) {
 				audioBuffer: createAudioBuffer(endSeconds - startSeconds),
 				endSeconds,
 				startSeconds,
-				trackId,
 			},
 		],
 		endSeconds,
 		kind: "playable" as const,
 		startSeconds,
-		state: "playable" as const,
 		trackId,
 	};
 }
@@ -264,15 +196,13 @@ function createProviderSpy({
 		generationId: number;
 		startSeconds: number;
 		trackIds: readonly string[];
-	}) => Promise<MediaWindowPullResult>;
+	}) => Promise<readonly MediaWindowTrackState[]>;
 	trackIds?: readonly string[];
 } = {}) {
 	let generationId = 0;
 	const provider = {
 		getTrackMetadata: () => ({
 			numberOfChannels: 2,
-			sampleRate: 48000,
-			failureReason: null,
 		}),
 		dispose: vi.fn(async () => {}),
 		durationSeconds,
@@ -280,7 +210,6 @@ function createProviderSpy({
 			cancel: ReturnType<typeof vi.fn>;
 			id: number;
 			pullThrough: ReturnType<typeof vi.fn>;
-			startSeconds: number;
 			trackIds: readonly string[];
 		}>,
 		openCalls: [] as Array<{
@@ -308,16 +237,10 @@ function createProviderSpy({
 						});
 					}
 
-					return {
-						endSeconds,
-						generationId,
-						startSeconds,
-						tracks: selectedTrackIds.map((trackId) =>
-							playable(trackId, startSeconds, endSeconds),
-						),
-					};
+					return selectedTrackIds.map((trackId) =>
+						playable(trackId, startSeconds, endSeconds),
+					);
 				}),
-				startSeconds,
 				trackIds: selectedTrackIds,
 			};
 			provider.generations.push(generation);

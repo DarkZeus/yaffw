@@ -29,10 +29,6 @@ export function createDefaultAudioMixTrackDecision(
 	};
 }
 
-export function audioMixHasIncludedTracks(audioMix: AudioMix): boolean {
-	return Object.values(audioMix.tracks).some((decision) => decision.include);
-}
-
 export function audioTrackVolumePercentToGain(volumePercent: number): number {
 	if (!Number.isFinite(volumePercent)) {
 		return 1;
@@ -41,4 +37,12 @@ export function audioTrackVolumePercentToGain(volumePercent: number): number {
 	const normalized = Math.max(0, Math.min(volumePercent, 100)) / 100;
 
 	return normalized * normalized;
+}
+
+export function normalizeAudioTrackVolumePercent(volumePercent: number) {
+	if (!Number.isFinite(volumePercent)) {
+		return DEFAULT_AUDIO_TRACK_VOLUME_PERCENT;
+	}
+
+	return Math.max(0, Math.min(100, Math.round(volumePercent)));
 }

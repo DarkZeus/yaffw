@@ -79,7 +79,7 @@ export function MediaLibrary({ editor }: { editor: Editor }) {
 								e.dataTransfer.setData("application/yaffw-asset", asset.id);
 								e.dataTransfer.effectAllowed = "copy";
 							}}
-							onClick={() => editor.selectSource(asset.id)}
+							onClick={() => editor.setSourceId(asset.id)}
 							onDoubleClick={() => editor.addAsset(asset, "append")}
 						>
 							<div

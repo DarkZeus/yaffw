@@ -36,8 +36,8 @@ const target = staging.target;`,
 				);
 				replace("if (!target.buffer)", "if (false)");
 				replace(
-					'const mimeType = resolvedOutput?.container.mimeType ?? "video/mp4";',
-					'const mimeType = resolvedOutput?.container.mimeType ?? "video/mp4"; const file = await staging.finish(); succeeded = true;',
+					"const mimeType = resolvedOutput.container.mimeType;",
+					"const mimeType = resolvedOutput.container.mimeType; const file = await staging.finish(); succeeded = true;",
 				);
 				replace("new Blob([target.buffer], { type: mimeType })", "file");
 			} else {
@@ -50,7 +50,7 @@ const target = staging.target;`,
 			replace(
 				"if (mixedAudio) {",
 				`if (mixedAudio) {
-globalThis.proofPcm = { frames: mixedAudio.audioBuffer.length, channels: mixedAudio.audioBuffer.numberOfChannels, sampleRate: mixedAudio.audioBuffer.sampleRate, bytes: mixedAudio.audioBuffer.length * mixedAudio.audioBuffer.numberOfChannels * 4 };`,
+globalThis.proofPcm = { frames: mixedAudio.length, channels: mixedAudio.numberOfChannels, sampleRate: mixedAudio.sampleRate, bytes: mixedAudio.length * mixedAudio.numberOfChannels * 4 };`,
 			);
 			const snapshot = `globalThis.proofReservation = output.tracks.map(t => ({ type: t.type, maximumPacketCount: t.metadata.maximumPacketCount }));
 globalThis.proofMuxState = { state: output.state, fastStart: output._muxer.fastStart, counts: output._muxer.trackDatas.map(t=>({ samples:t.samples.length, chunks:t.finalizedChunks.length, queued:t.sampleQueue.length })) };

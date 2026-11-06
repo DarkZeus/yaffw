@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { ALL_FORMATS, BufferSource, Input } from "mediabunny";
 import {
@@ -12,8 +11,7 @@ import {
 	probeFixture,
 } from "./fixtures.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+import { launchBrowser } from "../browser.cjs";
 const origin = process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000";
 const output = resolve(process.argv[2] || "tmp/frame-timing/evidence.json");
 const packageJson = JSON.parse(
@@ -103,10 +101,7 @@ function assertFixture(name, probe, metrics, timing) {
 		close(probe.firstTimestamp, 2, "Nonzero first timestamp retained by muxer");
 }
 
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+const browser = await launchBrowser();
 try {
 	const page = await browser.newPage();
 	const browserErrors = [];

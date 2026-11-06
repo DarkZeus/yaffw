@@ -1,4 +1,9 @@
 import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
+import {
+	type ResolvedChannelTransform,
+	isChannelActive,
+	resolveChannelTransform,
+} from "./audio-channel-analysis";
 
 import { DEFAULT_AUDIO_MIX_FINAL_PEAK_GUARD_DB } from "@/editor-core/audio-mix";
 import {
@@ -19,10 +24,6 @@ import {
 } from "../../media-work/adapters/mediabunny-audio-buffer";
 import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
 
-const ONE_SIDED_ACTIVE_PEAK_THRESHOLD = 0.001;
-const ONE_SIDED_ACTIVE_RMS_THRESHOLD = 0.0001;
-const ONE_SIDED_RELATIVE_SILENCE_RATIO = 0.01;
-
 export type BrowserAudioMixRequest = {
 	audioMix: AudioMix;
 	selection: Selection;
@@ -30,29 +31,12 @@ export type BrowserAudioMixRequest = {
 	source: Blob;
 };
 
-export type BrowserAudioMixResult = {
-	audioBuffer: AudioBuffer;
-	includedTrackCount: number;
-};
-
-export type ChannelAnalysis = {
-	channels: { peak: number; rms: number }[];
-	oneSidedStereo: "left-active" | "right-active" | null;
-	reason: string;
-};
-
-export type ResolvedChannelTransform = {
-	analysis: ChannelAnalysis;
-	requestedMode: AudioTrackChannelMode;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-};
-
 export async function renderBrowserAudioMix({
 	audioMix,
 	selection,
 	signal,
 	source,
-}: BrowserAudioMixRequest): Promise<BrowserAudioMixResult | null> {
+}: BrowserAudioMixRequest): Promise<AudioBuffer | null> {
 	return withDisposableMediaWorkScope(async (scope) => {
 		throwIfAborted(signal);
 
@@ -73,10 +57,9 @@ export async function renderBrowserAudioMix({
 			trackIds: trackIdsWithDecisions,
 		});
 		const selectedTracks = inputTracks
-			.map((track, trackIndex) => ({
+			.map((track) => ({
 				planTrack: mixPlan.tracksById[String(track.id)],
 				track,
-				trackIndex,
 			}))
 			.filter(
 				(
@@ -110,21 +93,13 @@ export async function renderBrowserAudioMix({
 				track,
 			});
 
-			if (decoded.length === 0) {
-				continue;
-			}
-
 			decodedTracks.push({
 				decoded,
 				planTrack,
 			});
 		}
 
-		if (decodedTracks.length === 0) {
-			return null;
-		}
-
-		const sampleRate = decodedTracks[0]?.decoded.sampleRate ?? 48_000;
+		const sampleRate = decodedTracks[0].decoded.sampleRate;
 		const outputChannels = mixPlan.outputChannels;
 		const durationSeconds = Math.max(0, endSeconds - startSeconds);
 		const frameCount = Math.max(1, Math.ceil(durationSeconds * sampleRate));
@@ -170,51 +145,11 @@ export async function renderBrowserAudioMix({
 			mixPlan.finalPeakGuardDb,
 		);
 
-		return {
-			audioBuffer: peakSafe,
-			includedTrackCount: decodedTracks.length,
-		};
+		return peakSafe;
 	});
 }
 
-export function resolveChannelTransform(
-	audioBuffer: AudioBuffer,
-	requestedMode: AudioTrackChannelMode,
-): ResolvedChannelTransform {
-	const analysis = analyzeChannelActivity(audioBuffer);
-
-	if (requestedMode !== "auto-one-sided-stereo") {
-		return {
-			analysis,
-			requestedMode,
-			resolvedMode: requestedMode,
-		};
-	}
-
-	if (analysis.oneSidedStereo === "left-active") {
-		return {
-			analysis,
-			requestedMode,
-			resolvedMode: "use-left-as-mono",
-		};
-	}
-
-	if (analysis.oneSidedStereo === "right-active") {
-		return {
-			analysis,
-			requestedMode,
-			resolvedMode: "use-right-as-mono",
-		};
-	}
-
-	return {
-		analysis,
-		requestedMode,
-		resolvedMode: "preserve",
-	};
-}
-
-export function createTransformedAudioBuffer(
+function createTransformedAudioBuffer(
 	audioBuffer: AudioBuffer,
 	{
 		channelMode,
@@ -278,7 +213,7 @@ export function createTransformedAudioBuffer(
 	return audioBuffer;
 }
 
-export function outputChannelCountForMode(
+function outputChannelCountForMode(
 	audioBuffer: AudioBuffer,
 	channelMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">,
 ): number {
@@ -288,7 +223,7 @@ export function outputChannelCountForMode(
 	});
 }
 
-export function createChannelCompensatedAudioBuffer({
+function createChannelCompensatedAudioBuffer({
 	channelTransform,
 	inputBuffer,
 	outputBuffer,
@@ -324,7 +259,7 @@ export function createChannelCompensatedAudioBuffer({
 	);
 }
 
-export function createPeakSafeAudioBuffer(
+function createPeakSafeAudioBuffer(
 	audioBuffer: AudioBuffer,
 	finalPeakGuardDb: number,
 ): AudioBuffer {
@@ -340,90 +275,6 @@ export function createPeakSafeAudioBuffer(
 	}
 
 	return applyGainToAudioBuffer(audioBuffer, peakSafetyTarget / peak);
-}
-
-function analyzeChannelActivity(audioBuffer: AudioBuffer): ChannelAnalysis {
-	const channels = Array.from(
-		{ length: audioBuffer.numberOfChannels },
-		(_, channel) => analyzeChannel(audioBuffer.getChannelData(channel)),
-	);
-
-	if (channels.length < 2) {
-		return {
-			channels,
-			oneSidedStereo: null,
-			reason: "less-than-two-channels",
-		};
-	}
-
-	const left = channels[0];
-	const right = channels[1];
-	const leftActive = isChannelActive(left);
-	const rightActive = isChannelActive(right);
-
-	if (leftActive && isChannelSilentComparedTo(right, left)) {
-		return {
-			channels,
-			oneSidedStereo: "left-active",
-			reason: "left-active-right-silent",
-		};
-	}
-
-	if (rightActive && isChannelSilentComparedTo(left, right)) {
-		return {
-			channels,
-			oneSidedStereo: "right-active",
-			reason: "right-active-left-silent",
-		};
-	}
-
-	return {
-		channels,
-		oneSidedStereo: null,
-		reason:
-			leftActive || rightActive ? "both-channels-have-signal" : "both-silent",
-	};
-}
-
-function analyzeChannel(channelData: Float32Array) {
-	let peak = 0;
-	let squareSum = 0;
-
-	for (const sample of channelData) {
-		const absoluteSample = Math.abs(sample);
-		peak = Math.max(peak, absoluteSample);
-		squareSum += sample * sample;
-	}
-
-	return {
-		peak,
-		rms: Math.sqrt(squareSum / Math.max(1, channelData.length)),
-	};
-}
-
-function isChannelActive(channel: { peak: number; rms: number }): boolean {
-	return (
-		channel.peak >= ONE_SIDED_ACTIVE_PEAK_THRESHOLD ||
-		channel.rms >= ONE_SIDED_ACTIVE_RMS_THRESHOLD
-	);
-}
-
-function isChannelSilentComparedTo(
-	candidate: { peak: number; rms: number },
-	reference: { peak: number; rms: number },
-): boolean {
-	return (
-		candidate.peak <=
-			Math.max(
-				ONE_SIDED_ACTIVE_PEAK_THRESHOLD,
-				reference.peak * ONE_SIDED_RELATIVE_SILENCE_RATIO,
-			) &&
-		candidate.rms <=
-			Math.max(
-				ONE_SIDED_ACTIVE_RMS_THRESHOLD,
-				reference.rms * ONE_SIDED_RELATIVE_SILENCE_RATIO,
-			)
-	);
 }
 
 function sourceChannelForChannelMode(

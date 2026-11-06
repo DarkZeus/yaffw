@@ -7,9 +7,11 @@ import {
 } from "../../src/editor-next/audio/prototype/playhead-window/preview-audio-evidence-harness";
 
 const fixtureInput = requiredElement<HTMLInputElement>("fixture");
-const playbackSecondsInput = requiredElement<HTMLInputElement>("playback-seconds");
+const playbackSecondsInput =
+	requiredElement<HTMLInputElement>("playback-seconds");
 const windowSecondsInput = requiredElement<HTMLInputElement>("window-seconds");
-const lookaheadSecondsInput = requiredElement<HTMLInputElement>("lookahead-seconds");
+const lookaheadSecondsInput =
+	requiredElement<HTMLInputElement>("lookahead-seconds");
 const runButton = requiredElement<HTMLButtonElement>("run");
 const functionalButton = requiredElement<HTMLButtonElement>("functional");
 const downloadButton = requiredElement<HTMLButtonElement>("download");
@@ -71,12 +73,14 @@ runButton.addEventListener("click", async () => {
 		});
 
 		json.textContent = JSON.stringify(latestRecord, null, 2);
-		status.textContent = "All controlled trials completed and passed the evidence-record gate.";
+		status.textContent =
+			"All controlled trials completed and passed the evidence-record gate.";
 		downloadButton.disabled = false;
 	} catch (error) {
 		latestRecord = null;
 		showError(error instanceof Error ? error.message : String(error));
-		json.textContent = error instanceof Error ? error.stack ?? error.message : String(error);
+		json.textContent =
+			error instanceof Error ? (error.stack ?? error.message) : String(error);
 	} finally {
 		runButton.disabled = false;
 	}
@@ -90,7 +94,8 @@ functionalButton.addEventListener("click", async () => {
 	}
 	functionalButton.disabled = true;
 	status.classList.remove("error");
-	status.textContent = "Running pause/seek/rate/loop/retry/stall/replacement/cleanup scenarios…";
+	status.textContent =
+		"Running pause/seek/rate/loop/retry/stall/replacement/cleanup scenarios…";
 	try {
 		const result = await runBrowserPreviewAudioFunctionalScenarios({
 			config: readConfig(),
@@ -162,7 +167,10 @@ function appendTrial(trial: PreviewAudioEvidenceRecord["trials"][number]) {
 }
 
 async function digestSha256(file: File) {
-	const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+	const digest = await crypto.subtle.digest(
+		"SHA-256",
+		await file.arrayBuffer(),
+	);
 	return Array.from(new Uint8Array(digest), (byte) =>
 		byte.toString(16).padStart(2, "0"),
 	).join("");

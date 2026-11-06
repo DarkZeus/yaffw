@@ -1,4 +1,6 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { createEditorId } from "@/editor-core/identity";
+import { errorMessage } from "@/lib/error-message";
+import { useEffect, useRef, useState } from "react";
 
 import { planDefaultExportCapability } from "@/editor-core/export-capability";
 import {
@@ -13,8 +15,10 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import { areOutputSettingsEqual } from "@/editor-core/model";
+import { resolveOutputPlan } from "@/editor-core/output-settings";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import {
+	type EditorSessionAction,
 	type EditorSessionState,
 	canCloseEditorSession,
 	createInitialEditorSession,
@@ -88,7 +92,7 @@ export function useSingleAssetEditingSession({
 	confirmCloseFile = defaultConfirmCloseFile,
 	createAssetId,
 	createDraftId,
-	createExportJobId = createSessionExportJobId,
+	createExportJobId = () => createEditorId("export"),
 	createGeneratedMediaId,
 	defaultExportRunner = browserDefaultExportRunner,
 	deliverGeneratedMedia = deliverBrowserGeneratedMedia,
@@ -96,11 +100,10 @@ export function useSingleAssetEditingSession({
 	now,
 	runtime,
 }: UseSingleAssetEditingSessionOptions): SingleAssetEditingSession {
-	const [session, dispatch] = useReducer(
-		editorSessionReducer,
-		runtime,
-		createInitialEditorSession,
+	const [session, setSession] = useState(() =>
+		createInitialEditorSession(runtime),
 	);
+	const sessionRef = useRef(session);
 	const activeMediaAssetCleanupControllerRef =
 		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
 	const activeImportAnalysisAbortControllerRef = useRef<AbortController | null>(
@@ -142,6 +145,18 @@ export function useSingleAssetEditingSession({
 		};
 	}, []);
 
+	function dispatch(action: EditorSessionAction) {
+		const nextSession = editorSessionReducer(sessionRef.current, action);
+		sessionRef.current = nextSession;
+		generatedMediaArtifactStoreRef.current?.reconcile(
+			nextSession.status === "ready" &&
+				nextSession.export.status === "succeeded"
+				? nextSession.export.generatedMedia.id
+				: null,
+		);
+		setSession(nextSession);
+	}
+
 	function clearSessionLocalResources() {
 		abortActiveImportAnalysis();
 		activeExportAbortControllerRef.current?.abort();
@@ -176,7 +191,6 @@ export function useSingleAssetEditingSession({
 			const result = await analyzeLocalMediaAssetDraft(draft, {
 				createAssetId,
 				inspect: inspectLocalAsset,
-				runtime,
 				signal: abortController.signal,
 			});
 
@@ -222,18 +236,18 @@ export function useSingleAssetEditingSession({
 
 		const review = planDefaultExportCapability({
 			asset: session.asset,
-			audioMix: session.audioMix,
+			output: resolveOutputPlan({
+				asset: session.asset,
+				audioMix: session.audioMix,
+				outputSettings: session.outputSettings,
+				support: MEDIABUNNY_OUTPUT_SUPPORT,
+			}),
 			outputSettings: session.outputSettings,
 			runtime: session.runtime,
 			selection: session.selection,
-			support: MEDIABUNNY_OUTPUT_SUPPORT,
 		});
 
-		if (
-			!review.supported ||
-			!review.resolvedOutput ||
-			session.export.status === "running"
-		) {
+		if (!review.supported || session.export.status === "running") {
 			return;
 		}
 
@@ -251,7 +265,6 @@ export function useSingleAssetEditingSession({
 
 		try {
 			const result = await defaultExportRunner.run({
-				asset: session.asset,
 				audioMix: session.audioMix,
 				onProgress: (progress) => {
 					dispatch({
@@ -260,7 +273,6 @@ export function useSingleAssetEditingSession({
 						type: "export.progressed",
 					});
 				},
-				outputSettings: session.outputSettings,
 				resolvedOutput: review.resolvedOutput,
 				selection: session.selection,
 				signal: abortController.signal,
@@ -310,7 +322,7 @@ export function useSingleAssetEditingSession({
 			dispatch({
 				jobId,
 				message: "Default export failed.",
-				technicalDetails: errorToMessage(error),
+				technicalDetails: errorMessage(error),
 				type: "export.failed",
 			});
 		} finally {
@@ -381,7 +393,6 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setSelectionStartFromPlayhead(playheadUs: number) {
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			playheadUs,
 			type: "selection.start.setFromPlayhead",
@@ -389,7 +400,6 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setSelectionEndFromPlayhead(playheadUs: number) {
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			playheadUs,
 			type: "selection.end.setFromPlayhead",
@@ -397,7 +407,6 @@ export function useSingleAssetEditingSession({
 	}
 
 	function moveSelectionRange(deltaUs: number) {
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			deltaUs,
 			type: "selection.range.moved",
@@ -405,7 +414,6 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setSelectionRange(selection: Selection) {
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			selection,
 			type: "selection.replaced",
@@ -413,14 +421,12 @@ export function useSingleAssetEditingSession({
 	}
 
 	function resetSelection() {
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			type: "selection.reset",
 		});
 	}
 
 	function setAudioTrackIncluded(trackId: string, include: boolean) {
-		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			include,
 			trackId,
@@ -432,7 +438,6 @@ export function useSingleAssetEditingSession({
 		trackId: string,
 		channelMode: AudioTrackChannelMode,
 	) {
-		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			channelMode,
 			trackId,
@@ -441,7 +446,6 @@ export function useSingleAssetEditingSession({
 	}
 
 	function setAudioTrackVolumePercent(trackId: string, volumePercent: number) {
-		invalidateCurrentGeneratedMediaArtifactForAudioTrack(trackId);
 		dispatch({
 			trackId,
 			type: "audio.track.volume.set",
@@ -457,7 +461,6 @@ export function useSingleAssetEditingSession({
 			return;
 		}
 
-		invalidateCurrentGeneratedMediaArtifact();
 		dispatch({
 			outputSettings,
 			type: "output-settings.applied",
@@ -471,26 +474,6 @@ export function useSingleAssetEditingSession({
 		}
 
 		return generatedMediaArtifactStoreRef.current;
-	}
-
-	function invalidateCurrentGeneratedMediaArtifact() {
-		if (session.status !== "ready" || session.export.status !== "succeeded") {
-			return;
-		}
-
-		getGeneratedMediaArtifactStore().invalidate(
-			session.export.generatedMedia.id,
-		);
-	}
-
-	function invalidateCurrentGeneratedMediaArtifactForAudioTrack(
-		trackId: string,
-	) {
-		if (session.status !== "ready" || !session.audioMix.tracks[trackId]) {
-			return;
-		}
-
-		invalidateCurrentGeneratedMediaArtifact();
 	}
 
 	return {
@@ -517,27 +500,6 @@ export function useSingleAssetEditingSession({
 	};
 }
 
-function errorToMessage(error: unknown): string {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
-}
-
 function defaultConfirmCloseFile(message: string): boolean {
 	return window.confirm(message);
-}
-
-function createSessionExportJobId(): string {
-	if (
-		"crypto" in globalThis &&
-		typeof globalThis.crypto.randomUUID === "function"
-	) {
-		return `export-${globalThis.crypto.randomUUID()}`;
-	}
-
-	return `export-${Date.now().toString(36)}-${Math.random()
-		.toString(36)
-		.slice(2)}`;
 }

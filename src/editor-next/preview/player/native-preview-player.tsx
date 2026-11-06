@@ -16,10 +16,7 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
-import {
-	type PreviewAudioEngine,
-	canUsePreviewAudioEngine,
-} from "../../audio/engine/preview-audio-engine";
+import { canUsePreviewAudioEngine } from "../../audio/engine/preview-audio-engine";
 import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
 import {
 	type PreviewAudioMonitoringStatus,
@@ -27,6 +24,7 @@ import {
 } from "../../audio/engine/use-preview-audio-monitoring-lifecycle";
 import { usePreviewAudioResources } from "../../audio/engine/use-preview-audio-resources";
 import { usePreviewMeteringSource } from "../../audio/meters/preview-metering-provider";
+import type { PreviewAudioEngine } from "../../audio/types/preview-audio-engine.types";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { EditorWorkbenchLayout } from "../../workbench/frame/editor-workbench-layout";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import {
 	createDefaultAudioMix,
 	createDefaultAudioMixTrackDecision,
+	normalizeAudioTrackVolumePercent,
 } from "@/editor-core/audio-mix";
 import type {
 	AudioMediaTrack,
@@ -24,6 +25,10 @@ import {
 	type PreviewLevelMeterChannel,
 	type PreviewLevelMeterState,
 } from "../meters/preview-level-meter";
+import {
+	formatPreviewMeterChannelLabel,
+	normalizePreviewMeterChannelCount,
+} from "../meters/preview-meter-channels";
 import type {
 	LivePreviewMeteringCombinedState,
 	LivePreviewMeteringTrackState,
@@ -166,7 +171,9 @@ function AudioTrackStrip({
 }) {
 	const label = track.label ?? `Audio ${index + 1}`;
 	const audioIncluded = decision.include;
-	const volumePercent = clampVolumePercent(decision.volumePercent);
+	const volumePercent = normalizeAudioTrackVolumePercent(
+		decision.volumePercent,
+	);
 	const meterDisplay = createTrackMeterDisplay({
 		controlled: previewMeteringControlled,
 		state: previewMeteringState,
@@ -374,14 +381,6 @@ const AudioTrackControls = memo(function AudioTrackControls({
 	);
 });
 
-function clampVolumePercent(volumePercent: number) {
-	if (!Number.isFinite(volumePercent)) {
-		return 100;
-	}
-
-	return Math.max(0, Math.min(100, Math.round(volumePercent)));
-}
-
 function CombinedPreviewStrip({
 	previewMeteringControlled,
 	previewMeteringState,
@@ -490,31 +489,6 @@ function createStaticTrackMeterChannels(
 		label: formatPreviewMeterChannelLabel(channelCount, channelIndex),
 		peakDb: Math.max(-90, -18 - trackIndex * 4 - channelIndex * 3),
 	}));
-}
-
-function normalizePreviewMeterChannelCount(
-	channels: number | undefined,
-): number {
-	if (!Number.isFinite(channels) || typeof channels !== "number") {
-		return 2;
-	}
-
-	return Math.min(Math.max(Math.round(channels), 1), 8);
-}
-
-function formatPreviewMeterChannelLabel(
-	channelCount: number,
-	channelIndex: number,
-): string {
-	if (channelCount === 1) {
-		return "Mono";
-	}
-
-	if (channelCount === 2) {
-		return channelIndex === 0 ? "Left" : "Right";
-	}
-
-	return `Ch ${channelIndex + 1}`;
 }
 
 function createTrackMeterDisplay({

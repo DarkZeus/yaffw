@@ -1,6 +1,7 @@
+import { errorMessage } from "@/lib/error-message";
 import {
 	type MediaWindowProvider,
-	type MediaWindowPullResult,
+	type MediaWindowTrackState,
 	createMediaWindowProvider,
 } from "../../engine/media-window-provider";
 import type { ScheduledWindowAudioContextLike } from "../../engine/scheduled-window-engine";
@@ -11,11 +12,15 @@ import {
 } from "./playhead-window-prototype";
 import {
 	type PreparedPreviewAudioBaseline,
-	type PreviewAudioDecoderWorkMetrics,
 	audioBufferPcmBytes,
 	prepareFullTrackDirectBaseline,
 	prepareRemuxDecodeBridgeBaseline,
 } from "./preview-audio-baselines";
+import {
+	type PreviewAudioDecoderWorkMetrics,
+	createPreviewAudioDecoderWorkMetrics,
+	throwIfPreviewAudioEvidenceAborted as throwIfAborted,
+} from "./preview-audio-evidence-primitives";
 
 export const PREVIEW_AUDIO_EVIDENCE_STRATEGIES = [
 	"playhead-window",
@@ -335,35 +340,6 @@ export function assertCompletePreviewAudioEvidence(
 	JSON.parse(JSON.stringify(record)) as PreviewAudioEvidenceRecord;
 }
 
-export type PreviewAudioFunctionalScenario = {
-	config: PreviewAudioEvidenceConfig;
-	fixture: PreviewAudioEvidenceFixture;
-	name: string;
-	signal?: AbortSignal;
-	source: Blob;
-};
-
-export async function runPreviewAudioFunctionalScenario(
-	scenario: PreviewAudioFunctionalScenario,
-	executeTrial: PreviewAudioTrialExecutor,
-) {
-	const signal = scenario.signal ?? new AbortController().signal;
-	const trial = await executeTrial({
-		config: scenario.config,
-		fixture: scenario.fixture,
-		round: 0,
-		signal,
-		source: scenario.source,
-		strategy: "playhead-window",
-	});
-
-	return {
-		name: scenario.name,
-		stallSchedule: scenario.config.stallSchedule.map((stall) => ({ ...stall })),
-		trial,
-	};
-}
-
 export type PreviewAudioFunctionalOperation = {
 	detail?: string;
 	name: string;
@@ -424,7 +400,7 @@ export async function runBrowserPreviewAudioFunctionalScenarios({
 			operations.push({ name, status: "passed" });
 		} catch (error) {
 			operations.push({
-				detail: errorToMessage(error),
+				detail: errorMessage(error),
 				name,
 				status: "failed",
 			});
@@ -601,7 +577,7 @@ async function runBrowserTrial(
 	const probe = createResponsivenessProbe();
 	const churn = createEmptyChurn();
 	const cleanup = createEmptyCleanup();
-	const decoderWork = createEmptyDecoderWork();
+	const decoderWork = createPreviewAudioDecoderWorkMetrics();
 	const pcm: PreviewAudioPcmMetrics = {
 		afterCleanupBytes: 0,
 		atReadinessBytes: 0,
@@ -641,18 +617,18 @@ async function runBrowserTrial(
 				(result) => {
 					decoderWork.windowPulls += 1;
 					if (decoderWork.windowPulls === 1) {
-						readiness.playableTrackCount = result.tracks.filter(
-							(track) => track.state === "playable",
+						readiness.playableTrackCount = result.filter(
+							(track) => track.kind === "playable",
 						).length;
-						readiness.knownSilenceTrackCount = result.tracks.filter(
-							(track) => track.state === "silence",
+						readiness.knownSilenceTrackCount = result.filter(
+							(track) => track.kind === "silence",
 						).length;
-						readiness.explicitFailureTrackCount = result.tracks.filter(
-							(track) => track.state === "failure",
+						readiness.explicitFailureTrackCount = result.filter(
+							(track) => track.kind === "failure",
 						).length;
 					}
-					for (const track of result.tracks) {
-						if (track.state !== "playable") continue;
+					for (const track of result) {
+						if (track.kind !== "playable") continue;
 						for (const chunk of track.chunks) {
 							decoderWork.decodedFrames += chunk.audioBuffer.length;
 							decoderWork.decodedMediaSeconds +=
@@ -696,7 +672,7 @@ async function runBrowserTrial(
 							prototypeMetrics?.engine.peakRetainedPcmBytes ?? 0,
 						);
 					} catch (error) {
-						if (!request.signal.aborted) errors.push(errorToMessage(error));
+						if (!request.signal.aborted) errors.push(errorMessage(error));
 					} finally {
 						candidatePullPromise = null;
 					}
@@ -739,7 +715,7 @@ async function runBrowserTrial(
 
 		await runTimedPlayback(request.config);
 	} catch (error) {
-		errors.push(errorToMessage(error));
+		errors.push(errorMessage(error));
 	} finally {
 		if (timer !== undefined) {
 			clearInterval(timer);
@@ -919,7 +895,7 @@ function blockRenderer(durationMs: number) {
 
 function instrumentProvider(
 	provider: MediaWindowProvider,
-	onPull: (result: MediaWindowPullResult) => void,
+	onPull: (result: readonly MediaWindowTrackState[]) => void,
 	onDispose: () => void,
 ): MediaWindowProvider {
 	let disposed = false;
@@ -943,7 +919,6 @@ function instrumentProvider(
 					onPull(result);
 					return result;
 				},
-				startSeconds: generation.startSeconds,
 				trackIds: generation.trackIds,
 			};
 		},
@@ -1095,21 +1070,6 @@ function pcmBytes(buffers: Iterable<AudioBuffer>) {
 	return total;
 }
 
-function createEmptyDecoderWork(): PreviewAudioDecoderWorkMetrics {
-	return {
-		decodeAudioDataCalls: 0,
-		decodedFrames: 0,
-		decodedMediaSeconds: 0,
-		decodedOutputChunks: 0,
-		decodedSamples: 0,
-		metadataPacketScans: 0,
-		rangeRequests: 0,
-		remuxedBytes: 0,
-		remuxedPackets: 0,
-		windowPulls: 0,
-	};
-}
-
 function createEmptyCleanup(): PreviewAudioCleanupMetrics {
 	return {
 		contextsClosed: 0,
@@ -1190,18 +1150,6 @@ function cloneConfig(
 		...config,
 		stallSchedule: config.stallSchedule.map((stall) => ({ ...stall })),
 	};
-}
-
-function throwIfAborted(signal: AbortSignal) {
-	if (signal.aborted) {
-		throw signal.reason instanceof Error
-			? signal.reason
-			: new DOMException("Preview audio evidence run cancelled.", "AbortError");
-	}
-}
-
-function errorToMessage(error: unknown) {
-	return error instanceof Error ? error.message : String(error);
 }
 
 function assertFunctional(

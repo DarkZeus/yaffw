@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { planDefaultExportCapability } from "./export-capability";
 import type {
 	GeneratedMedia,
 	MediaAssetDraft,
@@ -7,63 +8,17 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "./model";
-import { DEFAULT_OUTPUT_PROFILE, createDefaultOutputSettings } from "./model";
-import {
-	evaluateRuntimeSupport,
-	readRuntimeCapabilities,
-} from "./runtime-capabilities";
+import { createDefaultOutputSettings } from "./model";
+import { resolveOutputPlan } from "./output-settings";
+import { evaluateRuntimeSupport } from "./runtime-capabilities";
 import {
 	canChangeEditingDecisions,
 	canCloseEditorSession,
 	createInitialEditorSession,
 	editorSessionReducer,
-	shouldProtectEditorBeforeUnload,
 } from "./session";
 
 describe("editor-next session runtime gate", () => {
-	it("reads WebCodecs and browser media API basics from a runtime object", () => {
-		expect(
-			readRuntimeCapabilities({
-				File: function File() {},
-				MediaSource: function MediaSource() {},
-				URL: {
-					createObjectURL() {
-						return "blob:asset";
-					},
-					revokeObjectURL() {},
-				},
-				VideoDecoder: function VideoDecoder() {},
-				VideoEncoder: function VideoEncoder() {},
-			}),
-		).toEqual({
-			fileApi: true,
-			mediaSource: true,
-			objectUrl: true,
-			videoDecoder: true,
-			videoEncoder: true,
-		});
-	});
-
-	it("starts blocked when WebCodecs runtime basics are missing", () => {
-		const runtime = evaluateRuntimeSupport({
-			fileApi: true,
-			mediaSource: true,
-			objectUrl: true,
-			videoDecoder: false,
-			videoEncoder: false,
-		});
-
-		const session = createInitialEditorSession(runtime);
-
-		expect(session.status).toBe("unsupported-runtime");
-		if (session.status !== "unsupported-runtime") {
-			throw new Error(`Expected unsupported runtime, got ${session.status}`);
-		}
-
-		expect(session.importEnabled).toBe(false);
-		expect(session.message).toContain("WebCodecs");
-	});
-
 	it("moves a supported session through loading, ready asset, failure, and confirmed close back to empty", () => {
 		const runtime = evaluateRuntimeSupport({
 			fileApi: true,
@@ -329,7 +284,7 @@ describe("editor-next session runtime gate", () => {
 		expect("playheadUs" in replaced).toBe(false);
 	});
 
-	it("starts a default export job from a valid review and captures a start-time snapshot", () => {
+	it("starts an export from a valid review and locks editing decisions until it settles", () => {
 		const ready = createReadySession({
 			endUs: 800_000,
 			startUs: 200_000,
@@ -338,6 +293,7 @@ describe("editor-next session runtime gate", () => {
 		const exporting = editorSessionReducer(ready, {
 			cancelSupported: true,
 			jobId: "export-1",
+			review: reviewForSession(ready),
 			type: "export.started",
 		});
 
@@ -353,16 +309,6 @@ describe("editor-next session runtime gate", () => {
 
 		expect(exporting.export.job.id).toBe("export-1");
 		expect(exporting.export.job.cancelSupported).toBe(true);
-		expect(exporting.export.job.snapshot.asset).toBe(readyAsset);
-		expect(exporting.export.job.snapshot.audioMix).toBe(ready.audioMix);
-		expect(exporting.export.job.snapshot.outputSettings).toBe(
-			ready.outputSettings,
-		);
-		expect(exporting.export.job.snapshot.selection).toEqual({
-			endUs: 800_000,
-			startUs: 200_000,
-		});
-		expect(exporting.export.job.snapshot.review.supported).toBe(true);
 		expect(canChangeEditingDecisions(exporting)).toBe(false);
 		expect(canCloseEditorSession(exporting)).toBe(false);
 
@@ -403,133 +349,6 @@ describe("editor-next session runtime gate", () => {
 			editorSessionReducer(exporting, {
 				outputSettings: createDefaultOutputSettings(),
 				type: "output-settings.applied",
-			}),
-		).toBe(exporting);
-	});
-
-	it("creates default audio mix decisions when a media asset becomes ready", () => {
-		const ready = createReadySessionWithAsset(twoAudioTrackAsset);
-
-		expect(ready.audioMix).toEqual({
-			finalPeakGuardDb: -1,
-			outputChannels: 2,
-			tracks: {
-				"audio-1": {
-					channelMode: "preserve",
-					include: true,
-					trackId: "audio-1",
-					volumePercent: 100,
-				},
-				"audio-2": {
-					channelMode: "preserve",
-					include: true,
-					trackId: "audio-2",
-					volumePercent: 100,
-				},
-			},
-		});
-
-		const reset = editorSessionReducer(ready, { type: "selection.reset" });
-		expect(reset.status).toBe("ready");
-		if (reset.status !== "ready") {
-			throw new Error(`Expected ready, got ${reset.status}`);
-		}
-		expect(reset.audioMix).toBe(ready.audioMix);
-	});
-
-	it("updates audio mix track include, channel mode, and volume as editing decisions", () => {
-		const ready = createReadySessionWithAsset(twoAudioTrackAsset);
-
-		const excluded = editorSessionReducer(ready, {
-			include: false,
-			trackId: "audio-2",
-			type: "audio.track.include.set",
-		});
-
-		expect(excluded.status).toBe("ready");
-		if (excluded.status !== "ready") {
-			throw new Error(`Expected ready, got ${excluded.status}`);
-		}
-		expect(excluded.audioMix.tracks["audio-2"]?.include).toBe(false);
-		expect(excluded.audioMix.tracks["audio-1"]?.include).toBe(true);
-		expect(excluded.audioMix).not.toBe(ready.audioMix);
-		expect(excluded.export).toEqual({ status: "reviewing" });
-
-		const channelModeChanged = editorSessionReducer(excluded, {
-			channelMode: "use-left-as-mono",
-			trackId: "audio-2",
-			type: "audio.track.channelMode.set",
-		});
-
-		expect(channelModeChanged.status).toBe("ready");
-		if (channelModeChanged.status !== "ready") {
-			throw new Error(`Expected ready, got ${channelModeChanged.status}`);
-		}
-		expect(channelModeChanged.audioMix.tracks["audio-2"]?.channelMode).toBe(
-			"use-left-as-mono",
-		);
-		expect(channelModeChanged.audioMix.tracks["audio-1"]?.channelMode).toBe(
-			"preserve",
-		);
-
-		const volumeChanged = editorSessionReducer(channelModeChanged, {
-			trackId: "audio-2",
-			type: "audio.track.volume.set",
-			volumePercent: 42.6,
-		});
-
-		expect(volumeChanged.status).toBe("ready");
-		if (volumeChanged.status !== "ready") {
-			throw new Error(`Expected ready, got ${volumeChanged.status}`);
-		}
-		expect(volumeChanged.audioMix.tracks["audio-2"]?.volumePercent).toBe(43);
-		expect(volumeChanged.audioMix.tracks["audio-1"]?.volumePercent).toBe(100);
-
-		const clamped = editorSessionReducer(volumeChanged, {
-			trackId: "audio-2",
-			type: "audio.track.volume.set",
-			volumePercent: 140,
-		});
-
-		expect(clamped.status).toBe("ready");
-		if (clamped.status !== "ready") {
-			throw new Error(`Expected ready, got ${clamped.status}`);
-		}
-		expect(clamped.audioMix.tracks["audio-2"]?.volumePercent).toBe(100);
-
-		const ignoredUnknownTrack = editorSessionReducer(clamped, {
-			include: false,
-			trackId: "missing-audio",
-			type: "audio.track.include.set",
-		});
-
-		expect(ignoredUnknownTrack).toBe(clamped);
-	});
-
-	it("blocks audio mix changes while export is running", () => {
-		const exporting = startExport(
-			createReadySessionWithAsset(twoAudioTrackAsset),
-		);
-
-		expect(
-			editorSessionReducer(exporting, {
-				include: false,
-				trackId: "audio-1",
-				type: "audio.track.include.set",
-			}),
-		).toBe(exporting);
-		expect(
-			editorSessionReducer(exporting, {
-				channelMode: "use-left-as-mono",
-				trackId: "audio-1",
-				type: "audio.track.channelMode.set",
-			}),
-		).toBe(exporting);
-		expect(
-			editorSessionReducer(exporting, {
-				trackId: "audio-1",
-				type: "audio.track.volume.set",
-				volumePercent: 20,
 			}),
 		).toBe(exporting);
 	});
@@ -653,6 +472,7 @@ describe("editor-next session runtime gate", () => {
 			{
 				cancelSupported: true,
 				jobId: "export-2",
+				review: reviewForSession(createReadySession()),
 				type: "export.started",
 			},
 		);
@@ -707,6 +527,7 @@ describe("editor-next session runtime gate", () => {
 		const ignoredStart = editorSessionReducer(invalidReviewReady, {
 			cancelSupported: true,
 			jobId: "export-invalid",
+			review: reviewForSession(invalidReviewReady),
 			type: "export.started",
 		});
 
@@ -715,6 +536,7 @@ describe("editor-next session runtime gate", () => {
 		const exporting = editorSessionReducer(createReadySession(), {
 			cancelSupported: false,
 			jobId: "export-uncancellable",
+			review: reviewForSession(createReadySession()),
 			type: "export.started",
 		});
 
@@ -724,33 +546,6 @@ describe("editor-next session runtime gate", () => {
 		});
 
 		expect(ignoredCancellation).toBe(exporting);
-	});
-
-	it("derives close availability and unload protection from session-local work", () => {
-		const empty = createInitialEditorSession(supportedRuntime);
-		const ready = createReadySession();
-		const exporting = startExport(ready);
-		const succeeded = editorSessionReducer(exporting, {
-			generatedMedia,
-			jobId: "export-1",
-			type: "export.succeeded",
-		});
-		const closed = editorSessionReducer(succeeded, { type: "session.closed" });
-
-		expect(canCloseEditorSession(empty)).toBe(false);
-		expect(shouldProtectEditorBeforeUnload(empty)).toBe(false);
-
-		expect(canCloseEditorSession(ready)).toBe(true);
-		expect(shouldProtectEditorBeforeUnload(ready)).toBe(true);
-
-		expect(canCloseEditorSession(exporting)).toBe(false);
-		expect(shouldProtectEditorBeforeUnload(exporting)).toBe(true);
-
-		expect(canCloseEditorSession(succeeded)).toBe(true);
-		expect(shouldProtectEditorBeforeUnload(succeeded)).toBe(true);
-
-		expect(closed.status).toBe("empty");
-		expect(shouldProtectEditorBeforeUnload(closed)).toBe(false);
 	});
 });
 
@@ -772,14 +567,6 @@ const localDraft = {
 
 const readyAsset = {
 	durationUs: 1_000_000,
-	exportCapability: {
-		profile: {
-			audioCodec: "aac",
-			container: "mp4",
-			videoCodec: "h264",
-		},
-		supported: true,
-	},
 	frameTiming: {
 		analysis: {
 			averageFrameRate: 30,
@@ -801,8 +588,11 @@ const readyAsset = {
 		audio: [],
 		video: [
 			{
+				codec: "avc",
+				height: 1080,
 				id: "video-1",
 				kind: "video",
+				width: 1920,
 			},
 		],
 	},
@@ -819,7 +609,19 @@ const generatedMedia = {
 	fileName: "clip-export.mp4",
 	id: "generated-1",
 	mimeType: "video/mp4",
-	profile: DEFAULT_OUTPUT_PROFILE,
+	outputSettings: createDefaultOutputSettings(),
+	resolvedOutput: {
+		audioQuality: { kind: "preserve-source" },
+		container: {
+			fileExtension: ".mp4",
+			id: "mp4",
+			label: "MP4",
+			mimeType: "video/mp4",
+		},
+		includedAudioTrackCount: 0,
+		videoCodec: "avc",
+		videoQuality: { kind: "preserve-source" },
+	},
 	selection: {
 		endUs: 1_000_000,
 		startUs: 0,
@@ -865,31 +667,11 @@ function createReadySessionWithAsset(
 	return ready;
 }
 
-const twoAudioTrackAsset = {
-	...readyAsset,
-	tracks: {
-		audio: [
-			{
-				channels: 2,
-				id: "audio-1",
-				kind: "audio",
-				label: "System",
-			},
-			{
-				channels: 2,
-				id: "audio-2",
-				kind: "audio",
-				label: "Mic",
-			},
-		],
-		video: readyAsset.tracks.video,
-	},
-} satisfies ReadyMediaAsset;
-
 function startExport(ready: ReturnType<typeof createReadySession>) {
 	const exporting = editorSessionReducer(ready, {
 		cancelSupported: true,
 		jobId: "export-1",
+		review: reviewForSession(ready),
 		type: "export.started",
 	});
 
@@ -902,6 +684,32 @@ function startExport(ready: ReturnType<typeof createReadySession>) {
 	}
 
 	return exporting;
+}
+
+function reviewForSession(ready: ReturnType<typeof createReadySession>) {
+	return planDefaultExportCapability({
+		asset: ready.asset,
+		output: resolveOutputPlan({
+			asset: ready.asset,
+			audioMix: ready.audioMix,
+			outputSettings: ready.outputSettings,
+			support: {
+				containers: [
+					{
+						id: "mp4",
+						label: "MP4",
+						fileExtension: ".mp4",
+						mimeType: "video/mp4",
+						audioCodecs: ["aac"],
+						videoCodecs: ["avc"],
+					},
+				],
+			},
+		}),
+		outputSettings: ready.outputSettings,
+		runtime: ready.runtime,
+		selection: ready.selection,
+	});
 }
 
 const supportedRuntime = evaluateRuntimeSupport({

@@ -16,7 +16,7 @@ import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { MediaTimeUs } from "@/editor-core/model";
 
-import type { PreviewAudioPlaybackState } from "../../audio/engine/preview-audio-engine";
+import type { PreviewAudioPlaybackState } from "../../audio/types/preview-audio-engine.types";
 
 export type PreviewTransportRegionProps = {
 	playbackRequested: boolean;

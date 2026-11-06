@@ -1,10 +1,10 @@
 import { audioMixPlanTrackOutputChannelCount } from "@/editor-core/audio-mix-plan";
 import type { AudioTrackChannelMode } from "@/editor-core/model";
-import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
+import { errorMessage } from "@/lib/error-message";
 import {
-	type ResolvedChannelTransform,
-	resolveChannelTransform,
-} from "./browser-audio-mix";
+	createPreviewMeterChannelLabels,
+	normalizePreviewMeterChannelCount,
+} from "../meters/preview-meter-channels";
 import type {
 	PreviewAudioAnalyserNodeLike,
 	PreviewAudioContextLike,
@@ -13,7 +13,12 @@ import type {
 	PreviewAudioEngineTrackMeterState,
 	PreviewAudioGainNodeLike,
 	PreviewAudioNodeLike,
-} from "./preview-audio-engine";
+} from "../types/preview-audio-engine.types";
+import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
+import {
+	type ResolvedChannelTransform,
+	resolveChannelTransform,
+} from "./audio-channel-analysis";
 import { createPreviewGainTransition } from "./preview-gain-transition";
 type PreviewAudioTrackChannelRouting = {
 	dispose: () => void;
@@ -44,8 +49,7 @@ export function createPreviewAudioGraph(
 	resources: PreviewAudioResource[],
 	outputChannels: number,
 ) {
-	const outputChannelCount =
-		normalizePreviewAudioMeterOutputChannelCount(outputChannels);
+	const outputChannelCount = normalizePreviewMeterChannelCount(outputChannels);
 	const outputGain = audioContext.createGain();
 	const outputTransition = createPreviewGainTransition(outputGain.gain);
 	outputGain.connect(audioContext.destination);
@@ -55,7 +59,7 @@ export function createPreviewAudioGraph(
 	const combinedTap = createPreviewAudioMeterTapState({
 		audioContext,
 		channelCount: outputChannelCount,
-		labels: createPreviewOutputChannelLabels(outputChannelCount),
+		labels: createPreviewMeterChannelLabels(outputChannelCount),
 		sourceNode: mix,
 	});
 	const tracks = resources.map((resource) => {
@@ -85,7 +89,6 @@ export function createPreviewAudioGraph(
 			track.resource = {
 				...track.resource,
 				numberOfChannels: buffer.numberOfChannels,
-				sampleRate: buffer.sampleRate,
 			};
 			for (const route of track.routes.values()) route.dispose();
 			track.routes.clear();
@@ -244,10 +247,7 @@ function createPreviewAudioTrackChannelRouting({
 	gainNode: PreviewAudioGainNodeLike;
 	resource: PreviewAudioResource;
 }): PreviewAudioTrackChannelRouting {
-	const resolvedChannelMode = resolvePreviewAudioChannelMode({
-		audioBuffer: resource,
-		channelMode,
-	});
+	const resolvedChannelMode = resolvePreviewAudioChannelMode(channelMode);
 
 	if (
 		resolvedChannelMode === "preserve" ||
@@ -340,12 +340,9 @@ function createPreviewAudioTrackChannelRouting({
 	};
 }
 
-function resolvePreviewAudioChannelMode({
-	channelMode,
-}: {
-	audioBuffer: Pick<AudioBuffer, "numberOfChannels">;
-	channelMode: AudioTrackChannelMode;
-}): Exclude<AudioTrackChannelMode, "auto-one-sided-stereo"> {
+function resolvePreviewAudioChannelMode(
+	channelMode: AudioTrackChannelMode,
+): Exclude<AudioTrackChannelMode, "auto-one-sided-stereo"> {
 	return channelMode === "auto-one-sided-stereo" ? "preserve" : channelMode;
 }
 
@@ -383,11 +380,8 @@ function createPreviewAudioTrackMeterTapState({
 	gainNode: PreviewAudioGainNodeLike;
 	resource: PreviewAudioResource;
 }): PreviewAudioMeterTapState {
-	const resolvedMode = resolvePreviewAudioChannelMode({
-		audioBuffer: resource,
-		channelMode,
-	});
-	const channelCount = normalizePreviewAudioMeterOutputChannelCount(
+	const resolvedMode = resolvePreviewAudioChannelMode(channelMode);
+	const channelCount = normalizePreviewMeterChannelCount(
 		audioMixPlanTrackOutputChannelCount({
 			inputChannelCount: resource.numberOfChannels,
 			resolvedChannelMode: resolvedMode,
@@ -397,11 +391,7 @@ function createPreviewAudioTrackMeterTapState({
 	return createPreviewAudioMeterTapState({
 		audioContext,
 		channelCount,
-		labels: createPreviewAudioMeterChannelLabels({
-			audioBuffer: resource,
-			outputChannels: channelCount,
-			resolvedMode,
-		}),
+		labels: createPreviewMeterChannelLabels(channelCount),
 		sourceNode: gainNode,
 	});
 }
@@ -462,7 +452,7 @@ function createPreviewAudioMeterTapState({
 		disconnectPreviewAudioNodes(createdNodes);
 
 		return {
-			reason: `Preview audio engine meter tap unavailable: ${errorToMessage(error)}`,
+			reason: `Preview audio engine meter tap unavailable: ${errorMessage(error)}`,
 			status: "unavailable",
 		};
 	}
@@ -534,91 +524,10 @@ function createPreviewAudioMeterChannels({
 	}));
 }
 
-function createPreviewAudioMeterChannelLabels({
-	audioBuffer,
-	outputChannels,
-	resolvedMode,
-}: {
-	audioBuffer: Pick<AudioBuffer, "numberOfChannels">;
-	outputChannels: number;
-	resolvedMode: Exclude<AudioTrackChannelMode, "auto-one-sided-stereo">;
-}): string[] {
-	if (
-		resolvedMode === "use-left-as-mono" ||
-		resolvedMode === "use-right-as-mono" ||
-		resolvedMode === "average-to-mono"
-	) {
-		return outputChannels === 1
-			? ["Mono"]
-			: createPreviewOutputChannelLabels(outputChannels);
-	}
-
-	if (
-		outputChannels === 2 &&
-		(resolvedMode === "duplicate-left-to-stereo" ||
-			resolvedMode === "duplicate-right-to-stereo")
-	) {
-		return ["Left", "Right"];
-	}
-
-	return Array.from({ length: outputChannels }, (_, channelIndex) =>
-		formatPreviewAudioSourceChannelLabel(
-			audioBuffer.numberOfChannels,
-			channelIndex,
-		),
-	);
-}
-
-function formatPreviewAudioSourceChannelLabel(
-	channelCount: number,
-	channelIndex: number,
-): string {
-	if (channelCount === 1) {
-		return "Mono";
-	}
-
-	if (channelCount === 2) {
-		return channelIndex === 0 ? "Left" : "Right";
-	}
-
-	return `Ch ${channelIndex + 1}`;
-}
-
-function createPreviewOutputChannelLabels(outputChannels: number): string[] {
-	if (outputChannels === 1) {
-		return ["Mono"];
-	}
-
-	if (outputChannels === 2) {
-		return ["Left", "Right"];
-	}
-
-	return Array.from(
-		{ length: outputChannels },
-		(_, channelIndex) => `Ch ${channelIndex + 1}`,
-	);
-}
-
 function disconnectPreviewAudioNodes(nodes: PreviewAudioNodeLike[]) {
 	for (const node of nodes) {
 		node.disconnect?.();
 	}
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
-}
-
-function normalizePreviewAudioMeterOutputChannelCount(outputChannels: number) {
-	if (!Number.isFinite(outputChannels)) {
-		return 2;
-	}
-
-	return Math.max(1, Math.min(8, Math.round(outputChannels)));
 }
 
 function clampPreviewVolume(volume: number) {

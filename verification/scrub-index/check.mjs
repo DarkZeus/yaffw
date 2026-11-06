@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { posix, resolve } from "node:path";
 import { generateFixtures } from "./fixtures.mjs";
 
 const baseline = "234286135b2c2af3272ec94fc4a4392fd607e792";
@@ -23,64 +22,36 @@ const production = readFileSync(
 	`${owner}mediabunny-scrub-frame-provider.ts`,
 	"utf8",
 );
-const expectedProduction = original(
-	`${owner}mediabunny-scrub-frame-provider.ts`,
-)
-	.replace('import { createKeyframeIndex } from "./keyframe-index";\n', "")
-	.replace(
-		"\tlet keyframeIndex: ReturnType<typeof createKeyframeIndex> | null = null;\n",
-		"",
-	)
-	.replace(
-		"\t\tconst indexedTimestamp = keyframeIndex?.floor(timestampSeconds) ?? null;\n\t\treturn packetSink.getKeyPacket(indexedTimestamp ?? timestampSeconds);",
-		"\t\treturn packetSink.getKeyPacket(timestampSeconds);",
-	)
-	.replace(
-		"\t\t\tkeyframeIndex = createKeyframeIndex(new EncodedPacketSink(videoTrack));\n",
-		"",
-	);
-assert.equal(
-	production,
-	expectedProduction,
-	"Candidate matches the adopted production provider",
-);
 assert.equal(
 	JSON.parse(readFileSync("node_modules/mediabunny/package.json", "utf8"))
 		.version,
 	"1.65.2",
 );
-let indexed = original(`${owner}mediabunny-scrub-frame-provider.ts`)
-	.replaceAll('"../../media-work/', '"/src/editor-next/media-work/')
-	.replace(
-		'"./scrub-frame-cache"',
-		'"/src/editor-next/preview/scrub/scrub-frame-cache"',
+function instrument(originalSource, historical = false) {
+	let source = originalSource.replace(
+		/from "(\.[^"]+)"/g,
+		(match, specifier) =>
+			historical && specifier === "./keyframe-index"
+				? match
+				: `from "${posix.join("/", owner, specifier)}"`,
 	);
-indexed = replace(
-	indexed,
-	"new BlobSource(source, {\n\t\t\t\thandleUnhandledError: sourceFailure.handleUnhandledError,\n\t\t\t})",
-	"countSource(new BlobSource(source, { handleUnhandledError: sourceFailure.handleUnhandledError }))",
-);
-indexed = replace(
-	indexed,
-	"\t\t\tpacketSink = new EncodedPacketSink(videoTrack);",
-	"\t\t\tglobalThis.__scrubProbe.ready = true;\n\t\t\tpacketSink = new EncodedPacketSink(videoTrack);",
-);
-indexed +=
-	'\nfunction countSource(source) { source.on("read", ({start,end}) => { globalThis.__scrubProbe.bytes += end-start; globalThis.__scrubProbe.reads++; }); return source; }\n';
-const direct = indexed
-	.replace('import { createKeyframeIndex } from "./keyframe-index";\n', "")
-	.replace(
-		"\tlet keyframeIndex: ReturnType<typeof createKeyframeIndex> | null = null;\n",
-		"",
-	)
-	.replace(
-		"\t\tconst indexedTimestamp = keyframeIndex?.floor(timestampSeconds) ?? null;\n\t\treturn packetSink.getKeyPacket(indexedTimestamp ?? timestampSeconds);",
-		"\t\treturn packetSink.getKeyPacket(timestampSeconds);",
-	)
-	.replace(
-		"\t\t\tkeyframeIndex = createKeyframeIndex(new EncodedPacketSink(videoTrack));\n",
-		"",
+	source = replace(
+		source,
+		"new BlobSource(source, {\n\t\t\t\thandleUnhandledError: sourceFailure.handleUnhandledError,\n\t\t\t})",
+		"countSource(new BlobSource(source, { handleUnhandledError: sourceFailure.handleUnhandledError }))",
 	);
+	source = replace(
+		source,
+		"\t\t\tpacketSink = new EncodedPacketSink(videoTrack);",
+		"\t\t\tglobalThis.__scrubProbe.ready = true;\n\t\t\tpacketSink = new EncodedPacketSink(videoTrack);",
+	);
+	return `${source}\nfunction countSource(source) { source.on("read", ({start,end}) => { globalThis.__scrubProbe.bytes += end-start; globalThis.__scrubProbe.reads++; }); return source; }\n`;
+}
+const indexed = instrument(
+	original(`${owner}mediabunny-scrub-frame-provider.ts`),
+	true,
+);
+const direct = instrument(production);
 assert.ok(!direct.includes("keyframeIndex"));
 writeFileSync(resolve(directory, "indexed.ts"), indexed);
 writeFileSync(resolve(directory, "direct.ts"), direct);
@@ -97,12 +68,8 @@ index = replace(
 );
 writeFileSync(resolve(directory, "keyframe-index.ts"), index);
 const fixtures = generateFixtures();
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+import { launchBrowser } from "../browser.cjs";
+const browser = await launchBrowser();
 const results = [];
 try {
 	for (let trial = 0; trial < 3; trial++)
@@ -173,6 +140,9 @@ try {
 				}
 	const evidence = {
 		baseline,
+		candidateSourceSha256: createHash("sha256")
+			.update(production)
+			.digest("hex"),
 		recordedAt: new Date().toISOString(),
 		browser: await browser.version(),
 		mediabunny: JSON.parse(

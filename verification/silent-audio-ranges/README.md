@@ -12,6 +12,10 @@ pnpm exec tsc --project verification/silent-audio-ranges/tsconfig.json
 pnpm exec biome check --config-path verification/silent-audio-ranges verification/silent-audio-ranges
 ```
 
+Both runners call `prepareFixture()` from `fixtures.mjs` before opening a browser.
+Either command can run directly; they reuse the same source bytes unless
+`YAFFW_REGENERATE_FIXTURE=1` is set.
+
 `check.mjs` creates and then reuses a six-second H.264/Opus MKV using ffmpeg.
 Its first audio track begins near one second, ends near five seconds, and contains a real missing
 packet interval between two and three seconds. The second track has healthy

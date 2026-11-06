@@ -1,4 +1,10 @@
 import {
+	browserNowMs,
+	cancelBrowserFrame,
+	requestBrowserFrame,
+} from "@/lib/browser-animation-frame";
+import { clamp } from "@/lib/clamp";
+import {
 	type RefObject,
 	useCallback,
 	useEffect,
@@ -8,11 +14,10 @@ import {
 
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
 
-import {
-	type PreviewAudioEngine,
-	type PreviewAudioPlaybackState,
-	setPreviewAudioEnginePlaybackRate,
-} from "../../audio/engine/preview-audio-engine";
+import type {
+	PreviewAudioEngine,
+	PreviewAudioPlaybackState,
+} from "../../audio/types/preview-audio-engine.types";
 import type { PreviewClockMode } from "./preview-clock-mode";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
@@ -140,7 +145,7 @@ export function useNativePreviewTransport({
 
 			playheadStateRef.current = nextPlayheadUs;
 			playheadStateCommitTimestampRef.current =
-				options.kind === "throttled" ? options.timestampMs : previewNowMs();
+				options.kind === "throttled" ? options.timestampMs : browserNowMs();
 			setPlayheadUsState((currentPlayheadUs) =>
 				currentPlayheadUs === nextPlayheadUs
 					? currentPlayheadUs
@@ -155,7 +160,7 @@ export function useNativePreviewTransport({
 			nextPlayheadUs: MediaTimeUs,
 			options: PlayheadCommitOptions = { kind: "force" },
 		) => {
-			const clampedPlayheadUs = clampMediaTime(
+			const clampedPlayheadUs = clamp(
 				Math.round(nextPlayheadUs),
 				0,
 				durationUs,
@@ -211,7 +216,7 @@ export function useNativePreviewTransport({
 
 	const seekToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
-			const clampedPlayheadUs = clampMediaTime(
+			const clampedPlayheadUs = clamp(
 				Math.round(nextPlayheadUs),
 				0,
 				durationUs,
@@ -232,7 +237,7 @@ export function useNativePreviewTransport({
 
 	const previewScrubToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
-			const clampedPlayheadUs = clampMediaTime(
+			const clampedPlayheadUs = clamp(
 				Math.round(nextPlayheadUs),
 				0,
 				durationUs,
@@ -387,10 +392,7 @@ export function useNativePreviewTransport({
 				video.playbackRate = nextPlaybackRate;
 			}
 
-			setPreviewAudioEnginePlaybackRate(
-				previewAudioEngineRef.current,
-				nextPlaybackRate,
-			);
+			previewAudioEngineRef.current?.setPlaybackRate(nextPlaybackRate);
 			playbackRateRef.current = nextPlaybackRate;
 			setPlaybackRate(nextPlaybackRate);
 		},
@@ -660,7 +662,7 @@ export function useNativePreviewTransport({
 
 			setPlayheadUs(nativePlayheadUs, {
 				kind: "throttled",
-				timestampMs: options?.timestampMs ?? previewNowMs(),
+				timestampMs: options?.timestampMs ?? browserNowMs(),
 			});
 		},
 		[
@@ -707,7 +709,7 @@ export function useNativePreviewTransport({
 	useEffect(() => {
 		if (!isPlaying) {
 			if (playheadAnimationFrameRef.current !== null) {
-				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				cancelBrowserFrame(playheadAnimationFrameRef.current);
 				playheadAnimationFrameRef.current = null;
 			}
 			return;
@@ -722,17 +724,17 @@ export function useNativePreviewTransport({
 
 			syncPlayheadWithNativeVideo({ timestampMs });
 			playheadAnimationFrameRef.current =
-				requestPreviewFrame(syncOnAnimationFrame);
+				requestBrowserFrame(syncOnAnimationFrame);
 		}
 
 		playheadAnimationFrameRef.current =
-			requestPreviewFrame(syncOnAnimationFrame);
+			requestBrowserFrame(syncOnAnimationFrame);
 
 		return () => {
 			cancelled = true;
 
 			if (playheadAnimationFrameRef.current !== null) {
-				cancelPreviewFrame(playheadAnimationFrameRef.current);
+				cancelBrowserFrame(playheadAnimationFrameRef.current);
 				playheadAnimationFrameRef.current = null;
 			}
 		};
@@ -956,19 +958,18 @@ function resolveAudioMasterPlaybackStartSeconds({
 }) {
 	if (pendingSeekSeconds !== null && Number.isFinite(pendingSeekSeconds)) {
 		return (
-			clampMediaTime(secondsToMicroseconds(pendingSeekSeconds), 0, durationUs) /
+			clamp(secondsToMicroseconds(pendingSeekSeconds), 0, durationUs) /
 			1_000_000
 		);
 	}
 
 	if (Number.isFinite(video.currentTime)) {
 		return (
-			clampMediaTime(secondsToMicroseconds(video.currentTime), 0, durationUs) /
-			1_000_000
+			clamp(secondsToMicroseconds(video.currentTime), 0, durationUs) / 1_000_000
 		);
 	}
 
-	return clampMediaTime(playheadUs, 0, durationUs) / 1_000_000;
+	return clamp(playheadUs, 0, durationUs) / 1_000_000;
 }
 
 function finiteVideoPlayheadUs(
@@ -990,37 +991,4 @@ function setVideoFollowerTime(
 
 	video.currentTime = playheadUs / 1_000_000;
 	return true;
-}
-
-function clampMediaTime(
-	valueUs: MediaTimeUs,
-	minUs: MediaTimeUs,
-	maxUs: MediaTimeUs,
-): MediaTimeUs {
-	return Math.min(Math.max(valueUs, minUs), maxUs);
-}
-
-function requestPreviewFrame(callback: FrameRequestCallback): number {
-	if (typeof window.requestAnimationFrame === "function") {
-		return window.requestAnimationFrame(callback);
-	}
-
-	return window.setTimeout(() => callback(window.performance.now()), 16);
-}
-
-function cancelPreviewFrame(frameId: number) {
-	if (typeof window.cancelAnimationFrame === "function") {
-		window.cancelAnimationFrame(frameId);
-		return;
-	}
-
-	window.clearTimeout(frameId);
-}
-
-function previewNowMs(): number {
-	if (typeof window.performance?.now === "function") {
-		return window.performance.now();
-	}
-
-	return Date.now();
 }

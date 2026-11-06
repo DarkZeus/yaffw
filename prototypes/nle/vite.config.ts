@@ -5,6 +5,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
 	root: fileURLToPath(new URL(".", import.meta.url)),
+	cacheDir: fileURLToPath(
+		new URL("../../node_modules/.vite-nle", import.meta.url),
+	),
 	plugins: [react(), tailwindcss()],
 	resolve: {
 		alias: { "@": fileURLToPath(new URL("../../src", import.meta.url)) },

@@ -2,151 +2,23 @@ import {
 	type AudioMixPlanTrack,
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
-import type {
-	AudioMix,
-	AudioTrackChannelMode,
-	ReadyMediaAsset,
-} from "@/editor-core/model";
+import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
+import {
+	PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+	PREVIEW_AUDIO_WINDOW_LOW_WATER_SECONDS,
+} from "./preview-audio-window-policy";
 
+import type {
+	CreatePreviewAudioEngineOptions,
+	PreviewAudioContextLike,
+	PreviewAudioEngine,
+} from "../types/preview-audio-engine.types";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
-import type { MediaWindowProvider } from "./media-window-provider";
-import type { PreviewAudioContextLifecycleSource } from "./preview-audio-context-lifecycle";
 import { createPreviewAudioGraph } from "./preview-audio-graph";
 import { createPreviewAudioWindowController } from "./preview-audio-window-controller";
-import type { PreviewGainParam } from "./preview-gain-transition";
 import { createPreviewOutputTime } from "./preview-output-time";
 import { PREVIEW_OUTPUT_TIMING_ENABLED } from "./preview-output-timing-enabled";
-import {
-	type ScheduledWindowEngineStatus,
-	createScheduledWindowEngine,
-} from "./scheduled-window-engine";
-
-export type PreviewAudioEngine = {
-	destroy: () => void;
-	subscribe: (listener: () => void) => () => void;
-	getMetrics: () => ReturnType<
-		ReturnType<typeof createPreviewAudioWindowController>["getMetrics"]
-	>;
-	retryTrack: (trackId: string) => Promise<void>;
-	setPlaybackEnd: (endSeconds: number | null) => void;
-	getCurrentTime: () => number;
-	getPresentationTime: () => number;
-	getStatus: () => PreviewAudioEngineStatus;
-	getPlaybackState: () => PreviewAudioPlaybackState;
-	pause: () => void;
-	play: () => Promise<void>;
-	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot;
-	setOutputGain: (gain: number) => void;
-	setPlaybackRate: (playbackRate: number) => Promise<void>;
-	setTime: (timeSeconds: number) => Promise<void>;
-	setTrackChannelMode: (
-		trackIndex: number,
-		channelMode: AudioTrackChannelMode,
-	) => void;
-	setTrackMonitorGain: (trackIndex: number, gain: number) => void;
-	setTrackVolumeGain: (trackIndex: number, gain: number) => void;
-};
-
-export type PreviewAudioEngineStatus = ScheduledWindowEngineStatus;
-
-/** Playback availability is separate from decoded-track readiness and clock authority. */
-export type PreviewAudioPlaybackState =
-	| "paused"
-	| "playing"
-	| "buffering"
-	| "interrupted"
-	| "recovery-required"
-	| "closed";
-
-export type PreviewAudioEngineMeterChannel = {
-	label: string;
-	peak: number;
-};
-
-export type PreviewAudioEngineTrackMeterState =
-	| {
-			channels: PreviewAudioEngineMeterChannel[];
-			status: "ready";
-			trackId: string;
-	  }
-	| {
-			reason: string;
-			status: "unavailable";
-			trackId: string;
-	  };
-
-export type PreviewAudioEngineCombinedMeterState =
-	| {
-			channels: PreviewAudioEngineMeterChannel[];
-			partial: boolean;
-			reason?: string;
-			status: "ready";
-	  }
-	| {
-			reason: string;
-			status: "unavailable";
-	  };
-
-export type PreviewAudioEngineMeterSnapshot = {
-	combinedState: PreviewAudioEngineCombinedMeterState;
-	trackStates: Record<string, PreviewAudioEngineTrackMeterState>;
-};
-
-export type PreviewAudioContextLike = PreviewAudioContextLifecycleSource & {
-	close?: () => Promise<void> | void;
-	createAnalyser: () => PreviewAudioAnalyserNodeLike;
-	createBufferSource: () => PreviewAudioBufferSourceNodeLike;
-	createChannelMerger?: (numberOfInputs?: number) => PreviewAudioNodeLike;
-	createChannelSplitter?: (numberOfOutputs?: number) => PreviewAudioNodeLike;
-	createGain: () => PreviewAudioGainNodeLike;
-	currentTime: number;
-	getOutputTimestamp?: () => { contextTime?: number; performanceTime?: number };
-	destination: PreviewAudioNodeLike;
-	resume?: () => Promise<void> | void;
-	sampleRate: number;
-};
-
-export type PreviewAudioNodeLike = {
-	channelCount?: number;
-	channelCountMode?: "clamped-max" | "explicit" | "max";
-	channelInterpretation?: "discrete" | "speakers";
-	connect: (
-		destination: PreviewAudioNodeLike,
-		output?: number,
-		input?: number,
-	) => unknown;
-	disconnect?: (destination?: PreviewAudioNodeLike) => void;
-};
-
-export type PreviewAudioAnalyserNodeLike = PreviewAudioNodeLike & {
-	fftSize: number;
-	getFloatTimeDomainData: (array: Float32Array) => void;
-};
-
-export type PreviewAudioGainNodeLike = PreviewAudioNodeLike & {
-	gain: PreviewGainParam;
-};
-
-export type PreviewAudioBufferSourceNodeLike = PreviewAudioNodeLike & {
-	buffer: AudioBuffer | null;
-	onended: (() => void) | null;
-	playbackRate: {
-		value: number;
-	};
-	start: (when?: number, offset?: number, duration?: number) => void;
-	stop: () => void;
-};
-
-export type CreatePreviewAudioEngineOptions = {
-	createAudioContext?: () => PreviewAudioContextLike;
-	outputTimingEnabled?: boolean;
-	provider: MediaWindowProvider;
-	initialTimeSeconds?: number;
-	initialPlaybackRate?: number;
-	signal?: AbortSignal;
-	outputChannels: number;
-	resources: PreviewAudioResource[];
-};
+import { createScheduledWindowEngine } from "./scheduled-window-engine";
 
 export function canUsePreviewAudioEngine(asset: ReadyMediaAsset) {
 	return (
@@ -183,8 +55,8 @@ export async function createPreviewAudioEngine({
 			createAudioContext: () => audioContext,
 			contextLifecycleManaged: true,
 			durationSeconds: provider.durationSeconds,
-			horizonSeconds: 2,
-			lowWaterSeconds: 1.5,
+			horizonSeconds: PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+			lowWaterSeconds: PREVIEW_AUDIO_WINDOW_LOW_WATER_SECONDS,
 			trackIds: resources.map((resource) => resource.trackId),
 			trackDestination: ownedGraph.destination,
 		});
@@ -286,56 +158,6 @@ export async function createPreviewAudioEngine({
 	};
 }
 
-export function previewTrackVolumeGainForAudioTrackResource({
-	audioMix,
-	resource,
-}: {
-	audioMix: AudioMix;
-	resource: PreviewAudioResource;
-}) {
-	const plan = createAudioMixPlan({
-		audioMix,
-		trackIds: [resource.trackId],
-	});
-
-	return plan.tracksById[resource.trackId]?.trackVolumeGain ?? 1;
-}
-
-export function previewTrackMonitorGainForAudioTrackResource({
-	audioMix,
-	soloedAudioTrackId,
-	resource,
-}: {
-	audioMix: AudioMix;
-	soloedAudioTrackId?: string | null;
-	resource: PreviewAudioResource;
-}) {
-	const plan = createAudioMixPlan({
-		audioMix,
-		trackIds: [resource.trackId],
-	});
-	const trackPlan = plan.tracksById[resource.trackId];
-
-	return previewTrackMonitorGainForAudioMixPlanTrack({
-		soloedAudioTrackId,
-		trackPlan,
-	});
-}
-
-export function previewOutputGainForAudioMonitoring({
-	muted,
-	volume,
-}: {
-	muted: boolean;
-	volume: number;
-}) {
-	if (muted) {
-		return 0;
-	}
-
-	return clampPreviewVolume(volume);
-}
-
 function previewTrackMonitorGainForAudioMixPlanTrack({
 	soloedAudioTrackId,
 	trackPlan,
@@ -369,9 +191,7 @@ export function applyPreviewAudioEngineMix({
 	resources: PreviewAudioResource[];
 	volume: number;
 }) {
-	previewAudioEngine.setOutputGain(
-		previewOutputGainForAudioMonitoring({ muted, volume }),
-	);
+	previewAudioEngine.setOutputGain(muted ? 0 : volume);
 
 	const mixPlan = createAudioMixPlan({
 		audioMix,
@@ -397,15 +217,4 @@ export function applyPreviewAudioEngineMix({
 			}),
 		);
 	});
-}
-
-export function setPreviewAudioEnginePlaybackRate(
-	previewAudioEngine: PreviewAudioEngine | null,
-	playbackRate: number,
-) {
-	previewAudioEngine?.setPlaybackRate(playbackRate);
-}
-
-function clampPreviewVolume(volume: number) {
-	return Number.isFinite(volume) ? Math.max(0, Math.min(volume, 1)) : 1;
 }

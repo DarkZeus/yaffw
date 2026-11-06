@@ -14,11 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
 
-import type { PreviewAudioEngineMeterSnapshot } from "../../audio/engine/preview-audio-engine";
 import {
 	type PreviewAudioResourcesResult,
 	preparePreviewAudioResources,
 } from "../../audio/engine/preview-audio-resources";
+import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { loadBrowserWaveformLane } from "../../selection/waveform/selection-waveform-lanes";
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
@@ -539,20 +539,11 @@ function createPreparedPreviewAudioResources(
 	_assetId: string,
 ): PreviewAudioResourcesResult {
 	return {
-		failures: [],
 		provider: createPreviewAudioProviderStub(),
 		resources: [
 			{
 				numberOfChannels: 2,
-				sampleRate: 48_000,
-				track: {
-					codec: "aac",
-					id: "audio-1",
-					kind: "audio",
-					label: "Voice",
-				},
 				trackId: "audio-1",
-				trackIndex: 0,
 			} satisfies PreviewAudioResource,
 		],
 	};

@@ -1,21 +1,16 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { generateFixtures } from "./fixtures.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+import { launchBrowser } from "../browser.cjs";
 const version = JSON.parse(
 	readFileSync("node_modules/mediabunny/package.json", "utf8"),
 ).version;
 assert.equal(version, "1.65.2");
 const fixtures = generateFixtures();
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+const browser = await launchBrowser();
 const output = resolve(
 	process.argv[2] || "tmp/mediabunny-upgrade/evidence.json",
 );

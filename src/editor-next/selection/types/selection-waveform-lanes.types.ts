@@ -39,3 +39,8 @@ export type WaveformLaneState = {
 			status: "unavailable";
 	  }
 );
+
+export type WaveformWorkerRequest = Omit<
+	WaveformLaneRequest,
+	"signal" | "track"
+>;

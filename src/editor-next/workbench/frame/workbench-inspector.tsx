@@ -118,7 +118,6 @@ function WorkbenchInspectorTabTrigger({
 	);
 }
 
-// Tab choice is a UI preference, not editing-session state.
 export function useWorkbenchInspector() {
 	const [activeTab, setActiveTab] = useState<WorkbenchInspectorTabValue>(
 		readStoredWorkbenchInspectorTabValue,

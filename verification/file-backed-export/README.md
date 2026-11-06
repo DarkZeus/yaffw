@@ -21,6 +21,11 @@ npm run test
 npm run build
 ```
 
+The fixture CLI is optional. `check.mjs`, `lifecycle.mjs`, and `app-check.mjs`
+explicitly call `prepareFixtures()` before opening a browser, so each prepares its own
+fixture prerequisites. `inspect.mjs` and `retain.mjs` still consume evidence from the
+preceding measurements. Importing `fixtures.mjs` alone does not generate media.
+
 `YAFFW_ORIGIN` optionally overrides the origin; `YAFFW_REPEATS` defaults to two.
 Keep at least two repetitions, reversing order on the second. Generated files,
 screenshots, raw memory samples, packet evidence and reports go under ignored

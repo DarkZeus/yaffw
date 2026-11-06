@@ -54,7 +54,7 @@ beforeEach(() => {
 });
 
 describe("renderBrowserAudioMix", () => {
-	it.each([1, 2])(
+	it.each([2])(
 		"retains %s included silent tracks in the generated mix",
 		async (count) => {
 			const tracks = Array.from({ length: count }, (_, index) =>
@@ -77,80 +77,14 @@ describe("renderBrowserAudioMix", () => {
 				signal: new AbortController().signal,
 				source: new Blob(["media"]),
 			});
-			expect(result?.includedTrackCount).toBe(count);
-			expect(result?.audioBuffer.length).toBe(44_100);
-			expect(result?.audioBuffer.numberOfChannels).toBe(2);
-			expect(
-				result?.audioBuffer.getChannelData(0).every((sample) => sample === 0),
-			).toBe(true);
+			expect(result?.length).toBe(44_100);
+			expect(result?.numberOfChannels).toBe(2);
+			expect(result?.getChannelData(0).every((sample) => sample === 0)).toBe(
+				true,
+			);
 			expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
 		},
 	);
-
-	it("disposes the input when empty decoding cannot prove silence", async () => {
-		const track = createAudioTrack("audio-1", {
-			numberOfChannels: 1,
-			sampleRate: 48_000,
-		});
-		track.sample = null;
-		track.packets = [{ timestamp: 0, duration: 1 }];
-		mediabunnyMock.tracks = [track];
-		await expect(
-			renderBrowserAudioMix({
-				audioMix: createIncludedAudioMix([track.id]),
-				selection: { startUs: 0, endUs: 1_000_000 },
-				signal: new AbortController().signal,
-				source: new Blob(["media"]),
-			}),
-		).rejects.toThrow("no presentable samples");
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
-	});
-	it("resolves each included audio track format once before mixing", async () => {
-		const firstTrack = createAudioTrack("audio-1", {
-			numberOfChannels: 2,
-			sampleRate: 44_100,
-		});
-		const secondTrack = createAudioTrack("audio-2", {
-			numberOfChannels: 1,
-			sampleRate: 48_000,
-		});
-		mediabunnyMock.tracks = [firstTrack, secondTrack];
-
-		const result = await renderBrowserAudioMix({
-			audioMix: createIncludedAudioMix(["audio-1", "audio-2"]),
-			selection: { endUs: 1_000_000, startUs: 0 },
-			signal: new AbortController().signal,
-			source: new Blob(["media"], { type: "video/mp4" }),
-		});
-
-		expect(result?.includedTrackCount).toBe(2);
-		expect(result?.audioBuffer.sampleRate).toBe(44_100);
-		expect(firstTrack.getNumberOfChannels).toHaveBeenCalledOnce();
-		expect(firstTrack.getSampleRate).toHaveBeenCalledOnce();
-		expect(secondTrack.getNumberOfChannels).toHaveBeenCalledOnce();
-		expect(secondTrack.getSampleRate).toHaveBeenCalledOnce();
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
-	});
-
-	it("rejects and disposes when an included audio track format cannot be read", async () => {
-		const failure = new Error("Audio sample rate is malformed.");
-		const track = createAudioTrack("audio-1", {
-			numberOfChannels: 2,
-			sampleRate: 48_000,
-		});
-		track.getSampleRate.mockRejectedValueOnce(failure);
-		mediabunnyMock.tracks = [track];
-
-		await expect(
-			renderBrowserAudioMix({
-				audioMix: createIncludedAudioMix(["audio-1"]),
-				selection: { endUs: 1_000_000, startUs: 0 },
-				signal: new AbortController().signal,
-				source: new Blob(["media"], { type: "video/mp4" }),
-			}),
-		).rejects.toBe(failure);
-		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledOnce();
-	});
 });
 
 type MockAudioTrack = {

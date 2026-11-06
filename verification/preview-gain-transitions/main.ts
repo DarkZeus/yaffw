@@ -1,9 +1,9 @@
-import type { PreviewAudioContextLike } from "../../src/editor-next/audio/engine/preview-audio-engine";
 import { createPreviewAudioGraph } from "../../src/editor-next/audio/engine/preview-audio-graph";
 import {
 	PREVIEW_GAIN_TRANSITION_SECONDS,
 	createPreviewGainTransition,
 } from "../../src/editor-next/audio/engine/preview-gain-transition";
+import type { PreviewAudioContextLike } from "../../src/editor-next/audio/types/preview-audio-engine.types";
 
 const RATE = 48_000;
 const LENGTH = 4096;

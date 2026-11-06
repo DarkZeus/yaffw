@@ -1,3 +1,4 @@
+import { clamp } from "@/lib/clamp";
 import type { FrameTiming, MediaTimeUs, Selection } from "./model";
 
 export type SelectionCommandContext = {
@@ -11,12 +12,12 @@ export function setSelectionStartFromPlayhead(
 	context: SelectionCommandContext,
 ): Selection {
 	const minimumDurationUs = minimumSelectionDurationUs(context);
-	const startUs = clampMediaTime(
+	const startUs = clamp(
 		Math.round(playheadUs),
 		0,
 		Math.max(0, context.durationUs - minimumDurationUs),
 	);
-	const endUs = clampMediaTime(
+	const endUs = clamp(
 		Math.max(selection.endUs, startUs + minimumDurationUs),
 		startUs + minimumDurationUs,
 		context.durationUs,
@@ -34,12 +35,12 @@ export function setSelectionEndFromPlayhead(
 	context: SelectionCommandContext,
 ): Selection {
 	const minimumDurationUs = minimumSelectionDurationUs(context);
-	const endUs = clampMediaTime(
+	const endUs = clamp(
 		Math.round(playheadUs),
 		minimumDurationUs,
 		context.durationUs,
 	);
-	const startUs = clampMediaTime(
+	const startUs = clamp(
 		Math.min(selection.startUs, endUs - minimumDurationUs),
 		0,
 		endUs - minimumDurationUs,
@@ -57,12 +58,12 @@ export function moveSelectionRangeByDelta(
 	context: SelectionCommandContext,
 ): Selection {
 	const minimumDurationUs = minimumSelectionDurationUs(context);
-	const selectionDurationUs = clampMediaTime(
+	const selectionDurationUs = clamp(
 		selection.endUs - selection.startUs,
 		minimumDurationUs,
 		context.durationUs,
 	);
-	const startUs = clampMediaTime(
+	const startUs = clamp(
 		Math.round(selection.startUs + deltaUs),
 		0,
 		context.durationUs - selectionDurationUs,
@@ -79,12 +80,12 @@ export function replaceSelection(
 	context: SelectionCommandContext,
 ): Selection {
 	const minimumDurationUs = minimumSelectionDurationUs(context);
-	const startUs = clampMediaTime(
+	const startUs = clamp(
 		Math.round(selection.startUs),
 		0,
 		Math.max(0, context.durationUs - minimumDurationUs),
 	);
-	const endUs = clampMediaTime(
+	const endUs = clamp(
 		Math.round(selection.endUs),
 		startUs + minimumDurationUs,
 		context.durationUs,
@@ -103,17 +104,9 @@ export function resetSelection(context: SelectionCommandContext): Selection {
 	};
 }
 
-function minimumSelectionDurationUs({
+export function minimumSelectionDurationUs({
 	durationUs,
 	frameTiming,
 }: SelectionCommandContext): MediaTimeUs {
 	return Math.max(1, Math.min(frameTiming.frameDurationUs, durationUs));
-}
-
-function clampMediaTime(
-	valueUs: MediaTimeUs,
-	minUs: MediaTimeUs,
-	maxUs: MediaTimeUs,
-): MediaTimeUs {
-	return Math.min(Math.max(valueUs, minUs), maxUs);
 }

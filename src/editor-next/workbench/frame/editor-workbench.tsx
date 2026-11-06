@@ -208,7 +208,6 @@ function NonReadyImportSurface({
 		}
 
 		resetDragState();
-		// Listen only while the import surface is mounted, including the page chrome.
 		window.addEventListener("dragenter", handleDragEnter, true);
 		window.addEventListener("dragover", handleDragOver, true);
 		window.addEventListener("dragleave", handleDragLeave, true);
@@ -381,11 +380,6 @@ function isSupportedVideoFile(file: File): boolean {
 
 function workbenchNonReadyStateCopy(session: NonReadyEditorSession) {
 	switch (session.status) {
-		case "closed":
-			return {
-				description: "Reload the page to open another video.",
-				title: "Video closed",
-			};
 		case "empty":
 			return {
 				description: null,

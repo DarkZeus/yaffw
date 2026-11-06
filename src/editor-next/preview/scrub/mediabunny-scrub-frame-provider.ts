@@ -1,9 +1,12 @@
+import { browserNowMs } from "@/lib/browser-animation-frame";
+import { errorMessage } from "@/lib/error-message";
 import type {
 	EncodedPacket,
 	EncodedPacketSink,
 	VideoSample,
 	VideoSampleSink,
 } from "mediabunny";
+import { type ScrubCanvas, createScrubCanvas } from "./scrub-canvas";
 
 import type { MediaTimeUs } from "@/editor-core/model";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
@@ -15,7 +18,7 @@ const EXACT_PREFETCH_SAMPLE_COUNT = 24;
 
 export type ScrubFrame = {
 	actualTimestampUs: MediaTimeUs;
-	canvas: HTMLCanvasElement | OffscreenCanvas;
+	canvas: ScrubCanvas;
 	requestId: number;
 	requestedAtMs: number;
 	timestampUs: MediaTimeUs;
@@ -69,7 +72,7 @@ export function createMediabunnyScrubFrameProvider({
 		displayHeight,
 		displayWidth,
 	});
-	const scratchCanvas = createOutputCanvas(dimensions.width, dimensions.height);
+	const scratchCanvas = createScrubCanvas(dimensions.width, dimensions.height);
 	const scratchContext = scratchCanvas.getContext("2d") as
 		| CanvasRenderingContext2D
 		| OffscreenCanvasRenderingContext2D
@@ -89,7 +92,7 @@ export function createMediabunnyScrubFrameProvider({
 
 	function reportUnavailable(error: unknown) {
 		if (!disposed) {
-			onUnavailable?.(errorToMessage(error));
+			onUnavailable?.(errorMessage(error));
 		}
 	}
 
@@ -315,7 +318,7 @@ export function createMediabunnyScrubFrameProvider({
 			const request: PendingScrubFrameRequest = {
 				id: latestRequestId,
 				phase: priority === "interactive" ? "cached" : "exact",
-				requestedAtMs: previewNowMs(),
+				requestedAtMs: browserNowMs(),
 				timestampSeconds: Math.max(0, timestampUs / 1_000_000),
 				timestampUs,
 			};
@@ -391,29 +394,8 @@ class LatestScrubFrameRequestSource {
 	}
 }
 
-function createOutputCanvas(width: number, height: number) {
-	if (typeof OffscreenCanvas !== "undefined") {
-		return new OffscreenCanvas(width, height);
-	}
-	const canvas = document.createElement("canvas");
-	canvas.width = width;
-	canvas.height = height;
-	return canvas;
-}
-
 function usableDimension(value: number | undefined) {
 	return typeof value === "number" && Number.isFinite(value) && value > 0
 		? value
 		: undefined;
-}
-
-function previewNowMs() {
-	return typeof performance !== "undefined" &&
-		typeof performance.now === "function"
-		? performance.now()
-		: Date.now();
-}
-
-function errorToMessage(error: unknown) {
-	return error instanceof Error ? error.message : String(error);
 }

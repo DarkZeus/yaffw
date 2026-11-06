@@ -1,19 +1,17 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { launchBrowser } from "../browser.cjs";
 import {
 	inspectArtifact,
 	inspectSource,
 } from "../copy-boundaries/artifact.mjs";
+import { prepareFixtures } from "./fixtures.mjs";
 import { instrument } from "./instrument.mjs";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
 const directory = resolve("tmp/file-backed-export");
-const browser = await chromium.launch({
-	headless: true,
+prepareFixtures();
+const browser = await launchBrowser({
 	args: ["--autoplay-policy=no-user-gesture-required"],
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
 });
 const results = [];
 try {

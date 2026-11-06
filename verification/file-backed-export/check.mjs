@@ -1,17 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { prepareFixtures } from "./fixtures.mjs";
 import { instrument } from "./instrument.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
+import { launchBrowser } from "../browser.cjs";
 const directory = resolve("tmp/file-backed-export");
 mkdirSync(directory, { recursive: true });
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
+prepareFixtures();
+const browser = await launchBrowser({
 	args: ["--enable-precise-memory-info"],
 });
 const results = [];

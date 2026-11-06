@@ -1,5 +1,7 @@
 export const SECOND = 1_000_000;
-export const FRAME = Math.round(SECOND / 30);
+export const SEQUENCE_FORMAT = { width: 1920, height: 1080, fps: 30 } as const;
+export const FRAME = Math.round(SECOND / SEQUENCE_FORMAT.fps);
+export const sequenceFormatLabel = `${SEQUENCE_FORMAT.width} × ${SEQUENCE_FORMAT.height} · ${SEQUENCE_FORMAT.fps} fps`;
 export type Kind = "video" | "audio" | "image" | "title";
 export type Asset = {
 	id: string;
@@ -52,21 +54,33 @@ export function clamp(v: number, lo: number, hi: number) {
 	return Math.max(lo, Math.min(hi, v));
 }
 export function frame(v: number) {
-	return Math.round((Math.round((v / SECOND) * 30) * SECOND) / 30);
+	return Math.round(
+		(Math.round((v / SECOND) * SEQUENCE_FORMAT.fps) * SECOND) /
+			SEQUENCE_FORMAT.fps,
+	);
 }
 export function end(c: Clip) {
 	return c.start + c.duration;
+}
+export function clipFadeAt(clip: Clip, at: number) {
+	return Math.min(
+		clip.fadeIn ? clamp((at - clip.start) / clip.fadeIn, 0, 1) : 1,
+		clip.fadeOut ? clamp((end(clip) - at) / clip.fadeOut, 0, 1) : 1,
+	);
 }
 export function duration(clips: Clip[]) {
 	return Math.max(0, ...clips.map(end));
 }
 export function time(v: number) {
-	const n = Math.max(0, Math.round((v / SECOND) * 30));
-	return `${Math.floor(n / 1800)
+	const n = Math.max(0, Math.round((v / SECOND) * SEQUENCE_FORMAT.fps));
+	return `${Math.floor(n / (60 * SEQUENCE_FORMAT.fps))
 		.toString()
-		.padStart(2, "0")}:${Math.floor((n / 30) % 60)
+		.padStart(2, "0")}:${Math.floor((n / SEQUENCE_FORMAT.fps) % 60)
 		.toString()
-		.padStart(2, "0")}:${(n % 30).toString().padStart(2, "0")}`;
+		.padStart(
+			2,
+			"0",
+		)}:${(n % SEQUENCE_FORMAT.fps).toString().padStart(2, "0")}`;
 }
 export function makeTrack(
 	id: string,
@@ -115,156 +129,6 @@ export function makeClip(
 		...extra,
 	};
 }
-export const initialSequence: Sequence = {
-	name: "Sequence 01",
-	tracks: [
-		makeTrack("v3", "Titles", "video"),
-		makeTrack("v2", "Inserts", "video"),
-		makeTrack("v1", "Main picture", "video"),
-		makeTrack("a1", "Production", "audio"),
-		makeTrack("a2", "Score", "audio"),
-		makeTrack("a3", "Atmosphere", "audio"),
-	],
-	clips: [
-		makeClip("wide", "zone", "Marsh · wide", "video", "v1", 0, 6 * SECOND, {
-			linkId: "wide-pair",
-		}),
-		makeClip(
-			"action",
-			"encounter",
-			"Close encounter",
-			"video",
-			"v1",
-			6 * SECOND,
-			7 * SECOND,
-			{ linkId: "action-pair" },
-		),
-		makeClip(
-			"return",
-			"zone",
-			"Back into the Zone",
-			"video",
-			"v1",
-			13 * SECOND,
-			7 * SECOND,
-			{ sourceIn: 5 * SECOND, linkId: "return-pair" },
-		),
-		makeClip(
-			"ending",
-			"detail",
-			"Creature detail",
-			"video",
-			"v1",
-			20 * SECOND,
-			5 * SECOND,
-			{ linkId: "ending-pair" },
-		),
-		makeClip(
-			"detail-insert",
-			"detail",
-			"Creature · inset",
-			"video",
-			"v2",
-			7 * SECOND,
-			4 * SECOND,
-			{ x: 29, y: 24, scale: 0.32, fadeIn: SECOND / 2, fadeOut: SECOND / 2 },
-		),
-		makeClip(
-			"opening-title",
-			"title",
-			"Into the Zone",
-			"title",
-			"v3",
-			SECOND,
-			4 * SECOND,
-			{
-				text: "INTO THE ZONE",
-				x: 0,
-				y: 26,
-				scale: 1,
-				fadeIn: SECOND / 2,
-				fadeOut: SECOND / 2,
-			},
-		),
-		makeClip(
-			"chapter-title",
-			"title",
-			"Expect the unexpected",
-			"title",
-			"v3",
-			14 * SECOND,
-			5 * SECOND,
-			{
-				text: "EXPECT THE UNEXPECTED",
-				x: 0,
-				y: 26,
-				scale: 0.7,
-				fadeIn: SECOND / 2,
-				fadeOut: SECOND / 2,
-			},
-		),
-		makeClip(
-			"wide-audio",
-			"zone",
-			"Marsh · sync",
-			"audio",
-			"a1",
-			0,
-			6 * SECOND,
-			{ linkId: "wide-pair", gain: 0.75 },
-		),
-		makeClip(
-			"action-audio",
-			"encounter",
-			"Encounter · sync",
-			"audio",
-			"a1",
-			6 * SECOND,
-			7 * SECOND,
-			{ linkId: "action-pair", gain: 0.75 },
-		),
-		makeClip(
-			"return-audio",
-			"zone",
-			"Zone · sync",
-			"audio",
-			"a1",
-			13 * SECOND,
-			7 * SECOND,
-			{ sourceIn: 5 * SECOND, linkId: "return-pair", gain: 0.75 },
-		),
-		makeClip(
-			"ending-audio",
-			"detail",
-			"Creature · sync",
-			"audio",
-			"a1",
-			20 * SECOND,
-			5 * SECOND,
-			{ linkId: "ending-pair", gain: 0.75 },
-		),
-		makeClip("score", "score", "Low tension", "audio", "a2", 0, 25 * SECOND, {
-			gain: 0.5,
-			fadeIn: 2 * SECOND,
-			fadeOut: 3 * SECOND,
-		}),
-		makeClip(
-			"atmos",
-			"zone",
-			"Distant movement",
-			"audio",
-			"a3",
-			15 * SECOND,
-			6 * SECOND,
-			{ sourceIn: 6 * SECOND, gain: 0.25, fadeIn: SECOND, fadeOut: SECOND },
-		),
-	],
-	markers: [
-		{ id: "intro", at: SECOND, name: "Establish the world" },
-		{ id: "encounter-mark", at: 6 * SECOND, name: "First encounter" },
-		{ id: "resolve", at: 20 * SECOND, name: "Final beat" },
-	],
-};
 export function selection(state: Sequence, ids: string[], linked: boolean) {
 	const groups = new Set(
 		state.clips
@@ -281,6 +145,24 @@ export function isLocked(state: Sequence, clips: Clip[]) {
 		(c) => state.tracks.find((t) => t.id === c.trackId)?.locked,
 	);
 }
+function sliceClip(
+	clip: Clip,
+	offset: number,
+	length: number,
+	start = clip.start + offset,
+	linkId = clip.linkId,
+): Clip {
+	return {
+		...clip,
+		id: offset === 0 ? clip.id : crypto.randomUUID(),
+		start,
+		sourceIn: clip.sourceIn + offset,
+		duration: length,
+		fadeIn: offset === 0 ? clip.fadeIn : 0,
+		fadeOut: offset + length === clip.duration ? clip.fadeOut : 0,
+		linkId,
+	};
+}
 export function splitClips(
 	state: Sequence,
 	ids: string[],
@@ -291,16 +173,14 @@ export function splitClips(
 			return [c];
 		const offset = at - c.start;
 		return [
-			{ ...c, duration: offset, fadeOut: 0 },
-			{
-				...c,
-				id: crypto.randomUUID(),
-				start: at,
-				sourceIn: c.sourceIn + offset,
-				duration: c.duration - offset,
-				fadeIn: 0,
-				linkId: c.linkId ? `${c.linkId}:${at}` : undefined,
-			},
+			sliceClip(c, 0, offset),
+			sliceClip(
+				c,
+				offset,
+				c.duration - offset,
+				at,
+				c.linkId ? `${c.linkId}:${at}` : undefined,
+			),
 		];
 	});
 	return { ...state, clips };
@@ -440,16 +320,14 @@ export function placeClips(
 				if (end(c) > add.start) {
 					const offset = add.start - c.start;
 					return [
-						{ ...c, duration: offset, fadeOut: 0 },
-						{
-							...c,
-							id: crypto.randomUUID(),
-							linkId: c.linkId ? `${c.linkId}:insert:${add.start}` : undefined,
-							start: add.start + add.duration,
-							sourceIn: c.sourceIn + offset,
-							duration: c.duration - offset,
-							fadeIn: 0,
-						},
+						sliceClip(c, 0, offset),
+						sliceClip(
+							c,
+							offset,
+							c.duration - offset,
+							add.start + add.duration,
+							c.linkId ? `${c.linkId}:insert:${add.start}` : undefined,
+						),
 					];
 				}
 				return [c];
@@ -457,17 +335,19 @@ export function placeClips(
 			if (end(c) <= add.start || c.start >= end(add)) return [c];
 			const pieces: Clip[] = [];
 			if (c.start < add.start)
-				pieces.push({ ...c, duration: add.start - c.start, fadeOut: 0 });
-			if (end(c) > end(add))
-				pieces.push({
-					...c,
-					id: crypto.randomUUID(),
-					linkId: c.linkId ? `${c.linkId}:overwrite:${end(add)}` : undefined,
-					start: end(add),
-					sourceIn: c.sourceIn + end(add) - c.start,
-					duration: end(c) - end(add),
-					fadeIn: 0,
-				});
+				pieces.push(sliceClip(c, 0, add.start - c.start));
+			if (end(c) > end(add)) {
+				const offset = end(add) - c.start;
+				pieces.push(
+					sliceClip(
+						c,
+						offset,
+						c.duration - offset,
+						end(add),
+						c.linkId ? `${c.linkId}:overwrite:${end(add)}` : undefined,
+					),
+				);
+			}
 			return pieces;
 		});
 		clips = [...clips, add];

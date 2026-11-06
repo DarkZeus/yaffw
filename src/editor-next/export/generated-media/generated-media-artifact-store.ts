@@ -5,8 +5,7 @@ import type { GeneratedMediaDeliveryRequest } from "../types/generated-media-del
 export type GeneratedMediaArtifactStore = {
 	clear: () => void;
 	deliver: (request: GeneratedMediaArtifactDeliveryRequest) => boolean;
-	invalidate: (generatedMediaId: string) => void;
-	read: (generatedMedia: GeneratedMedia) => Blob | null;
+	reconcile: (generatedMediaId: string | null) => void;
 	retain: (request: GeneratedMediaArtifactRetentionRequest) => void;
 };
 
@@ -42,15 +41,9 @@ export function createGeneratedMediaArtifactStore(): GeneratedMediaArtifactStore
 
 			return true;
 		},
-		invalidate(generatedMediaId) {
-			if (currentArtifact?.generatedMediaId === generatedMediaId) {
+		reconcile(generatedMediaId) {
+			if (currentArtifact?.generatedMediaId !== generatedMediaId)
 				currentArtifact = null;
-			}
-		},
-		read(generatedMedia) {
-			return currentArtifact?.generatedMediaId === generatedMedia.id
-				? currentArtifact.blob
-				: null;
 		},
 		retain({ blob, generatedMedia }) {
 			currentArtifact = {

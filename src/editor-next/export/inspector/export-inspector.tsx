@@ -1,3 +1,4 @@
+import { formatOutputVideoCodec } from "@/editor-core/output-settings";
 import { BadgeCheck, Check, Download, Square } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,11 +23,12 @@ import {
 	type ResolvedOutputResolution,
 	formatOutputQualitySetting,
 	resolveOutputAudioProfile,
+	resolveOutputPlan,
 	resolveOutputResolution,
 } from "@/editor-core/output-settings";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { ExportJob, ExportSessionState } from "@/editor-core/session";
-import { getMediabunnyOutputSupport } from "../adapters/mediabunny-output-support";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import { OutputSettingsPanel } from "./output-settings-panel";
 
 export type ExportInspectorPanelProps = {
@@ -42,8 +44,6 @@ export type ExportInspectorPanelProps = {
 	selection: Selection;
 };
 
-const OUTPUT_SUPPORT = getMediabunnyOutputSupport();
-
 export function ExportInspectorPanel({
 	asset,
 	audioMix,
@@ -58,17 +58,21 @@ export function ExportInspectorPanel({
 }: ExportInspectorPanelProps) {
 	const review = planDefaultExportCapability({
 		asset,
-		audioMix,
+		output: resolveOutputPlan({
+			asset,
+			audioMix,
+			outputSettings,
+			support: MEDIABUNNY_OUTPUT_SUPPORT,
+		}),
 		outputSettings,
 		runtime,
 		selection,
-		support: OUTPUT_SUPPORT,
 	});
 	const outputAudio = resolveOutputAudioProfile({
 		asset,
 		audioMix,
 		outputSettings,
-		support: OUTPUT_SUPPORT,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
 	});
 	const outputResolution = resolveOutputResolution({
 		asset,
@@ -166,7 +170,7 @@ function ExportReviewSection({
 			</div>
 			<p className="mb-5 text-sm leading-6 text-foreground">
 				<span className="mb-1 block text-xs text-muted-foreground">Format</span>
-				{review.plannedOutput.label}
+				{review.plannedOutput?.label ?? "Invalid Output settings"}
 			</p>
 			<div className="space-y-3">
 				<InspectorLine
@@ -355,9 +359,9 @@ function GeneratedMediaStatus({
 	exportState: Extract<ExportSessionState, { status: "succeeded" }>;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 }) {
-	const outputSummary = exportState.generatedMedia.resolvedOutput
-		? formatGeneratedMediaOutput(exportState.generatedMedia.resolvedOutput)
-		: undefined;
+	const outputSummary = formatGeneratedMediaOutput(
+		exportState.generatedMedia.resolvedOutput,
+	);
 
 	return (
 		<div
@@ -498,18 +502,7 @@ function formatGeneratedMediaOutput(output: ResolvedOutputPlan): string {
 	const resolution = output.resolution
 		? ` · ${output.resolution.width}x${output.resolution.height}`
 		: "";
-	return `${output.container.label} · ${formatVideoCodec(output.videoCodec)}${output.audioCodec ? ` · ${output.audioCodec.toUpperCase()}` : " · No audio"}${resolution}`;
-}
-
-function formatVideoCodec(codec: string): string {
-	if (codec === "avc") {
-		return "H.264";
-	}
-	if (codec === "hevc") {
-		return "H.265";
-	}
-
-	return codec.toUpperCase();
+	return `${output.container.label} · ${formatOutputVideoCodec(output.videoCodec)}${output.audioCodec ? ` · ${output.audioCodec.toUpperCase()}` : " · No audio"}${resolution}`;
 }
 
 function progressPercent(progress: ExportProgress): number {

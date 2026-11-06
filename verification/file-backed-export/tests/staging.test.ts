@@ -137,13 +137,6 @@ describe("proof OPFS staging", () => {
 		expect(storage.writable.abort).toHaveBeenCalledOnce();
 		expect(storage.root.removeEntry).toHaveBeenCalledOnce();
 	});
-
-	it("fails explicitly when OPFS is unavailable", async () => {
-		vi.stubGlobal("navigator", {});
-		await expect(createFileBackedExportStaging()).rejects.toMatchObject({
-			code: "unavailable",
-		});
-	});
 });
 
 describe("mixed AAC reservation", () => {

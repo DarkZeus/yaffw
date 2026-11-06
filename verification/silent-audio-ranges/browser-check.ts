@@ -1,10 +1,11 @@
 import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
 import { createDefaultAudioMix } from "../../src/editor-core/audio-mix";
 import {
-	DEFAULT_OUTPUT_PROFILE,
 	type ReadyMediaAsset,
 	createDefaultOutputSettings,
 } from "../../src/editor-core/model";
+import { resolveOutputPlan } from "../../src/editor-core/output-settings";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../../src/editor-next/export/adapters/mediabunny-output-support";
 import { browserDefaultExportRunner } from "../../src/editor-next/export/runners/default-export-runner";
 
 export async function checkExport(base64: string, start: number, mode: string) {
@@ -26,7 +27,6 @@ export async function checkExport(base64: string, start: number, mode: string) {
 				sizeBytes: source.size,
 				mimeType: "video/x-matroska",
 			},
-			exportCapability: { supported: true, profile: DEFAULT_OUTPUT_PROFILE },
 			frameTiming: {
 				analysis: null,
 				fps: 30,
@@ -52,10 +52,16 @@ export async function checkExport(base64: string, start: number, mode: string) {
 		const outputSettings = createDefaultOutputSettings();
 		if (mode === "no-audio") outputSettings.audioCodec = { kind: "no-audio" };
 		try {
-			const result = await browserDefaultExportRunner.run({
+			const output = resolveOutputPlan({
 				asset,
 				audioMix,
 				outputSettings,
+				support: MEDIABUNNY_OUTPUT_SUPPORT,
+			});
+			if (output.kind === "invalid") throw new Error(output.error);
+			const result = await browserDefaultExportRunner.run({
+				audioMix,
+				resolvedOutput: output.plan,
 				selection: { startUs: start * 1e6, endUs: (start + 0.5) * 1e6 },
 				signal: new AbortController().signal,
 				source,

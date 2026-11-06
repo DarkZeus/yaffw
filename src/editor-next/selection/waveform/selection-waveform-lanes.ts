@@ -1,12 +1,15 @@
+import { errorMessage } from "@/lib/error-message";
 import { useEffect, useState } from "react";
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
+import { runWorkerJob } from "../../media-work/workers/worker-job";
 
 import type {
 	WaveformLaneLoader,
 	WaveformLaneRequest,
 	WaveformLaneResult,
 	WaveformLaneState,
+	WaveformWorkerRequest,
 } from "../types/selection-waveform-lanes.types";
 import {
 	createWaveformAbortError,
@@ -27,8 +30,6 @@ let waveformLaneResultCache = new WeakMap<
 	Blob,
 	Map<string, WaveformLaneResult>
 >();
-
-let nextWorkerRequestId = 0;
 
 export function useWaveformLaneStates({
 	asset,
@@ -88,7 +89,7 @@ export function useWaveformLaneStates({
 					setLaneStates((currentStates) => ({
 						...currentStates,
 						[track.id]: {
-							reason: errorToMessage(error),
+							reason: errorMessage(error),
 							status: "unavailable",
 							track,
 						},
@@ -176,102 +177,14 @@ function loadWorkerWaveformLane({
 	source,
 	trackIndex,
 }: WaveformLaneRequest): Promise<WaveformLaneResult> {
-	if (signal?.aborted) {
-		return Promise.reject(createWaveformAbortError());
-	}
-
-	return new Promise((resolve, reject) => {
-		const requestId = nextWorkerRequestId++;
-		let worker: InstanceType<typeof WaveformLaneWorker>;
-
-		try {
-			worker = new WaveformLaneWorker();
-		} catch (error) {
-			reject(error instanceof Error ? error : new Error(String(error)));
-			return;
-		}
-
-		let settled = false;
-
-		function cleanup() {
-			signal?.removeEventListener("abort", handleAbort);
-			worker.removeEventListener("error", handleError);
-			worker.removeEventListener("message", handleMessage);
-			worker.terminate();
-		}
-
-		function resolveSettled(value: WaveformLaneResult) {
-			if (settled) {
-				return;
-			}
-
-			settled = true;
-			cleanup();
-			resolve(value);
-		}
-
-		function rejectSettled(error: Error) {
-			if (settled) {
-				return;
-			}
-
-			settled = true;
-			cleanup();
-			reject(error);
-		}
-
-		function handleAbort() {
-			rejectSettled(createWaveformAbortError());
-		}
-
-		function handleError(event: ErrorEvent) {
-			rejectSettled(new Error(event.message || "Waveform worker failed."));
-		}
-
-		function handleMessage(event: MessageEvent<WaveformWorkerResponseMessage>) {
-			if (event.data.requestId !== requestId) {
-				return;
-			}
-
-			resolveSettled(event.data.result);
-		}
-
-		signal?.addEventListener("abort", handleAbort, { once: true });
-		worker.addEventListener("error", handleError);
-		worker.addEventListener("message", handleMessage);
-
-		if (signal?.aborted) {
-			handleAbort();
-			return;
-		}
-
-		try {
-			worker.postMessage({
-				request: {
-					assetDurationUs,
-					source,
-					trackIndex,
-				},
-				requestId,
-				type: "generate",
-			} satisfies WaveformWorkerRequestMessage);
-		} catch (error) {
-			rejectSettled(error instanceof Error ? error : new Error(String(error)));
-		}
+	return runWorkerJob<WaveformWorkerRequest, WaveformLaneResult>({
+		createWorker: () => new WaveformLaneWorker(),
+		request: { assetDurationUs, source, trackIndex },
+		signal,
+		createAbortError: createWaveformAbortError,
+		failureMessage: "Waveform worker failed.",
 	});
 }
-
-type WaveformWorkerRequestMessage = {
-	request: Omit<WaveformLaneRequest, "signal" | "track">;
-	requestId: number;
-	type: "generate";
-};
-
-type WaveformWorkerResponseMessage = {
-	requestId: number;
-	result: WaveformLaneResult;
-	type: "done";
-};
 
 function readCachedWaveformLaneResult({
 	assetDurationUs,
@@ -319,12 +232,4 @@ function createWaveformLaneCacheKey({
 
 function canUseWaveformWorker() {
 	return typeof Worker !== "undefined";
-}
-
-function errorToMessage(error: unknown) {
-	if (error instanceof Error) {
-		return error.message;
-	}
-
-	return String(error);
 }

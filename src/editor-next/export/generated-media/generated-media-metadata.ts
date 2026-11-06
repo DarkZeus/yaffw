@@ -1,3 +1,4 @@
+import { createEditorId } from "@/editor-core/identity";
 import type {
 	GeneratedMedia,
 	OutputSettings,
@@ -5,12 +6,13 @@ import type {
 	ResolvedOutputPlan,
 	Selection,
 } from "@/editor-core/model";
+import { cloneOutputSettings } from "@/editor-core/output-settings";
 
 export function createGeneratedMediaMetadata({
 	asset,
 	blob,
 	fileName,
-	generatedMediaId = createGeneratedMediaId(),
+	generatedMediaId = createEditorId("generated"),
 	now = Date.now,
 	outputSettings,
 	resolvedOutput,
@@ -38,28 +40,10 @@ export function createGeneratedMediaMetadata({
 		id: generatedMediaId,
 		mimeType: resolvedOutput.container.mimeType,
 		outputSettings: cloneOutputSettings(outputSettings),
-		profile: asset.exportCapability.profile,
 		resolvedOutput: cloneResolvedOutputPlan(resolvedOutput),
 		selection: { ...selection },
 		sizeBytes: blob.size,
 	};
-}
-
-function createGeneratedMediaId(): string {
-	return createOwnedId("generated");
-}
-
-function createOwnedId(prefix: string): string {
-	if (
-		"crypto" in globalThis &&
-		typeof globalThis.crypto.randomUUID === "function"
-	) {
-		return `${prefix}-${globalThis.crypto.randomUUID()}`;
-	}
-
-	return `${prefix}-${Date.now().toString(36)}-${Math.random()
-		.toString(36)
-		.slice(2)}`;
 }
 
 function replaceFileExtension(fileName: string, fileExtension: string): string {
@@ -85,17 +69,6 @@ function createGeneratedMediaFileName(
 	}
 
 	return `${fileName.slice(0, extensionStart)}-export${normalizedExtension}`;
-}
-
-function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {
-	return {
-		audioCodec: { ...outputSettings.audioCodec },
-		audioQuality: { ...outputSettings.audioQuality },
-		container: { ...outputSettings.container },
-		resolution: { ...outputSettings.resolution },
-		videoCodec: { ...outputSettings.videoCodec },
-		videoQuality: { ...outputSettings.videoQuality },
-	};
 }
 
 function cloneResolvedOutputPlan(

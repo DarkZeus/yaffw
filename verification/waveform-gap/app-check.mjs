@@ -1,36 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { prepareVideoFixture } from "./fixtures.mjs";
 
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.YAFFW_PLAYWRIGHT_PATH || "playwright");
-const directory = resolve("tmp/waveform-gap");
-const source = resolve(directory, "video-gap.mkv");
-execFileSync("ffmpeg", [
-	"-hide_banner",
-	"-loglevel",
-	"error",
-	"-y",
-	"-i",
-	"tmp/mediabunny-upgrade/long-gop.mp4",
-	"-i",
-	"tmp/mediabunny-upgrade/libopus-gap.webm",
-	"-map",
-	"0:v",
-	"-map",
-	"1:a",
-	"-c",
-	"copy",
-	"-t",
-	"5.1",
-	source,
-]);
-const browser = await chromium.launch({
-	headless: true,
-	executablePath: process.env.YAFFW_BROWSER_EXECUTABLE,
-});
+import { launchBrowser } from "../browser.cjs";
+const { directory, source } = prepareVideoFixture();
+const browser = await launchBrowser();
 try {
 	const page = await browser.newPage({
 		viewport: { width: 1440, height: 1000 },

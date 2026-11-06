@@ -5,13 +5,7 @@ import type { MediaTimeUs } from "@/editor-core/model";
 const SHORT_SEEK_DELTA_US = 1_000_000;
 const LARGE_SEEK_DELTA_US = 10_000_000;
 
-export type UsePreviewKeyboardShortcutsOptions = {
-	getPlayheadUs: () => MediaTimeUs;
-	onFrameStep: (direction: -1 | 1) => void;
-	onSeekBy: (deltaUs: MediaTimeUs) => void;
-	onSelectionEndRequested: (playheadUs: MediaTimeUs) => void;
-	onSelectionStartRequested: (playheadUs: MediaTimeUs) => void;
-	onTogglePlayback: () => void;
+export type UsePreviewKeyboardShortcutsOptions = PreviewShortcutHandlers & {
 	shortcutsDisabled?: boolean;
 };
 

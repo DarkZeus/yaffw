@@ -10,9 +10,7 @@ export function createPreviewAudioProviderStub(
 		dispose: vi.fn(async () => {}),
 		durationSeconds,
 		getTrackMetadata: vi.fn(() => ({
-			failureReason: null,
 			numberOfChannels: 2,
-			sampleRate: 48_000,
 		})),
 		openGeneration: vi.fn<MediaWindowProvider["openGeneration"]>(() => {
 			throw new Error(

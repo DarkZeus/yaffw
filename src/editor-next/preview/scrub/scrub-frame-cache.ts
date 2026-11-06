@@ -1,17 +1,16 @@
 import type { MediaTimeUs } from "@/editor-core/model";
+import { type ScrubCanvas, createScrubCanvas } from "./scrub-canvas";
 
 const DEFAULT_CACHE_BUDGET_BYTES = 48 * 1024 * 1024;
 
-type CacheCanvas = HTMLCanvasElement | OffscreenCanvas;
-
 type CachedScrubFrame = {
 	byteSize: number;
-	canvas: CacheCanvas;
+	canvas: ScrubCanvas;
 };
 
 export type ScrubFrameCache = {
 	clear: () => void;
-	get: (timestampUs: MediaTimeUs) => CacheCanvas | null;
+	get: (timestampUs: MediaTimeUs) => ScrubCanvas | null;
 	set: (timestampUs: MediaTimeUs, source: CanvasImageSource) => void;
 };
 
@@ -59,7 +58,7 @@ export function createScrubFrameCache({
 				return;
 			}
 
-			const canvas = createCacheCanvas(width, height);
+			const canvas = createScrubCanvas(width, height);
 			const context = canvas.getContext("2d") as
 				| CanvasRenderingContext2D
 				| OffscreenCanvasRenderingContext2D
@@ -106,18 +105,7 @@ export function scrubFrameCacheKey(
 	);
 }
 
-function createCacheCanvas(width: number, height: number): CacheCanvas {
-	if (typeof OffscreenCanvas !== "undefined") {
-		return new OffscreenCanvas(width, height);
-	}
-
-	const canvas = document.createElement("canvas");
-	canvas.width = width;
-	canvas.height = height;
-	return canvas;
-}
-
-function releaseCanvas(canvas: CacheCanvas) {
+function releaseCanvas(canvas: ScrubCanvas) {
 	canvas.width = 0;
 	canvas.height = 0;
 }

@@ -11,23 +11,15 @@ import {
 } from "mediabunny";
 
 import { createBrowserAudioBuffer } from "../../../media-work/adapters/mediabunny-audio-buffer";
+import {
+	type PreviewAudioDecoderWorkMetrics,
+	createPreviewAudioDecoderWorkMetrics,
+	throwIfPreviewAudioEvidenceAborted as throwIfAborted,
+} from "./preview-audio-evidence-primitives";
 
 export type PreviewAudioBaselineStrategy =
 	| "full-track-direct"
 	| "remux-decode-bridge";
-
-export type PreviewAudioDecoderWorkMetrics = {
-	decodeAudioDataCalls: number;
-	decodedFrames: number;
-	decodedMediaSeconds: number;
-	decodedOutputChunks: number;
-	decodedSamples: number;
-	metadataPacketScans: number;
-	rangeRequests: number;
-	remuxedBytes: number;
-	remuxedPackets: number;
-	windowPulls: number;
-};
 
 export type PreviewAudioBaselineCleanupMetrics = {
 	buffersReleased: number;
@@ -72,7 +64,7 @@ export async function prepareFullTrackDirectBaseline({
 	source,
 }: PreparePreviewAudioBaselineOptions): Promise<PreparedPreviewAudioBaseline> {
 	const cleanup = createCleanupMetrics();
-	const decoderWork = createDecoderWorkMetrics();
+	const decoderWork = createPreviewAudioDecoderWorkMetrics();
 	const input = new Input({
 		formats: ALL_FORMATS,
 		source: new BlobSource(source),
@@ -131,7 +123,7 @@ export async function prepareRemuxDecodeBridgeBaseline({
 	source,
 }: PreparePreviewAudioBaselineOptions): Promise<PreparedPreviewAudioBaseline> {
 	const cleanup = createCleanupMetrics();
-	const decoderWork = createDecoderWorkMetrics();
+	const decoderWork = createPreviewAudioDecoderWorkMetrics();
 	const input = new Input({
 		formats: ALL_FORMATS,
 		source: new BlobSource(source),
@@ -495,21 +487,6 @@ export function audioBufferPcmBytes(buffer: AudioBuffer) {
 	);
 }
 
-function createDecoderWorkMetrics(): PreviewAudioDecoderWorkMetrics {
-	return {
-		decodeAudioDataCalls: 0,
-		decodedFrames: 0,
-		decodedMediaSeconds: 0,
-		decodedOutputChunks: 0,
-		decodedSamples: 0,
-		metadataPacketScans: 0,
-		rangeRequests: 0,
-		remuxedBytes: 0,
-		remuxedPackets: 0,
-		windowPulls: 0,
-	};
-}
-
 function createCleanupMetrics(): PreviewAudioBaselineCleanupMetrics {
 	return {
 		buffersReleased: 0,
@@ -518,12 +495,4 @@ function createCleanupMetrics(): PreviewAudioBaselineCleanupMetrics {
 		outputsFinalized: 0,
 		remuxSourcesClosed: 0,
 	};
-}
-
-function throwIfAborted(signal: AbortSignal) {
-	if (signal.aborted) {
-		throw signal.reason instanceof Error
-			? signal.reason
-			: new DOMException("Preview audio evidence run cancelled.", "AbortError");
-	}
 }

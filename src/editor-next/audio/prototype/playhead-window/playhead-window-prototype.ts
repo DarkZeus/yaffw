@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/error-message";
 import type {
 	MediaWindowGeneration,
 	MediaWindowProvider,
@@ -144,7 +145,7 @@ export function createPlayheadWindowPrototype({
 			return;
 		}
 
-		const reason = failure instanceof Error ? failure.message : String(failure);
+		const reason = errorMessage(failure);
 		engine.applyTrackStates({
 			generationId: ownership.generation.id,
 			tracks: ownership.generation.trackIds.map(
@@ -153,7 +154,6 @@ export function createPlayheadWindowPrototype({
 					kind: "failure",
 					reason,
 					startSeconds,
-					state: "failure",
 					trackId,
 				}),
 			),
@@ -178,7 +178,7 @@ export function createPlayheadWindowPrototype({
 
 			engine.applyTrackStates({
 				generationId: ownership.generation.id,
-				tracks: result.tracks,
+				tracks: result,
 			});
 		} catch (error) {
 			if (isAbortError(error) || !generationIsCurrent(ownership)) {
@@ -230,7 +230,6 @@ export function createPlayheadWindowPrototype({
 									endSeconds: normalizedStartSeconds,
 									kind: "silence",
 									startSeconds: normalizedStartSeconds,
-									state: "silence",
 									trackId,
 								}),
 							),
@@ -269,7 +268,7 @@ export function createPlayheadWindowPrototype({
 
 					engine.applyTrackStates({
 						generationId: expectedEngineGenerationId,
-						tracks: result.tracks,
+						tracks: result,
 					});
 				} catch (error) {
 					if (!isAbortError(error) && expectedVersion === generationVersion) {
@@ -308,7 +307,7 @@ export function createPlayheadWindowPrototype({
 			return;
 		}
 
-		const reason = error instanceof Error ? error.message : String(error);
+		const reason = errorMessage(error);
 		engine.applyTrackStates({
 			generationId: expectedEngineGenerationId,
 			tracks: ownership.generation.trackIds.map(
@@ -317,7 +316,6 @@ export function createPlayheadWindowPrototype({
 					kind: "failure",
 					reason,
 					startSeconds: engine.getCurrentTime(),
-					state: "failure",
 					trackId,
 				}),
 			),
@@ -428,7 +426,7 @@ export function createPlayheadWindowPrototype({
 
 				engine.applyTrackStates({
 					generationId: engineGenerationId,
-					tracks: result.tracks,
+					tracks: result,
 				});
 			} catch (error) {
 				if (!isAbortError(error) && ownership.version === generationVersion) {

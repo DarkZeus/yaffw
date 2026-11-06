@@ -1,3 +1,4 @@
+import type { ResolvedOutputPlan } from "@/editor-core/model";
 import {
 	ALL_FORMATS,
 	AudioBufferSource,
@@ -10,15 +11,6 @@ import {
 	type VideoCodec,
 } from "mediabunny";
 
-import {
-	audioMixPlanHasIncludedTracks,
-	createAudioMixPlan,
-} from "@/editor-core/audio-mix-plan";
-import {
-	resolveOutputPlan,
-	resolveOutputQuality,
-	resolveOutputResolution,
-} from "@/editor-core/output-settings";
 import { renderBrowserAudioMix } from "../../audio/engine/browser-audio-mix";
 import {
 	type DisposableMediaCleanup,
@@ -30,10 +22,7 @@ import {
 	toMediabunnyAudioQuality,
 	toMediabunnyQuality,
 } from "../adapters/mediabunny-output-quality";
-import {
-	MEDIABUNNY_OUTPUT_SUPPORT,
-	createMediabunnyOutputFormat,
-} from "../adapters/mediabunny-output-support";
+import { createMediabunnyOutputFormat } from "../adapters/mediabunny-output-support";
 import type {
 	DefaultExportRunner,
 	DefaultExportRunnerRequest,
@@ -60,11 +49,9 @@ export function isDefaultExportCancelledError(error: unknown): boolean {
 }
 
 async function runBrowserDefaultExport({
-	asset,
 	audioMix,
 	onProgress,
-	outputSettings,
-	resolvedOutput: suppliedResolvedOutput,
+	resolvedOutput,
 	selection,
 	signal,
 	source,
@@ -72,33 +59,9 @@ async function runBrowserDefaultExport({
 	throwIfAborted(signal);
 	onProgress({ phase: "preparing" });
 
-	const resolved = suppliedResolvedOutput
-		? { kind: "resolved" as const, plan: suppliedResolvedOutput }
-		: resolveOutputPlan({
-				asset,
-				audioMix,
-				outputSettings,
-				support: MEDIABUNNY_OUTPUT_SUPPORT,
-			});
-	if (resolved.kind === "invalid") {
-		throw new Error(resolved.error);
-	}
-	const resolvedOutput = resolved.plan;
-	const mixPlan = createAudioMixPlan({
-		audioMix,
-		trackIds: Object.keys(audioMix.tracks),
-	});
 	let mixedAudioOutput: MixedAudioOutput | undefined;
 
-	if (audioMixPlanHasIncludedTracks(mixPlan) && resolvedOutput.audioCodec) {
-		const audioQuality = resolveOutputQuality({
-			mediaKind: "audio",
-			setting: resolvedOutput.audioQuality,
-		});
-		if (audioQuality.kind === "invalid") {
-			throw new Error(audioQuality.error);
-		}
-
+	if (resolvedOutput.audioCodec) {
 		onProgress({ phase: "preparing", message: "Preparing audio mix." });
 		const mixedAudio = await renderBrowserAudioMix({
 			audioMix,
@@ -109,21 +72,19 @@ async function runBrowserDefaultExport({
 
 		if (mixedAudio) {
 			mixedAudioOutput = {
-				audioBuffer: mixedAudio.audioBuffer,
+				audioBuffer: mixedAudio,
 				audioCodec: resolvedOutput.audioCodec as AudioCodec,
 				audioQuality: toMediabunnyAudioQuality({
 					codec: resolvedOutput.audioCodec as AudioCodec,
-					quality: audioQuality,
+					quality: resolvedOutput.audioQuality,
 				}),
 			};
 		}
 	}
 
 	return runBrowserMediaExport({
-		asset,
 		mixedAudioOutput,
 		onProgress,
-		outputSettings,
 		resolvedOutput,
 		selection,
 		signal,
@@ -138,42 +99,23 @@ type MixedAudioOutput = {
 };
 
 async function runBrowserMediaExport({
-	asset,
 	mixedAudioOutput,
 	onProgress,
-	outputSettings,
 	resolvedOutput,
 	selection,
 	signal,
 	source,
 }: Pick<
 	DefaultExportRunnerRequest,
-	| "asset"
-	| "onProgress"
-	| "outputSettings"
-	| "resolvedOutput"
-	| "selection"
-	| "signal"
-	| "source"
+	"onProgress" | "selection" | "signal" | "source"
 > & {
 	mixedAudioOutput?: MixedAudioOutput;
+	resolvedOutput: ResolvedOutputPlan;
 }): Promise<DefaultExportRunnerResult> {
 	return withDisposableMediaWorkScope(async (scope) => {
-		const resolution = resolveOutputResolution({
-			asset,
-			setting: outputSettings.resolution,
-		});
-		if (resolution.kind === "invalid") {
-			throw new Error(resolution.error);
-		}
-		const videoQuality = resolveOutputQuality({
-			mediaKind: "video",
-			setting: resolvedOutput?.videoQuality ?? outputSettings.videoQuality,
-		});
-		if (videoQuality.kind === "invalid") {
-			throw new Error(videoQuality.error);
-		}
-		const mediabunnyVideoQuality = toMediabunnyQuality(videoQuality);
+		const mediabunnyVideoQuality = toMediabunnyQuality(
+			resolvedOutput.videoQuality,
+		);
 		const input = scope.registerDisposable(
 			new Input({
 				formats: ALL_FORMATS,
@@ -185,7 +127,7 @@ async function runBrowserMediaExport({
 		const target = new BufferTarget();
 		const output = new Output({
 			format: createMediabunnyOutputFormat(
-				resolvedOutput?.container.id ?? "mp4",
+				resolvedOutput.container.id,
 				mixedAudioOutput ? { fastStart: true } : {},
 			),
 			target,
@@ -205,13 +147,14 @@ async function runBrowserMediaExport({
 				start: selection.startUs / 1_000_000,
 			},
 			video: {
-				codec: (resolvedOutput?.videoCodec ?? "avc") as VideoCodec,
+				codec: resolvedOutput.videoCodec as VideoCodec,
 				...(mediabunnyVideoQuality === undefined
 					? {}
 					: { quality: mediabunnyVideoQuality }),
-				...(resolution.conversionDimensions
+				...(resolvedOutput.resolution?.kind === "target-dimensions"
 					? {
-							...resolution.conversionDimensions,
+							height: resolvedOutput.resolution.height,
+							width: resolvedOutput.resolution.width,
 							fit: "fill" as const,
 						}
 					: {}),
@@ -292,7 +235,7 @@ async function runBrowserMediaExport({
 			);
 		}
 
-		const mimeType = resolvedOutput?.container.mimeType ?? "video/mp4";
+		const mimeType = resolvedOutput.container.mimeType;
 
 		return {
 			blob: new Blob([target.buffer], { type: mimeType }),

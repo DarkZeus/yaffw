@@ -1,4 +1,9 @@
 import {
+	cancelBrowserFrame,
+	requestBrowserFrame,
+} from "@/lib/browser-animation-frame";
+import { clamp } from "@/lib/clamp";
+import {
 	AudioWaveform,
 	Film,
 	LocateFixed,
@@ -28,6 +33,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import {
+	minimumSelectionDurationUs,
 	moveSelectionRangeByDelta,
 	setSelectionEndFromPlayhead,
 	setSelectionStartFromPlayhead,
@@ -193,10 +199,7 @@ export function SelectionTimeline({
 		(laneState) => laneState.status === "ready",
 	).length;
 	const selectionIsRegionBacked = readyWaveformLaneCount > 0;
-	const minimumSelectionDurationUs = Math.max(
-		1,
-		Math.min(asset.frameTiming.frameDurationUs, asset.durationUs),
-	);
+	const minimumDurationUs = minimumSelectionDurationUs(selectionContext);
 	const normalizeRegionSelectionChange = useCallback(
 		(change: WaveformRegionSelectionChange): Selection => {
 			if (change.side === "start") {
@@ -349,7 +352,7 @@ export function SelectionTimeline({
 				return;
 			}
 
-			dragAnimationFrameRef.current = requestTimelineFrame(() => {
+			dragAnimationFrameRef.current = requestBrowserFrame(() => {
 				dragAnimationFrameRef.current = null;
 				const latestClientX = latestDragClientXRef.current;
 
@@ -367,7 +370,7 @@ export function SelectionTimeline({
 			}
 
 			if (dragAnimationFrameRef.current !== null) {
-				cancelTimelineFrame(dragAnimationFrameRef.current);
+				cancelBrowserFrame(dragAnimationFrameRef.current);
 				dragAnimationFrameRef.current = null;
 			}
 			latestDragClientXRef.current = null;
@@ -436,7 +439,7 @@ export function SelectionTimeline({
 			window.removeEventListener("mousemove", handlePointerMove);
 			window.removeEventListener("mouseup", handlePointerUp);
 			if (dragAnimationFrameRef.current !== null) {
-				cancelTimelineFrame(dragAnimationFrameRef.current);
+				cancelBrowserFrame(dragAnimationFrameRef.current);
 				dragAnimationFrameRef.current = null;
 			}
 			latestDragClientXRef.current = null;
@@ -649,7 +652,7 @@ export function SelectionTimeline({
 				centerPlayheadInScrollContainer(livePlayheadPercent, "auto");
 			}
 
-			animationFrameId = requestTimelineFrame(updateLivePlayheadHandle);
+			animationFrameId = requestBrowserFrame(updateLivePlayheadHandle);
 		}
 
 		updateLivePlayheadHandle();
@@ -658,7 +661,7 @@ export function SelectionTimeline({
 			cancelled = true;
 
 			if (animationFrameId !== null) {
-				cancelTimelineFrame(animationFrameId);
+				cancelBrowserFrame(animationFrameId);
 			}
 		};
 	}, [
@@ -796,7 +799,7 @@ export function SelectionTimeline({
 												laneStates[track.id] ?? { status: "loading", track }
 											}
 											laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
-											minimumSelectionDurationUs={minimumSelectionDurationUs}
+											minimumSelectionDurationUs={minimumDurationUs}
 											onAudioTrackIncludedChange={onAudioTrackIncludedChange}
 											onPlayheadSeekRequested={onPlayheadSeekRequested}
 											onPointerDown={seekFromLanePointer}
@@ -1053,11 +1056,7 @@ function useTimelineViewport({
 			const maxScrollLeftPx = Math.max(0, trackWidthPx - viewportWidthPx);
 
 			return {
-				scrollLeftPx: clampTimelineNumber(
-					scrollContainer.scrollLeft,
-					0,
-					maxScrollLeftPx,
-				),
+				scrollLeftPx: clamp(scrollContainer.scrollLeft, 0, maxScrollLeftPx),
 				trackWidthPx,
 				viewportWidthPx: Math.min(viewportWidthPx, trackWidthPx),
 			};
@@ -1078,7 +1077,7 @@ function useTimelineViewport({
 				return;
 			}
 
-			animationFrameId = requestTimelineFrame(publishViewport);
+			animationFrameId = requestBrowserFrame(publishViewport);
 		}
 
 		const resizeObserver =
@@ -1098,7 +1097,7 @@ function useTimelineViewport({
 			resizeObserver?.disconnect();
 
 			if (animationFrameId !== null) {
-				cancelTimelineFrame(animationFrameId);
+				cancelBrowserFrame(animationFrameId);
 			}
 		};
 	}, [laneHeaderWidthPx, scrollContainerRef, trackRef, zoom]);
@@ -1337,23 +1336,6 @@ function VideoThumbnailStripPlaceholder({
 	);
 }
 
-function requestTimelineFrame(callback: () => void): number {
-	if (typeof window.requestAnimationFrame === "function") {
-		return window.requestAnimationFrame(callback);
-	}
-
-	return window.setTimeout(callback, 16);
-}
-
-function cancelTimelineFrame(frameId: number) {
-	if (typeof window.cancelAnimationFrame === "function") {
-		window.cancelAnimationFrame(frameId);
-		return;
-	}
-
-	window.clearTimeout(frameId);
-}
-
 function timelineViewportEquals(
 	currentViewport: VideoStripThumbnailViewport,
 	nextViewport: VideoStripThumbnailViewport,
@@ -1364,10 +1346,6 @@ function timelineViewportEquals(
 		Math.abs(currentViewport.viewportWidthPx - nextViewport.viewportWidthPx) <
 			0.5
 	);
-}
-
-function clampTimelineNumber(value: number, min: number, max: number) {
-	return Math.min(Math.max(value, min), max);
 }
 
 function timeMarkerLabelClassName(placement: SelectionTimelineMarkerPlacement) {

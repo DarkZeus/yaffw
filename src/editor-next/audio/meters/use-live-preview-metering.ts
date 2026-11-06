@@ -1,3 +1,4 @@
+import { browserNowMs } from "@/lib/browser-animation-frame";
 import { useEffect, useRef, useState } from "react";
 
 import type { AudioMix } from "@/editor-core/model";
@@ -40,7 +41,7 @@ export function useLivePreviewMetering({
 	clock,
 	enabled,
 	knownTrackIds,
-	now = previewNowMs,
+	now = browserNowMs,
 	soloedAudioTrackId,
 }: UseLivePreviewMeteringOptions): LivePreviewMeteringState {
 	const stableKnownTrackIdsRef = useRef(knownTrackIds);
@@ -574,12 +575,4 @@ function channelsEqual(
 			leftChannel.peakDb === rightChannel.peakDb
 		);
 	});
-}
-
-function previewNowMs(): number {
-	if (typeof window.performance?.now === "function") {
-		return window.performance.now();
-	}
-
-	return Date.now();
 }

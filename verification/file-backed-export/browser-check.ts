@@ -2,7 +2,8 @@ import { createDefaultAudioMix } from "../../src/editor-core/audio-mix";
 import { analyzeLocalMediaAssetDraft } from "../../src/editor-core/local-file-analysis";
 import { createLocalMediaAssetDraft } from "../../src/editor-core/local-file-import";
 import { createDefaultOutputSettings } from "../../src/editor-core/model";
-import { detectRuntimeSupport } from "../../src/editor-core/runtime-capabilities";
+import { resolveOutputPlan } from "../../src/editor-core/output-settings";
+import { MEDIABUNNY_OUTPUT_SUPPORT } from "../../src/editor-next/export/adapters/mediabunny-output-support";
 import { inspectGeneratedMediaBlob } from "../../src/editor-next/export/generated-media/generated-media-inspector";
 import { browserDefaultExportRunner } from "../../src/editor-next/export/runners/default-export-runner";
 import { inspectBrowserLocalMediaAssetDraft } from "../../src/editor-next/media-asset/adapters/browser-local-asset-analyzer";
@@ -29,17 +30,23 @@ export async function checkExport({
 		createLocalMediaAssetDraft(source),
 		{
 			inspect: inspectBrowserLocalMediaAssetDraft,
-			runtime: detectRuntimeSupport(),
 		},
 	);
 	if (analysis.status !== "ready") throw new Error(JSON.stringify(analysis));
 	const outputSettings = createDefaultOutputSettings();
 	if (noAudio) outputSettings.audioCodec = { kind: "no-audio" };
 	const controller = new AbortController();
-	const request = {
+	const audioMix = createDefaultAudioMix(analysis.asset);
+	const output = resolveOutputPlan({
 		asset: analysis.asset,
-		audioMix: createDefaultAudioMix(analysis.asset),
+		audioMix,
 		outputSettings,
+		support: MEDIABUNNY_OUTPUT_SUPPORT,
+	});
+	if (output.kind === "invalid") throw new Error(output.error);
+	const request = {
+		audioMix,
+		resolvedOutput: output.plan,
 		selection: { startUs: 1_137_000, endUs: Math.round(end * 1e6) },
 		signal: controller.signal,
 		source,

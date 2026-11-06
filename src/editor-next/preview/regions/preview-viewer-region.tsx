@@ -6,10 +6,8 @@ import {
 	MediaPlayer,
 	type MediaPlayerInstance,
 	MediaProvider,
-	type MediaProviderAdapter,
 	Menu,
 	type PlayerSrc,
-	isHLSProvider,
 	useChapterOptions,
 	useMediaStore,
 } from "@vidstack/react";
@@ -213,13 +211,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					onPlaying={onNativePlaying}
 					onSeeked={onNativeSeeked}
 					onTimeUpdate={onSyncPlayhead}
-					onProviderChange={handlePreviewProviderChange}
 					playsInline
 					preload="metadata"
 					ref={videoRef}
 					src={playerSrc}
 					title={asset.label}
-					viewType={asset.tracks.video.length > 0 ? "video" : "audio"}
+					viewType="video"
 				>
 					<MediaProvider
 						loaders={localVideoProviderLoaders}
@@ -260,19 +257,9 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	);
 });
 
-function handlePreviewProviderChange(provider: MediaProviderAdapter | null) {
-	if (isHLSProvider(provider)) {
-		provider.config = {
-			...provider.config,
-			enableWorker: true,
-		};
-	}
-}
-
 type PreviewChapterSelection = Selection & {
 	durationText: string;
 	label: string;
-	selected: boolean;
 	startTimeText: string;
 	value: string;
 };
@@ -372,7 +359,6 @@ function buildPreviewChapterSelections(
 				durationText: option.durationText,
 				endUs: secondsToMicroseconds(endSeconds),
 				label: option.label,
-				selected: option.selected,
 				startTimeText: option.startTimeText,
 				startUs: secondsToMicroseconds(startSeconds),
 				value: option.value,

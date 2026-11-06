@@ -1,4 +1,8 @@
 import type { OutputSettings } from "@/editor-core/model";
+import {
+	cloneOutputSettings,
+	isOutputSettings,
+} from "@/editor-core/output-settings";
 
 export const EXPORT_PRESET_STORAGE_KEY = "yaffw.export-presets";
 export const EXPORT_PRESET_STORAGE_VERSION = 1;
@@ -158,66 +162,6 @@ function isExportPresetDocument(value: unknown): value is ExportPresetDocument {
 	return true;
 }
 
-function isOutputSettings(value: unknown): value is OutputSettings {
-	return (
-		isRecord(value) &&
-		isContainerSetting(value.container) &&
-		isCodecSetting(value.videoCodec) &&
-		(isCodecSetting(value.audioCodec) ||
-			(isRecord(value.audioCodec) && value.audioCodec.kind === "no-audio")) &&
-		isResolutionSetting(value.resolution) &&
-		isQualitySetting(value.videoQuality) &&
-		isQualitySetting(value.audioQuality)
-	);
-}
-
-function isContainerSetting(value: unknown): boolean {
-	return (
-		isRecord(value) &&
-		(value.kind === "default-output-profile" ||
-			(value.kind === "documented-container" &&
-				typeof value.container === "string" &&
-				value.container.length > 0))
-	);
-}
-
-function isCodecSetting(value: unknown): boolean {
-	return (
-		isRecord(value) &&
-		(value.kind === "default-output-profile" ||
-			value.kind === "preserve-source" ||
-			(value.kind === "documented-codec" &&
-				typeof value.codec === "string" &&
-				value.codec.length > 0))
-	);
-}
-
-function isResolutionSetting(value: unknown): boolean {
-	return (
-		isRecord(value) &&
-		(value.kind === "preserve-source" ||
-			(value.kind === "target-dimensions" &&
-				isPositiveInteger(value.width) &&
-				isPositiveInteger(value.height)))
-	);
-}
-
-function isQualitySetting(value: unknown): boolean {
-	return (
-		isRecord(value) &&
-		(value.kind === "preserve-source" ||
-			(value.kind === "subjective-quality" &&
-				["very-low", "low", "medium", "high", "very-high"].includes(
-					String(value.quality),
-				)) ||
-			(value.kind === "custom-bitrate" && isPositiveInteger(value.bitrateBps)))
-	);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-	return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -238,16 +182,5 @@ function cloneExportPreset(preset: ExportPreset): ExportPreset {
 	return {
 		name: preset.name,
 		outputSettings: cloneOutputSettings(preset.outputSettings),
-	};
-}
-
-function cloneOutputSettings(outputSettings: OutputSettings): OutputSettings {
-	return {
-		audioCodec: { ...outputSettings.audioCodec },
-		audioQuality: { ...outputSettings.audioQuality },
-		container: { ...outputSettings.container },
-		resolution: { ...outputSettings.resolution },
-		videoCodec: { ...outputSettings.videoCodec },
-		videoQuality: { ...outputSettings.videoQuality },
 	};
 }

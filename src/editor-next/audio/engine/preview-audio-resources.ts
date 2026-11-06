@@ -1,15 +1,11 @@
 import type { ReadyMediaAsset } from "@/editor-core/model";
-import type {
-	PreviewAudioResource,
-	PreviewAudioResourceFailure,
-} from "../types/preview-audio-resources.types";
+import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import {
 	type MediaWindowProvider,
 	createMediaWindowProvider,
 } from "./media-window-provider";
 
 export type PreviewAudioResourcesResult = {
-	failures: PreviewAudioResourceFailure[];
 	provider: MediaWindowProvider;
 	resources: PreviewAudioResource[];
 };
@@ -37,27 +33,14 @@ export async function preparePreviewAudioResources({
 				"Audio preview preparation was cancelled.",
 				"AbortError",
 			);
-		const failures: PreviewAudioResourceFailure[] = [];
-		const resources = asset.tracks.audio.map(
-			(track, trackIndex): PreviewAudioResource => {
-				const metadata = provider.getTrackMetadata(track.id);
-				if (metadata.failureReason)
-					failures.push({
-						reason: metadata.failureReason,
-						track,
-						trackId: track.id,
-						trackIndex,
-					});
-				return {
-					numberOfChannels: metadata.numberOfChannels,
-					sampleRate: metadata.sampleRate,
-					track,
-					trackId: track.id,
-					trackIndex,
-				};
-			},
-		);
-		return { provider, failures, resources };
+		const resources = asset.tracks.audio.map((track): PreviewAudioResource => {
+			const metadata = provider.getTrackMetadata(track.id);
+			return {
+				numberOfChannels: metadata.numberOfChannels,
+				trackId: track.id,
+			};
+		});
+		return { provider, resources };
 	} catch (error) {
 		await provider.dispose();
 		throw error;

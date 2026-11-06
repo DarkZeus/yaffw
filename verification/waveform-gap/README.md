@@ -29,7 +29,10 @@ an unavailable track produces a final unavailable worker response. Each case
 has one successful worker, one immediately aborted worker, and one worker that
 reports an unavailable track.
 
-`app-check.mjs` requires the generated fixtures. It muxes the gap Opus track
+Both runners prepare their fixtures before opening a browser: `check.mjs` calls
+`prepareFixtures()` and `app-check.mjs` calls `prepareVideoFixture()` from
+`fixtures.mjs`. Either command can run directly without a prior verification run.
+The app setup muxes the gap Opus track
 with H.264 video, imports it through the actual editor, captures the ready
 Wavesurfer lane, exercises Play/Pause, exports/downloads, and independently
 checks generated PCM using ffmpeg. Its screenshot requires human inspection
