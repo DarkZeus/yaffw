@@ -2,11 +2,8 @@
 
 import type { FrameRateMetrics } from "mediabunny";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { analyzeLocalMediaAssetDraft } from "@/editor-core/local-file-analysis";
-
 import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
-
 import { inspectBrowserLocalMediaAssetDraft } from "../adapters/browser-local-asset-analyzer";
 
 const mediabunnyMock = vi.hoisted(() => ({

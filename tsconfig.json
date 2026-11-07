@@ -1,5 +1,12 @@
 {
-	"include": ["src/**/*.ts", "src/**/*.tsx", "prototypes/nle/**/*.ts", "prototypes/nle/**/*.tsx", "verification/**/*.ts", "vite.config.ts"],
+	"include": [
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		"prototypes/nle/**/*.ts",
+		"prototypes/nle/**/*.tsx",
+		"verification/**/*.ts",
+		"vite.config.ts"
+	],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",

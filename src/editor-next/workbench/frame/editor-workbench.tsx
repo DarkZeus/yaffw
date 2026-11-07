@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
-
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -306,7 +305,7 @@ function NonReadyImportSurface({
 						</div>
 
 						{!isProcessing ? (
-							<p className="tabular-nums text-[9px] font-medium tracking-[0.08em] text-muted-foreground">
+							<p className="text-[9px] font-medium tracking-[0.08em] text-muted-foreground tabular-nums">
 								{supportedFormatLabels.join("  ·  ")}
 							</p>
 						) : null}
@@ -398,11 +397,7 @@ function workbenchNonReadyStateCopy(session: NonReadyEditorSession) {
 	}
 }
 
-function RuntimeChecksPanel({
-	session,
-}: {
-	session: EditorSessionState;
-}) {
+function RuntimeChecksPanel({ session }: { session: EditorSessionState }) {
 	return (
 		<section className="flex flex-col gap-3 rounded-md border bg-card p-4">
 			<h2 className="text-sm font-semibold tracking-tight">Browser support</h2>

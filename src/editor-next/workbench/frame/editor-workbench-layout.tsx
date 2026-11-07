@@ -13,7 +13,6 @@ import {
 	Workspace,
 	useWorkspaceRef,
 } from "react-resizable-panels";
-
 import {
 	type WorkbenchInspectorPanels,
 	type WorkbenchPanelId,
@@ -22,7 +21,6 @@ import {
 	saveWorkbenchLayout,
 	workbenchTabsets,
 } from "./workbench-layout-model";
-
 import {
 	WorkbenchPanel,
 	WorkbenchPanelsProvider,

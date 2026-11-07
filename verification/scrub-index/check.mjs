@@ -28,12 +28,10 @@ assert.equal(
 	"1.65.2",
 );
 function instrument(originalSource, historical = false) {
-	let source = originalSource.replace(
-		/from "(\.[^"]+)"/g,
-		(match, specifier) =>
-			historical && specifier === "./keyframe-index"
-				? match
-				: `from "${posix.join("/", owner, specifier)}"`,
+	let source = originalSource.replace(/from "(\.[^"]+)"/g, (match, specifier) =>
+		historical && specifier === "./keyframe-index"
+			? match
+			: `from "${posix.join("/", owner, specifier)}"`,
 	);
 	source = replace(
 		source,
@@ -83,9 +81,8 @@ try {
 					await page.goto(process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000");
 					const observed = await page.evaluate(
 						async (args) => {
-							const harness = await import(
-								"/verification/scrub-index/browser-check.ts"
-							);
+							const harness =
+								await import("/verification/scrub-index/browser-check.ts");
 							return harness.compare(args);
 						},
 						{

@@ -183,7 +183,6 @@ vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 });
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
-
 import type {
 	WaveformLaneLoader,
 	WaveformLaneResult,

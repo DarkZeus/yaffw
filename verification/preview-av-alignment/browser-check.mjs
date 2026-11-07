@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
-
 import { launchBrowser } from "../browser.cjs";
 import { prepareAlignmentMeasurement } from "./prepare.mjs";
 

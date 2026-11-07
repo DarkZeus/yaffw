@@ -1,5 +1,4 @@
 import { useCallback, useEffect } from "react";
-
 import type { MediaTimeUs } from "@/editor-core/model";
 
 const SHORT_SEEK_DELTA_US = 1_000_000;

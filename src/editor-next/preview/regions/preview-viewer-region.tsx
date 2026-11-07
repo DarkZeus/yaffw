@@ -1,6 +1,3 @@
-import { CircleDot, Maximize2 } from "lucide-react";
-import { type RefObject, memo, useMemo } from "react";
-
 import {
 	type ChapterOption,
 	MediaPlayer,
@@ -11,23 +8,23 @@ import {
 	useChapterOptions,
 	useMediaStore,
 } from "@vidstack/react";
-import "@vidstack/react/player/styles/default/theme.css";
-import "@vidstack/react/player/styles/default/layouts/audio.css";
-import "@vidstack/react/player/styles/default/layouts/video.css";
 import {
 	DefaultTooltip,
 	DefaultVideoLayout,
 	defaultLayoutIcons,
 	useDefaultLayoutContext,
 } from "@vidstack/react/player/layouts/default";
-
+import { CircleDot, Maximize2 } from "lucide-react";
+import "@vidstack/react/player/styles/default/theme.css";
+import "@vidstack/react/player/styles/default/layouts/audio.css";
+import "@vidstack/react/player/styles/default/layouts/video.css";
+import { type RefObject, memo, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import type {
 	MediaTimeUs,
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
-
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { localVideoProviderLoaders } from "../player/local-video-provider-loader";
@@ -101,14 +98,14 @@ export function PreviewViewerRegion({
 							}`}
 						/>
 						<span className="sr-only">Preview</span>
-						<span className="tabular-nums text-muted-foreground">
+						<span className="text-muted-foreground tabular-nums">
 							{playbackRate}x
 						</span>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
 						<span
 							aria-label="Preview playhead time"
-							className="tabular-nums text-[11px] leading-none"
+							className="text-[11px] leading-none tabular-nums"
 						>
 							{formatMediaTime(playheadUs)}
 						</span>

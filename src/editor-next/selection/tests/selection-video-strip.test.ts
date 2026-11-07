@@ -3,9 +3,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
-
 import type { VideoStripThumbnailLoader } from "../types/selection-video-strip.types";
 import {
 	type VideoStripThumbnailWindow,

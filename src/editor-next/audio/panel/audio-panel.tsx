@@ -6,7 +6,6 @@ import {
 	VolumeX,
 } from "lucide-react";
 import { memo, useMemo } from "react";
-
 import { Button } from "@/components/ui/button";
 import {
 	createDefaultAudioMix,
@@ -83,7 +82,7 @@ export const AudioPanel = memo(function AudioPanel({
 	return (
 		<section
 			aria-label="Audio panel"
-			className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:rounded-none xl:border-0"
+			className="flex h-full min-h-0 max-w-full min-w-0 flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:rounded-none xl:border-0"
 		>
 			<div className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain px-2 py-2">
 				{hasAutomaticChannelMode ? (
@@ -202,7 +201,7 @@ function AudioTrackStrip({
 			</div>
 			<div className="grid min-h-0 min-w-0 grid-cols-[2.25rem_4.25rem] justify-center gap-2">
 				<label className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] justify-items-center gap-1 rounded-sm border border-workbench-border bg-workbench-viewer px-1 py-2">
-					<span className="tabular-nums text-[10px] text-workbench-progress">
+					<span className="text-[10px] text-workbench-progress tabular-nums">
 						{volumePercent}%
 					</span>
 					<span className="sr-only">{label} track volume</span>

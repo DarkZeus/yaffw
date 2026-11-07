@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { launchBrowser } from "../browser.cjs";
 import { prepareFixtures } from "./fixtures.mjs";
 import { instrument } from "./instrument.mjs";
-
-import { launchBrowser } from "../browser.cjs";
 const directory = resolve("tmp/file-backed-export");
 mkdirSync(directory, { recursive: true });
 prepareFixtures();

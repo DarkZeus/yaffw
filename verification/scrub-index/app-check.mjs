@@ -66,9 +66,8 @@ try {
 		});
 		const displayedFrame = await page.evaluate(
 			async (base64) => {
-				const harness = await import(
-					"/verification/scrub-index/browser-check.ts"
-				);
+				const harness =
+					await import("/verification/scrub-index/browser-check.ts");
 				return harness.checkDisplayedFrame(base64);
 			},
 			readFileSync(fixturePath(file)).toString("base64"),
@@ -89,9 +88,8 @@ try {
 		});
 		const replacementFrame = await page.evaluate(
 			async (base64) => {
-				const harness = await import(
-					"/verification/scrub-index/browser-check.ts"
-				);
+				const harness =
+					await import("/verification/scrub-index/browser-check.ts");
 				return harness.checkDisplayedFrame(base64);
 			},
 			readFileSync(fixturePath("short-long-gop.mp4")).toString("base64"),

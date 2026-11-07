@@ -2,12 +2,10 @@
 
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import type { GeneratedMedia, OutputSettings } from "@/editor-core/model";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
-
 import { useSingleAssetEditingSession } from "../session/use-single-asset-editing-session";
 import type { SingleAssetEditingSession } from "../session/use-single-asset-editing-session";
 

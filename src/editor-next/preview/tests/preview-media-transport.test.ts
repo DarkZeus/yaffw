@@ -1,6 +1,5 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { describe, expect, it, vi } from "vitest";
-
 import { createPreviewMediaTransport } from "../transport/preview-media-transport";
 
 describe("createPreviewMediaTransport", () => {

@@ -185,7 +185,7 @@ function eventAlignment(file) {
 			await page.addInitScript(() => {
 				window.__formats = [];
 				// oxlint-disable-next-line typescript/unbound-method -- Instrumentation calls the original with its encoder receiver and restores it afterward.
-const encode = AudioEncoder.prototype.encode;
+				const encode = AudioEncoder.prototype.encode;
 				AudioEncoder.prototype.encode = function (sample) {
 					if (!window.__formats.includes(sample.format))
 						window.__formats.push(sample.format);

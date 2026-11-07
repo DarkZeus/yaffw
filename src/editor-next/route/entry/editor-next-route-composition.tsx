@@ -1,5 +1,4 @@
 import { type ChangeEvent, useMemo, useRef } from "react";
-
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import { canCloseEditorSession } from "@/editor-core/session";
 import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";

@@ -1,12 +1,6 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"plugins": [
-		"typescript",
-		"react",
-		"jsx-a11y",
-		"unicorn",
-		"oxc"
-	],
+	"plugins": ["typescript", "react", "jsx-a11y", "unicorn", "oxc"],
 	"categories": {
 		"correctness": "error"
 	},
@@ -58,11 +52,7 @@
 	],
 	"overrides": [
 		{
-			"files": [
-				"**/*.test.ts",
-				"**/*.test.tsx",
-				"**/*.test.mjs"
-			],
+			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs"],
 			"rules": {
 				"typescript/unbound-method": "off"
 			}

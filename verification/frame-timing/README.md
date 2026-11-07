@@ -40,14 +40,14 @@ pnpm exec oxfmt --check verification/frame-timing
 160×90 testsrc2 frames, libx264 with no B-frames, a 1 μs encoder/container time
 base, and passthrough timestamps. The cases are:
 
-| File in `tmp/frame-timing/` | Timestamp construction |
-| --- | --- |
-| `fractional-cfr.mp4` | 360 frames at 30000/1001 fps |
-| `dropped-cfr.mp4` | A 30 fps lattice with each input frame where `n % 10 === 4` removed; continue until 360 output packets |
-| `vfr.mp4` | 360 frames; timestamp in μs is `N*37000 + 7000*sin(N*1.7)` |
-| `single-frame.mp4` | One 30 fps input frame; no measurable timestamp interval |
-| `nonzero-start.mp4` | 360 frames on a 30 fps lattice, shifted forward 2 seconds |
-| `late-vfr.mp4` | 600 frames; 33333 μs intervals for the first 300, followed by sinusoidal timestamp variation |
+| File in `tmp/frame-timing/` | Timestamp construction                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `fractional-cfr.mp4`        | 360 frames at 30000/1001 fps                                                                           |
+| `dropped-cfr.mp4`           | A 30 fps lattice with each input frame where `n % 10 === 4` removed; continue until 360 output packets |
+| `vfr.mp4`                   | 360 frames; timestamp in μs is `N*37000 + 7000*sin(N*1.7)`                                             |
+| `single-frame.mp4`          | One 30 fps input frame; no measurable timestamp interval                                               |
+| `nonzero-start.mp4`         | 360 frames on a 30 fps lattice, shifted forward 2 seconds                                              |
+| `late-vfr.mp4`              | 600 frames; 33333 μs intervals for the first 300, followed by sinusoidal timestamp variation           |
 
 Assertions require correct known/estimated classification, exact preservation of
 the seven analysis fields, the rounded positive navigation interval, retained VFR

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { createDefaultOutputSettings } from "./model";
 import {
 	type BrowserLocalOutputSupport,

@@ -1,7 +1,6 @@
-import { browserNowMs } from "@/lib/browser-animation-frame";
 import { useEffect, useRef, useState } from "react";
-
 import type { AudioMix } from "@/editor-core/model";
+import { browserNowMs } from "@/lib/browser-animation-frame";
 import type { PreviewLevelMeterChannel } from "./preview-level-meter";
 import {
 	type LivePreviewMeteringClipHoldState,

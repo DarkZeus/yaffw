@@ -1,7 +1,5 @@
 import { useMemo } from "react";
-
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
-
 import { useSingleAssetEditingSession } from "../session/use-single-asset-editing-session";
 import { EditorNextRouteComposition } from "./editor-next-route-composition";
 

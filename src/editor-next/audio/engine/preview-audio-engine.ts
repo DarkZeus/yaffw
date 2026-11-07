@@ -3,11 +3,6 @@ import {
 	createAudioMixPlan,
 } from "@/editor-core/audio-mix-plan";
 import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
-import {
-	PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
-	PREVIEW_AUDIO_WINDOW_LOW_WATER_SECONDS,
-} from "./preview-audio-window-policy";
-
 import type {
 	CreatePreviewAudioEngineOptions,
 	PreviewAudioContextLike,
@@ -16,6 +11,10 @@ import type {
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import { createPreviewAudioGraph } from "./preview-audio-graph";
 import { createPreviewAudioWindowController } from "./preview-audio-window-controller";
+import {
+	PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+	PREVIEW_AUDIO_WINDOW_LOW_WATER_SECONDS,
+} from "./preview-audio-window-policy";
 import { createPreviewOutputTime } from "./preview-output-time";
 import { PREVIEW_OUTPUT_TIMING_ENABLED } from "./preview-output-timing-enabled";
 import { createScheduledWindowEngine } from "./scheduled-window-engine";

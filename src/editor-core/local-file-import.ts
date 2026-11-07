@@ -1,5 +1,4 @@
 import { createEditorId } from "./identity";
-
 import type { LocalFileSource, MediaAssetDraft } from "./model";
 
 type LocalMediaAssetDraftOptions = {

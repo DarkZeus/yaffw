@@ -1,9 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
-import { generateFixtures } from "../copy-boundaries/fixtures.mjs";
-
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { generateFixtures } from "../copy-boundaries/fixtures.mjs";
 
 export function prepareFixtures() {
 	mkdirSync("tmp/file-backed-export", { recursive: true });

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { AudioMix } from "@/editor-core/model";
 
 const mediabunnyMock = vi.hoisted(() => ({

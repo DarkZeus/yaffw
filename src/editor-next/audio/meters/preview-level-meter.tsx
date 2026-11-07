@@ -6,7 +6,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { cn } from "@/lib/utils";
 import type {
 	PreviewLevelMeterChannel,
@@ -273,7 +272,7 @@ function PreviewLevelMeterChannelBar({
 					"relative min-h-0 overflow-hidden rounded-sm border border-workbench-border/80 bg-workbench-lane",
 					orientation === "horizontal" ? "h-4" : "",
 				)}
-// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- Custom segmented meter needs styled child elements that native meter hides.
+				// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- Custom segmented meter needs styled child elements that native meter hides.
 				role="meter"
 			>
 				{zones.map((zone) => (
@@ -301,7 +300,7 @@ function PreviewLevelMeterChannelBar({
 				{channel.clipHeld ? (
 					<span
 						aria-label={`${channelLabel} clip held`}
-						className="absolute right-0.5 top-0.5 rounded-sm bg-red-500 px-0.5 font-mono text-[8px] font-bold leading-3 text-white"
+						className="absolute top-0.5 right-0.5 rounded-sm bg-red-500 px-0.5 font-mono text-[8px] leading-3 font-bold text-white"
 					>
 						CLIP
 					</span>
@@ -327,7 +326,7 @@ function NonReadyPreviewLevelMeter({
 		state === "preparing" ? "Preparing meter" : "Meter unavailable";
 
 	return (
-		<div className="grid min-h-0 place-items-center overflow-auto rounded-sm border border-workbench-border border-dashed bg-workbench-lane/60 p-2 text-center text-[10px] leading-4 text-muted-foreground">
+		<div className="grid min-h-0 place-items-center overflow-auto rounded-sm border border-dashed border-workbench-border bg-workbench-lane/60 p-2 text-center text-[10px] leading-4 text-muted-foreground">
 			{message ?? fallbackMessage}
 		</div>
 	);
@@ -347,11 +346,11 @@ function TickLabels({
 			aria-hidden="true"
 			className={cn(
 				"pointer-events-none absolute z-20",
-				orientation === "vertical" ? "bottom-0 right-0 top-0 w-8" : "inset-0",
+				orientation === "vertical" ? "top-0 right-0 bottom-0 w-8" : "inset-0",
 			)}
 		>
 			{orientation === "vertical" ? (
-				<span className="absolute right-0 top-0 font-mono text-[7px] uppercase leading-3 text-muted-foreground/60">
+				<span className="absolute top-0 right-0 font-mono text-[7px] leading-3 text-muted-foreground/60 uppercase">
 					dBFS
 				</span>
 			) : null}
@@ -360,14 +359,14 @@ function TickLabels({
 					className={cn(
 						"absolute",
 						orientation === "vertical"
-							? "left-0 right-0"
-							: "bottom-0 top-0 border-l",
+							? "right-0 left-0"
+							: "top-0 bottom-0 border-l",
 					)}
 					key={tick}
 					style={tickStyle(tick, range, orientation)}
 				>
 					{orientation === "vertical" ? (
-						<span className="absolute left-0 top-0 h-px w-1.5 bg-workbench-border-strong/45" />
+						<span className="absolute top-0 left-0 h-px w-1.5 bg-workbench-border-strong/45" />
 					) : null}
 					<span
 						className={cn(

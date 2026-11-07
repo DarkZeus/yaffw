@@ -1,5 +1,4 @@
 import { AudioSampleSink, EncodedPacketSink } from "mediabunny";
-
 import {
 	AudioPacketTimeline,
 	DecodedAudioTimestampProjector,

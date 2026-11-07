@@ -1,9 +1,7 @@
-import { errorMessage } from "@/lib/error-message";
 import { useEffect, useState } from "react";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
+import { errorMessage } from "@/lib/error-message";
 import { runWorkerJob } from "../../media-work/workers/worker-job";
-
 import type {
 	WaveformLaneLoader,
 	WaveformLaneRequest,

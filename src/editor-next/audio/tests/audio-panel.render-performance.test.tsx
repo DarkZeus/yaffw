@@ -2,7 +2,6 @@
 
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
 import { PreviewAudioMonitoringProvider } from "../engine/preview-audio-monitoring-provider";

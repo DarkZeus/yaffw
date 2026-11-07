@@ -42,11 +42,11 @@ changing the harness's exact-fixture check.
 
 Independent FFmpeg-decoded 200 ms RMS probes measured:
 
-| Media time | Track 1 | Track 2 |
-| --- | --- | --- |
-| 2.5 s | 0.088371 | 0.088331 |
-| 4.5 s | 0.088330 | 0 |
-| 6 s | 0.088325 | 0.088329 |
+| Media time | Track 1  | Track 2  |
+| ---------- | -------- | -------- |
+| 2.5 s      | 0.088371 | 0.088331 |
+| 4.5 s      | 0.088330 | 0        |
+| 6 s        | 0.088325 | 0.088329 |
 
 Browser probes verify silence before both starts, the first track beginning
 before the second, both tracks playing, only the second track becoming silent,

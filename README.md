@@ -28,13 +28,13 @@ The initial selection covers the whole video, so you can also use YAFFW to chang
 
 ## Keyboard shortcuts
 
-| Key | Action |
-| --- | --- |
-| Space or K | Play / pause |
-| ← / → | Seek backward / forward one second |
-| J / L | Seek backward / forward ten seconds |
-| Shift + ← / → | Step backward / forward one frame |
-| [ / ] | Set the selection start / end at the playhead |
+| Key           | Action                                        |
+| ------------- | --------------------------------------------- |
+| Space or K    | Play / pause                                  |
+| ← / →         | Seek backward / forward one second            |
+| J / L         | Seek backward / forward ten seconds           |
+| Shift + ← / → | Step backward / forward one frame             |
+| [ / ]         | Set the selection start / end at the playhead |
 
 Shortcuts pause while you're editing an input, using a dialog, or exporting.
 
@@ -61,15 +61,15 @@ Open [localhost:3000](http://localhost:3000).
 
 Useful development commands:
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm verify` | Run formatting, linting, tests, production build, and type checking |
-| `pnpm check` | Check formatting with Oxfmt and type-aware lint rules with Oxlint |
-| `pnpm format` | Format maintained files and sort imports and Tailwind classes |
-| `pnpm typecheck` | Check types with TypeScript 7 |
-| `pnpm test` | Run the test suite |
-| `pnpm run build` | Build to `dist` and check TypeScript |
-| `pnpm run serve` | Preview the production build locally |
+| Command          | Purpose                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| `pnpm verify`    | Run formatting, linting, tests, production build, and type checking |
+| `pnpm check`     | Check formatting with Oxfmt and type-aware lint rules with Oxlint   |
+| `pnpm format`    | Format maintained files and sort imports and Tailwind classes       |
+| `pnpm typecheck` | Check types with TypeScript 7                                       |
+| `pnpm test`      | Run the test suite                                                  |
+| `pnpm run build` | Build to `dist` and check TypeScript                                |
+| `pnpm run serve` | Preview the production build locally                                |
 
 Linting includes React Hooks, accessibility, and type-aware checks for promises and method binding. React Compiler eligibility rules are excluded because the app does not use React Compiler. Method-binding checks exempt test files so assertions can inspect spies without calling them.
 

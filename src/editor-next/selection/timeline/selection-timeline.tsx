@@ -1,9 +1,4 @@
 import {
-	cancelBrowserFrame,
-	requestBrowserFrame,
-} from "@/lib/browser-animation-frame";
-import { clamp } from "@/lib/clamp";
-import {
 	AudioWaveform,
 	Film,
 	LocateFixed,
@@ -23,7 +18,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { Button } from "@/components/ui/button";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
@@ -38,7 +32,11 @@ import {
 	setSelectionEndFromPlayhead,
 	setSelectionStartFromPlayhead,
 } from "@/editor-core/selection";
-
+import {
+	cancelBrowserFrame,
+	requestBrowserFrame,
+} from "@/lib/browser-animation-frame";
+import { clamp } from "@/lib/clamp";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
 import type {
 	VideoStripThumbnailLoader,
@@ -708,7 +706,7 @@ export function SelectionTimeline({
 						className="size-4 text-workbench-progress"
 					/>
 					<span className="truncate">Selection</span>
-					<span className="hidden tabular-nums text-[11px] font-normal text-muted-foreground sm:inline">
+					<span className="hidden text-[11px] font-normal text-muted-foreground tabular-nums sm:inline">
 						{formatMediaTime(visibleSelection.endUs - visibleSelection.startUs)}
 					</span>
 				</div>
@@ -765,7 +763,7 @@ export function SelectionTimeline({
 									>
 										<div className="absolute bottom-5 left-0 h-4 w-px bg-workbench-border-strong" />
 										<span
-											className={`absolute ${marker.placement === "start" ? "bottom-6 sm:bottom-1" : "bottom-1"} ${marker.placement === "middle" ? "hidden sm:block" : ""} whitespace-nowrap tabular-nums text-[11px] text-muted-foreground ${timeMarkerLabelClassName(marker.placement)}`}
+											className={`absolute ${marker.placement === "start" ? "bottom-6 sm:bottom-1" : "bottom-1"} ${marker.placement === "middle" ? "hidden sm:block" : ""} text-[11px] whitespace-nowrap text-muted-foreground tabular-nums ${timeMarkerLabelClassName(marker.placement)}`}
 										>
 											{formatMediaTime(marker.timeUs)}
 										</span>
@@ -951,7 +949,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			</Button>
 			<Button
 				aria-label="Zoom out timeline"
-				className="inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+				className="inline-flex size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:size-7"
 				disabled={zoom <= MINIMUM_TIMELINE_ZOOM}
 				onClick={onZoomOut}
 				size="icon"
@@ -960,7 +958,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			>
 				<ZoomOut data-icon="inline-start" />
 			</Button>
-			<label className="flex min-w-0 w-24 sm:w-28 items-center gap-2 text-xs font-medium text-muted-foreground">
+			<label className="flex w-24 min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground sm:w-28">
 				<span>Zoom</span>
 				<input
 					aria-label="Timeline zoom"
@@ -979,7 +977,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			</label>
 			<Button
 				aria-label="Zoom in timeline"
-				className="inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+				className="inline-flex size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:size-7"
 				disabled={zoom >= MAXIMUM_TIMELINE_ZOOM}
 				onClick={onZoomIn}
 				size="icon"
@@ -991,7 +989,7 @@ const SelectionTimelineToolbar = memo(function SelectionTimelineToolbar({
 			<Button
 				aria-label="Keep playhead centered"
 				aria-pressed={playheadFollowEnabled}
-				className="cinema-toggle-button inline-flex size-8 sm:size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
+				className="cinema-toggle-button inline-flex size-8 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground sm:size-7"
 				onClick={onFollowToggle}
 				size="icon"
 				title="Keep playhead centered"
@@ -1208,7 +1206,7 @@ const VideoThumbnailStrip = memo(function VideoThumbnailStrip({
 											draggable={false}
 											src={slot.frame.url}
 										/>
-										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 tabular-nums text-[10px] leading-none text-workbench-selected-foreground">
+										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 text-[10px] leading-none text-workbench-selected-foreground tabular-nums">
 											{formatVideoThumbnailTime(slot.timestampUs)}
 										</span>
 									</>
@@ -1237,7 +1235,7 @@ function VideoThumbnailStripStatus({
 }) {
 	if (state.status === "ready") {
 		return (
-			<span className="rounded border border-workbench-border-strong px-1.5 py-0.5 tabular-nums text-[11px] text-muted-foreground">
+			<span className="rounded border border-workbench-border-strong px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
 				{frameCount} frames
 			</span>
 		);
@@ -1245,7 +1243,7 @@ function VideoThumbnailStripStatus({
 
 	if (state.status === "loading") {
 		return (
-			<span className="rounded border border-workbench-progress/45 bg-workbench-progress/15 px-1.5 py-0.5 tabular-nums text-[11px] text-workbench-progress">
+			<span className="rounded border border-workbench-progress/45 bg-workbench-progress/15 px-1.5 py-0.5 text-[11px] text-workbench-progress tabular-nums">
 				{frameCount > 0
 					? `${frameCount}/${expectedFrameCount} frames`
 					: "Loading frames"}
@@ -1255,7 +1253,7 @@ function VideoThumbnailStripStatus({
 
 	return (
 		<span
-			className="rounded border border-destructive/45 bg-destructive/15 px-1.5 py-0.5 tabular-nums text-[11px] text-destructive"
+			className="rounded border border-destructive/45 bg-destructive/15 px-1.5 py-0.5 text-[11px] text-destructive tabular-nums"
 			title={state.reason}
 		>
 			Frames unavailable
@@ -1310,7 +1308,9 @@ function createVideoThumbnailStripFrameSlots({
 
 function VideoThumbnailStripPlaceholder({
 	state,
-}: { state: Exclude<VideoStripThumbnailState, { status: "ready" }> }) {
+}: {
+	state: Exclude<VideoStripThumbnailState, { status: "ready" }>;
+}) {
 	return (
 		<div
 			className="relative grid h-full gap-px bg-black/60"

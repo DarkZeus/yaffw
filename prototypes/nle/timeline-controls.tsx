@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
 	ChevronDown,
 	Film,
@@ -9,6 +8,7 @@ import {
 	Scissors,
 } from "lucide-react";
 import { type ReactNode, useId, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { EditableName } from "./editable-name";
 import { FRAME, end } from "./model";
 import type { Editor } from "./use-editor";
@@ -17,7 +17,11 @@ export function Disclosure({
 	label,
 	children,
 	icon,
-}: { label: string; children: ReactNode; icon?: ReactNode }) {
+}: {
+	label: string;
+	children: ReactNode;
+	icon?: ReactNode;
+}) {
 	const id = useId();
 	return (
 		<div className="timeline-disclosure">

@@ -1,5 +1,4 @@
 import type { ReadyMediaAsset } from "@/editor-core/model";
-
 import type { PreviewAudioResourcesState } from "../../audio/engine/use-preview-audio-resources";
 
 export type PreviewClockMode =

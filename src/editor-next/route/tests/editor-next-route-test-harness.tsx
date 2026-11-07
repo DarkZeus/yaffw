@@ -2,7 +2,6 @@ import {
 	type RuntimeSupport,
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
-
 import { EditorNextRouteComposition } from "../entry/editor-next-route-composition";
 import {
 	type UseSingleAssetEditingSessionOptions,

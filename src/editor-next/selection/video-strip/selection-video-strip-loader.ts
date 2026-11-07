@@ -1,9 +1,7 @@
+import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
+import type { MediaTimeUs } from "@/editor-core/model";
 import { clamp } from "@/lib/clamp";
 import { errorMessage } from "@/lib/error-message";
-import { ALL_FORMATS, BlobSource, CanvasSink, Input } from "mediabunny";
-
-import type { MediaTimeUs } from "@/editor-core/model";
-
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 import type {
 	VideoStripThumbnailFrame,

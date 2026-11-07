@@ -10,9 +10,7 @@ import {
 } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { Selection } from "@/editor-core/model";
-
 import type {
 	PreviewAudioEngine,
 	PreviewAudioEngineMeterSnapshot,

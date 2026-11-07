@@ -4,7 +4,6 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-
 import { launchBrowser } from "../browser.cjs";
 import { bundle, prepareAlignmentMeasurement } from "./prepare.mjs";
 

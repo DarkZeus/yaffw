@@ -1,5 +1,4 @@
 import type { GeneratedMedia } from "@/editor-core/model";
-
 import type { GeneratedMediaDeliveryRequest } from "../types/generated-media-delivery.types";
 
 export type GeneratedMediaArtifactStore = {

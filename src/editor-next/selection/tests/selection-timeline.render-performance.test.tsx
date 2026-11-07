@@ -10,7 +10,6 @@ import {
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset, Selection } from "@/editor-core/model";
 import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";

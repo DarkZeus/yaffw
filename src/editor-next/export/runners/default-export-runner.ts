@@ -1,4 +1,3 @@
-import type { ResolvedOutputPlan } from "@/editor-core/model";
 import {
 	ALL_FORMATS,
 	AudioBufferSource,
@@ -10,7 +9,7 @@ import {
 	Output,
 	type VideoCodec,
 } from "mediabunny";
-
+import type { ResolvedOutputPlan } from "@/editor-core/model";
 import { renderBrowserAudioMix } from "../../audio/engine/browser-audio-mix";
 import {
 	type DisposableMediaCleanup,
@@ -284,7 +283,9 @@ function raceWithAbort<T>(
 
 			settled = true;
 			const rejectCancelled = () => reject(new DefaultExportCancelledError());
-			void Promise.resolve().then(cancel).then(rejectCancelled, rejectCancelled);
+			void Promise.resolve()
+				.then(cancel)
+				.then(rejectCancelled, rejectCancelled);
 		}
 
 		signal.addEventListener("abort", handleAbort, { once: true });

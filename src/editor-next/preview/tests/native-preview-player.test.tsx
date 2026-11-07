@@ -1,6 +1,3 @@
-/* @vitest-environment jsdom */
-import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
-
 import {
 	act,
 	cleanup,
@@ -11,7 +8,6 @@ import {
 } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
@@ -22,6 +18,8 @@ import type {
 import { PreviewAudioMonitoringProvider } from "../../audio/engine/preview-audio-monitoring-provider";
 import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-provider";
 import { AudioPanel } from "../../audio/panel/audio-panel";
+/* @vitest-environment jsdom */
+import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
 
 type MockMediaPlayerProps = Record<string, unknown> & {
@@ -210,11 +208,7 @@ vi.mock("@vidstack/react/player/layouts/default", async () => {
 	return {
 		DefaultTooltip: ({ children }: { children?: React.ReactNode }) =>
 			React.createElement(React.Fragment, null, children),
-		DefaultVideoLayout: ({
-			slots,
-		}: {
-			slots?: Record<string, unknown>;
-		}) =>
+		DefaultVideoLayout: ({ slots }: { slots?: Record<string, unknown> }) =>
 			React.createElement("div", {
 				"data-large-mute-button-hidden": String(
 					(slots?.largeLayout as Record<string, unknown> | undefined)

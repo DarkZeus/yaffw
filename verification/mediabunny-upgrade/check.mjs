@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { generateFixtures } from "./fixtures.mjs";
-
 import { launchBrowser } from "../browser.cjs";
+import { generateFixtures } from "./fixtures.mjs";
 const version = JSON.parse(
 	readFileSync("node_modules/mediabunny/package.json", "utf8"),
 ).version;
@@ -21,9 +20,8 @@ try {
 	for (const fixture of fixtures) {
 		const observed = await page.evaluate(
 			async ({ kind, base64 }) => {
-				const harness = await import(
-					"/verification/mediabunny-upgrade/browser-check.ts"
-				);
+				const harness =
+					await import("/verification/mediabunny-upgrade/browser-check.ts");
 				return kind === "video"
 					? harness.checkVideo(base64)
 					: harness.checkAudio(base64, kind === "sync");

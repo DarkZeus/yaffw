@@ -6,7 +6,6 @@ import {
 	type OutputFormat,
 	WebMOutputFormat,
 } from "mediabunny";
-
 import type {
 	BrowserLocalOutputSupport,
 	DocumentedOutputContainer,

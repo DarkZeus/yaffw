@@ -5,7 +5,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import {

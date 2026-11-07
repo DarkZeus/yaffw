@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 export function elements(bytes, start, end) {
 	const result = [];
-	for (let offset = start; offset < end; ) {
+	for (let offset = start; offset < end;) {
 		const id = vint(bytes, offset, true);
 		const size = vint(bytes, offset + id.length, false);
 		const payload = offset + id.length + size.length;

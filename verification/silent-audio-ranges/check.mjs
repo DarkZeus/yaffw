@@ -4,9 +4,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { transformWithEsbuild } from "vite";
+import { launchBrowser } from "../browser.cjs";
 import { inspect, probe } from "./artifact.mjs";
 import { prepareFixture } from "./fixtures.mjs";
-import { launchBrowser } from "../browser.cjs";
 const { directory, source } = prepareFixture();
 const fixture = probe(source);
 const packets = fixture.packets.filter((p) => p.stream_index === 1);
@@ -64,9 +64,8 @@ try {
 		for (const mode of ["silent", "mixed", "excluded", "no-audio"]) {
 			const observed = await page.evaluate(
 				async (args) => {
-					const harness = await import(
-						"/verification/silent-audio-ranges/browser-check.ts"
-					);
+					const harness =
+						await import("/verification/silent-audio-ranges/browser-check.ts");
 					return harness.checkExport(args.base64, args.start, args.mode);
 				},
 				{ base64: readFileSync(source).toString("base64"), start, mode },

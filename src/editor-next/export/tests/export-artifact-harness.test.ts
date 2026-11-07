@@ -1,11 +1,9 @@
 import { readFile } from "node:fs/promises";
-
+import { describe, expect, it, vi } from "vitest";
 import type { ExportBoundaryEvidence } from "@/editor-core/export-correctness";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
-import { describe, expect, it, vi } from "vitest";
-
 import { inspectGeneratedMediaBlob } from "../generated-media/generated-media-inspector";
 import {
 	runFixtureCatalogExportArtifactHarness,

@@ -4,9 +4,8 @@ async function collectBoundedAudioEvidence({ revision, pollPresentation }) {
 		runProductionAudioTrial,
 		runProductionAudioFunctionalChecks,
 		evaluateProductionAudioTrials,
-	} = await import(
-		"/src/editor-next/audio/harness/production-audio-evidence.ts"
-	);
+	} =
+		await import("/src/editor-next/audio/harness/production-audio-evidence.ts");
 	const file = document.querySelector("#fixture").files[0];
 	const { asset, fixture } = await inspectProductionAudioFixture(file);
 	const functional = await runProductionAudioFunctionalChecks(file, revision);

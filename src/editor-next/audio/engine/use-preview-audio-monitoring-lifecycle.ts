@@ -5,7 +5,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
 import type {

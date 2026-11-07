@@ -1,5 +1,5 @@
-import type { ReadyMediaAsset } from "@/editor-core/model";
 import { useEffect, useRef, useState } from "react";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import type { MediaWindowProvider } from "./media-window-provider";

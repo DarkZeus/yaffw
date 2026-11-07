@@ -8,12 +8,9 @@ import {
 	waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
-
 import type { WorkbenchInspectorPanels } from "../../workbench/frame/workbench-layout-model";
-
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
@@ -26,9 +23,8 @@ const previewRenderStats = vi.hoisted(() => ({
 
 vi.mock("../../preview/player/native-preview-player", async () => {
 	const React = await import("react");
-	const { EditorWorkbenchLayout } = await import(
-		"../../workbench/frame/editor-workbench-layout"
-	);
+	const { EditorWorkbenchLayout } =
+		await import("../../workbench/frame/editor-workbench-layout");
 
 	return {
 		NativePreviewPlayer: React.memo(function MockNativePreviewPlayer(props: {

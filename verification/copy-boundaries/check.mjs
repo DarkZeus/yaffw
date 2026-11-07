@@ -2,14 +2,13 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { launchBrowser } from "../browser.cjs";
 import {
 	inspectArtifact,
 	inspectSource,
 	measurePresentedBoundaryEvidence,
 } from "./artifact.mjs";
 import { generateFixtures } from "./fixtures.mjs";
-
-import { launchBrowser } from "../browser.cjs";
 const directory = resolve("tmp/copy-boundaries");
 mkdirSync(directory, { recursive: true });
 assert.equal(
@@ -99,9 +98,8 @@ try {
 							await page.goto(origin);
 							const observed = await page.evaluate(
 								async (args) => {
-									const harness = await import(
-										"/verification/copy-boundaries/browser-check.ts"
-									);
+									const harness =
+										await import("/verification/copy-boundaries/browser-check.ts");
 									return harness.checkExport(args);
 								},
 								{

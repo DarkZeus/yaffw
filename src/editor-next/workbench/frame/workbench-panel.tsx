@@ -1,13 +1,4 @@
 import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuGroup,
-	ContextMenuItem,
-	ContextMenuLabel,
-	ContextMenuSeparator,
-	ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import {
 	type PointerEvent,
 	type ReactNode,
 	createContext,
@@ -24,6 +15,15 @@ import {
 	useParentTabsetState,
 	useParentWorkspace,
 } from "react-resizable-panels";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuGroup,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
 	type WorkbenchPanelId,
 	createDefaultWorkbenchLayout,
@@ -82,7 +82,10 @@ export function WorkbenchPanelsProvider({
 export function WorkbenchTab({
 	tab,
 	tabProps,
-}: { tab: TabNode<null>; tabProps: TabRenderProps }) {
+}: {
+	tab: TabNode<null>;
+	tabProps: TabRenderProps;
+}) {
 	const dragHandlers = useContext(PanelsContext)?.dragHandlers;
 	const handler = tabProps.onPointerDown;
 	useLayoutEffect(() => {

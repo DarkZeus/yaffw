@@ -1,5 +1,4 @@
 import type { Input, InputTrack, InputVideoTrack } from "mediabunny";
-
 import type {
 	LocalMediaAssetInspection,
 	LocalMediaAssetInspector,

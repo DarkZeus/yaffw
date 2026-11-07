@@ -22,7 +22,12 @@ export async function compare({
 	variant,
 	preparation,
 	duration,
-}: { base64: string; variant: string; preparation: string; duration: number }) {
+}: {
+	base64: string;
+	variant: string;
+	preparation: string;
+	duration: number;
+}) {
 	const probe: Probe = {
 		bytes: 0,
 		reads: 0,

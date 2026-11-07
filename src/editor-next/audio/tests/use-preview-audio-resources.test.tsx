@@ -1,7 +1,7 @@
-import type { ReadyMediaAsset } from "@/editor-core/model";
 /* @vitest-environment jsdom */
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { MediaWindowProvider } from "../engine/media-window-provider";
 import {
 	type PreviewAudioResourcesResult,

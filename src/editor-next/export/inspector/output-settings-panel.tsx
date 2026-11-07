@@ -1,8 +1,6 @@
-import { cloneOutputSettings } from "@/editor-core/output-settings";
 import { Settings, Sparkles, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +19,7 @@ import type {
 	OutputSettings,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
+import { cloneOutputSettings } from "@/editor-core/output-settings";
 import {
 	OUTPUT_SUBJECTIVE_QUALITY_CHOICES,
 	type ResolvedOutputAudioProfile,
@@ -373,7 +372,7 @@ export function OutputSettingsPanel({
 				}}
 			>
 				<DialogContent className="quality-settings-dialog flex h-[min(36rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-none sm:max-w-[48rem]">
-					<DialogHeader className="shrink-0 text-left px-6 pt-6 pb-4">
+					<DialogHeader className="shrink-0 px-6 pt-6 pb-4 text-left">
 						<DialogTitle className="min-w-0 text-xl font-medium tracking-tight">
 							<span className="min-w-0 truncate">Output settings</span>
 						</DialogTitle>
@@ -762,7 +761,7 @@ function OutputSettingsChoice({
 			<span>{label}</span>
 			<select
 				aria-label={label}
-				className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-transparent focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+				className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-muted-foreground"
 				onChange={(event) => onChange(event.currentTarget.value)}
 				value={value}
 			>
@@ -808,7 +807,7 @@ function OutputQualityChoice({
 					<span>Custom {label.toLowerCase()} bitrate (Mbps)</span>
 					<input
 						aria-label={`Custom ${label.toLowerCase()} bitrate in Mbps`}
-						className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:text-muted-foreground disabled:bg-transparent focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25"
+						className="h-10 w-full rounded-md border border-workbench-border bg-workbench-hover/35 px-2 text-sm text-foreground outline-none focus:border-workbench-focus focus:ring-2 focus:ring-workbench-focus/25 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-muted-foreground"
 						min="0.000001"
 						onChange={(event) => {
 							const bitrateMbps = event.currentTarget.valueAsNumber;
@@ -879,11 +878,7 @@ function OutputSettingsTabSection({
 	);
 }
 
-function OutputSettingsDeferredSection({
-	title,
-}: {
-	title: string;
-}) {
+function OutputSettingsDeferredSection({ title }: { title: string }) {
 	return (
 		<OutputSettingsTabSection title={title}>
 			<Separator />
@@ -978,7 +973,7 @@ function OutputSettingsRoadmapFact({
 	return (
 		<div className="rounded border border-workbench-border bg-workbench-hover/25 px-2 py-1.5 text-[11px]">
 			<div className="text-muted-foreground">{label}</div>
-			<div className="font-medium leading-5 text-foreground">{value}</div>
+			<div className="leading-5 font-medium text-foreground">{value}</div>
 		</div>
 	);
 }

@@ -2,7 +2,6 @@
 
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { AudioMix } from "@/editor-core/model";
 import type { LivePreviewMeteringClock } from "../meters/preview-metering-live";
 import { useLivePreviewMetering } from "../meters/use-live-preview-metering";

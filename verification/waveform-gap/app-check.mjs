@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { prepareVideoFixture } from "./fixtures.mjs";
-
 import { launchBrowser } from "../browser.cjs";
+import { prepareVideoFixture } from "./fixtures.mjs";
 const { directory, source } = prepareVideoFixture();
 const browser = await launchBrowser();
 try {

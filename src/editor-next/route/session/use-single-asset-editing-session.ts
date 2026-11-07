@@ -1,8 +1,6 @@
-import { createEditorId } from "@/editor-core/identity";
-import { errorMessage } from "@/lib/error-message";
 import { useEffect, useRef, useState } from "react";
-
 import { planDefaultExportCapability } from "@/editor-core/export-capability";
+import { createEditorId } from "@/editor-core/identity";
 import {
 	type LocalMediaAssetInspector,
 	analyzeLocalMediaAssetDraft,
@@ -25,6 +23,7 @@ import {
 	editorSessionReducer,
 	shouldProtectEditorBeforeUnload,
 } from "@/editor-core/session";
+import { errorMessage } from "@/lib/error-message";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../../export/adapters/mediabunny-output-support";
 import {
 	type GeneratedMediaArtifactStore,

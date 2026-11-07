@@ -1,6 +1,6 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type { ReadyMediaAsset } from "@/editor-core/model";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import { resolveChannelTransform } from "../engine/audio-channel-analysis";
 import type {
 	MediaWindowProvider,

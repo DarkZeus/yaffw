@@ -1,8 +1,7 @@
+import { useEffect, useRef, useState } from "react";
+import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 import { clamp } from "@/lib/clamp";
 import { errorMessage } from "@/lib/error-message";
-import { useEffect, useRef, useState } from "react";
-
-import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
 import { runWorkerJob } from "../../media-work/workers/worker-job";
 import type {
 	VideoStripThumbnailFrame,

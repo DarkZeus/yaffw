@@ -35,7 +35,7 @@
 	gap: 8px;
 	font-size: 16px;
 	font-weight: 600;
-	letter-spacing: -.6px;
+	letter-spacing: -0.6px;
 }
 .cinema-mark {
 	width: 18px;
@@ -187,10 +187,10 @@
 	overscroll-behavior: contain;
 }
 .workbench-panel-body:is(
-		[data-workbench-panel="media"],
-		[data-workbench-panel="audio"],
-		[data-workbench-panel="export"]
-	) {
+	[data-workbench-panel="media"],
+	[data-workbench-panel="audio"],
+	[data-workbench-panel="export"]
+) {
 	padding: 20px 12px 12px;
 }
 .workbench-panel-separator {

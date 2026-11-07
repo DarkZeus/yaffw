@@ -6,7 +6,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import type { ReadyMediaAsset } from "@/editor-core/model";
 
 const FALLBACK_PREVIEW_ASPECT_RATIO = 16 / 9;

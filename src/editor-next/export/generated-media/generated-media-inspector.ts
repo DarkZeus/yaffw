@@ -5,7 +5,6 @@ import {
 	type InputAudioTrack,
 	type InputVideoTrack,
 } from "mediabunny";
-
 import type {
 	GeneratedMediaInspection,
 	GeneratedMediaTrackInspection,

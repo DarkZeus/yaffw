@@ -1,4 +1,3 @@
-import { errorMessage } from "@/lib/error-message";
 import {
 	ALL_FORMATS,
 	type AudioSample,
@@ -9,14 +8,14 @@ import {
 	Input,
 	type InputAudioTrack,
 } from "mediabunny";
-import { PREVIEW_AUDIO_MAX_CHUNK_SECONDS } from "./preview-audio-window-policy";
-
+import { errorMessage } from "@/lib/error-message";
 import {
 	type AudioPacketRange,
 	AudioPacketTimeline,
 	DecodedAudioTimestampProjector,
 	audioPacketDurationsMaySpanGaps,
 } from "../../media-work/adapters/audio-packet-timeline";
+import { PREVIEW_AUDIO_MAX_CHUNK_SECONDS } from "./preview-audio-window-policy";
 
 export type MediaWindowChunk = {
 	audioBuffer: AudioBuffer;

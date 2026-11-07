@@ -1,7 +1,5 @@
-import { formatOutputVideoCodec } from "@/editor-core/output-settings";
 import { BadgeCheck, Check, Download, Square } from "lucide-react";
 import type { ReactNode } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +16,7 @@ import type {
 	ResolvedOutputPlan,
 	Selection,
 } from "@/editor-core/model";
+import { formatOutputVideoCodec } from "@/editor-core/output-settings";
 import {
 	type ResolvedOutputAudioProfile,
 	type ResolvedOutputResolution,
@@ -389,7 +388,7 @@ function GeneratedMediaStatus({
 			</Button>
 			<p
 				aria-label="Generated media filename"
-				className="block max-w-full min-w-0 whitespace-normal rounded-md bg-muted/45 px-2 py-1.5 tabular-nums text-xs leading-5 text-muted-foreground [overflow-wrap:anywhere]"
+				className="block max-w-full min-w-0 rounded-md bg-muted/45 px-2 py-1.5 text-xs leading-5 [overflow-wrap:anywhere] whitespace-normal text-muted-foreground tabular-nums"
 			>
 				{exportState.generatedMedia.fileName}
 			</p>
@@ -434,17 +433,11 @@ function ExportActionShell({ children }: { children: ReactNode }) {
 	);
 }
 
-function InspectorLine({
-	label,
-	value,
-}: {
-	label: string;
-	value: string;
-}) {
+function InspectorLine({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="grid grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-start gap-4 text-xs leading-5">
 			<span className="text-muted-foreground">{label}</span>
-			<span className="min-w-0 break-words text-left font-medium text-foreground">
+			<span className="min-w-0 text-left font-medium break-words text-foreground">
 				{value}
 			</span>
 		</div>

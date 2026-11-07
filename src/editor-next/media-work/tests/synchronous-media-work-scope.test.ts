@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { createSynchronousMediaWorkScope } from "../scopes/synchronous-media-work-scope";
 
 describe("synchronous media resource ownership", () => {

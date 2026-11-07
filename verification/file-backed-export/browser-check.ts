@@ -89,9 +89,8 @@ export async function deliver() {
 		globalThis as unknown as { proof: { phase: string; result: Blob } }
 	).proof;
 	state.phase = "delivery";
-	const { deliverBrowserGeneratedMedia } = await import(
-		"../../src/editor-next/export/generated-media/generated-media-delivery"
-	);
+	const { deliverBrowserGeneratedMedia } =
+		await import("../../src/editor-next/export/generated-media/generated-media-delivery");
 	deliverBrowserGeneratedMedia({
 		blob: state.result,
 		generatedMedia: { fileName: "proof.mp4" } as Parameters<

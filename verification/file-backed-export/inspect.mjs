@@ -27,7 +27,7 @@ function packets(file) {
 function boxes(file) {
 	const data = readFileSync(file);
 	const result = [];
-	for (let offset = 0; offset < data.length; ) {
+	for (let offset = 0; offset < data.length;) {
 		let size = data.readUInt32BE(offset);
 		if (size === 1) size = Number(data.readBigUInt64BE(offset + 8));
 		if (size === 0) size = data.length - offset;

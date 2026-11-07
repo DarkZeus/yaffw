@@ -1,15 +1,14 @@
-import { browserNowMs } from "@/lib/browser-animation-frame";
-import { errorMessage } from "@/lib/error-message";
 import type {
 	EncodedPacket,
 	EncodedPacketSink,
 	VideoSample,
 	VideoSampleSink,
 } from "mediabunny";
-import { type ScrubCanvas, createScrubCanvas } from "./scrub-canvas";
-
 import type { MediaTimeUs } from "@/editor-core/model";
+import { browserNowMs } from "@/lib/browser-animation-frame";
+import { errorMessage } from "@/lib/error-message";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
+import { type ScrubCanvas, createScrubCanvas } from "./scrub-canvas";
 import { createScrubFrameCache } from "./scrub-frame-cache";
 
 const DEFAULT_MAX_OUTPUT_DIMENSION_PX = 1280;

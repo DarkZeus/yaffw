@@ -1,6 +1,3 @@
-/* @vitest-environment jsdom */
-import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
-
 import {
 	cleanup,
 	fireEvent,
@@ -10,14 +7,14 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
-
 import {
 	type PreviewAudioResourcesResult,
 	preparePreviewAudioResources,
 } from "../../audio/engine/preview-audio-resources";
+/* @vitest-environment jsdom */
+import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { loadBrowserWaveformLane } from "../../selection/waveform/selection-waveform-lanes";

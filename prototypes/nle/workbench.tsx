@@ -1,3 +1,5 @@
+import { CircleDot, Maximize2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import { createDefaultOutputSettings } from "@/editor-core/model";
 import { detectRuntimeSupport } from "@/editor-core/runtime-capabilities";
@@ -10,8 +12,6 @@ import { ExportInspectorPanel } from "@/editor-next/export/inspector/export-insp
 import { MediaAssetContextPanel } from "@/editor-next/media-asset/panel/media-asset-context";
 import { PreviewTransportRegion } from "@/editor-next/preview/regions/preview-transport-region";
 import { EditorWorkbenchLayout } from "@/editor-next/workbench/frame/editor-workbench-layout";
-import { CircleDot, Maximize2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
 import { Inspector } from "./inspector";
 import { MediaLibrary } from "./media-library";
 import { FRAME, time } from "./model";
@@ -146,58 +146,58 @@ function ExistingShell({ editor }: { editor: Editor }) {
 						}
 						inspector={{
 							media: (
-									<MediaAssetContextPanel
-										asset={asset}
-										closeFileDisabled={false}
-										onCloseFileRequested={() => {
-											editor.setPlaying(false);
-											setClosed(true);
-										}}
-										selection={selection}
-									/>
+								<MediaAssetContextPanel
+									asset={asset}
+									closeFileDisabled={false}
+									onCloseFileRequested={() => {
+										editor.setPlaying(false);
+										setClosed(true);
+									}}
+									selection={selection}
+								/>
 							),
 							audio: (
-									<AudioPanel
-										asset={asset}
-										audioMix={mix}
-										onAudioTrackIncludedChange={(id, include) =>
-											editor.patchTrack(id, { muted: !include })
-										}
-										onAudioTrackVolumePercentChange={(id, value) =>
-											editor.patchTrack(id, { gain: value / 100 })
-										}
-										onAudioTrackChannelModeChange={(id, channelMode) =>
-											setChannelModes((m) => ({
-												...m,
-												tracks: {
-													...m.tracks,
-													[id]: { ...m.tracks[id], channelMode },
-												},
-											}))
-										}
-									/>
+								<AudioPanel
+									asset={asset}
+									audioMix={mix}
+									onAudioTrackIncludedChange={(id, include) =>
+										editor.patchTrack(id, { muted: !include })
+									}
+									onAudioTrackVolumePercentChange={(id, value) =>
+										editor.patchTrack(id, { gain: value / 100 })
+									}
+									onAudioTrackChannelModeChange={(id, channelMode) =>
+										setChannelModes((m) => ({
+											...m,
+											tracks: {
+												...m.tracks,
+												[id]: { ...m.tracks[id], channelMode },
+											},
+										}))
+									}
+								/>
 							),
 							export: (
-									<div>
-										<p className="px-2 py-2 text-xs text-muted-foreground">
-											Export is shown for context. Sequence rendering is outside
-											this timeline prototype.
-										</p>
-										<fieldset disabled>
-											<ExportInspectorPanel
-												asset={asset}
-												audioMix={mix}
-												exportState={{ status: "reviewing" }}
-												onCancelExport={noop}
-												onDownloadGeneratedMedia={noop}
-												onApplyOutputSettings={setOutputSettings}
-												onStartExport={noop}
-												outputSettings={outputSettings}
-												runtime={detectRuntimeSupport()}
-												selection={selection}
-											/>
-										</fieldset>
-									</div>
+								<div>
+									<p className="px-2 py-2 text-xs text-muted-foreground">
+										Export is shown for context. Sequence rendering is outside
+										this timeline prototype.
+									</p>
+									<fieldset disabled>
+										<ExportInspectorPanel
+											asset={asset}
+											audioMix={mix}
+											exportState={{ status: "reviewing" }}
+											onCancelExport={noop}
+											onDownloadGeneratedMedia={noop}
+											onApplyOutputSettings={setOutputSettings}
+											onStartExport={noop}
+											outputSettings={outputSettings}
+											runtime={detectRuntimeSupport()}
+											selection={selection}
+										/>
+									</fieldset>
+								</div>
 							),
 						}}
 						selection={

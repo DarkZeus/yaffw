@@ -3,14 +3,12 @@
 import { cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
 	MediaTimeUs,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
-
 import {
 	type PreviewAudioEngineFactory,
 	usePreviewAudioMonitoringLifecycle,

@@ -1,10 +1,4 @@
 import { ALL_FORMATS, BlobSource, Input } from "mediabunny";
-import {
-	type ResolvedChannelTransform,
-	isChannelActive,
-	resolveChannelTransform,
-} from "./audio-channel-analysis";
-
 import { DEFAULT_AUDIO_MIX_FINAL_PEAK_GUARD_DB } from "@/editor-core/audio-mix";
 import {
 	type AudioMixPlanTrack,
@@ -17,12 +11,16 @@ import type {
 	AudioTrackChannelMode,
 	Selection,
 } from "@/editor-core/model";
-
 import {
 	createBrowserAudioBuffer,
 	decodeMediabunnyAudioTrackRange,
 } from "../../media-work/adapters/mediabunny-audio-buffer";
 import { withDisposableMediaWorkScope } from "../../media-work/scopes/disposable-media-work-scope";
+import {
+	type ResolvedChannelTransform,
+	isChannelActive,
+	resolveChannelTransform,
+} from "./audio-channel-analysis";
 
 export type BrowserAudioMixRequest = {
 	audioMix: AudioMix;

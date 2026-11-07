@@ -1,19 +1,17 @@
 import {
-	browserNowMs,
-	cancelBrowserFrame,
-	requestBrowserFrame,
-} from "@/lib/browser-animation-frame";
-import { clamp } from "@/lib/clamp";
-import {
 	type RefObject,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
 } from "react";
-
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
-
+import {
+	browserNowMs,
+	cancelBrowserFrame,
+	requestBrowserFrame,
+} from "@/lib/browser-animation-frame";
+import { clamp } from "@/lib/clamp";
 import type {
 	PreviewAudioEngine,
 	PreviewAudioPlaybackState,

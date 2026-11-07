@@ -292,7 +292,10 @@ function ClipView({
 export function SequenceTimeline({
 	editor,
 	toolbar,
-}: { editor: Editor; toolbar: ReactNode }) {
+}: {
+	editor: Editor;
+	toolbar: ReactNode;
+}) {
 	const [trackHeights, setTrackHeights] = useState<Record<string, number>>({});
 
 	const extent = Math.max(30 * SECOND, editor.total + 3 * SECOND);

@@ -1,5 +1,4 @@
 import { type AudioCodec, Quality } from "mediabunny";
-
 import type { ResolvedOutputQuality } from "@/editor-core/output-settings";
 
 export function toMediabunnyQuality(

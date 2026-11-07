@@ -1,6 +1,5 @@
 import type { MediaPlayerInstance } from "@vidstack/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
@@ -266,9 +265,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	);
 	const handleNativeSeeked = useCallback(() => {
 		syncPlayheadWithNativeVideo();
-		handleScrubNativeSeeked(
-			videoRef.current?.currentTime ?? Number.NaN,
-		);
+		handleScrubNativeSeeked(videoRef.current?.currentTime ?? Number.NaN);
 	}, [handleScrubNativeSeeked, syncPlayheadWithNativeVideo]);
 	const togglePlaybackWithScrubPreview = useCallback(() => {
 		void togglePlayback();

@@ -32,7 +32,6 @@ import {
 	detectRuntimeSupport,
 } from "@/editor-core/runtime-capabilities";
 import { errorMessage } from "@/lib/error-message";
-
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import { inspectGeneratedMediaBlob } from "../generated-media/generated-media-inspector";

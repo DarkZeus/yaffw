@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	type AudioMix,
 	type ExportProgress,
@@ -5,7 +6,6 @@ import {
 	type ReadyMediaAsset,
 	createDefaultOutputSettings,
 } from "@/editor-core/model";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mediabunnyMock = vi.hoisted(() => ({
 	audioAddFailure: undefined as Error | undefined,
@@ -91,7 +91,10 @@ vi.mock("mediabunny", () => {
 			({
 				format,
 				target,
-			}: { format: MockOutputFormat; target: BufferTarget }) => {
+			}: {
+				format: MockOutputFormat;
+				target: BufferTarget;
+			}) => {
 				const output: MockOutput = {
 					addAudioTrack: vi.fn(),
 					addVideoTrack: vi.fn(),
@@ -273,15 +276,24 @@ describe("browserDefaultExportRunner cleanup", () => {
 	it("reports cancellation when conversion cancellation rejects", async () => {
 		const controller = new AbortController();
 		mediabunnyMock.conversionExecute = () => new Promise(() => undefined);
-		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({} as AudioBuffer);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue(
+			{} as AudioBuffer,
+		);
 		const exportPromise = browserDefaultExportRunner.run(
-			createExportRequest({ audioMix: includedAudioMix, signal: controller.signal }),
+			createExportRequest({
+				audioMix: includedAudioMix,
+				signal: controller.signal,
+			}),
 		);
 		await waitForConversion();
-		mediabunnyMock.conversions[0].cancel.mockRejectedValueOnce(new Error("Cancel failed."));
+		mediabunnyMock.conversions[0].cancel.mockRejectedValueOnce(
+			new Error("Cancel failed."),
+		);
 		controller.abort();
 
-		await expect(exportPromise).rejects.toBeInstanceOf(DefaultExportCancelledError);
+		await expect(exportPromise).rejects.toBeInstanceOf(
+			DefaultExportCancelledError,
+		);
 		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
 		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
 	});

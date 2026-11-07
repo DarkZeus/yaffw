@@ -10,10 +10,8 @@ import {
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
-
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;

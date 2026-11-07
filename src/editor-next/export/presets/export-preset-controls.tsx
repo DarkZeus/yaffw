@@ -1,6 +1,5 @@
 import { Bookmark, ChevronUp, FolderOpen, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { OutputSettings } from "@/editor-core/model";
@@ -201,7 +200,7 @@ export function ExportPresetControls({
 			{panelOpen ? (
 				<section
 					aria-label="Export presets"
-					className="absolute bottom-11 left-0 z-20 grid w-[min(28rem,calc(100vw-5rem))] max-h-[calc(100dvh-14rem)] overflow-y-auto gap-2.5 rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-none"
+					className="absolute bottom-11 left-0 z-20 grid max-h-[calc(100dvh-14rem)] w-[min(28rem,calc(100vw-5rem))] gap-2.5 overflow-y-auto rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-none"
 				>
 					<div>
 						<div className="text-xs font-semibold text-foreground">
@@ -353,7 +352,7 @@ export function ExportPresetControls({
 					{deletePresetName ? (
 						<section
 							aria-label="Delete Export preset"
-							className="absolute right-2.5 top-16 z-10 w-64 rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-xl"
+							className="absolute top-16 right-2.5 z-10 w-64 rounded border border-workbench-border-strong bg-workbench-inspector p-3 shadow-xl"
 						>
 							<p className="text-xs leading-5 text-foreground">
 								Delete {deletePresetName}? This cannot be undone.

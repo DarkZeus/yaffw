@@ -39,16 +39,7 @@ function MediaLayer({
 		if (el.readyState >= 2) sync();
 		el.addEventListener("loadeddata", sync);
 		return () => el.removeEventListener("loadeddata", sync);
-	}, [
-		at,
-		playing,
-		speed,
-		clip.gain,
-		masterGain,
-		gain,
-		setPlaying,
-		setMessage,
-	]);
+	}, [at, playing, speed, clip.gain, masterGain, gain, setPlaying, setMessage]);
 	return (
 		// oxlint-disable-next-line jsx-a11y/media-has-caption -- Local prototype media has no caption tracks.
 		<video

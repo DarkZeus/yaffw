@@ -1,5 +1,5 @@
-import type { ReadyMediaAsset } from "@/editor-core/model";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import { preparePreviewAudioResources } from "../engine/preview-audio-resources";
 const mockMedia = vi.hoisted(() => ({
 	inputs: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,

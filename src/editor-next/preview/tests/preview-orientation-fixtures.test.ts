@@ -1,8 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-
 import { describe, expect, it } from "vitest";
-
 import type { MediaAssetDraft } from "@/editor-core/model";
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import { PREVIEW_ORIENTATION_FIXTURES } from "../harness/preview-orientation-fixtures";

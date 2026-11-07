@@ -4,14 +4,13 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { ALL_FORMATS, BufferSource, Input } from "mediabunny";
+import { launchBrowser } from "../browser.cjs";
 import {
 	fixtureDirectory,
 	fixtures,
 	generateFixtures,
 	probeFixture,
 } from "./fixtures.mjs";
-
-import { launchBrowser } from "../browser.cjs";
 const origin = process.env.YAFFW_ORIGIN || "http://127.0.0.1:3000";
 const output = resolve(process.argv[2] || "tmp/frame-timing/evidence.json");
 const packageJson = JSON.parse(
@@ -127,9 +126,8 @@ try {
 		}
 		const observed = await page.evaluate(
 			async ({ name, base64 }) => {
-				const { analyzeFixture } = await import(
-					"/verification/frame-timing/browser-analysis.ts"
-				);
+				const { analyzeFixture } =
+					await import("/verification/frame-timing/browser-analysis.ts");
 				return analyzeFixture(name, base64);
 			},
 			{ name, base64: bytes.toString("base64") },

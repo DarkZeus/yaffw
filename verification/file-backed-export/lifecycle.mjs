@@ -23,9 +23,8 @@ try {
 				});
 			let failure;
 			try {
-				const { checkExport } = await import(
-					"/verification/file-backed-export/browser-check.ts"
-				);
+				const { checkExport } =
+					await import("/verification/file-backed-export/browser-check.ts");
 				await checkExport({
 					file: "large.mp4",
 					noAudio: false,

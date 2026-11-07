@@ -4,7 +4,6 @@ import {
 	type PointerEvent as ReactPointerEvent,
 	memo,
 } from "react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,7 +88,7 @@ export const WaveformLane = memo(function WaveformLane({
 			>
 				<div className="flex min-w-0 items-start justify-between gap-1">
 					<div className="min-w-0">
-						<div className="truncate text-xs font-medium leading-4 text-workbench-lane-foreground">
+						<div className="truncate text-xs leading-4 font-medium text-workbench-lane-foreground">
 							{identity.title}
 						</div>
 						<div className="truncate font-mono text-[9px] leading-3 text-muted-foreground">

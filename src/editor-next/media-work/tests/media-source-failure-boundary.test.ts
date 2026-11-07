@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { createMediaSourceFailureBoundary } from "../scopes/media-source-failure-boundary";
 
 describe("createMediaSourceFailureBoundary", () => {

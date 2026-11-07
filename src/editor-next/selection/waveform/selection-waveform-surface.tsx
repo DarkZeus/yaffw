@@ -1,14 +1,13 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
+import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
+import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
+import type { MediaTimeUs, Selection } from "@/editor-core/model";
 import {
 	cancelBrowserFrame,
 	requestBrowserFrame,
 } from "@/lib/browser-animation-frame";
 import { clamp } from "@/lib/clamp";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
-import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
-import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
-
-import type { MediaTimeUs, Selection } from "@/editor-core/model";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
 import type { WaveformSamples } from "../types/selection-waveform-lanes.types";
 import type {

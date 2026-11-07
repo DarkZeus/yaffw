@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-
 import { createActiveMediaAssetCleanupScopeController } from "../scopes/active-media-asset-cleanup-scope";
 
 describe("active Media asset cleanup scope", () => {

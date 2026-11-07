@@ -357,7 +357,7 @@
 	justify-content: center;
 	font-weight: 800;
 	font-size: 6cqw;
-	letter-spacing: .06em;
+	letter-spacing: 0.06em;
 	white-space: pre-wrap;
 	text-align: center;
 	text-shadow: 0 2px 12px oklch(0 0 none / 0.733333);
@@ -440,7 +440,7 @@
 	margin: 8px 0 18px;
 	color: oklch(0.949119 0 none);
 	font-size: 16px;
-	letter-spacing: -.4px;
+	letter-spacing: -0.4px;
 }
 .nle .name-field:focus {
 	background: oklch(0.28094 0 none);
@@ -449,7 +449,7 @@
 	font-size: 9px;
 	font-weight: 500;
 	text-transform: uppercase;
-	letter-spacing: .8px;
+	letter-spacing: 0.8px;
 	color: oklch(0.626754 0 none);
 	border-top: 1px solid oklch(0.309186 0 none);
 	margin: 13px 0 8px;

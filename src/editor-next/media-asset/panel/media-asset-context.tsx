@@ -1,6 +1,5 @@
 import { AudioLines, ChevronRight, Film, X } from "lucide-react";
 import { type ReactElement, type ReactNode, cloneElement } from "react";
-
 import { Button } from "@/components/ui/button";
 import type {
 	AudioMediaTrack,
@@ -264,7 +263,7 @@ function CompactMetric({ label, value }: { label: string; value: string }) {
 			<div className="truncate leading-tight text-muted-foreground">
 				{label}
 			</div>
-			<div className="truncate tabular-nums leading-tight text-foreground">
+			<div className="truncate leading-tight text-foreground tabular-nums">
 				{value}
 			</div>
 		</div>
@@ -289,7 +288,7 @@ function CompactTrackRow({
 				})}
 			</div>
 			<div className="min-w-0">
-				<div className="truncate text-xs font-medium leading-tight text-foreground">
+				<div className="truncate text-xs leading-tight font-medium text-foreground">
 					{label}
 				</div>
 				<div className="truncate text-xs leading-tight text-muted-foreground">
@@ -302,9 +301,9 @@ function CompactTrackRow({
 
 function CompactTimeBox({ label, value }: { label: string; value: string }) {
 	return (
-		<div className=" p-1.5">
+		<div className="p-1.5">
 			<div className="text-xs text-muted-foreground">{label}</div>
-			<div className="truncate tabular-nums text-xs text-foreground">
+			<div className="truncate text-xs text-foreground tabular-nums">
 				{value}
 			</div>
 		</div>
@@ -319,8 +318,8 @@ function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
 	}
 
 	return (
-		<details aria-label="Media analysis" className="group mt-3 /65 pb-1">
-			<summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-t px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-workbench-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-workbench-selected marker:hidden [&::-webkit-details-marker]:hidden">
+		<details aria-label="Media analysis" className="group /65 mt-3 pb-1">
+			<summary className="flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-t px-2 py-1.5 text-xs font-semibold text-muted-foreground transition-colors marker:hidden hover:bg-workbench-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-workbench-selected focus-visible:outline-none [&::-webkit-details-marker]:hidden">
 				<span>Analysis</span>
 				<ChevronRight
 					aria-hidden="true"
@@ -343,7 +342,7 @@ function MediaAnalysisSection({ groups }: { groups: AnalysisFactGroup[] }) {
 										{fact.label}
 									</dt>
 									<dd
-										className="min-w-0 break-words tabular-nums text-right text-foreground [overflow-wrap:anywhere]"
+										className="min-w-0 text-right [overflow-wrap:anywhere] break-words text-foreground tabular-nums"
 										title={fact.value}
 									>
 										{fact.value}
