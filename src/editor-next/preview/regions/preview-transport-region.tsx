@@ -64,7 +64,10 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 	}
 
 	return (
-		<section aria-label="Workbench transport region">
+		<section
+			aria-label="Workbench transport region"
+			className="cinema-transport"
+		>
 			<div
 				aria-label="Preview transport controls"
 				className="cinema-transport-controls"

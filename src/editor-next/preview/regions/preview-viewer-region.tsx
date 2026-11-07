@@ -214,6 +214,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					/>
 					<DefaultVideoLayout
 						icons={defaultLayoutIcons}
+						noAudioGain
 						slots={{
 							chaptersMenu: (
 								<PreviewChaptersMenu

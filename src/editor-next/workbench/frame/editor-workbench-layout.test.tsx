@@ -257,6 +257,36 @@ describe("customizable workbench layout", () => {
 		);
 	});
 
+	it("supports keyboard activation and Escape dismissal of panel actions", async () => {
+		vi.stubGlobal("PointerEvent", MouseEvent);
+		try {
+			render(<Workbench />);
+			fireEvent.contextMenu(panelContent("preview"));
+			fireEvent.keyDown(
+				screen.getByRole("menuitem", { name: "Maximize panel group" }),
+				{ key: "Enter" },
+			);
+			await waitFor(() =>
+				expect(readWorkbenchLayout().maximizedTabsetId).toBe("viewer"),
+			);
+			fireEvent.contextMenu(panelContent("preview"));
+			const menu = screen.getByRole("menu", { name: "Preview layout" });
+			fireEvent.keyDown(menu, { key: "Escape" });
+			await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+			expect(readWorkbenchLayout().maximizedTabsetId).toBe("viewer");
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("preserves the native context menu in editable panel content", () => {
+		render(<Workbench />);
+		expect(fireEvent.contextMenu(screen.getByLabelText("Viewer state"))).toBe(
+			true,
+		);
+		expect(screen.queryByRole("menu")).toBeNull();
+	});
+
 	it("restores the selected inspector tab when the workbench opens again", async () => {
 		const view = render(<Workbench />);
 		fireEvent.click(screen.getByRole("tab", { name: "Export" }));
@@ -363,6 +393,8 @@ describe("customizable workbench layout", () => {
 		);
 		expect(readWorkbenchLayout()).toEqual(desktop);
 		expect(screen.getByLabelText("Test media")).toBe(media);
+		fireEvent.contextMenu(panelContent("preview"));
+		expect(screen.queryByRole("menu")).toBeNull();
 		fireEvent.keyDown(window, { key: "Alt", altKey: true });
 		expect(document.querySelector("[data-layout-drag-ready]")).toBeNull();
 		fireEvent.keyUp(window, { key: "Alt", altKey: false });

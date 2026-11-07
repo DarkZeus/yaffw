@@ -1,4 +1,12 @@
-import * as ContextMenu from "@radix-ui/react-context-menu";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuGroup,
+	ContextMenuItem,
+	ContextMenuLabel,
+	ContextMenuSeparator,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
 	type PointerEvent,
 	type ReactNode,
@@ -106,70 +114,62 @@ export function WorkbenchPanel({ id }: { id: WorkbenchPanelId }) {
 	}
 
 	return (
-		<ContextMenu.Root modal={false}>
-			<ContextMenu.Trigger asChild disabled={context?.disabled}>
-				<div
-					className="workbench-panel-body"
-					data-workbench-panel={id}
-					data-layout-drag-ready={
-						(context?.altPressed && !context.disabled) || undefined
-					}
-					onPointerDownCapture={beginPanelDrag}
-					onClickCapture={(event) => {
-						if (!event.altKey || context?.disabled) return;
-						event.preventDefault();
+		<ContextMenu disabled={context?.disabled}>
+			<ContextMenuTrigger
+				className="workbench-panel-body select-auto"
+				data-workbench-panel={id}
+				data-layout-drag-ready={
+					(context?.altPressed && !context.disabled) || undefined
+				}
+				onPointerDownCapture={beginPanelDrag}
+				onClickCapture={(event) => {
+					if (!event.altKey || context?.disabled) return;
+					event.preventDefault();
+					event.stopPropagation();
+				}}
+				onContextMenuCapture={(event) => {
+					if (
+						event.target instanceof Element &&
+						event.target.closest('input, textarea, [contenteditable="true"]')
+					)
 						event.stopPropagation();
-					}}
-					onContextMenuCapture={(event) => {
-						if (
-							event.target instanceof Element &&
-							event.target.closest('input, textarea, [contenteditable="true"]')
-						)
-							event.stopPropagation();
-					}}
-				>
-					{context?.panels[id]}
-				</div>
-			</ContextMenu.Trigger>
-			<ContextMenu.Portal>
-				<ContextMenu.Content
-					aria-label={`${workbenchPanelTitles[id]} layout`}
-					className="workbench dark workbench-layout-menu"
-				>
-					<ContextMenu.Label className="workbench-layout-menu-label">
-						{workbenchPanelTitles[id]}
-					</ContextMenu.Label>
-					<ContextMenu.Group>
-						<ContextMenu.Item
-							className="workbench-layout-menu-item"
-							disabled={state?.isRoot}
-							onSelect={() =>
-								state?.isMaximized ? parent?.restore() : parent?.maximize()
-							}
-						>
-							{state?.isMaximized
-								? "Restore panel group"
-								: "Maximize panel group"}
-						</ContextMenu.Item>
-						<ContextMenu.Item
-							className="workbench-layout-menu-item"
-							onSelect={() =>
-								workspace?.setModel(
-									createDefaultWorkbenchLayout(
-										!!context && "media" in context.panels,
-									),
-								)
-							}
-						>
-							Reset workbench layout
-						</ContextMenu.Item>
-					</ContextMenu.Group>
-					<ContextMenu.Separator className="workbench-layout-menu-separator" />
-					<ContextMenu.Label className="workbench-layout-menu-hint">
-						Alt-drag content to move this panel
-					</ContextMenu.Label>
-				</ContextMenu.Content>
-			</ContextMenu.Portal>
-		</ContextMenu.Root>
+				}}
+			>
+				{context?.panels[id]}
+			</ContextMenuTrigger>
+			<ContextMenuContent
+				aria-label={`${workbenchPanelTitles[id]} layout`}
+				className="workbench dark min-w-56"
+			>
+				<ContextMenuGroup>
+					<ContextMenuLabel>{workbenchPanelTitles[id]}</ContextMenuLabel>
+					<ContextMenuItem
+						disabled={state?.isRoot}
+						onClick={() =>
+							state?.isMaximized ? parent?.restore() : parent?.maximize()
+						}
+					>
+						{state?.isMaximized
+							? "Restore panel group"
+							: "Maximize panel group"}
+					</ContextMenuItem>
+					<ContextMenuItem
+						onClick={() =>
+							workspace?.setModel(
+								createDefaultWorkbenchLayout(
+									!!context && "media" in context.panels,
+								),
+							)
+						}
+					>
+						Reset workbench layout
+					</ContextMenuItem>
+				</ContextMenuGroup>
+				<ContextMenuSeparator />
+				<p className="px-1.5 py-1 text-xs text-muted-foreground">
+					Alt-drag content to move this panel
+				</p>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
