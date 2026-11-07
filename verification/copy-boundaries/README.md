@@ -11,7 +11,8 @@ node verification/copy-boundaries/check.mjs
 node verification/copy-boundaries/app-check.mjs
 node verification/copy-boundaries/summarize.mjs
 pnpm exec tsc --project verification/copy-boundaries/tsconfig.json
-pnpm exec biome check --config-path verification/copy-boundaries verification/copy-boundaries
+pnpm exec oxlint --deny-warnings verification/copy-boundaries
+pnpm exec oxfmt --check verification/copy-boundaries
 pnpm exec vitest run verification/copy-boundaries/tests/artifact.test.mjs
 ```
 

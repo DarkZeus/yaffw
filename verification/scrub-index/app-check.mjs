@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { launchBrowser } from "../browser.cjs";
 import { generateFixtures } from "./fixtures.mjs";
 const fixtures = generateFixtures();

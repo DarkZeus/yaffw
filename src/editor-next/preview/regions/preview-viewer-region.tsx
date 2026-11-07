@@ -302,7 +302,7 @@ function PreviewChaptersMenu({
 									});
 									option?.select(event);
 								}}
-								ref={option?.setProgressVar}
+								ref={(element) => option?.setProgressVar(element)}
 								value={chapter.value}
 							>
 								<div className="vds-chapter-radio-content">

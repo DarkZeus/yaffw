@@ -24,6 +24,7 @@ export function Disclosure({
 			<Button variant="ghost" popoverTarget={id} aria-label={label}>
 				{icon ?? label}
 			</Button>
+			{/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Popover delegates clicks and Escape from its interactive children. */}
 			<div
 				id={id}
 				popover="auto"
@@ -186,6 +187,7 @@ function AddTrackControl({ editor }: { editor: Editor }) {
 	const trigger = useRef<HTMLButtonElement>(null);
 	const audio = useRef<HTMLButtonElement>(null);
 	return (
+		// oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Button group delegates Escape and focus dismissal from its children.
 		<div
 			className="add-track-control"
 			onPointerLeave={(e) => {

@@ -20,7 +20,8 @@ Media samples and thumbnails are local derivatives of the repository's S.T.A.L.K
 Checks:
 
 ```sh
-npx biome check --config-path prototypes/nle prototypes/nle/*.ts prototypes/nle/*.tsx prototypes/nle/*.css
+pnpm exec oxlint --deny-warnings prototypes/nle
+pnpm exec oxfmt --check prototypes/nle
 npx tsc -p prototypes/nle/tsconfig.json
 npx vitest run --config prototypes/nle/vite.config.ts
 npx vite build --config prototypes/nle/vite.config.ts

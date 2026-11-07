@@ -15,7 +15,8 @@ offline fixture verification dependency, not an application dependency.
 ```sh
 node verification/preview-av-alignment/fixture-validation.mjs
 npm run test -- verification/preview-av-alignment/tests
-pnpm exec biome check --config-path=verification/preview-av-alignment verification/preview-av-alignment
+pnpm exec oxlint --deny-warnings verification/preview-av-alignment
+pnpm exec oxfmt --check verification/preview-av-alignment
 YAFFW_HEADED=1 node verification/preview-av-alignment/browser-check.mjs
 ```
 

@@ -278,7 +278,7 @@ describe("loadBrowserWaveformLane", () => {
 				{ timestamp: 3.1, duration: 0.1 },
 			]);
 			const samples = timestamps.map((time) =>
-				createAudioSampleLike([new Array(10).fill(1)], 100, time),
+				createAudioSampleLike([Array.from({ length: 10 }, () => 1)], 100, time),
 			);
 			mediabunnyMock.samplesByTrack.set(track, samples);
 			const result = await loadBrowserWaveformLane({
@@ -392,7 +392,7 @@ describe("loadBrowserWaveformLane", () => {
 
 describe("addAudioSampleToBuckets", () => {
 	it("maps waveform samples by media timestamps instead of lane-local offsets", () => {
-		const delayedBuckets = new Array<number>(10).fill(0);
+		const delayedBuckets = Array.from({ length: 10 }, () => 0);
 		const delayedSample = createAudioSampleLike(
 			[
 				[0.5, 1, 0.25, 0.75],
@@ -411,7 +411,7 @@ describe("addAudioSampleToBuckets", () => {
 		expect(delayedBuckets).toEqual([0, 0, 0, 0, 0.75, 0.5, 0, 0, 0, 0]);
 		expect(delayedSample.copyTo).toHaveBeenCalledTimes(2);
 
-		const clippedBuckets = new Array<number>(4).fill(0);
+		const clippedBuckets = Array.from({ length: 4 }, () => 0);
 
 		addAudioSampleToBuckets({
 			buckets: clippedBuckets,

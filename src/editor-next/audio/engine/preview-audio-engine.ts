@@ -125,16 +125,16 @@ export async function createPreviewAudioEngine({
 		},
 		getStatus: scheduler.getStatus,
 		getPlaybackState: controller.getPlaybackState,
-		subscribe: controller.subscribe,
+		subscribe: (...args) => controller.subscribe(...args),
 		getMetrics: controller.getMetrics,
 		pause() {
 			controller.pause();
 			graph.settleGains();
 		},
-		play: controller.play,
-		retryTrack: controller.retryTrack,
-		setTime: controller.setTime,
-		setPlaybackRate: controller.setPlaybackRate,
+		play: (...args) => controller.play(...args),
+		retryTrack: (...args) => controller.retryTrack(...args),
+		setTime: (...args) => controller.setTime(...args),
+		setPlaybackRate: (...args) => controller.setPlaybackRate(...args),
 		setPlaybackEnd: scheduler.setPlaybackEnd,
 		readMeterSnapshot: () =>
 			graph.readMeterSnapshot(scheduler.isPlaying(), controller.getFailures()),

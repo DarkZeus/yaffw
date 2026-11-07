@@ -277,17 +277,14 @@ function raceWithAbort<T>(
 	return new Promise<T>((resolve, reject) => {
 		let settled = false;
 
-		async function handleAbort() {
+		function handleAbort() {
 			if (settled) {
 				return;
 			}
 
 			settled = true;
-			try {
-				await cancel();
-			} finally {
-				reject(new DefaultExportCancelledError());
-			}
+			const rejectCancelled = () => reject(new DefaultExportCancelledError());
+			void Promise.resolve().then(cancel).then(rejectCancelled, rejectCancelled);
 		}
 
 		signal.addEventListener("abort", handleAbort, { once: true });

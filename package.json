@@ -7,15 +7,18 @@
 		"dev": "vite --port 3000",
 		"frontend": "vite --port 3000",
 		"start": "vite --port 3000",
-		"build": "vite build && npm run typecheck",
-		"typecheck": "tsc --project tsconfig.editor-next.json",
+		"build": "vite build && pnpm typecheck",
+		"typecheck": "tsc --project tsconfig.json",
 		"serve": "vite preview",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
-		"format": "biome format",
-		"lint": "biome lint",
-		"check": "biome check",
-		"doctor": "react-doctor"
+		"format": "oxfmt --write .",
+		"lint": "oxlint --deny-warnings .",
+		"check": "pnpm format:check && pnpm lint",
+		"doctor": "react-doctor",
+		"format:check": "oxfmt --check .",
+		"lint:fix": "oxlint --fix --deny-warnings .",
+		"verify": "pnpm check && pnpm test && pnpm build"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.9.0",
@@ -40,7 +43,6 @@
 		"wavesurfer.js": "^7.12.11"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "1.9.4",
 		"@testing-library/dom": "^10.4.1",
 		"@testing-library/react": "^16.3.2",
 		"@types/culori": "^4.0.1",
@@ -49,9 +51,15 @@
 		"@vitejs/plugin-react": "^4.7.0",
 		"@vitest/coverage-istanbul": "3.2.7",
 		"jsdom": "^26.0.0",
+		"oxfmt": "0.75.0",
+		"oxlint": "1.90.0",
+		"oxlint-tsgolint": "7.0.2005",
 		"react-doctor": "^0.6.3",
-		"typescript": "^5.9.3",
+		"typescript": "7.0.2",
 		"vite": "^6.4.3",
 		"vitest": "^3.2.7"
+	},
+	"engines": {
+		"node": ">=24"
 	}
 }

@@ -10,10 +10,6 @@ import { ExportInspectorPanel } from "@/editor-next/export/inspector/export-insp
 import { MediaAssetContextPanel } from "@/editor-next/media-asset/panel/media-asset-context";
 import { PreviewTransportRegion } from "@/editor-next/preview/regions/preview-transport-region";
 import { EditorWorkbenchLayout } from "@/editor-next/workbench/frame/editor-workbench-layout";
-import {
-	type WorkbenchInspectorTabValue,
-	WorkbenchInspectorTabs,
-} from "@/editor-next/workbench/frame/workbench-inspector";
 import { CircleDot, Maximize2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Inspector } from "./inspector";
@@ -34,7 +30,6 @@ export function Workbench({ editor }: { editor: Editor }) {
 }
 function ExistingShell({ editor }: { editor: Editor }) {
 	const preview = useRef<HTMLDivElement>(null);
-	const [activeTab, setTab] = useState<WorkbenchInspectorTabValue>("media");
 	const [mediaOpen, setMediaOpen] = useState(false);
 	const [propertiesOpen, setPropertiesOpen] = useState(false);
 	const [closed, setClosed] = useState(false);
@@ -149,11 +144,8 @@ function ExistingShell({ editor }: { editor: Editor }) {
 								volume={editor.masterGain}
 							/>
 						}
-						inspector={
-							<WorkbenchInspectorTabs
-								activeTab={activeTab}
-								onTabChange={setTab}
-								mediaAssetContext={
+						inspector={{
+							media: (
 									<MediaAssetContextPanel
 										asset={asset}
 										closeFileDisabled={false}
@@ -163,8 +155,8 @@ function ExistingShell({ editor }: { editor: Editor }) {
 										}}
 										selection={selection}
 									/>
-								}
-								audioPanel={
+							),
+							audio: (
 									<AudioPanel
 										asset={asset}
 										audioMix={mix}
@@ -184,8 +176,8 @@ function ExistingShell({ editor }: { editor: Editor }) {
 											}))
 										}
 									/>
-								}
-								exportInspector={
+							),
+							export: (
 									<div>
 										<p className="px-2 py-2 text-xs text-muted-foreground">
 											Export is shown for context. Sequence rendering is outside
@@ -206,9 +198,8 @@ function ExistingShell({ editor }: { editor: Editor }) {
 											/>
 										</fieldset>
 									</div>
-								}
-							/>
-						}
+							),
+						}}
 						selection={
 							<div className="nle timeline-only">
 								{mediaOpen && (

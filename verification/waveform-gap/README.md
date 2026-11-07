@@ -9,7 +9,8 @@ export YAFFW_BROWSER_EXECUTABLE=/absolute/path/to/chromium
 node verification/waveform-gap/check.mjs tmp/waveform-gap/after.json
 node verification/waveform-gap/app-check.mjs
 pnpm exec tsc --project verification/waveform-gap/tsconfig.json
-pnpm exec biome check --config-path verification/waveform-gap verification/waveform-gap
+pnpm exec oxlint --deny-warnings verification/waveform-gap
+pnpm exec oxfmt --check verification/waveform-gap
 ```
 
 `YAFFW_ORIGIN` defaults to `http://127.0.0.1:3000`. Fixture generation reuses

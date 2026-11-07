@@ -10,7 +10,8 @@ export YAFFW_BROWSER_EXECUTABLE=/absolute/path/to/chromium
 node verification/scrub-index/check.mjs
 node verification/scrub-index/app-check.mjs
 pnpm exec tsc --project verification/scrub-index/tsconfig.json
-pnpm exec biome check --config-path verification/scrub-index verification/scrub-index
+pnpm exec oxlint --deny-warnings verification/scrub-index
+pnpm exec oxfmt --check verification/scrub-index
 ```
 
 Both browser entry points call `generateFixtures()` from `fixtures.mjs` before opening a

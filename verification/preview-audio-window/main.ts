@@ -28,7 +28,10 @@ const CONTROLLED_FIXTURE = {
 const EVIDENCE_REVISION =
 	"9036d2393dc2b9ec958b7502b75ca4034ee6de86+issue-108-working-tree";
 
-runButton.addEventListener("click", async () => {
+runButton.addEventListener("click", () => {
+	void runEvidence();
+});
+async function runEvidence() {
 	const file = fixtureInput.files?.[0];
 	if (!file) {
 		showError("Select the controlled fixture first.");
@@ -84,9 +87,12 @@ runButton.addEventListener("click", async () => {
 	} finally {
 		runButton.disabled = false;
 	}
-});
+}
 
-functionalButton.addEventListener("click", async () => {
+functionalButton.addEventListener("click", () => {
+	void runFunctional();
+});
+async function runFunctional() {
 	const file = fixtureInput.files?.[0];
 	if (!file) {
 		showError("Select the controlled fixture first.");
@@ -114,7 +120,7 @@ functionalButton.addEventListener("click", async () => {
 	} finally {
 		functionalButton.disabled = false;
 	}
-});
+}
 
 downloadButton.addEventListener("click", () => {
 	if (!latestRecord) return;

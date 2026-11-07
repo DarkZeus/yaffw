@@ -250,7 +250,7 @@ try {
 						interventionRequests,
 					});
 					console.error(
-						`${variant} ${rate} repetition ${repetition}: ${error}`,
+						`${variant} ${rate} repetition ${repetition}: ${String(error)}`,
 					);
 				} finally {
 					await context.close();

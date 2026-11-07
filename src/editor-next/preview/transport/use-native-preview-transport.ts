@@ -193,7 +193,7 @@ export function useNativePreviewTransport({
 						? selection.endUs / 1_000_000
 						: null,
 				);
-				previewAudioEngineRef.current?.setTime(nextTimeSeconds);
+				void previewAudioEngineRef.current?.setTime(nextTimeSeconds);
 			}
 		},
 		[
@@ -250,7 +250,7 @@ export function useNativePreviewTransport({
 				playbackStartPendingRef.current = false;
 				previewAudioEngineRef.current?.pause();
 				if (nativePlaybackShouldPause && !audioMasterClockActive) {
-					videoRef.current?.pause();
+					void videoRef.current?.pause();
 				}
 				setPlaybackRequested(false);
 				previewScrubActiveRef.current = true;
@@ -286,7 +286,7 @@ export function useNativePreviewTransport({
 			playbackStartRequestIdRef.current += 1;
 			playbackStartPendingRef.current = false;
 			previewAudioEngineRef.current?.pause();
-			if (!audioMasterClockActive) videoRef.current?.pause();
+			if (!audioMasterClockActive) void videoRef.current?.pause();
 			setPlaybackRequested(false);
 			setIsPlaying(false);
 			seekByUs(direction * frameDurationUs);
@@ -343,7 +343,7 @@ export function useNativePreviewTransport({
 			} catch {
 				if (requestId !== playbackStartRequestIdRef.current) return;
 				engine?.pause();
-				video.pause();
+				void video.pause();
 				setPlaybackRequested(false);
 				setIsPlaying(false);
 			} finally {
@@ -369,7 +369,7 @@ export function useNativePreviewTransport({
 			playbackStartPendingRef.current = false;
 			setPlaybackRequested(false);
 			previewAudioEngineRef.current?.pause();
-			if (!audioMasterClockActive) videoRef.current?.pause();
+			if (!audioMasterClockActive) void videoRef.current?.pause();
 			setIsPlaying(false);
 			return;
 		}
@@ -392,7 +392,7 @@ export function useNativePreviewTransport({
 				video.playbackRate = nextPlaybackRate;
 			}
 
-			previewAudioEngineRef.current?.setPlaybackRate(nextPlaybackRate);
+			void previewAudioEngineRef.current?.setPlaybackRate(nextPlaybackRate);
 			playbackRateRef.current = nextPlaybackRate;
 			setPlaybackRate(nextPlaybackRate);
 		},
@@ -449,7 +449,7 @@ export function useNativePreviewTransport({
 			setAudioPlaybackState(state);
 			if (state !== "playing") {
 				followerRequest++;
-				if (following || state !== "paused") video.pause();
+				if (following || state !== "paused") void video.pause();
 				following = false;
 				setIsPlaying(false);
 				if (state === "closed") setPlaybackRequested(false);
@@ -484,7 +484,7 @@ export function useNativePreviewTransport({
 				.then(() => {
 					if (disposed) return;
 					if (request !== followerRequest) {
-						if (!following) video.pause();
+						if (!following) void video.pause();
 						return;
 					}
 					setIsPlaying(true);
@@ -504,7 +504,7 @@ export function useNativePreviewTransport({
 			followerRequest++;
 			unsubscribe();
 			engine.pause();
-			video.pause();
+			void video.pause();
 		};
 	}, [
 		audioMasterClockActive,
@@ -793,7 +793,7 @@ export function useNativePreviewTransport({
 	const handleNativePlay = useCallback(() => {
 		if (!nativeVideoClockActive) {
 			if (previewAudioEngineRef.current?.getPlaybackState() !== "playing")
-				videoRef.current?.pause();
+				void videoRef.current?.pause();
 			return;
 		}
 

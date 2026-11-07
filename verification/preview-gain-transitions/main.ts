@@ -118,10 +118,7 @@ function graph(ctx: OfflineAudioContext) {
 		[
 			{
 				numberOfChannels: 2,
-				sampleRate: RATE,
 				trackId: "track",
-				trackIndex: 0,
-				track: { id: "track", kind: "audio", channels: 2, sampleRate: RATE },
 			},
 		],
 		2,
@@ -603,7 +600,11 @@ export async function runPreviewGainTransitionChecks() {
 Object.assign(window, { runPreviewGainTransitionChecks });
 const button = document.querySelector<HTMLButtonElement>("#run");
 const result = document.querySelector<HTMLPreElement>("#result");
-button?.addEventListener("click", async () => {
+button?.addEventListener("click", () => {
+	void runChecks();
+});
+async function runChecks() {
+	if (!button) return;
 	button.disabled = true;
 	try {
 		const summary = await runPreviewGainTransitionChecks();
@@ -612,8 +613,7 @@ button?.addEventListener("click", async () => {
 		if (result)
 			result.textContent =
 				error instanceof Error ? (error.stack ?? error.message) : String(error);
-		throw error;
 	} finally {
 		button.disabled = false;
 	}
-});
+}

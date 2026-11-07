@@ -193,7 +193,7 @@ export function evaluateProductionAudioTrials(trials: ProductionAudioTrial[]) {
 					trial.observedPlaybackSeconds >= 30 && trial.errors.length === 0,
 			),
 		medianReadinessBelow100MsAndBothBaselines:
-			readiness.medianMs < 100 && readiness.medianMs < 259,
+			readiness.medianMs < 100,
 		p95ReadinessBelow250Ms: readiness.p95Ms < 250,
 		peakPcmAtMost2MiB: trials.every(
 			(trial) =>

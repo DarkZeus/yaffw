@@ -9,7 +9,8 @@ YAFFW_PLAYWRIGHT_PATH=/absolute/path/to/playwright \
 YAFFW_BROWSER_EXECUTABLE=/absolute/path/to/chromium \
 node verification/mediabunny-upgrade/check.mjs
 pnpm exec tsc --project verification/mediabunny-upgrade/tsconfig.json
-pnpm exec biome check --config-path verification/mediabunny-upgrade verification/mediabunny-upgrade
+pnpm exec oxlint --deny-warnings verification/mediabunny-upgrade
+pnpm exec oxfmt --check verification/mediabunny-upgrade
 ```
 
 `YAFFW_ORIGIN` defaults to `http://127.0.0.1:3000`. The optional first CLI argument

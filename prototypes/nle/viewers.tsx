@@ -16,39 +16,41 @@ function MediaLayer({
 	gain?: number;
 }) {
 	const media = useRef<HTMLVideoElement>(null);
+	const { playing, speed, masterGain, setPlaying, setMessage } = editor;
 	const at = (clip.sourceIn + editor.playhead - clip.start) / SECOND;
 	useEffect(() => {
 		const el = media.current;
 		if (!el) return;
-		el.volume = clamp(clip.gain * gain * editor.masterGain, 0, 1);
-		el.playbackRate = editor.speed;
+		el.volume = clamp(clip.gain * gain * masterGain, 0, 1);
+		el.playbackRate = speed;
 		function sync() {
 			if (!el) return;
-			if (Math.abs(el.currentTime - at) > (editor.playing ? 0.16 : 0.01))
+			if (Math.abs(el.currentTime - at) > (playing ? 0.16 : 0.01))
 				el.currentTime = Math.max(0, at);
-			if (editor.playing && el.paused)
+			if (playing && el.paused)
 				void el.play().catch((error: unknown) => {
 					if (error instanceof DOMException && error.name === "AbortError")
 						return;
-					editor.setPlaying(false);
-					editor.setMessage("Playback could not start. Press Play to retry.");
+					setPlaying(false);
+					setMessage("Playback could not start. Press Play to retry.");
 				});
-			if (!editor.playing && !el.paused) el.pause();
+			if (!playing && !el.paused) el.pause();
 		}
 		if (el.readyState >= 2) sync();
 		el.addEventListener("loadeddata", sync);
 		return () => el.removeEventListener("loadeddata", sync);
 	}, [
 		at,
-		editor.playing,
-		editor.speed,
+		playing,
+		speed,
 		clip.gain,
-		editor.masterGain,
+		masterGain,
 		gain,
-		editor.setPlaying,
-		editor.setMessage,
+		setPlaying,
+		setMessage,
 	]);
 	return (
+		// oxlint-disable-next-line jsx-a11y/media-has-caption -- Local prototype media has no caption tracks.
 		<video
 			ref={media}
 			className={audio ? "audio-renderer" : "layer-media"}

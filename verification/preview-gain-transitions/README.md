@@ -26,8 +26,7 @@ Native 5/8/10 ms reference ramps report adjacent-sample differences and
 endpoint timing. These results quantify discontinuity reduction and latency;
 they do not establish perceptual inaudibility.
 
-`pnpm exec tsc --project tsconfig.json --noEmit` includes this verification entry
-(the narrower production `tsconfig.editor-next.json` does not).
+`pnpm typecheck` includes this verification entry alongside the app and prototype.
 
 ## Application checks
 

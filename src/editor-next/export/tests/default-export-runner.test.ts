@@ -270,6 +270,22 @@ describe("browserDefaultExportRunner cleanup", () => {
 		expect(mediabunnyMock.audioBufferSources[0].close).toHaveBeenCalledOnce();
 	});
 
+	it("reports cancellation when conversion cancellation rejects", async () => {
+		const controller = new AbortController();
+		mediabunnyMock.conversionExecute = () => new Promise(() => undefined);
+		browserAudioMixMock.renderBrowserAudioMix.mockResolvedValue({} as AudioBuffer);
+		const exportPromise = browserDefaultExportRunner.run(
+			createExportRequest({ audioMix: includedAudioMix, signal: controller.signal }),
+		);
+		await waitForConversion();
+		mediabunnyMock.conversions[0].cancel.mockRejectedValueOnce(new Error("Cancel failed."));
+		controller.abort();
+
+		await expect(exportPromise).rejects.toBeInstanceOf(DefaultExportCancelledError);
+		expect(mediabunnyMock.inputs[0].dispose).toHaveBeenCalledOnce();
+		expect(mediabunnyMock.outputs[0].cancel).toHaveBeenCalledOnce();
+	});
+
 	it("cancels Output after mixed-audio finalization failure", async () => {
 		const failure = new Error("Output finalization failed.");
 		mediabunnyMock.outputFinalizeFailure = failure;

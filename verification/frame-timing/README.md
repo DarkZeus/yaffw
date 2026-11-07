@@ -32,7 +32,8 @@ An optional first argument writes evidence to another location:
 YAFFW_PLAYWRIGHT_PATH=/absolute/path/to/playwright \
   node verification/frame-timing/check.mjs \
   docs/verification/evidence/frame-timing-analysis-2026-11-05.json
-pnpm exec biome check --config-path verification/frame-timing verification/frame-timing
+pnpm exec oxlint --deny-warnings verification/frame-timing
+pnpm exec oxfmt --check verification/frame-timing
 ```
 
 `fixtures.mjs` contains the full executable ffmpeg recipe. All fixtures use

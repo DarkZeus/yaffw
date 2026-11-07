@@ -39,8 +39,10 @@ export async function checkExport({
 	};
 	let videoEncodeCalls = 0;
 	let audioEncodeCalls = 0;
-	const videoEncode = VideoEncoder.prototype.encode;
-	const audioEncode = AudioEncoder.prototype.encode;
+	// oxlint-disable-next-line typescript/unbound-method -- Instrumentation calls the original with its encoder receiver and restores it afterward.
+const videoEncode = VideoEncoder.prototype.encode;
+	// oxlint-disable-next-line typescript/unbound-method -- Instrumentation calls the original with its encoder receiver and restores it afterward.
+const audioEncode = AudioEncoder.prototype.encode;
 	VideoEncoder.prototype.encode = function (...args) {
 		videoEncodeCalls++;
 		return videoEncode.apply(this, args);

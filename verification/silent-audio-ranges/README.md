@@ -9,7 +9,8 @@ Playwright package and Chromium executable with H.264/AAC/Opus support.
 node verification/silent-audio-ranges/check.mjs candidate
 node verification/silent-audio-ranges/app-check.mjs
 pnpm exec tsc --project verification/silent-audio-ranges/tsconfig.json
-pnpm exec biome check --config-path verification/silent-audio-ranges verification/silent-audio-ranges
+pnpm exec oxlint --deny-warnings verification/silent-audio-ranges
+pnpm exec oxfmt --check verification/silent-audio-ranges
 ```
 
 Both runners call `prepareFixture()` from `fixtures.mjs` before opening a browser.

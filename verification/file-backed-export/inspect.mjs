@@ -50,9 +50,7 @@ for (const result of evidence.results) {
 	assert.ok(result.samples.every((s) => Number.isFinite(s.backingStorageSize)));
 }
 const artifacts = [];
-for (const repetition of [
-	...new Set(evidence.results.map((r) => r.repetition)),
-]) {
+for (const repetition of new Set(evidence.results.map((r) => r.repetition))) {
 	const baseline = packets(`tmp/file-backed-export/buffer-${repetition}.mp4`);
 	const candidate = packets(`tmp/file-backed-export/file-${repetition}.mp4`);
 	// Interleaving may differ; compare each complete encoded track independently.

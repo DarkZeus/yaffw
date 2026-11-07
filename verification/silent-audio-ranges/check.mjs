@@ -2,11 +2,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
+import { transformWithEsbuild } from "vite";
 import { inspect, probe } from "./artifact.mjs";
 import { prepareFixture } from "./fixtures.mjs";
-const require = createRequire(import.meta.url);
 import { launchBrowser } from "../browser.cjs";
 const { directory, source } = prepareFixture();
 const fixture = probe(source);
@@ -34,25 +33,23 @@ try {
 			],
 			{ encoding: "utf8" },
 		);
-		const ts = require("typescript");
 		await page.route(
 			"**/src/editor-next/media-work/adapters/mediabunny-audio-buffer.ts*",
 			async (route) => {
 				const transformed = await (await route.fetch()).text();
 				const dependency = transformed.match(
-					/from "([^\"]*mediabunny\.js[^\"]*)"/,
+					/from "([^"]*mediabunny\.js[^"]*)"/,
 				)[1];
 				const timeline = transformed.match(
-					/from "([^\"]*audio-packet-timeline[^\"]*)"/,
+					/from "([^"]*audio-packet-timeline[^"]*)"/,
 				)[1];
-				const javascript = ts
-					.transpileModule(baseline, {
-						compilerOptions: {
-							module: ts.ModuleKind.ESNext,
-							target: ts.ScriptTarget.ESNext,
-						},
-					})
-					.outputText.replace('from "mediabunny"', `from "${dependency}"`)
+				const { code } = await transformWithEsbuild(
+					baseline,
+					"mediabunny-audio-buffer.ts",
+					{ target: "esnext", format: "esm" },
+				);
+				const javascript = code
+					.replace('from "mediabunny"', `from "${dependency}"`)
 					.replace('from "./audio-packet-timeline"', `from "${timeline}"`);
 				await route.fulfill({
 					status: 200,

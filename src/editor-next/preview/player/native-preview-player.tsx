@@ -202,20 +202,24 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		asset,
 		source,
 	});
+	const {
+		requestFrame: requestScrubFrame,
+		handleNativeSeeked: handleScrubNativeSeeked,
+	} = scrubPreview;
 	const seekToUsWithScrubPreview = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
 			const clampedPlayheadUs = Math.min(
 				Math.max(Math.round(nextPlayheadUs), 0),
 				asset.durationUs,
 			);
-			scrubPreview.requestFrame(clampedPlayheadUs, { priority: "final" });
+			requestScrubFrame(clampedPlayheadUs, { priority: "final" });
 			if (playbackRequested && !isPlaying) seekToUs(clampedPlayheadUs);
 			else previewScrubToUs(clampedPlayheadUs);
 		},
 		[
 			asset.durationUs,
 			previewScrubToUs,
-			scrubPreview.requestFrame,
+			requestScrubFrame,
 			playbackRequested,
 			isPlaying,
 			seekToUs,
@@ -233,12 +237,12 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 				Math.max(Math.round(nextPlayheadUs), 0),
 				asset.durationUs,
 			);
-			scrubPreview.requestFrame(clampedPlayheadUs, {
+			requestScrubFrame(clampedPlayheadUs, {
 				priority: "interactive",
 			});
 			previewScrubToUs(clampedPlayheadUs);
 		},
-		[asset.durationUs, previewScrubToUs, scrubPreview.requestFrame],
+		[asset.durationUs, previewScrubToUs, requestScrubFrame],
 	);
 	const stepFrameWithScrubPreview = useCallback(
 		(direction: -1 | 1) => {
@@ -249,7 +253,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 				),
 				asset.durationUs,
 			);
-			scrubPreview.requestFrame(nextPlayheadUs, { priority: "final" });
+			requestScrubFrame(nextPlayheadUs, { priority: "final" });
 			previewScrubToUs(nextPlayheadUs);
 		},
 		[
@@ -257,15 +261,15 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			asset.frameTiming.frameDurationUs,
 			getPlayheadUs,
 			previewScrubToUs,
-			scrubPreview.requestFrame,
+			requestScrubFrame,
 		],
 	);
 	const handleNativeSeeked = useCallback(() => {
 		syncPlayheadWithNativeVideo();
-		scrubPreview.handleNativeSeeked(
+		handleScrubNativeSeeked(
 			videoRef.current?.currentTime ?? Number.NaN,
 		);
-	}, [scrubPreview.handleNativeSeeked, syncPlayheadWithNativeVideo]);
+	}, [handleScrubNativeSeeked, syncPlayheadWithNativeVideo]);
 	const togglePlaybackWithScrubPreview = useCallback(() => {
 		void togglePlayback();
 	}, [togglePlayback]);

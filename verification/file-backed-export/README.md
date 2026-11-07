@@ -15,7 +15,8 @@ node verification/file-backed-export/lifecycle.mjs
 node verification/file-backed-export/app-check.mjs
 node verification/file-backed-export/retain.mjs
 pnpm exec tsc --project verification/file-backed-export/tsconfig.json
-pnpm exec biome check --config-path verification/file-backed-export verification/file-backed-export
+pnpm exec oxlint --deny-warnings verification/file-backed-export
+pnpm exec oxfmt --check verification/file-backed-export
 npm run typecheck
 npm run test
 npm run build

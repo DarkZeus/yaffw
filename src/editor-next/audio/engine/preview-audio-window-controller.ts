@@ -312,7 +312,7 @@ export function createPreviewAudioWindowController(
 			desiredPlaying = true;
 			if (contextLifecycle.isRunning()) setPlaybackState("buffering");
 			if (!(await requestContextResume()) || request !== playRequest) return;
-			if (!active) prepare(engine.getCurrentTime());
+			if (!active) void prepare(engine.getCurrentTime());
 			// A seek can replace the awaited preparation while a play command is pending.
 			let pending: Promise<void>;
 			do {

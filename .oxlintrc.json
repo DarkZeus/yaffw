@@ -1,0 +1,71 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": [
+		"typescript",
+		"react",
+		"jsx-a11y",
+		"unicorn",
+		"oxc"
+	],
+	"categories": {
+		"correctness": "error"
+	},
+	"rules": {
+		"typescript/no-floating-promises": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/consistent-type-imports": [
+			"error",
+			{
+				"disallowTypeAnnotations": false
+			}
+		],
+		"react/error-boundaries": "off",
+		"react/globals": "off",
+		"react/immutability": "off",
+		"react/incompatible-library": "off",
+		"react/preserve-manual-memoization": "off",
+		"react/purity": "off",
+		"react/refs": "off",
+		"react/set-state-in-effect": "off",
+		"react/set-state-in-render": "off",
+		"react/static-components": "off",
+		"react/use-memo": "off",
+		"react/void-use-memo": "off",
+		"eslint/no-unused-vars": [
+			"error",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"ignoreRestSiblings": true
+			}
+		],
+		"react/rules-of-hooks": "error",
+		"typescript/no-explicit-any": "error"
+	},
+	"options": {
+		"typeAware": true,
+		"reportUnusedDisableDirectives": "error"
+	},
+	"ignorePatterns": [
+		"src/routeTree.gen.ts",
+		"dist/**",
+		"coverage/**",
+		".tanstack/**",
+		"tmp/**",
+		"docs/**",
+		"public/**",
+		"prototypes/nle/media/**"
+	],
+	"overrides": [
+		{
+			"files": [
+				"**/*.test.ts",
+				"**/*.test.tsx",
+				"**/*.test.mjs"
+			],
+			"rules": {
+				"typescript/unbound-method": "off"
+			}
+		}
+	]
+}

@@ -273,6 +273,7 @@ function PreviewLevelMeterChannelBar({
 					"relative min-h-0 overflow-hidden rounded-sm border border-workbench-border/80 bg-workbench-lane",
 					orientation === "horizontal" ? "h-4" : "",
 				)}
+// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- Custom segmented meter needs styled child elements that native meter hides.
 				role="meter"
 			>
 				{zones.map((zone) => (

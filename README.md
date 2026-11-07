@@ -48,7 +48,7 @@ Shortcuts pause while you're editing an input, using a dialog, or exporting.
 
 ## Run locally
 
-You'll need Node.js and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
+You'll need Node.js 24 or newer and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
 
 ```sh
 git clone https://github.com/DarkZeus/yaffw.git
@@ -63,11 +63,17 @@ Useful development commands:
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm run check` | Check formatting and lint rules with Biome |
-| `pnpm run typecheck` | Check TypeScript |
+| `pnpm verify` | Run formatting, linting, tests, production build, and type checking |
+| `pnpm check` | Check formatting with Oxfmt and type-aware lint rules with Oxlint |
+| `pnpm format` | Format maintained files and sort imports and Tailwind classes |
+| `pnpm typecheck` | Check types with TypeScript 7 |
 | `pnpm test` | Run the test suite |
 | `pnpm run build` | Build to `dist` and check TypeScript |
 | `pnpm run serve` | Preview the production build locally |
+
+Linting includes React Hooks, accessibility, and type-aware checks for promises and method binding. React Compiler eligibility rules are excluded because the app does not use React Compiler. Method-binding checks exempt test files so assertions can inspect spies without calling them.
+
+CI runs `pnpm verify` on pushes and pull requests. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 

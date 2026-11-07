@@ -1,0 +1,27 @@
+{
+	"$schema": "./node_modules/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"printWidth": 80,
+	"sortImports": {
+		"newlinesBetween": false,
+		"sortSideEffects": false
+	},
+	"sortPackageJson": false,
+	"sortTailwindcss": {
+		"stylesheet": "./src/styles.css",
+		"functions": [
+			"cn",
+			"clsx",
+			"cva"
+		]
+	},
+	"ignorePatterns": [
+		"src/routeTree.gen.ts",
+		"pnpm-lock.yaml",
+		"docs/**",
+		"public/**",
+		"prototypes/nle/media/**",
+		"CONTEXT.md",
+		"AGENTS.md"
+	]
+}

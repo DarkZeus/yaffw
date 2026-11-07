@@ -491,7 +491,8 @@ export function useEditor() {
 			if (document.querySelector("dialog[open]")) return;
 			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
 				e.preventDefault();
-				e.shiftKey ? redo() : undo();
+				if (e.shiftKey) redo();
+				else undo();
 				return;
 			}
 			if ((e.metaKey || e.ctrlKey) && e.key === "a") {

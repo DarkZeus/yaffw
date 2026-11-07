@@ -14,7 +14,6 @@ overrides:
   rollup: 4.62.2
 
 onlyBuiltDependencies:
-  - '@biomejs/biome'
   - '@tailwindcss/oxide'
   - canvas
   - esbuild

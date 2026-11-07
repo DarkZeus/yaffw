@@ -194,7 +194,7 @@ desktop.ini
 *.iws
 
 # Visual Studio Code
-.vscode/
+.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -288,9 +288,6 @@ routeTree.gen.ts
 
 # TanStack Router cache
 .tanstack/
-
-# Biome cache
-.biome/
 
 # TypeScript compiled output
 *.js.map

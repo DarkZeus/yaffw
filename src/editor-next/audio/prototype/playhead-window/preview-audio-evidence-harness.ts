@@ -661,7 +661,7 @@ async function runBrowserTrial(
 			await prototype.play();
 			readiness.readyToSharedEpochMs =
 				performance.now() - startedAt - readiness.prepareToReadyMs;
-			timer = window.setInterval(async () => {
+			timer = window.setInterval(() => {
 				if (candidatePullPromise) return;
 				candidatePullPromise = (async () => {
 					try {
@@ -677,7 +677,6 @@ async function runBrowserTrial(
 						candidatePullPromise = null;
 					}
 				})();
-				await candidatePullPromise;
 			}, request.config.pumpIntervalMs);
 		} else {
 			baseline =
@@ -721,7 +720,7 @@ async function runBrowserTrial(
 			clearInterval(timer);
 			timer = undefined;
 		}
-		await candidatePullPromise;
+		await Promise.resolve(candidatePullPromise);
 		if (prototype) {
 			prototypeMetrics = prototype.getMetrics();
 			await prototype.destroy();

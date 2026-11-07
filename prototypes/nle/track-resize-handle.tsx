@@ -36,6 +36,7 @@ export function TrackResizeHandle({
 	return (
 		<div
 			className="track-height-handle"
+// oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- This focusable resize control needs pointer and keyboard interaction, not a thematic break.
 			role="separator"
 			tabIndex={0}
 			aria-label={`Resize ${track.name} track from bottom`}
