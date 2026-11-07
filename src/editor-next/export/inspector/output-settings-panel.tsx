@@ -48,7 +48,7 @@ type OutputSettingsPanelProps = {
 
 const BITS_PER_MEGABIT = 1_000_000;
 const outputSettingsCategoryTabClassName =
-	"relative h-11 flex-none justify-start rounded-none border-0 bg-transparent px-0 font-medium text-muted-foreground shadow-none hover:text-foreground disabled:opacity-40 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent dark:data-[state=active]:text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent data-[state=active]:after:bg-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-workbench-focus focus-visible:ring-0";
+	"relative h-11 flex-none justify-start rounded-none border-0 bg-transparent px-0 font-medium text-muted-foreground shadow-none hover:text-foreground aria-disabled:opacity-40 data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:bg-transparent dark:data-active:text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-transparent data-active:after:bg-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-workbench-focus focus-visible:ring-0";
 
 // Keep this deferred AI roadmap in the modal until these controls are fully implemented.
 const AI_UPSCALING_MODELS = [

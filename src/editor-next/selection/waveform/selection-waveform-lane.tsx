@@ -226,15 +226,18 @@ function LaneStatus({
 	if (lane.status === "unavailable") {
 		return (
 			<Tooltip>
-				<TooltipTrigger asChild>
-					<Badge
-						className="pointer-events-auto shrink-0 border-destructive/45 bg-destructive/15 px-1.5 text-[10px] text-destructive"
-						tabIndex={0}
-						title={status.label}
-						variant="outline"
-					>
-						Failed
-					</Badge>
+				<TooltipTrigger
+					aria-label={`${status.label}: ${lane.reason}`}
+					render={
+						<Badge
+							className="pointer-events-auto shrink-0 border-destructive/45 bg-destructive/15 px-1.5 text-[10px] text-destructive"
+							tabIndex={0}
+							title={status.label}
+							variant="outline"
+						/>
+					}
+				>
+					Failed
 				</TooltipTrigger>
 				<TooltipContent className="max-w-80">{lane.reason}</TooltipContent>
 			</Tooltip>
