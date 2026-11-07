@@ -1,5 +1,5 @@
 import { Video, VideoPlayer } from "@videojs/react/video";
-import { CircleDot, Maximize2 } from "lucide-react";
+import { CircleDot, FileX2, Maximize2 } from "lucide-react";
 import { type RefObject, memo } from "react";
 import { Button } from "@/components/ui/button";
 import type {
@@ -13,6 +13,8 @@ import { PreviewVideoSkin } from "../player/preview-video-skin";
 
 export type PreviewViewerRegionProps = {
 	asset: ReadyMediaAsset;
+	closeFileDisabled?: boolean;
+	onCloseFileRequested?: () => void;
 	canFullscreen: boolean;
 	isPlaying: boolean;
 	mediaMuted: boolean;
@@ -37,6 +39,8 @@ export type PreviewViewerRegionProps = {
 
 export function PreviewViewerRegion({
 	asset,
+	closeFileDisabled = false,
+	onCloseFileRequested,
 	canFullscreen,
 	fullscreenRef,
 	isPlaying,
@@ -103,6 +107,20 @@ export function PreviewViewerRegion({
 						>
 							<Maximize2 data-icon="inline-start" />
 						</Button>
+						{onCloseFileRequested ? (
+							<Button
+								aria-label="Close file"
+								className="size-7 text-muted-foreground"
+								disabled={closeFileDisabled}
+								onClick={onCloseFileRequested}
+								size="icon"
+								title="Close file"
+								type="button"
+								variant="ghost"
+							>
+								<FileX2 data-icon="inline-start" />
+							</Button>
+						) : null}
 					</div>
 				</div>
 				<PreviewMediaSurface

@@ -1,4 +1,4 @@
-import { CircleDot, Maximize2 } from "lucide-react";
+import { CircleDot, FileX2, Maximize2 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import { createDefaultOutputSettings } from "@/editor-core/model";
@@ -104,6 +104,17 @@ function ExistingShell({ editor }: { editor: Editor }) {
 									>
 										<Maximize2 size={14} />
 									</button>
+									<button
+										type="button"
+										aria-label="Close file"
+										title="Close file"
+										onClick={() => {
+											editor.setPlaying(false);
+											setClosed(true);
+										}}
+									>
+										<FileX2 size={14} />
+									</button>
 								</div>
 								<div className="nle preview-adapter">
 									<ProgramMonitor
@@ -146,15 +157,7 @@ function ExistingShell({ editor }: { editor: Editor }) {
 						}
 						inspector={{
 							media: (
-								<MediaAssetContextPanel
-									asset={asset}
-									closeFileDisabled={false}
-									onCloseFileRequested={() => {
-										editor.setPlaying(false);
-										setClosed(true);
-									}}
-									selection={selection}
-								/>
+								<MediaAssetContextPanel asset={asset} selection={selection} />
 							),
 							audio: (
 								<AudioPanel

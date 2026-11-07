@@ -54,8 +54,6 @@ export function EditorNextRouteComposition({
 			session.status === "ready" ? (
 				<MediaAssetContextPanel
 					asset={session.asset}
-					closeFileDisabled={!canCloseEditorSession(session)}
-					onCloseFileRequested={stableCommands.requestCloseFile}
 					selection={session.selection}
 				/>
 			) : null;
@@ -103,6 +101,8 @@ export function EditorNextRouteComposition({
 	const readyPreviewPlayer =
 		session.status === "ready" && previewSource ? (
 			<NativePreviewPlayer
+				closeFileDisabled={!canCloseEditorSession(session)}
+				onCloseFileRequested={stableCommands.requestCloseFile}
 				inspector={readyInspector}
 				activeMediaAssetCleanupScope={activeMediaAssetCleanupScope ?? undefined}
 				asset={session.asset}

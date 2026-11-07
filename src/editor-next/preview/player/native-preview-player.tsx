@@ -32,6 +32,8 @@ const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 export type NativePreviewPlayerProps = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
+	closeFileDisabled?: boolean;
+	onCloseFileRequested?: () => void;
 	inspector?: WorkbenchInspectorPanels;
 	audioMix?: AudioMix;
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
@@ -50,6 +52,8 @@ export type NativePreviewPlayerProps = {
 export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	activeMediaAssetCleanupScope,
 	asset,
+	closeFileDisabled = false,
+	onCloseFileRequested,
 	inspector,
 	audioMix = createDefaultAudioMix(asset),
 	onAudioTrackIncludedChange,
@@ -335,6 +339,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			viewer={
 				<PreviewViewerRegion
 					asset={asset}
+					closeFileDisabled={closeFileDisabled}
+					onCloseFileRequested={onCloseFileRequested}
 					canFullscreen={canFullscreen}
 					fullscreenRef={fullscreenRef}
 					isPlaying={isPlaying}

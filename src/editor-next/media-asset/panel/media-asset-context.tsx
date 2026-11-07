@@ -1,6 +1,5 @@
-import { AudioLines, ChevronRight, Film, X } from "lucide-react";
+import { AudioLines, ChevronRight, Film } from "lucide-react";
 import { type ReactElement, type ReactNode, cloneElement } from "react";
-import { Button } from "@/components/ui/button";
 import type {
 	AudioMediaTrack,
 	FrameTiming,
@@ -27,15 +26,11 @@ type AnalysisFactGroup = {
 
 export type MediaAssetContextPanelProps = {
 	asset: ReadyMediaAsset;
-	closeFileDisabled: boolean;
-	onCloseFileRequested: () => void;
 	selection: Selection;
 };
 
 export function MediaAssetContextPanel({
 	asset,
-	closeFileDisabled,
-	onCloseFileRequested,
 	selection,
 }: MediaAssetContextPanelProps) {
 	const primaryVideoTrack = asset.tracks.video[0];
@@ -53,22 +48,8 @@ export function MediaAssetContextPanel({
 			<div className="min-h-0">
 				<SectionLabel>Source</SectionLabel>
 				<div aria-label="Loaded media asset" className="mb-6 space-y-3">
-					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-						<div className="truncate text-sm font-medium text-foreground">
-							{asset.label}
-						</div>
-						<Button
-							aria-label="Close file"
-							className="size-7 rounded border-workbench-border bg-workbench-viewer text-muted-foreground hover:bg-workbench-hover hover:text-foreground"
-							disabled={closeFileDisabled}
-							onClick={onCloseFileRequested}
-							size="icon"
-							title="Close file"
-							type="button"
-							variant="outline"
-						>
-							<X data-icon="inline-start" />
-						</Button>
+					<div className="truncate text-sm font-medium text-foreground">
+						{asset.label}
 					</div>
 					<div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
 						<CompactMetric label="Size" value={sourceFileSize} />

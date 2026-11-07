@@ -255,9 +255,12 @@ describe("EditorNextRoute cleanup contract", () => {
 			}),
 		});
 
-		openMediaTab();
-		openMediaTab();
-		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+		fireEvent.click(
+			within(screen.getByLabelText("Preview viewer header")).getByRole(
+				"button",
+				{ name: "Close file" },
+			),
+		);
 
 		await waitFor(() => {
 			expect(screen.getByText("Open a video")).toBeTruthy();
@@ -342,8 +345,12 @@ describe("EditorNextRoute cleanup contract", () => {
 			expect(waveformRuns).toHaveLength(1);
 		});
 
-		openMediaTab();
-		fireEvent.click(screen.getByRole("button", { name: "Close file" }));
+		fireEvent.click(
+			within(screen.getByLabelText("Preview viewer header")).getByRole(
+				"button",
+				{ name: "Close file" },
+			),
+		);
 
 		await waitFor(() => {
 			expect(screen.getByLabelText("Local media file")).toBeTruthy();
@@ -563,10 +570,6 @@ function restoreObjectUrl(
 
 function openExportTab() {
 	activateTab(screen.getByRole("tab", { name: "Export" }));
-}
-
-function openMediaTab() {
-	activateTab(screen.getByRole("tab", { name: "Media" }));
 }
 
 function activateTab(tab: HTMLElement) {
