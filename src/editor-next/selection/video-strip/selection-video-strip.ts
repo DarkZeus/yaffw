@@ -1,16 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import type { MediaTimeUs, ReadyMediaAsset } from "@/editor-core/model";
+import type { MediaTimeUs } from "@/editor-core/model";
 import { clamp } from "@/lib/clamp";
-import { errorMessage } from "@/lib/error-message";
 import { runWorkerJob } from "../../media-work/workers/worker-job";
 import type {
 	VideoStripThumbnailFrame,
-	VideoStripThumbnailLoader,
 	VideoStripThumbnailProgress,
 	VideoStripThumbnailRequest,
 	VideoStripThumbnailResult,
-	VideoStripThumbnailState,
-	VideoStripThumbnailViewFrame,
 	VideoStripThumbnailViewport,
 	VideoStripWorkerRequest,
 } from "../types/selection-video-strip.types";
@@ -36,13 +31,6 @@ const VIDEO_STRIP_OVERSCAN_VIEWPORTS = 1;
 const VIDEO_STRIP_TARGET_THUMBNAIL_WIDTH_PX = 128;
 export const MAX_VIDEO_STRIP_WINDOW_THUMBNAIL_COUNT = 72;
 
-export type UseVideoStripThumbnailsOptions = {
-	asset: ReadyMediaAsset;
-	source: Blob;
-	thumbnailWindow: VideoStripThumbnailWindow | null;
-	videoStripThumbnailLoader: VideoStripThumbnailLoader;
-};
-
 export type VideoStripThumbnailWindow = {
 	assetDurationUs: MediaTimeUs;
 	frameStepUs: MediaTimeUs;
@@ -64,262 +52,10 @@ let thumbnailFrameCache = new WeakMap<
 	Map<string, CachedVideoStripThumbnailFrame>
 >();
 
-export function useVideoStripThumbnails({
-	asset,
-	source,
-	thumbnailWindow,
-	videoStripThumbnailLoader,
-}: UseVideoStripThumbnailsOptions): VideoStripThumbnailState {
-	const requestWindowRef = useRef<VideoStripThumbnailWindow | null>(
-		thumbnailWindow,
-	);
-	if (
-		shouldReplaceVideoStripThumbnailRequestWindow(
-			requestWindowRef.current,
-			thumbnailWindow,
-		)
-	) {
-		requestWindowRef.current = thumbnailWindow;
-	}
-	const requestWindow = requestWindowRef.current;
-	const [state, setState] = useState<VideoStripThumbnailState>(() =>
-		asset.tracks.video.length > 0
-			? { frames: [], status: "loading" }
-			: {
-					reason: "The active media asset has no video track.",
-					status: "unavailable",
-				},
-	);
-
-	useEffect(() => {
-		let cancelled = false;
-		const abortController = new AbortController();
-		const objectUrlsByIndex = new Map<number, string>();
-
-		function revokeObjectUrls() {
-			for (const objectUrl of objectUrlsByIndex.values()) {
-				URL.revokeObjectURL(objectUrl);
-			}
-			objectUrlsByIndex.clear();
-		}
-
-		function createViewFrame(
-			frame: VideoStripThumbnailFrame,
-			{ replace = false }: { replace?: boolean } = {},
-		) {
-			const existingUrl = objectUrlsByIndex.get(frame.index);
-			if (existingUrl && !replace) {
-				return {
-					index: frame.index,
-					timestampUs: frame.timestampUs,
-					url: existingUrl,
-				};
-			}
-
-			if (existingUrl) {
-				URL.revokeObjectURL(existingUrl);
-			}
-
-			const url = URL.createObjectURL(frame.imageBlob);
-			objectUrlsByIndex.set(frame.index, url);
-
-			return {
-				index: frame.index,
-				timestampUs: frame.timestampUs,
-				url,
-			};
-		}
-
-		function publishProgress(progress: VideoStripThumbnailProgress) {
-			if (cancelled) {
-				return;
-			}
-
-			try {
-				const viewFrame = createViewFrame(progress.frame, { replace: true });
-				setState((previousState) => {
-					const previousFrames =
-						previousState.status === "loading" ? previousState.frames : [];
-					const nextFrames = upsertVideoStripViewFrame(
-						previousFrames,
-						viewFrame,
-					);
-
-					return {
-						frameStepUs: requestWindow?.frameStepUs,
-						frames: nextFrames,
-						status: "loading",
-						thumbnailCount: progress.thumbnailCount,
-						thumbnailHeightPx: progress.thumbnailHeightPx,
-						thumbnailWidthPx: progress.thumbnailWidthPx,
-						timestampsUs: requestWindow?.timestampsUs,
-					};
-				});
-			} catch (error) {
-				revokeObjectUrls();
-				setState({
-					reason: errorMessage(error),
-					status: "unavailable",
-				});
-			}
-		}
-
-		if (asset.tracks.video.length === 0) {
-			setState({
-				reason: "The active media asset has no video track.",
-				status: "unavailable",
-			});
-
-			return () => {
-				cancelled = true;
-				abortController.abort();
-			};
-		}
-
-		if (!requestWindow || requestWindow.timestampsUs.length === 0) {
-			setState({
-				frames: [],
-				status: "loading",
-				thumbnailCount: 0,
-				thumbnailHeightPx: VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
-				timestampsUs: [],
-			});
-
-			return () => {
-				cancelled = true;
-				abortController.abort();
-				revokeObjectUrls();
-			};
-		}
-
-		setState({
-			frameStepUs: requestWindow.frameStepUs,
-			frames: [],
-			status: "loading",
-			thumbnailCount: requestWindow.timestampsUs.length,
-			thumbnailHeightPx: VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
-			timestampsUs: requestWindow.timestampsUs,
-		});
-
-		void videoStripThumbnailLoader({
-			assetDurationUs: asset.durationUs,
-			devicePixelRatio: browserDevicePixelRatio(),
-			onFrame: publishProgress,
-			signal: abortController.signal,
-			source,
-			thumbnailHeightPx: VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
-			timestampsUs: requestWindow.timestampsUs,
-		})
-			.then((result) => {
-				if (cancelled) {
-					return;
-				}
-
-				if (result.status === "unavailable") {
-					revokeObjectUrls();
-					setState(result);
-					return;
-				}
-
-				try {
-					const finalFrameIndexes = new Set(
-						result.frames.map((frame) => frame.index),
-					);
-					for (const [index, objectUrl] of objectUrlsByIndex) {
-						if (!finalFrameIndexes.has(index)) {
-							URL.revokeObjectURL(objectUrl);
-							objectUrlsByIndex.delete(index);
-						}
-					}
-
-					const frames = result.frames.map((frame) => createViewFrame(frame));
-
-					setState({
-						frameStepUs: requestWindow.frameStepUs,
-						frames,
-						status: "ready",
-						thumbnailHeightPx: result.thumbnailHeightPx,
-						thumbnailWidthPx: result.thumbnailWidthPx,
-						timestampsUs: requestWindow.timestampsUs,
-					});
-				} catch (error) {
-					revokeObjectUrls();
-					setState({
-						reason: errorMessage(error),
-						status: "unavailable",
-					});
-				}
-			})
-			.catch((error: unknown) => {
-				if (cancelled || isAbortError(error)) {
-					return;
-				}
-
-				revokeObjectUrls();
-				setState({
-					reason: errorMessage(error),
-					status: "unavailable",
-				});
-			});
-
-		return () => {
-			cancelled = true;
-			abortController.abort();
-			revokeObjectUrls();
-		};
-	}, [
-		asset.durationUs,
-		asset.tracks.video.length,
-		requestWindow,
-		source,
-		videoStripThumbnailLoader,
-	]);
-
-	return state;
-}
-
-function shouldReplaceVideoStripThumbnailRequestWindow(
-	currentWindow: VideoStripThumbnailWindow | null,
-	nextWindow: VideoStripThumbnailWindow | null,
-) {
-	if (currentWindow === nextWindow) {
-		return false;
-	}
-
-	if (!currentWindow || !nextWindow) {
-		return currentWindow !== nextWindow;
-	}
-
-	if (currentWindow.key === nextWindow.key) {
-		return false;
-	}
-
-	if (currentWindow.assetDurationUs !== nextWindow.assetDurationUs) {
-		return true;
-	}
-
-	const currentFrameStepUs = Math.max(1, currentWindow.frameStepUs);
-	const nextFrameStepUs = Math.max(1, nextWindow.frameStepUs);
-	const frameStepDeltaRatio =
-		Math.abs(currentFrameStepUs - nextFrameStepUs) /
-		Math.max(currentFrameStepUs, nextFrameStepUs);
-
-	if (frameStepDeltaRatio > 0.12) {
-		return true;
-	}
-
-	const coveragePaddingUs = Math.max(currentFrameStepUs, nextFrameStepUs);
-
-	return (
-		nextWindow.visibleStartUs <
-			currentWindow.windowStartUs - coveragePaddingUs ||
-		nextWindow.visibleEndUs > currentWindow.windowEndUs + coveragePaddingUs
-	);
-}
-
 export async function loadBrowserVideoStripThumbnails(
 	request: VideoStripThumbnailRequest,
 ): Promise<VideoStripThumbnailResult> {
+	if (request.signal?.aborted) throw createAbortError();
 	const cachedFrames = readCachedVideoStripThumbnailFrames(request);
 	const requestedFrameCount = request.timestampsUs.length;
 
@@ -330,6 +66,7 @@ export async function loadBrowserVideoStripThumbnails(
 			thumbnailHeightPx: cachedFrame.thumbnailHeightPx,
 			thumbnailWidthPx: cachedFrame.thumbnailWidthPx,
 		});
+		if (request.signal?.aborted) throw createAbortError();
 	}
 
 	if (
@@ -350,6 +87,7 @@ export async function loadBrowserVideoStripThumbnails(
 	const missingRequest = {
 		...request,
 		onFrame: (progress: VideoStripThumbnailProgress) => {
+			if (request.signal?.aborted) return;
 			const remappedFrame = remapMissingVideoStripThumbnailFrame(
 				progress.frame,
 				cachedFrames.missingTimestamps,
@@ -389,6 +127,7 @@ export async function loadBrowserVideoStripThumbnails(
 	if (result?.status !== "ready") {
 		result = await loadVideoStripThumbnailsOnCurrentThread(missingRequest);
 	}
+	if (request.signal?.aborted) throw createAbortError();
 
 	if (result.status !== "ready") {
 		if (
@@ -417,13 +156,11 @@ export async function loadBrowserVideoStripThumbnails(
 			return [];
 		}
 
-		if (!request.signal?.aborted) {
-			writeCachedVideoStripThumbnailFrame(request, {
-				...remappedFrame,
-				thumbnailHeightPx: result.thumbnailHeightPx,
-				thumbnailWidthPx: result.thumbnailWidthPx,
-			});
-		}
+		writeCachedVideoStripThumbnailFrame(request, {
+			...remappedFrame,
+			thumbnailHeightPx: result.thumbnailHeightPx,
+			thumbnailWidthPx: result.thumbnailWidthPx,
+		});
 
 		return [remappedFrame];
 	});
@@ -755,30 +492,10 @@ function createVideoStripWindowTimestamps({
 	return timestampsUs;
 }
 
-function upsertVideoStripViewFrame(
-	frames: VideoStripThumbnailViewFrame[],
-	frame: VideoStripThumbnailViewFrame,
-) {
-	const nextFrames = frames.filter(
-		(existingFrame) => existingFrame.index !== frame.index,
-	);
-	nextFrames.push(frame);
-	nextFrames.sort((a, b) => a.index - b.index);
-	return nextFrames;
-}
-
 function canUseVideoStripWorker() {
 	return typeof Worker !== "undefined";
 }
 
 function normalizeCacheNumber(value: number) {
 	return Number.isFinite(value) ? value : "NaN";
-}
-
-function browserDevicePixelRatio() {
-	if (typeof window === "undefined") {
-		return 1;
-	}
-
-	return window.devicePixelRatio || 1;
 }

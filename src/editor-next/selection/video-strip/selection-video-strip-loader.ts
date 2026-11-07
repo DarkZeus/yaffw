@@ -35,8 +35,16 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 			handleUnhandledError: sourceFailure.handleUnhandledError,
 		}),
 	});
+	let disposed = false;
+	function disposeInput() {
+		if (disposed) return;
+		disposed = true;
+		input.dispose();
+	}
+	signal?.addEventListener("abort", disposeInput, { once: true });
 
 	try {
+		throwIfAborted(signal);
 		return await sourceFailure.run(
 			loadThumbnails(input, {
 				assetDurationUs,
@@ -57,7 +65,8 @@ export async function loadVideoStripThumbnailsOnCurrentThread({
 			status: "unavailable",
 		};
 	} finally {
-		input.dispose();
+		signal?.removeEventListener("abort", disposeInput);
+		disposeInput();
 	}
 }
 
@@ -169,8 +178,10 @@ async function loadThumbnails(
 			throwIfAborted(signal);
 
 			if (wrappedCanvas) {
+				const imageBlob = await canvasToThumbnailBlob(wrappedCanvas.canvas);
+				throwIfAborted(signal);
 				const frame = {
-					imageBlob: await canvasToThumbnailBlob(wrappedCanvas.canvas),
+					imageBlob,
 					index,
 					timestampUs: secondsToMicroseconds(
 						timestamps[index] ?? wrappedCanvas.timestamp,

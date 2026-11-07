@@ -4,9 +4,11 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { SelectionTimeline } from "../../selection/timeline/selection-timeline";
 
 export type PreviewSelectionWaveformRegionProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	audioMix: AudioMix;
 	audioPreviewPreparingTrackIds: ReadonlySet<string>;
@@ -26,6 +28,7 @@ export type PreviewSelectionWaveformRegionProps = {
 };
 
 export function PreviewSelectionWaveformRegion({
+	activeMediaAssetCleanupScope,
 	asset,
 	audioMix,
 	audioPreviewPreparingTrackIds,
@@ -49,6 +52,7 @@ export function PreviewSelectionWaveformRegion({
 			className="h-full min-h-0 overflow-auto"
 		>
 			<SelectionTimeline
+				activeMediaAssetCleanupScope={activeMediaAssetCleanupScope}
 				audioMix={audioMix}
 				audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 				asset={asset}

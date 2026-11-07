@@ -385,6 +385,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			}
 			selection={
 				<PreviewSelectionWaveformRegion
+					activeMediaAssetCleanupScope={activeMediaAssetCleanupScope}
 					audioMix={audioMix}
 					audioPreviewPreparingTrackIds={audioPreviewPreparingTrackIds}
 					asset={asset}

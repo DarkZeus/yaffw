@@ -510,6 +510,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - Clicking a **Waveform lane** seeks the shared **Playhead** to that media time.
 - Dragging empty **Waveform lane** space does not create or replace **Selection**; selection changes use the existing selection affordance edges/body or keyboard commands.
 - The first slice includes minimal **Timeline zoom** with horizontal scrolling while keeping waveform lanes, selection, and playhead aligned.
+- The video strip publishes partial and final thumbnails for its current viewport request. Replacing the request or closing the asset cancels its work and releases its image URLs. Decoded image Blobs may be reused from the source cache.
 - An **Export job** consumes one **Media asset** and the session's **Editing decisions**.
 - An **Export job** runs from a snapshot of the **Media asset** and **Editing decisions** captured when the job starts.
 - A running **Export job** reports minimal **Export progress** such as preparing, processing, muxing, or finalizing. Conversion progress uses neutral Processing wording because it does not establish whether video is copied or transcoded, and the **Generated audio mix** is encoded independently.

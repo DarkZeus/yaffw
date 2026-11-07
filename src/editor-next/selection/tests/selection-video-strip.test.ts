@@ -1,17 +1,24 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReadyMediaAsset } from "@/editor-core/model";
-import type { VideoStripThumbnailLoader } from "../types/selection-video-strip.types";
+import {
+	type ActiveMediaAssetCleanupScope,
+	createActiveMediaAssetCleanupScopeController,
+} from "../../media-work/scopes/active-media-asset-cleanup-scope";
+import type {
+	VideoStripThumbnailLoader,
+	VideoStripThumbnailResult,
+} from "../types/selection-video-strip.types";
 import {
 	type VideoStripThumbnailWindow,
 	clearVideoStripThumbnailCache,
 	createVideoStripThumbnailWindow,
 	loadBrowserVideoStripThumbnails,
-	useVideoStripThumbnails,
 } from "../video-strip/selection-video-strip";
+import { useVideoStripThumbnails } from "../video-strip/use-video-strip-thumbnails";
 
 const mediabunnyMock = vi.hoisted(() => ({
 	canvases: [] as Array<{
@@ -78,17 +85,20 @@ afterEach(() => {
 });
 
 function VideoStripThumbnailProbe({
+	activeMediaAssetCleanupScope,
 	asset,
 	source,
 	thumbnailWindow,
 	videoStripThumbnailLoader,
 }: {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	source: Blob;
 	thumbnailWindow: VideoStripThumbnailWindow | null;
 	videoStripThumbnailLoader: VideoStripThumbnailLoader;
 }) {
 	const state = useVideoStripThumbnails({
+		activeMediaAssetCleanupScope,
 		asset,
 		source,
 		thumbnailWindow,
@@ -231,6 +241,105 @@ describe("video strip thumbnail generation", () => {
 		expect(screenText("video strip status")).toBe("ready:3");
 	});
 
+	it("retires viewport requests, replaces changed final frames, and ignores late progress", async () => {
+		mockThumbnailObjectUrls();
+		const scope =
+			createActiveMediaAssetCleanupScopeController().replaceCurrentScope(
+				readyAsset.id,
+			);
+		const first = deferredThumbnails();
+		const second = deferredThumbnails();
+		const loader = vi
+			.fn<VideoStripThumbnailLoader>()
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise);
+		const source = new Blob(["video"]);
+		const requestWindow = (trackWidthPx: number) =>
+			createVideoStripThumbnailWindow({
+				assetDurationUs: readyAsset.durationUs,
+				viewport: { scrollLeftPx: 0, trackWidthPx, viewportWidthPx: 640 },
+			});
+		const initialWindow = requestWindow(640);
+		const zoomedWindow = requestWindow(3_840);
+		const probe = (thumbnailWindow: VideoStripThumbnailWindow | null) =>
+			createElement(VideoStripThumbnailProbe, {
+				asset: readyAsset,
+				source,
+				thumbnailWindow,
+				videoStripThumbnailLoader: loader,
+				activeMediaAssetCleanupScope: scope,
+			});
+		const view = render(probe(initialWindow));
+		await waitFor(() => expect(loader).toHaveBeenCalledTimes(1));
+		const original = loader.mock.calls[0][0];
+		const firstFrame = {
+			index: 0,
+			timestampUs: original.timestampsUs[0],
+			imageBlob: new Blob(["old partial"]),
+		};
+		act(() =>
+			original.onFrame?.({
+				frame: firstFrame,
+				...frameDimensions,
+				thumbnailCount: original.timestampsUs.length,
+			}),
+		);
+		expect(screenText("video strip status")).toBe("loading:1");
+
+		view.rerender(probe(zoomedWindow));
+		await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+		expect(original.signal?.aborted).toBe(true);
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:thumbnail-1");
+		expect(screenText("video strip status")).toBe("loading:0");
+
+		const active = loader.mock.calls[1][0];
+		const partial = {
+			index: 0,
+			timestampUs: active.timestampsUs[0],
+			imageBlob: new Blob(["active partial"]),
+		};
+		const final = { ...partial, imageBlob: new Blob(["active final"]) };
+		act(() =>
+			active.onFrame?.({
+				frame: partial,
+				...frameDimensions,
+				thumbnailCount: active.timestampsUs.length,
+			}),
+		);
+		expect(screenText("video strip status")).toBe("loading:1");
+		await act(async () => {
+			original.onFrame?.({
+				frame: firstFrame,
+				...frameDimensions,
+				thumbnailCount: original.timestampsUs.length,
+			});
+			first.resolve({
+				frames: [firstFrame],
+				...frameDimensions,
+				status: "ready",
+			});
+			second.resolve({ frames: [final], ...frameDimensions, status: "ready" });
+		});
+		expect(screenText("video strip status")).toBe("ready:1");
+		expect(URL.createObjectURL).toHaveBeenLastCalledWith(final.imageBlob);
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:thumbnail-2");
+		act(() =>
+			active.onFrame?.({
+				frame: partial,
+				...frameDimensions,
+				thumbnailCount: active.timestampsUs.length,
+			}),
+		);
+		expect(screenText("video strip status")).toBe("ready:1");
+		expect(URL.createObjectURL).toHaveBeenCalledTimes(3);
+
+		scope.dispose();
+		expect(active.signal?.aborted).toBe(true);
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:thumbnail-3");
+		view.unmount();
+		expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
+	});
+
 	it("caches decoded thumbnail frames for the same source and dimensions", async () => {
 		vi.stubGlobal("Worker", undefined);
 		const source = new Blob(["video"], { type: "video/mp4" });
@@ -248,9 +357,11 @@ describe("video strip thumbnail generation", () => {
 			thumbnailHeightPx: 54,
 			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
 		});
+		const onFrame = vi.fn();
 		const secondResult = await loadBrowserVideoStripThumbnails({
 			assetDurationUs: 8_000_000,
 			devicePixelRatio: 2,
+			onFrame,
 			source,
 			thumbnailHeightPx: 54,
 			timestampsUs: [1_000_000, 2_750_000, 4_500_000, 6_250_000],
@@ -265,6 +376,35 @@ describe("video strip thumbnail generation", () => {
 			1_000_000, 2_750_000, 4_500_000, 6_250_000,
 		]);
 		expect(mediabunnyMock.inputInstances).toHaveLength(1);
+		expect(onFrame).toHaveBeenCalledTimes(4);
+	});
+
+	it("disposes main-thread decoding as soon as its viewport request aborts", async () => {
+		vi.stubGlobal("Worker", undefined);
+		const controller = new AbortController();
+		let finishImage: BlobCallback | undefined;
+		const frame = createWrappedCanvas(1);
+		mediabunnyMock.canvases = [frame];
+		vi.mocked(frame.canvas.toBlob).mockImplementation((callback) => {
+			finishImage = callback;
+		});
+		const onFrame = vi.fn();
+		const result = loadBrowserVideoStripThumbnails({
+			assetDurationUs: 8_000_000,
+			devicePixelRatio: 1,
+			onFrame,
+			signal: controller.signal,
+			source: new Blob(["video"]),
+			thumbnailHeightPx: 54,
+			timestampsUs: [1_000_000],
+		});
+		await waitFor(() => expect(finishImage).toBeTypeOf("function"));
+		controller.abort();
+		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledTimes(1);
+		finishImage?.(new Blob(["late image"]));
+		await expect(result).rejects.toMatchObject({ name: "AbortError" });
+		expect(onFrame).not.toHaveBeenCalled();
+		expect(mediabunnyMock.inputInstances[0]?.dispose).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -297,4 +437,14 @@ function createWrappedCanvas(timestamp: number) {
 		duration: 0.5,
 		timestamp,
 	};
+}
+
+const frameDimensions = { thumbnailHeightPx: 54, thumbnailWidthPx: 96 };
+
+function deferredThumbnails() {
+	let resolve: (result: VideoStripThumbnailResult) => void = () => {};
+	const promise = new Promise<VideoStripThumbnailResult>((onResolve) => {
+		resolve = onResolve;
+	});
+	return { promise, resolve };
 }

@@ -38,6 +38,7 @@ import {
 } from "@/lib/browser-animation-frame";
 import { clamp } from "@/lib/clamp";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type {
 	VideoStripThumbnailLoader,
 	VideoStripThumbnailState,
@@ -51,8 +52,8 @@ import {
 	VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
 	createVideoStripThumbnailWindow,
 	loadBrowserVideoStripThumbnails,
-	useVideoStripThumbnails,
 } from "../video-strip/selection-video-strip";
+import { useVideoStripThumbnails } from "../video-strip/use-video-strip-thumbnails";
 import { WaveformLane } from "../waveform/selection-waveform-lane";
 import {
 	loadBrowserWaveformLane,
@@ -82,6 +83,7 @@ const VIDEO_STRIP_PLACEHOLDER_KEYS = Array.from(
 const TIMELINE_LANE_HEADER_WIDTH_PX = 168;
 
 export type SelectionTimelineProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	asset: ReadyMediaAsset;
 	audioMix?: AudioMix;
 	audioPreviewPreparingTrackIds?: ReadonlySet<string>;
@@ -123,6 +125,7 @@ export type DragState =
 	  };
 
 export function SelectionTimeline({
+	activeMediaAssetCleanupScope,
 	asset,
 	audioMix = createDefaultAudioMix(asset),
 	audioPreviewPreparingTrackIds = EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS,
@@ -178,6 +181,7 @@ export function SelectionTimeline({
 		waveformLaneLoader,
 	});
 	const videoStripState = useVideoStripThumbnails({
+		activeMediaAssetCleanupScope,
 		asset,
 		source,
 		thumbnailWindow: videoStripThumbnailWindow,
@@ -1019,7 +1023,7 @@ function useTimelineViewport({
 		null,
 	);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const scrollContainerElement = scrollContainerRef.current;
 		const trackElement = trackRef.current;
 
