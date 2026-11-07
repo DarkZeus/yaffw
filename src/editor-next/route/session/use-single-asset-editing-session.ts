@@ -27,17 +27,15 @@ import {
 import { errorMessage } from "@/lib/error-message";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../../export/adapters/mediabunny-output-support";
 import {
-	type GeneratedMediaArtifactStore,
-	createGeneratedMediaArtifactStore,
-} from "../../export/generated-media/generated-media-artifact-store";
-import { deliverBrowserGeneratedMedia } from "../../export/generated-media/generated-media-delivery";
+	type GeneratedMediaArtifact,
+	deliverBrowserGeneratedMedia,
+} from "../../export/generated-media/generated-media-delivery";
 import { createGeneratedMediaMetadata } from "../../export/generated-media/generated-media-metadata";
 import {
 	browserDefaultExportRunner,
 	isDefaultExportCancelledError,
 } from "../../export/runners/default-export-runner";
 import type { DefaultExportRunner } from "../../export/types/default-export-runner.types";
-import type { GeneratedMediaDeliveryRequest } from "../../export/types/generated-media-delivery.types";
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import {
 	type ActiveMediaAssetCleanupScope,
@@ -50,7 +48,7 @@ const closeFileConfirmationMessage =
 export type SingleAssetEditingSessionCommands = {
 	applyOutputSettings: (outputSettings: OutputSettings) => boolean;
 	cancelDefaultExport: () => void;
-	downloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	downloadGeneratedMedia: (generatedMedia: GeneratedMedia) => boolean;
 	importLocalFile: (file: File) => Promise<void>;
 	moveSelectionRange: (deltaUs: number) => void;
 	requestCloseFile: () => void;
@@ -82,7 +80,7 @@ export type UseSingleAssetEditingSessionOptions = {
 	createExportJobId?: () => string;
 	createGeneratedMediaId?: () => string;
 	defaultExportRunner?: DefaultExportRunner;
-	deliverGeneratedMedia?: (request: GeneratedMediaDeliveryRequest) => void;
+	deliverGeneratedMedia?: (artifact: GeneratedMediaArtifact) => boolean;
 	inspectLocalAsset?: LocalMediaAssetInspector;
 	now?: () => number;
 	runtime: RuntimeSupport;
@@ -110,8 +108,7 @@ export function useSingleAssetEditingSession({
 		null,
 	);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
-	const generatedMediaArtifactStoreRef =
-		useRef<GeneratedMediaArtifactStore | null>(null);
+	const generatedMediaArtifactRef = useRef<GeneratedMediaArtifact | null>(null);
 	const [activeMediaAssetCleanupScope, setActiveMediaAssetCleanupScope] =
 		useState<ActiveMediaAssetCleanupScope | null>(null);
 	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
@@ -141,20 +138,27 @@ export function useSingleAssetEditingSession({
 			activeExportAbortControllerRef.current?.abort();
 			activeExportAbortControllerRef.current = null;
 			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
-			generatedMediaArtifactStoreRef.current?.clear();
+			generatedMediaArtifactRef.current = null;
 		};
 	}, []);
 
-	function dispatch(action: EditorSessionAction) {
-		const nextSession = editorSessionReducer(sessionRef.current, action);
-		sessionRef.current = nextSession;
-		generatedMediaArtifactStoreRef.current?.reconcile(
-			nextSession.status === "ready" &&
-				nextSession.export.status === "succeeded"
-				? nextSession.export.generatedMedia.id
-				: null,
-		);
-		setSession(nextSession);
+	function dispatch(
+		action: EditorSessionAction,
+		artifact = generatedMediaArtifactRef.current,
+	) {
+		const current = sessionRef.current;
+		const next = editorSessionReducer(current, action);
+		if (next === current) return;
+
+		// Publish and retire the Blob with the exact result the reducer accepted.
+		generatedMediaArtifactRef.current =
+			next.status === "ready" &&
+			next.export.status === "succeeded" &&
+			artifact?.generatedMedia === next.export.generatedMedia
+				? artifact
+				: null;
+		sessionRef.current = next;
+		setSession(next);
 	}
 
 	function clearSessionLocalResources() {
@@ -163,7 +167,6 @@ export function useSingleAssetEditingSession({
 		activeExportAbortControllerRef.current = null;
 		getActiveMediaAssetCleanupController().disposeCurrentScope();
 		setActiveMediaAssetCleanupScope(null);
-		getGeneratedMediaArtifactStore().clear();
 		setPreviewSource(null);
 	}
 
@@ -230,31 +233,36 @@ export function useSingleAssetEditingSession({
 	}
 
 	async function startDefaultExport(): Promise<void> {
-		if (session.status !== "ready" || !previewSource) {
+		const current = sessionRef.current;
+		if (
+			current.status !== "ready" ||
+			current.export.status === "running" ||
+			session.status !== "ready" ||
+			current.asset !== session.asset ||
+			!previewSource
+		)
 			return;
-		}
 
 		const review = planDefaultExportCapability({
-			asset: session.asset,
+			asset: current.asset,
 			output: resolveOutputPlan({
-				asset: session.asset,
-				audioMix: session.audioMix,
-				outputSettings: session.outputSettings,
+				asset: current.asset,
+				audioMix: current.audioMix,
+				outputSettings: current.outputSettings,
 				support: MEDIABUNNY_OUTPUT_SUPPORT,
 			}),
-			outputSettings: session.outputSettings,
-			runtime: session.runtime,
-			selection: session.selection,
+			outputSettings: current.outputSettings,
+			runtime: current.runtime,
+			selection: current.selection,
 		});
 
-		if (!review.supported || session.export.status === "running") {
+		if (!review.supported) {
 			return;
 		}
 
 		const jobId = createExportJobId();
 		const abortController = new AbortController();
 		activeExportAbortControllerRef.current = abortController;
-		getGeneratedMediaArtifactStore().clear();
 
 		dispatch({
 			cancelSupported: defaultExportRunner.cancelSupported,
@@ -265,7 +273,7 @@ export function useSingleAssetEditingSession({
 
 		try {
 			const result = await defaultExportRunner.run({
-				audioMix: session.audioMix,
+				audioMix: current.audioMix,
 				onProgress: (progress) => {
 					dispatch({
 						jobId,
@@ -274,11 +282,12 @@ export function useSingleAssetEditingSession({
 					});
 				},
 				resolvedOutput: review.resolvedOutput,
-				selection: session.selection,
+				selection: current.selection,
 				signal: abortController.signal,
 				source: previewSource,
 			});
 
+			if (activeExportAbortControllerRef.current !== abortController) return;
 			if (abortController.signal.aborted) {
 				dispatch({
 					jobId,
@@ -288,26 +297,22 @@ export function useSingleAssetEditingSession({
 			}
 
 			const generatedMedia = createGeneratedMediaMetadata({
-				asset: session.asset,
+				asset: current.asset,
 				blob: result.blob,
 				fileName: result.fileName,
 				generatedMediaId: createGeneratedMediaId?.(),
 				now,
-				outputSettings: session.outputSettings,
+				outputSettings: current.outputSettings,
 				resolvedOutput: review.resolvedOutput,
-				selection: session.selection,
+				selection: current.selection,
 			});
 
-			getGeneratedMediaArtifactStore().retain({
-				blob: result.blob,
-				generatedMedia,
-			});
-			dispatch({
-				generatedMedia,
-				jobId,
-				type: "export.succeeded",
-			});
+			dispatch(
+				{ generatedMedia, jobId, type: "export.succeeded" },
+				{ blob: result.blob, generatedMedia },
+			);
 		} catch (error) {
+			if (activeExportAbortControllerRef.current !== abortController) return;
 			if (
 				abortController.signal.aborted ||
 				isDefaultExportCancelledError(error)
@@ -345,23 +350,26 @@ export function useSingleAssetEditingSession({
 	}
 
 	function downloadGeneratedMedia(generatedMedia: GeneratedMedia) {
-		const delivered = getGeneratedMediaArtifactStore().deliver({
-			deliver: deliverGeneratedMedia,
-			generatedMedia,
-		});
+		const artifact = generatedMediaArtifactRef.current;
+		if (artifact?.generatedMedia !== generatedMedia) return false;
 
-		if (!delivered) {
-			return;
+		try {
+			if (!deliverGeneratedMedia(artifact)) return false;
+		} catch {
+			return false;
 		}
 
-		dispatch({
-			generatedMediaId: generatedMedia.id,
-			type: "generated-media.delivered",
-		});
+		if (generatedMediaArtifactRef.current === artifact) {
+			dispatch({
+				generatedMediaId: generatedMedia.id,
+				type: "generated-media.delivered",
+			});
+		}
+		return true;
 	}
 
 	function requestCloseFile() {
-		if (!canCloseEditorSession(session)) {
+		if (!canCloseEditorSession(sessionRef.current)) {
 			return;
 		}
 
@@ -371,11 +379,10 @@ export function useSingleAssetEditingSession({
 			return;
 		}
 
+		if (!canCloseEditorSession(sessionRef.current)) return;
+		dispatch({ type: "session.closed" });
 		clearSessionLocalResources();
 		setLocalFileInputKey((currentKey) => currentKey + 1);
-		dispatch({
-			type: "session.closed",
-		});
 	}
 
 	function getActiveMediaAssetCleanupController() {
@@ -469,15 +476,6 @@ export function useSingleAssetEditingSession({
 			dispatch({ outputSettings, type: "output-settings.applied" });
 		}
 		return true;
-	}
-
-	function getGeneratedMediaArtifactStore() {
-		if (!generatedMediaArtifactStoreRef.current) {
-			generatedMediaArtifactStoreRef.current =
-				createGeneratedMediaArtifactStore();
-		}
-
-		return generatedMediaArtifactStoreRef.current;
 	}
 
 	return {

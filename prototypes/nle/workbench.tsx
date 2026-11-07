@@ -192,7 +192,7 @@ function ExistingShell({ editor }: { editor: Editor }) {
 											audioMix={mix}
 											exportState={{ status: "reviewing" }}
 											onCancelExport={noop}
-											onDownloadGeneratedMedia={noop}
+											onDownloadGeneratedMedia={() => false}
 											onApplyOutputSettings={(settings) => {
 												setOutputSettings(settings);
 												return true;

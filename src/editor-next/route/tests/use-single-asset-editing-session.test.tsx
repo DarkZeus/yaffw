@@ -191,7 +191,7 @@ describe("useSingleAssetEditingSession", () => {
 	});
 
 	it("keeps rejected decisions deliverable and invalidates accepted changes before React renders", async () => {
-		const deliverGeneratedMedia = vi.fn();
+		const deliverGeneratedMedia = vi.fn(() => true);
 		const sessionRef: { current: SingleAssetEditingSession | null } = {
 			current: null,
 		};
@@ -234,7 +234,7 @@ describe("useSingleAssetEditingSession", () => {
 
 	it("invalidates retained Generated media blobs when changed Output settings are applied", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
-		const deliverGeneratedMedia = vi.fn();
+		const deliverGeneratedMedia = vi.fn(() => true);
 		const sessionRef: { current: SingleAssetEditingSession | null } = {
 			current: null,
 		};
@@ -306,6 +306,86 @@ describe("useSingleAssetEditingSession", () => {
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
 	});
+
+	it("releases a replaced artifact and only delivers the current result after an acknowledged handoff", async () => {
+		const firstBlob = new Blob(["first"]);
+		const secondBlob = new Blob(["second"]);
+		const replacement = createDeferred<{ blob: Blob }>();
+		const run = vi
+			.fn()
+			.mockResolvedValueOnce({ blob: firstBlob })
+			.mockReturnValueOnce(replacement.promise);
+		const deliverGeneratedMedia = vi
+			.fn()
+			.mockReturnValueOnce(false)
+			.mockReturnValue(true);
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		render(
+			<SingleAssetEditingSessionProbe
+				defaultExportRunner={{ cancelSupported: true, run }}
+				deliverGeneratedMedia={deliverGeneratedMedia}
+				sessionRef={sessionRef}
+			/>,
+		);
+		await act(async () => {
+			await sessionRef.current?.commands.importLocalFile(
+				new File(["video"], "clip.mp4", { type: "video/mp4" }),
+			);
+		});
+		await act(async () => {
+			await sessionRef.current?.commands.startDefaultExport();
+		});
+		const first = readGeneratedMedia(sessionRef.current);
+		act(() => {
+			expect(sessionRef.current?.commands.downloadGeneratedMedia(first)).toBe(
+				false,
+			);
+		});
+		expect(sessionRef.current?.session).toMatchObject({
+			export: { status: "succeeded", delivered: false },
+		});
+		act(() => {
+			expect(sessionRef.current?.commands.downloadGeneratedMedia(first)).toBe(
+				true,
+			);
+		});
+		expect(sessionRef.current?.session).toMatchObject({
+			export: { status: "succeeded", delivered: true },
+		});
+
+		await act(async () => {
+			const commands = sessionRef.current?.commands;
+			const pending = commands?.startDefaultExport();
+			await commands?.startDefaultExport();
+			commands?.downloadGeneratedMedia(first);
+			expect(run).toHaveBeenCalledTimes(2);
+			expect(deliverGeneratedMedia).toHaveBeenCalledTimes(2);
+			replacement.resolve({ blob: secondBlob });
+			await pending;
+		});
+		const second = readGeneratedMedia(sessionRef.current);
+		expect(second.id).toBe(first.id);
+		act(() => {
+			expect(sessionRef.current?.commands.downloadGeneratedMedia(first)).toBe(
+				false,
+			);
+		});
+		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(2);
+		act(() => {
+			expect(sessionRef.current?.commands.downloadGeneratedMedia(second)).toBe(
+				true,
+			);
+		});
+		expect(deliverGeneratedMedia).toHaveBeenLastCalledWith({
+			blob: secondBlob,
+			generatedMedia: second,
+		});
+		expect(sessionRef.current?.session).toMatchObject({
+			export: { status: "succeeded", delivered: true },
+		});
+	});
 });
 
 function SingleAssetEditingSessionProbe({
@@ -315,7 +395,7 @@ function SingleAssetEditingSessionProbe({
 	createExportJobId = () => "export-1",
 	createGeneratedMediaId = () => "generated-1",
 	defaultExportRunner,
-	deliverGeneratedMedia = () => {},
+	deliverGeneratedMedia = () => true,
 	generatedBlob,
 	inspectLocalAsset = async () => supportedInspection,
 	sessionRef,

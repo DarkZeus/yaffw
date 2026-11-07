@@ -1,4 +1,5 @@
 import { BadgeCheck, Check, Download, Square } from "lucide-react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,7 @@ export type ExportInspectorPanelProps = {
 	audioMix: AudioMix;
 	exportState: ExportSessionState;
 	onCancelExport: () => void;
-	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => boolean;
 	onApplyOutputSettings: (outputSettings: OutputSettings) => boolean;
 	onStartExport: () => void;
 	outputSettings: OutputSettings;
@@ -244,7 +245,7 @@ function ExportJobSection({
 }: {
 	exportState: ExportSessionState;
 	onCancelExport: () => void;
-	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => boolean;
 	onStartExport: () => void;
 	reviewSupported: boolean;
 }) {
@@ -356,8 +357,10 @@ function GeneratedMediaStatus({
 	onDownloadGeneratedMedia,
 }: {
 	exportState: Extract<ExportSessionState, { status: "succeeded" }>;
-	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
+	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => boolean;
 }) {
+	const [failedResult, setFailedResult] = useState<GeneratedMedia | null>(null);
+	const { generatedMedia } = exportState;
 	const outputSummary = formatGeneratedMediaOutput(
 		exportState.generatedMedia.resolvedOutput,
 	);
@@ -379,13 +382,22 @@ function GeneratedMediaStatus({
 			</div>
 			<Button
 				className="h-10 w-full"
-				onClick={() => onDownloadGeneratedMedia(exportState.generatedMedia)}
+				onClick={() =>
+					setFailedResult(
+						onDownloadGeneratedMedia(generatedMedia) ? null : generatedMedia,
+					)
+				}
 				size="sm"
 				type="button"
 			>
 				<Download data-icon="inline-start" />
 				Download export
 			</Button>
+			{failedResult === generatedMedia ? (
+				<p className="text-xs text-destructive" role="alert">
+					Could not start the download. Try again.
+				</p>
+			) : null}
 			<p
 				aria-label="Generated media filename"
 				className="block max-w-full min-w-0 rounded-md bg-muted/45 px-2 py-1.5 text-xs leading-5 [overflow-wrap:anywhere] whitespace-normal text-muted-foreground tabular-nums"

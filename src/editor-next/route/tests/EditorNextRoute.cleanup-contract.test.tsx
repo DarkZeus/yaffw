@@ -191,7 +191,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		const generatedBlob = new Blob(["generated media"], {
 			type: "video/mp4",
 		});
-		const deliverGeneratedMedia = vi.fn();
+		const deliverGeneratedMedia = vi.fn(() => true).mockReturnValueOnce(false);
 		vi.spyOn(window, "confirm").mockReturnValue(true);
 
 		render(
@@ -239,12 +239,16 @@ describe("EditorNextRoute cleanup contract", () => {
 			expect(screen.getByText("Export complete")).toBeTruthy();
 		});
 
-		fireEvent.click(
-			within(screen.getByLabelText("Generated media status")).getByRole(
-				"button",
-				{ name: "Download export" },
-			),
+		const result = within(screen.getByLabelText("Generated media status"));
+		const download = result.getByRole("button", { name: "Download export" });
+		fireEvent.click(download);
+		expect(result.getByRole("alert").textContent).toContain(
+			"Could not start the download",
 		);
+		expect(result.getByText("Ready to download")).toBeTruthy();
+		fireEvent.click(download);
+		expect(result.queryByRole("alert")).toBeNull();
+		expect(result.getByText("Delivered")).toBeTruthy();
 
 		expect(deliverGeneratedMedia).toHaveBeenCalledWith({
 			blob: generatedBlob,
@@ -280,7 +284,7 @@ describe("EditorNextRoute cleanup contract", () => {
 		expect(
 			screen.queryByRole("button", { name: "Download export" }),
 		).toBeNull();
-		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
+		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(2);
 	}, 10_000);
 
 	it("keeps the next Media asset current when stale preview async work resolves after Close file and re-import", async () => {
@@ -429,7 +433,7 @@ describe("EditorNextRoute cleanup contract", () => {
 
 	it("removes Generated media delivery after an editing decision invalidates the export result", async () => {
 		const generatedBlob = new Blob(["generated media"], { type: "video/mp4" });
-		const deliverGeneratedMedia = vi.fn();
+		const deliverGeneratedMedia = vi.fn(() => true);
 
 		render(
 			<EditorNextRouteTestHarness
