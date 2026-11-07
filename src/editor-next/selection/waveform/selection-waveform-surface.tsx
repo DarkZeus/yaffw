@@ -9,6 +9,10 @@ import {
 } from "@/lib/browser-animation-frame";
 import { clamp } from "@/lib/clamp";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
+import {
+	mediaTimeToPercent,
+	selectionBoundaryTrackStyle,
+} from "../timeline/selection-timeline-geometry";
 import type { WaveformSamples } from "../types/selection-waveform-lanes.types";
 import type {
 	WaveformRegionSelectionChange,
@@ -73,9 +77,13 @@ export function WaveformSurface({
 	return (
 		<div
 			aria-label={`${label} waveform detail`}
-			className="selection-waveform-surface absolute inset-x-0 top-1 bottom-1 h-[calc(100%-0.5rem)] w-full"
+			className="selection-boundary-track selection-waveform-surface absolute inset-x-0 top-1 bottom-1 h-[calc(100%-0.5rem)] w-full"
 			data-renderer={rendererStatus}
 			data-sample-count={samples.length}
+			style={selectionBoundaryTrackStyle(
+				mediaTimeToPercent(selection.startUs, durationUs),
+				mediaTimeToPercent(selection.endUs, durationUs),
+			)}
 		>
 			<div
 				aria-hidden="true"

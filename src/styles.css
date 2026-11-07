@@ -95,10 +95,6 @@ code {
 	--workbench-destructive: var(--destructive);
 	--workbench-waveform: var(--chart-2);
 	--workbench-waveform-guide: var(--muted-foreground);
-	--shadow-workbench-selection-start: 4px 0 8px
-		color-mix(in oklch, var(--workbench-selected) 55%, transparent);
-	--shadow-workbench-selection-end: -4px 0 8px
-		color-mix(in oklch, var(--workbench-selected) 55%, transparent);
 }
 
 .dark {
@@ -194,12 +190,6 @@ code {
 	--sidebar-border: var(--workbench-border);
 	--sidebar-ring: var(--workbench-focus);
 }
-.workbench,
-.quality-settings-dialog {
-	--shadow-workbench-selection-start: none;
-	--shadow-workbench-selection-end: none;
-}
-
 @theme inline {
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
@@ -287,21 +277,104 @@ code {
 		) !important;
 	}
 
-	.selection-waveform-surface ::part(region-handle-left),
+	.selection-boundary-track {
+		container-type: inline-size;
+	}
+
+	.selection-waveform-surface {
+		overflow: clip;
+	}
+
+	/* Resize grips take precedence where a selection boundary meets the playhead. */
+	.selection-waveform-surface ::part(wrapper),
+	.selection-waveform-surface ::part(regions-container) {
+		z-index: auto !important;
+	}
+
+	.selection-waveform-surface ::part(region-handle) {
+		z-index: 31 !important;
+	}
+
+	.selection-boundary-start,
+	.selection-waveform-surface ::part(region-handle-left) {
+		--boundary-position: var(--selection-start-position);
+	}
+
+	.selection-boundary-end,
 	.selection-waveform-surface ::part(region-handle-right) {
-		width: 10px !important;
-		background-color: transparent;
+		--boundary-position: var(--selection-end-position);
+	}
+
+	/* Trim the grab area at the media bounds, then fit the grip inside it.
+	   The thin rail still marks the boundary itself. */
+	.selection-boundary-handle,
+	.selection-waveform-surface ::part(region-handle) {
+		--handle-before: min(12px, var(--boundary-position));
+		--handle-after: min(12px, calc(100cqw - var(--boundary-position)));
+		width: calc(var(--handle-before) + var(--handle-after)) !important;
+		border: 0 !important;
+		touch-action: none;
+	}
+
+	.selection-boundary-handle {
+		left: calc(var(--boundary-position) - var(--handle-before));
 	}
 
 	.selection-waveform-surface ::part(region-handle-left) {
-		border-left: 2px solid var(--workbench-selected) !important;
-		border-radius: 0;
-		box-shadow: var(--shadow-workbench-selection-start);
+		left: calc(-1 * var(--handle-before)) !important;
 	}
 
 	.selection-waveform-surface ::part(region-handle-right) {
-		border-right: 2px solid var(--workbench-selected) !important;
-		border-radius: 0;
-		box-shadow: var(--shadow-workbench-selection-end);
+		right: calc(-1 * var(--handle-after)) !important;
+	}
+
+	.selection-boundary-handle::before,
+	.selection-waveform-surface ::part(region-handle)::before {
+		content: "";
+		position: absolute;
+		inset-block: 0;
+		left: clamp(0px, calc(var(--handle-before) - 1px), calc(100% - 2px));
+		width: 2px;
+		background: var(--workbench-selected);
+		pointer-events: none;
+	}
+
+	.selection-boundary-handle::after,
+	.selection-waveform-surface ::part(region-handle)::after {
+		content: "";
+		position: absolute;
+		left: clamp(1px, calc(var(--handle-before) - 4px), calc(100% - 9px));
+		top: 50%;
+		translate: 0 -50%;
+		width: 8px;
+		max-height: 100%;
+		height: 28px;
+		border-radius: 4px;
+		background:
+			linear-gradient(
+					to right,
+					transparent 2px,
+					var(--workbench-selected-foreground) 2px 3px,
+					transparent 3px 5px,
+					var(--workbench-selected-foreground) 5px 6px,
+					transparent 6px
+				)
+				center / 8px 10px no-repeat,
+			var(--workbench-selected);
+		box-shadow: 0 1px 4px oklch(0 0 none / 0.35);
+		pointer-events: none;
+		transition: scale 140ms ease-out;
+	}
+
+	.selection-boundary-handle:enabled:hover::after,
+	.selection-waveform-surface ::part(region-handle):hover::after {
+		scale: 1.15 1;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.selection-boundary-handle::after,
+		.selection-waveform-surface ::part(region-handle)::after {
+			transition: none;
+		}
 	}
 }

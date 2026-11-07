@@ -71,6 +71,7 @@ import {
 	clientXToMediaTime,
 	createSelectionTimelineMarkers,
 	mediaTimeToPercent,
+	selectionBoundaryTrackStyle,
 } from "./selection-timeline-geometry";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
@@ -107,6 +108,7 @@ export type DragState =
 	  }
 	| {
 			initialSelection: Selection;
+			pointerOffsetPx: number;
 			type: "end";
 	  }
 	| {
@@ -116,6 +118,7 @@ export type DragState =
 	  }
 	| {
 			initialSelection: Selection;
+			pointerOffsetPx: number;
 			type: "start";
 	  };
 
@@ -196,6 +199,7 @@ export function SelectionTimeline({
 	const readyWaveformLaneCount = Object.values(laneStates).filter(
 		(laneState) => laneState.status === "ready",
 	).length;
+	const hasAudioTracks = asset.tracks.audio.length > 0;
 	const selectionIsRegionBacked = readyWaveformLaneCount > 0;
 	const minimumDurationUs = minimumSelectionDurationUs(selectionContext);
 	const normalizeRegionSelectionChange = useCallback(
@@ -298,7 +302,7 @@ export function SelectionTimeline({
 				const nextSelection = setSelectionStartFromPlayhead(
 					dragState.initialSelection,
 					clientXToMediaTime({
-						clientX,
+						clientX: clientX - dragState.pointerOffsetPx,
 						durationUs: asset.durationUs,
 						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
 					}),
@@ -313,7 +317,7 @@ export function SelectionTimeline({
 				const nextSelection = setSelectionEndFromPlayhead(
 					dragState.initialSelection,
 					clientXToMediaTime({
-						clientX,
+						clientX: clientX - dragState.pointerOffsetPx,
 						durationUs: asset.durationUs,
 						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
 					}),
@@ -386,7 +390,7 @@ export function SelectionTimeline({
 				const nextSelection = setSelectionStartFromPlayhead(
 					dragState.initialSelection,
 					clientXToMediaTime({
-						clientX: event.clientX,
+						clientX: event.clientX - dragState.pointerOffsetPx,
 						durationUs: asset.durationUs,
 						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
 					}),
@@ -400,7 +404,7 @@ export function SelectionTimeline({
 				const nextSelection = setSelectionEndFromPlayhead(
 					dragState.initialSelection,
 					clientXToMediaTime({
-						clientX: event.clientX,
+						clientX: event.clientX - dragState.pointerOffsetPx,
 						durationUs: asset.durationUs,
 						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
 					}),
@@ -465,9 +469,17 @@ export function SelectionTimeline({
 		if (selectionEditingDisabled) {
 			return;
 		}
+		const geometry = timelineTrackGeometryFromElement(trackRef.current);
+		if (!geometry) return;
+		const boundaryUs = type === "start" ? selection.startUs : selection.endUs;
+		const boundaryX =
+			geometry.leftPx +
+			(geometry.widthPx * mediaTimeToPercent(boundaryUs, asset.durationUs)) /
+				100;
 		setDraftSelection(selection);
 		setDragState({
 			initialSelection: selection,
+			pointerOffsetPx: event.clientX - boundaryX,
 			type,
 		});
 	}
@@ -773,7 +785,9 @@ export function SelectionTimeline({
 						</div>
 
 						<div
-							className="relative min-h-0 flex-1"
+							className={
+								hasAudioTracks ? "relative min-h-0 flex-1" : "relative"
+							}
 							data-testid="selection-timeline-lane-surface"
 						>
 							<VideoThumbnailStrip
@@ -783,9 +797,9 @@ export function SelectionTimeline({
 								laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 								state={videoStripState}
 							/>
-							<div className="relative" data-testid="selection-audio-lanes">
-								{asset.tracks.audio.length > 0 ? (
-									asset.tracks.audio.map((track, trackIndex) => (
+							{hasAudioTracks && (
+								<div className="relative" data-testid="selection-audio-lanes">
+									{asset.tracks.audio.map((track, trackIndex) => (
 										<WaveformLane
 											audioDecision={audioMix.tracks[track.id]}
 											audioPreviewPreparing={audioPreviewPreparingTrackIds.has(
@@ -808,17 +822,17 @@ export function SelectionTimeline({
 											selectionEditInProgress={selectionEditInProgress}
 											trackIndex={trackIndex}
 										/>
-									))
-								) : (
-									<div className="grid min-h-24 place-items-center border-b border-workbench-border px-4 text-sm text-muted-foreground">
-										No audio tracks available for waveform lanes.
-									</div>
-								)}
-							</div>
+									))}
+								</div>
+							)}
 
 							<div
-								className="pointer-events-none absolute inset-y-0 z-30"
+								className="selection-boundary-track pointer-events-none absolute inset-y-0 z-30"
 								style={{
+									...selectionBoundaryTrackStyle(
+										selectionStartPercent,
+										selectionEndPercent,
+									),
 									left: `${TIMELINE_LANE_HEADER_WIDTH_PX}px`,
 									right: 0,
 								}}
@@ -852,7 +866,7 @@ export function SelectionTimeline({
 										/>
 										<button
 											aria-label="Selection start handle"
-											className={`pointer-events-auto absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											className={`selection-boundary-handle selection-boundary-start pointer-events-auto absolute inset-y-0 z-40 cursor-ew-resize border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
@@ -860,17 +874,11 @@ export function SelectionTimeline({
 												}
 											}}
 											onPointerDown={(event) => beginHandleDrag(event, "start")}
-											style={{ left: `${selectionStartPercent}%` }}
 											type="button"
-										>
-											<span
-												className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-start)]"
-												data-testid="selection-start-handle-rail"
-											/>
-										</button>
+										/>
 										<button
 											aria-label="Selection end handle"
-											className={`pointer-events-auto absolute inset-y-0 z-40 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											className={`selection-boundary-handle selection-boundary-end pointer-events-auto absolute inset-y-0 z-40 cursor-ew-resize border-0 bg-transparent p-0 ${selectionMotionClassName}`}
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
@@ -878,14 +886,8 @@ export function SelectionTimeline({
 												}
 											}}
 											onPointerDown={(event) => beginHandleDrag(event, "end")}
-											style={{ left: `${selectionEndPercent}%` }}
 											type="button"
-										>
-											<span
-												className="block h-full w-0.5 bg-workbench-selected shadow-[var(--shadow-workbench-selection-end)]"
-												data-testid="selection-end-handle-rail"
-											/>
-										</button>
+										/>
 									</>
 								)}
 								<button

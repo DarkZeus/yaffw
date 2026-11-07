@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { MediaTimeUs } from "@/editor-core/model";
 import { clamp } from "@/lib/clamp";
 
@@ -92,6 +93,16 @@ export function mediaTimeToPercent(
 	}
 
 	return clamp((timeUs / durationUs) * 100, 0, 100);
+}
+
+export function selectionBoundaryTrackStyle(
+	startPercent: number,
+	endPercent: number,
+): CSSProperties {
+	return {
+		"--selection-start-position": `${startPercent}cqw`,
+		"--selection-end-position": `${endPercent}cqw`,
+	} as CSSProperties;
 }
 
 export function clampTimelineZoom(zoom: number) {

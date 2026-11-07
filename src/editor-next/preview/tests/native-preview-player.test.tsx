@@ -537,12 +537,12 @@ describe("NativePreviewPlayer", () => {
 			fireEvent.pointerDown(screen.getByLabelText("Selection start handle"), {
 				pointerId: 1,
 				pointerType: "mouse",
-				clientX: 200,
+				clientX: 205,
 			});
 			fireEvent.pointerUp(window, {
 				pointerId: 1,
 				pointerType: "mouse",
-				clientX: 300,
+				clientX: 305,
 			});
 			expect(video.currentTime).toBe(0);
 			expect(onSelectionStartRequested).toHaveBeenCalledWith(3_000_000);
@@ -552,12 +552,12 @@ describe("NativePreviewPlayer", () => {
 			fireEvent.pointerDown(screen.getByLabelText("Selection end handle"), {
 				pointerId: 1,
 				pointerType: "mouse",
-				clientX: 800,
+				clientX: 795,
 			});
 			fireEvent.pointerUp(window, {
 				pointerId: 1,
 				pointerType: "mouse",
-				clientX: 900,
+				clientX: 895,
 			});
 			expect(video.currentTime).toBe(0);
 			expect(onSelectionEndRequested).toHaveBeenCalledWith(9_000_000);
