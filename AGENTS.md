@@ -1,3 +1,7 @@
+## Git workflow
+
+Work directly on `master`. Create a branch only when the user explicitly requests one.
+
 ## Agent skills
 
 ### Issue tracker
