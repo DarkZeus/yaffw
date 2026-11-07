@@ -1,6 +1,5 @@
 import { Settings, Sparkles, Zap } from "lucide-react";
 import type { ReactNode } from "react";
-import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,29 +18,31 @@ import type {
 	OutputSettings,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
-import { cloneOutputSettings } from "@/editor-core/output-settings";
 import {
 	OUTPUT_SUBJECTIVE_QUALITY_CHOICES,
 	type ResolvedOutputAudioProfile,
 	type ResolvedOutputResolution,
 	type ResolvedOutputVideoProfile,
 	formatOutputQualitySetting,
-	getOutputResolutionChoices,
 	outputContainerForSetting,
 	resolveOutputAudioProfile,
-	resolveOutputPlan,
+	resolveOutputQuality,
 	resolveOutputResolution,
 	resolveOutputVideoProfile,
 } from "@/editor-core/output-settings";
 import { MEDIABUNNY_OUTPUT_SUPPORT } from "../adapters/mediabunny-output-support";
 import { ExportPresetControls } from "../presets/export-preset-controls";
-import { saveLastUsedSettings } from "../presets/export-preset-store";
+import {
+	formatCodecName,
+	resolutionSettingValue,
+	useOutputSettingsDraft,
+} from "./use-output-settings-draft";
 
 type OutputSettingsPanelProps = {
 	asset: ReadyMediaAsset;
 	audioMix: AudioMix;
 	exportRunning: boolean;
-	onApplyOutputSettings: (outputSettings: OutputSettings) => void;
+	onApplyOutputSettings: (outputSettings: OutputSettings) => boolean;
 	outputSettings: OutputSettings;
 };
 
@@ -112,185 +113,31 @@ export function OutputSettingsPanel({
 	onApplyOutputSettings,
 	outputSettings,
 }: OutputSettingsPanelProps) {
-	const [open, setOpen] = useState(false);
-	const [draft, setDraft] = useState<OutputSettings | null>(null);
-	const openingSnapshotRef = useRef<OutputSettings | null>(null);
-	const activeDraft = draft ?? outputSettings;
-
-	function openModal() {
-		const snapshot = cloneOutputSettings(outputSettings);
-		setDraft(snapshot);
-		openingSnapshotRef.current = cloneOutputSettings(snapshot);
-		setOpen(true);
-	}
-
-	function closeModal() {
-		openingSnapshotRef.current = null;
-		setDraft(null);
-		setOpen(false);
-	}
-
-	function applyDraft() {
-		if (exportRunning || !draftIsValid) {
-			return;
-		}
-
-		const appliedOutputSettings = cloneOutputSettings(activeDraft);
-		onApplyOutputSettings(appliedOutputSettings);
-		try {
-			saveLastUsedSettings(window.localStorage, appliedOutputSettings);
-		} catch {
-			// Applying session-local settings must still succeed when storage is unavailable.
-		}
-		closeModal();
-	}
-	function changeContainer(containerId: string) {
-		const nextDraft = cloneOutputSettings(activeDraft);
-		nextDraft.container =
-			containerId === "default-output-profile"
-				? { kind: "default-output-profile" }
-				: { container: containerId, kind: "documented-container" };
-
-		if (nextDraft.videoCodec.kind === "default-output-profile") {
-			nextDraft.videoCodec = { kind: "preserve-source" };
-		}
-		if (nextDraft.audioCodec.kind === "default-output-profile") {
-			nextDraft.audioCodec = { kind: "preserve-source" };
-		}
-
-		setReconciledDraft(nextDraft);
-	}
-
-	function changeVideoCodec(codec: string) {
-		const nextDraft = cloneOutputSettings(activeDraft);
-		nextDraft.videoCodec =
-			codec === "default-output-profile"
-				? { kind: "default-output-profile" }
-				: codec === "preserve-source"
-					? { kind: "preserve-source" }
-					: { codec, kind: "documented-codec" };
-
-		setReconciledDraft(nextDraft);
-	}
-
-	function changeAudioCodec(codec: string) {
-		const nextDraft = cloneOutputSettings(activeDraft);
-		nextDraft.audioCodec =
-			codec === "no-audio"
-				? { kind: "no-audio" }
-				: codec === "default-output-profile"
-					? { kind: "default-output-profile" }
-					: codec === "preserve-source"
-						? { kind: "preserve-source" }
-						: { codec, kind: "documented-codec" };
-
-		setReconciledDraft(nextDraft);
-	}
-
-	function changeResolution(value: string) {
-		const choice = resolutionChoices.find(
-			({ setting }) => resolutionSettingValue(setting) === value,
-		);
-		if (!choice) {
-			return;
-		}
-
-		const nextDraft = cloneOutputSettings(activeDraft);
-		nextDraft.resolution = { ...choice.setting };
-		setDraft(nextDraft);
-	}
-
-	function changeQuality(mediaKind: "audio" | "video", value: string) {
-		const nextDraft = cloneOutputSettings(activeDraft);
-		const currentSetting =
-			mediaKind === "video"
-				? activeDraft.videoQuality
-				: activeDraft.audioQuality;
-		let nextSetting: OutputQualitySetting;
-		if (value === "preserve-source") {
-			nextSetting = { kind: "preserve-source" };
-		} else if (value === "custom-bitrate") {
-			nextSetting = {
-				bitrateBps:
-					currentSetting.kind === "custom-bitrate"
-						? currentSetting.bitrateBps
-						: mediaKind === "video"
-							? 5_000_000
-							: 192_000,
-				kind: "custom-bitrate",
-			};
-		} else {
-			const quality = OUTPUT_SUBJECTIVE_QUALITY_CHOICES.find(
-				(choice) => choice.value === value,
-			)?.value;
-			if (!quality) {
-				return;
-			}
-			nextSetting = { kind: "subjective-quality", quality };
-		}
-
-		if (mediaKind === "video") {
-			nextDraft.videoQuality = nextSetting;
-		} else {
-			nextDraft.audioQuality = nextSetting;
-		}
-		setDraft(nextDraft);
-	}
-
-	function changeCustomBitrate(
-		mediaKind: "audio" | "video",
-		bitrateBps: number,
-	) {
-		const nextDraft = cloneOutputSettings(activeDraft);
-		const nextSetting: OutputQualitySetting = {
-			bitrateBps,
-			kind: "custom-bitrate",
-		};
-		if (mediaKind === "video") {
-			nextDraft.videoQuality = nextSetting;
-		} else {
-			nextDraft.audioQuality = nextSetting;
-		}
-		setDraft(nextDraft);
-	}
-
-	function setReconciledDraft(nextDraft: OutputSettings) {
-		const videoProfile = resolveOutputVideoProfile({
-			asset,
-			outputSettings: nextDraft,
-			support: MEDIABUNNY_OUTPUT_SUPPORT,
-		});
-
-		const audioProfile = resolveOutputAudioProfile({
-			asset,
-			audioMix,
-			outputSettings: nextDraft,
-			support: MEDIABUNNY_OUTPUT_SUPPORT,
-		});
-		const replacementMessages: string[] = [];
-
-		if (videoProfile.kind === "resolved" && videoProfile.automaticReplacement) {
-			nextDraft.videoCodec = {
-				codec: videoProfile.videoCodec,
-				kind: "documented-codec",
-			};
-			replacementMessages.push(
-				`${formatCodecName(videoProfile.automaticReplacement.requestedCodec)} cannot be preserved in ${videoProfile.container.label}. ${formatCodecName(videoProfile.videoCodec)} was selected automatically.`,
-			);
-		}
-		if (audioProfile.kind === "resolved" && audioProfile.automaticReplacement) {
-			nextDraft.audioCodec = {
-				codec: audioProfile.automaticReplacement.audioCodec,
-				kind: "documented-codec",
-			};
-			replacementMessages.push(
-				`${formatCodecName(audioProfile.automaticReplacement.requestedCodec)} cannot be preserved in ${audioProfile.container.label}. ${formatCodecName(audioProfile.audioCodec)} was selected automatically.`,
-			);
-		}
-		setAutomaticReplacementMessage(replacementMessages.join(" ") || null);
-
-		setDraft(nextDraft);
-	}
+	const {
+		activeDraft,
+		applyDraft,
+		automaticReplacementMessage,
+		changeAudioCodec,
+		changeContainer,
+		changeCustomBitrate,
+		changeQuality,
+		changeResolution,
+		changeVideoCodec,
+		closeModal,
+		draftIsValid,
+		loadPreset,
+		open,
+		openModal,
+		resetDraft,
+		resolutionChoices,
+		validationError,
+	} = useOutputSettingsDraft({
+		asset,
+		audioMix,
+		exportRunning,
+		onApplyOutputSettings,
+		outputSettings,
+	});
 	const sourceDimensions = formatSourceDimensions(asset);
 	const sourceVideoTrack = asset.tracks.video[0];
 	const sourceResolution =
@@ -300,18 +147,9 @@ export function OutputSettingsPanel({
 					width: sourceVideoTrack.width,
 				}
 			: undefined;
-	const [automaticReplacementMessage, setAutomaticReplacementMessage] =
-		useState<string | null>(null);
-	const resolutionChoices = getOutputResolutionChoices(asset);
 	const resolvedResolution = resolveOutputResolution({
 		asset,
 		setting: activeDraft.resolution,
-	});
-	const resolvedPlan = resolveOutputPlan({
-		asset,
-		audioMix,
-		outputSettings: activeDraft,
-		support: MEDIABUNNY_OUTPUT_SUPPORT,
 	});
 	const resolvedDraft = resolveOutputVideoProfile({
 		asset,
@@ -333,21 +171,19 @@ export function OutputSettingsPanel({
 				);
 	const compatibleVideoCodecs = selectedContainer?.videoCodecs ?? [];
 	const compatibleAudioCodecs = selectedContainer?.audioCodecs ?? [];
-	const draftIsValid = resolvedPlan.kind === "resolved";
-	const validationError =
-		resolvedPlan.kind === "invalid" ? resolvedPlan.error : undefined;
-
-	function openResolvedOutputSettings() {
-		setAutomaticReplacementMessage(null);
-		openModal();
-	}
+	const audioQualityLocked =
+		activeDraft.audioCodec.kind === "no-audio" &&
+		resolveOutputQuality({
+			mediaKind: "audio",
+			setting: activeDraft.audioQuality,
+		}).kind !== "invalid";
 
 	return (
 		<section aria-label="Output settings panel" className="min-w-0">
 			<Button
 				className="h-10 w-full justify-between"
 				disabled={exportRunning}
-				onClick={openResolvedOutputSettings}
+				onClick={openModal}
 				size="sm"
 				type="button"
 				variant="outline"
@@ -363,12 +199,7 @@ export function OutputSettingsPanel({
 			<Dialog
 				open={open}
 				onOpenChange={(nextOpen) => {
-					if (nextOpen) {
-						openModal();
-						return;
-					}
-
-					closeModal();
+					if (!nextOpen) closeModal();
 				}}
 			>
 				<DialogContent className="quality-settings-dialog flex h-[min(36rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-workbench-border-strong bg-workbench-inspector p-0 text-workbench-foreground shadow-none sm:max-w-[48rem]">
@@ -523,7 +354,7 @@ export function OutputSettingsPanel({
 												changeCustomBitrate("audio", bitrateBps)
 											}
 											onChange={(value) => changeQuality("audio", value)}
-											disabled={activeDraft.audioCodec.kind === "no-audio"}
+											disabled={audioQualityLocked}
 											setting={activeDraft.audioQuality}
 										/>
 										<OutputSettingsValidationMessage
@@ -549,54 +380,77 @@ export function OutputSettingsPanel({
 							videoProfile={resolvedDraft}
 						/>
 					</Tabs>
-					<DialogFooter className="block shrink-0 border-t border-workbench-border px-6 py-4">
-						<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-							<ExportPresetControls
-								draft={activeDraft}
-								draftIsValid={draftIsValid}
-								exportRunning={exportRunning}
-								onLoadPreset={(preset) =>
-									setReconciledDraft(cloneOutputSettings(preset.outputSettings))
-								}
-							/>
-							<div>
-								<Button
-									className="h-10"
-									onClick={() => {
-										setAutomaticReplacementMessage(null);
-										if (openingSnapshotRef.current !== null) {
-											setDraft(cloneOutputSettings(openingSnapshotRef.current));
-										}
-									}}
-									type="button"
-									variant="ghost"
-								>
-									Reset
-								</Button>
-							</div>
-							<div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
-								<Button
-									className="h-10"
-									onClick={closeModal}
-									type="button"
-									variant="outline"
-								>
-									Cancel
-								</Button>
-								<Button
-									className="h-10 bg-primary px-5 text-primary-foreground hover:bg-primary/90"
-									disabled={exportRunning || !draftIsValid}
-									onClick={applyDraft}
-									type="button"
-								>
-									Apply
-								</Button>
-							</div>
-						</div>
-					</DialogFooter>
+					<OutputSettingsDraftActions
+						activeDraft={activeDraft}
+						applyDraft={applyDraft}
+						closeModal={closeModal}
+						draftIsValid={draftIsValid}
+						exportRunning={exportRunning}
+						loadPreset={loadPreset}
+						resetDraft={resetDraft}
+					/>
 				</DialogContent>
 			</Dialog>
 		</section>
+	);
+}
+
+function OutputSettingsDraftActions({
+	activeDraft,
+	applyDraft,
+	closeModal,
+	draftIsValid,
+	exportRunning,
+	loadPreset,
+	resetDraft,
+}: Pick<
+	ReturnType<typeof useOutputSettingsDraft>,
+	| "activeDraft"
+	| "applyDraft"
+	| "closeModal"
+	| "draftIsValid"
+	| "loadPreset"
+	| "resetDraft"
+> & { exportRunning: boolean }) {
+	return (
+		<DialogFooter className="block shrink-0 border-t border-workbench-border px-6 py-4">
+			<div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
+				<ExportPresetControls
+					draft={activeDraft}
+					draftIsValid={draftIsValid}
+					exportRunning={exportRunning}
+					onLoadPreset={loadPreset}
+				/>
+				<div>
+					<Button
+						className="h-10"
+						onClick={resetDraft}
+						type="button"
+						variant="ghost"
+					>
+						Reset
+					</Button>
+				</div>
+				<div className="col-span-2 flex items-center justify-end gap-2 sm:col-span-1">
+					<Button
+						className="h-10"
+						onClick={closeModal}
+						type="button"
+						variant="outline"
+					>
+						Cancel
+					</Button>
+					<Button
+						className="h-10 bg-primary px-5 text-primary-foreground hover:bg-primary/90"
+						disabled={exportRunning || !draftIsValid}
+						onClick={applyDraft}
+						type="button"
+					>
+						Apply
+					</Button>
+				</div>
+			</div>
+		</DialogFooter>
 	);
 }
 
@@ -990,28 +844,6 @@ function codecSettingValue(setting: OutputSettings["audioCodec"]): string {
 	}
 
 	return setting.kind;
-}
-
-function formatCodecName(codec: string | undefined): string {
-	if (!codec) {
-		return "Unknown source codec";
-	}
-
-	const normalized = codec.toLowerCase();
-	if (normalized === "avc" || normalized === "h264") {
-		return "AVC";
-	}
-	if (normalized === "hevc" || normalized === "h265") {
-		return "HEVC";
-	}
-
-	return normalized.toUpperCase();
-}
-
-function resolutionSettingValue(setting: OutputSettings["resolution"]): string {
-	return setting.kind === "target-dimensions"
-		? `${setting.width}x${setting.height}`
-		: setting.kind;
 }
 
 function qualitySettingValue(setting: OutputQualitySetting): string {

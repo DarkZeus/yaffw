@@ -36,7 +36,7 @@ export type ExportInspectorPanelProps = {
 	exportState: ExportSessionState;
 	onCancelExport: () => void;
 	onDownloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
-	onApplyOutputSettings: (outputSettings: OutputSettings) => void;
+	onApplyOutputSettings: (outputSettings: OutputSettings) => boolean;
 	onStartExport: () => void;
 	outputSettings: OutputSettings;
 	runtime: RuntimeSupport;

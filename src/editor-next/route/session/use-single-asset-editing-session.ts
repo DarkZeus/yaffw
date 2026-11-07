@@ -18,6 +18,7 @@ import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import {
 	type EditorSessionAction,
 	type EditorSessionState,
+	canChangeEditingDecisions,
 	canCloseEditorSession,
 	createInitialEditorSession,
 	editorSessionReducer,
@@ -47,7 +48,7 @@ const closeFileConfirmationMessage =
 	"Close this media asset? This clears the current selection, preview state, waveform state, and generated media result.";
 
 export type SingleAssetEditingSessionCommands = {
-	applyOutputSettings: (outputSettings: OutputSettings) => void;
+	applyOutputSettings: (outputSettings: OutputSettings) => boolean;
 	cancelDefaultExport: () => void;
 	downloadGeneratedMedia: (generatedMedia: GeneratedMedia) => void;
 	importLocalFile: (file: File) => Promise<void>;
@@ -453,17 +454,21 @@ export function useSingleAssetEditingSession({
 	}
 
 	function applyOutputSettings(outputSettings: OutputSettings) {
-		if (
-			session.status !== "ready" ||
-			areOutputSettingsEqual(session.outputSettings, outputSettings)
-		) {
-			return;
-		}
+		const current = sessionRef.current;
+		if (!canChangeEditingDecisions(current)) return false;
 
-		dispatch({
+		const plan = resolveOutputPlan({
+			asset: current.asset,
+			audioMix: current.audioMix,
 			outputSettings,
-			type: "output-settings.applied",
+			support: MEDIABUNNY_OUTPUT_SUPPORT,
 		});
+		if (plan.kind === "invalid") return false;
+
+		if (!areOutputSettingsEqual(current.outputSettings, outputSettings)) {
+			dispatch({ outputSettings, type: "output-settings.applied" });
+		}
+		return true;
 	}
 
 	function getGeneratedMediaArtifactStore() {

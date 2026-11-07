@@ -207,7 +207,12 @@ describe("useSingleAssetEditingSession", () => {
 			);
 		});
 		await act(async () => {
-			await sessionRef.current?.commands.startDefaultExport();
+			const commands = sessionRef.current?.commands;
+			const exportJob = commands?.startDefaultExport();
+			expect(commands?.applyOutputSettings(downscaledOutputSettings())).toBe(
+				false,
+			);
+			await exportJob;
 		});
 		const generatedMedia = readGeneratedMedia(sessionRef.current);
 		const commands = sessionRef.current?.commands;
@@ -266,6 +271,16 @@ describe("useSingleAssetEditingSession", () => {
 		const generatedMedia = readGeneratedMedia(sessionRef.current);
 
 		act(() => {
+			const commands = sessionRef.current?.commands;
+			expect(
+				commands?.applyOutputSettings({
+					...createDefaultOutputSettings(),
+					videoQuality: { kind: "custom-bitrate", bitrateBps: 0 },
+				}),
+			).toBe(false);
+			expect(commands?.applyOutputSettings(createDefaultOutputSettings())).toBe(
+				true,
+			);
 			sessionRef.current?.commands.downloadGeneratedMedia(generatedMedia);
 		});
 		expect(deliverGeneratedMedia).toHaveBeenCalledTimes(1);
@@ -426,9 +441,9 @@ function downscaledOutputSettings(): OutputSettings {
 	return {
 		...createDefaultOutputSettings(),
 		resolution: {
-			height: 720,
+			height: 90,
 			kind: "target-dimensions",
-			width: 1280,
+			width: 160,
 		},
 	};
 }

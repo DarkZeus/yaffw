@@ -1,5 +1,6 @@
 /* @vitest-environment jsdom */
 import {
+	act,
 	cleanup,
 	fireEvent,
 	render,
@@ -47,7 +48,7 @@ function click(name: string | RegExp, container = document.body) {
 }
 
 function openOutputSettings() {
-	const onApply = vi.fn();
+	const onApply = vi.fn(() => true);
 	render(
 		<OutputSettingsPanel
 			asset={asset}
@@ -177,5 +178,107 @@ describe("Export preset confirmations in Output settings", () => {
 		expect(window.localStorage.getItem(EXPORT_PRESET_STORAGE_KEY)).toBe(
 			unsupported,
 		);
+	});
+});
+
+describe("Output settings draft transaction", () => {
+	it("resets to the applied opening snapshot and discards edits on dismissal", () => {
+		const applied = createDefaultOutputSettings();
+		applied.videoQuality = { kind: "subjective-quality", quality: "high" };
+		const onApply = vi.fn(() => true);
+		render(
+			<OutputSettingsPanel
+				asset={asset}
+				audioMix={{ finalPeakGuardDb: -1, outputChannels: 2, tracks: {} }}
+				exportRunning={false}
+				onApplyOutputSettings={onApply}
+				outputSettings={applied}
+			/>,
+		);
+		click("Output settings");
+		fireEvent.click(screen.getByRole("tab", { name: "Video" }));
+		const quality = screen.getByLabelText<HTMLSelectElement>("Video quality");
+		expect(quality.value).toBe("high");
+		fireEvent.change(quality, { target: { value: "low" } });
+		click("Reset");
+		expect(
+			screen.getByRole("dialog", { name: "Output settings" }),
+		).toBeTruthy();
+		expect(quality.value).toBe("high");
+		fireEvent.change(quality, { target: { value: "medium" } });
+		click("Cancel");
+		click("Output settings");
+		fireEvent.click(screen.getByRole("tab", { name: "Video" }));
+		expect(
+			screen.getByLabelText<HTMLSelectElement>("Video quality").value,
+		).toBe("high");
+		expect(onApply).not.toHaveBeenCalled();
+	});
+
+	it("commits the same draft at most once before the dialog closes", () => {
+		const onApply = openOutputSettings();
+		const apply = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Apply",
+		});
+		act(() => {
+			apply.click();
+			apply.click();
+		});
+		expect(onApply).toHaveBeenCalledTimes(1);
+	});
+
+	it("blocks invalid drafts and preserves a draft when the session rejects Apply", () => {
+		const onApply = openOutputSettings();
+		fireEvent.click(screen.getByRole("tab", { name: "Video" }));
+		fireEvent.change(screen.getByLabelText("Video quality"), {
+			target: { value: "custom-bitrate" },
+		});
+		const bitrate = screen.getByLabelText<HTMLInputElement>(
+			"Custom video quality bitrate in Mbps",
+		);
+		fireEvent.change(bitrate, { target: { value: "" } });
+		const apply = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Apply",
+		});
+		expect(apply.disabled).toBe(true);
+		fireEvent.click(apply);
+		expect(onApply).not.toHaveBeenCalled();
+
+		fireEvent.change(bitrate, { target: { value: "3" } });
+		onApply.mockReturnValueOnce(false);
+		fireEvent.click(apply);
+		expect(
+			screen.getByRole("dialog", { name: "Output settings" }),
+		).toBeTruthy();
+		expect(bitrate.value).toBe("3");
+		expect(window.localStorage.getItem(EXPORT_PRESET_STORAGE_KEY)).toBeNull();
+		fireEvent.click(apply);
+		expect(
+			readExportPresetDocument(window.localStorage).lastUsedSettings
+				?.videoQuality,
+		).toEqual({ kind: "custom-bitrate", bitrateBps: 3_000_000 });
+	});
+
+	it("keeps an invalid audio bitrate editable and blocks Apply with No audio selected", () => {
+		const onApply = openOutputSettings();
+		fireEvent.click(screen.getByRole("tab", { name: "Audio" }));
+		fireEvent.change(screen.getByLabelText("Audio quality"), {
+			target: { value: "custom-bitrate" },
+		});
+		const bitrate = screen.getByLabelText<HTMLInputElement>(
+			"Custom audio quality bitrate in Mbps",
+		);
+		fireEvent.change(bitrate, { target: { value: "" } });
+		fireEvent.change(screen.getByLabelText("Audio codec"), {
+			target: { value: "no-audio" },
+		});
+		const apply = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Apply",
+		});
+		expect(apply.disabled).toBe(true);
+		expect(bitrate.disabled).toBe(false);
+		expect(onApply).not.toHaveBeenCalled();
+		fireEvent.change(bitrate, { target: { value: "0.192" } });
+		expect(apply.disabled).toBe(false);
 	});
 });

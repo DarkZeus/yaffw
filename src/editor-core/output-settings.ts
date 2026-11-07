@@ -390,7 +390,7 @@ export function resolveOutputPlan({
 		mediaKind: "audio",
 		setting: outputSettings.audioQuality,
 	});
-	if (audio.audioCodec && audioQuality.kind === "invalid") {
+	if (audioQuality.kind === "invalid") {
 		return audioQuality;
 	}
 

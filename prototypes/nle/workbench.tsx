@@ -193,7 +193,10 @@ function ExistingShell({ editor }: { editor: Editor }) {
 											exportState={{ status: "reviewing" }}
 											onCancelExport={noop}
 											onDownloadGeneratedMedia={noop}
-											onApplyOutputSettings={setOutputSettings}
+											onApplyOutputSettings={(settings) => {
+												setOutputSettings(settings);
+												return true;
+											}}
 											onStartExport={noop}
 											outputSettings={outputSettings}
 											runtime={detectRuntimeSupport()}
