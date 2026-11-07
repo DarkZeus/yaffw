@@ -1,0 +1,195 @@
+/* Video.js's frosted control treatment, composed for YAFFW's audio transport. */
+.preview-video-skin {
+	position: relative;
+	isolation: isolate;
+	width: 100%;
+	height: 100%;
+	color: var(--color-white);
+	background: var(--color-black);
+	container-type: inline-size;
+}
+.preview-video-skin:fullscreen {
+	width: 100%;
+	height: 100%;
+}
+.preview-video-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	pointer-events: none;
+	background: linear-gradient(to top, oklch(0 0 none / 0.5), transparent 40%);
+}
+.preview-video-controls {
+	position: absolute;
+	inset: auto 0 0;
+	z-index: 3;
+	padding: 16px;
+	pointer-events: none;
+}
+.preview-video-controls,
+.preview-video-backdrop {
+	transition: opacity 180ms ease-out;
+}
+.preview-video-controls:not([data-visible]),
+.preview-video-backdrop:not([data-visible]) {
+	opacity: 0;
+}
+.preview-video-controls:not([data-visible]) {
+	visibility: hidden;
+}
+.preview-video-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	border: 1px solid oklch(1 0 none / 0.15);
+	border-radius: 999px;
+	background: oklch(0.2 0 none / 0.75);
+	box-shadow: 0 4px 16px oklch(0 0 none / 0.2);
+	backdrop-filter: blur(16px);
+	pointer-events: auto;
+}
+.preview-video-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	padding: 6px;
+	border-radius: 50%;
+	cursor: pointer;
+	transition:
+		background-color 150ms ease-out,
+		scale 150ms ease-out;
+}
+.preview-video-button svg {
+	width: 20px;
+	height: 20px;
+}
+.preview-video-button:active {
+	scale: 0.96;
+}
+.preview-video-button:focus-visible,
+.preview-video-thumb:focus-visible {
+	outline: 2px solid var(--workbench-focus);
+	outline-offset: 3px;
+}
+@media (hover: hover) {
+	.preview-video-button:hover {
+		background: oklch(1 0 none / 0.12);
+	}
+}
+.preview-video-time {
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.preview-video-slider {
+	position: relative;
+	display: flex;
+	align-items: center;
+	flex: 1;
+	min-width: 24px;
+	height: 32px;
+	cursor: pointer;
+	touch-action: none;
+}
+.preview-video-track {
+	position: absolute;
+	width: 100%;
+	height: 4px;
+	border-radius: 999px;
+	background: oklch(1 0 none / 0.25);
+}
+.preview-video-fill {
+	width: var(--media-slider-fill);
+	height: 100%;
+	border-radius: inherit;
+	background: var(--workbench-selected);
+}
+.preview-video-thumb {
+	position: absolute;
+	left: var(--media-slider-fill);
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--color-white);
+	transform: translateX(-50%);
+}
+.preview-video-buffering {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: grid;
+	place-items: center;
+	pointer-events: none;
+}
+.preview-video-buffering:not([data-visible]) {
+	display: none;
+}
+.preview-video-buffering svg {
+	width: 32px;
+	height: 32px;
+	animation: preview-video-spin 1s linear infinite;
+}
+.preview-video-error {
+	position: absolute;
+	inset: 20% 10%;
+	z-index: 2;
+	display: grid;
+	place-items: center;
+	text-align: center;
+}
+.preview-video-chapters {
+	min-width: 220px;
+	max-height: min(320px, 70vh);
+	overflow: auto;
+	padding: 6px;
+	border: 1px solid oklch(1 0 none / 0.15);
+	border-radius: 12px;
+	color: var(--color-white);
+	background: oklch(0.2 0 none / 0.95);
+	backdrop-filter: blur(16px);
+}
+.preview-video-chapters [role="menuitem"] {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 12px;
+}
+.preview-video-chapters [role="menuitem"]:focus {
+	outline: none;
+	background: oklch(1 0 none / 0.12);
+}
+@container (width < 500px) {
+	.preview-video-controls {
+		padding: 8px;
+	}
+	.preview-video-duration {
+		display: none;
+	}
+	.preview-video-bar {
+		gap: 4px;
+	}
+}
+@container (width < 320px) {
+	.preview-video-time {
+		display: none;
+	}
+}
+@keyframes preview-video-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.preview-video-skin *,
+	.preview-video-backdrop {
+		animation: none;
+		transition: none;
+	}
+}

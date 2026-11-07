@@ -1,12 +1,10 @@
-import type { MediaPlayerInstance } from "@vidstack/react";
 import type { PreviewMediaTransportHandle } from "./use-native-preview-transport";
 
-/** Keep commands on the provider: Vidstack's presentation state may omit a
- * native pause event during a seek, so its guarded player.play() can be stale.
- * The provider still emits normal media events for the viewer's controls.
+/** Commands use the native element returned by Video.js's Video ref. This
+ * keeps the muted visual follower independent of presentation-store state.
  */
 export function createPreviewMediaTransport(
-	player: MediaPlayerInstance,
+	player: HTMLVideoElement,
 ): PreviewMediaTransportHandle {
 	return {
 		get currentTime() {
@@ -34,15 +32,13 @@ export function createPreviewMediaTransport(
 			player.volume = value;
 		},
 		get seeking() {
-			return player.state.seeking;
+			return player.seeking;
 		},
-		async play() {
-			const provider = player.provider;
-			if (!provider) throw new Error("Preview video is not ready.");
-			await provider.play();
+		play() {
+			return player.play();
 		},
 		pause() {
-			return player.provider?.pause();
+			player.pause();
 		},
 	};
 }

@@ -97,7 +97,7 @@ vi.mock("mediabunny", () => {
 		}
 	}
 
-	const Input = vi.fn().mockImplementation(() => {
+	const Input = vi.fn().mockImplementation(function () {
 		const input = {
 			dispose: vi.fn(),
 			getAudioTracks: vi.fn(async () => {

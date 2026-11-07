@@ -6,7 +6,7 @@ import {
 	screen,
 	waitFor,
 } from "@testing-library/react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
@@ -22,16 +22,7 @@ import { AudioPanel } from "../../audio/panel/audio-panel";
 import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
 import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
 
-type MockMediaPlayerProps = Record<string, unknown> & {
-	aspectRatio?: string;
-	children?: ReactNode;
-	className?: string;
-	crossOrigin?: boolean;
-	src?: unknown;
-};
-
 const adapterMockState = vi.hoisted(() => ({
-	mediaPlayerRenderCount: 0,
 	previewAudioEngineCreate: vi.fn(),
 	previewAudioEngines: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
@@ -93,152 +84,6 @@ vi.mock("../scrub/mediabunny-scrub-frame-provider", () => ({
 	},
 }));
 
-vi.mock("@vidstack/react", async () => {
-	const React = await import("react");
-	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
-		function MockMediaPlayer(
-			{
-				aspectRatio,
-				children,
-				className,
-				crossOrigin,
-				onProviderChange: _onProviderChange,
-				src,
-				title: _title,
-				viewType: _viewType,
-				...props
-			},
-			ref,
-		) {
-			adapterMockState.mediaPlayerRenderCount += 1;
-
-			return React.createElement(
-				"div",
-				{
-					className,
-					"data-preview-aspect-ratio": aspectRatio,
-					"data-testid": "mock-vidstack-player",
-					"data-source-type":
-						typeof src === "object" && src && "type" in src
-							? String(src.type)
-							: undefined,
-				},
-				React.createElement("video", {
-					...props,
-					className: "h-full w-full bg-black object-contain",
-					crossOrigin: crossOrigin ? "" : undefined,
-					ref: (video: HTMLVideoElement | null) => {
-						if (video) {
-							Object.defineProperty(video, "provider", {
-								configurable: true,
-								value: { play: () => video.play(), pause: () => video.pause() },
-							});
-							Object.defineProperty(video, "state", {
-								configurable: true,
-								get: () => ({ seeking: video.seeking }),
-							});
-						}
-						if (typeof ref === "function") ref(video);
-						else if (ref) ref.current = video;
-					},
-					src: normalizeMockPlayerSrc(src),
-				}),
-				children as ReactNode,
-			);
-		},
-	);
-
-	return {
-		VideoProviderLoader: class {},
-		MediaPlayer,
-		MediaProvider: ({ children }: { children?: React.ReactNode }) =>
-			React.createElement(React.Fragment, null, children),
-		Menu: {
-			Button: ({
-				children,
-				...props
-			}: React.PropsWithChildren<Record<string, unknown>>) =>
-				React.createElement("button", props, children),
-			Items: ({
-				children,
-				...props
-			}: React.PropsWithChildren<Record<string, unknown>>) =>
-				React.createElement("div", props, children),
-			Radio: ({
-				children,
-				onSelect,
-				...props
-			}: React.PropsWithChildren<{
-				onSelect?: (event: Event) => void;
-				[key: string]: unknown;
-			}>) =>
-				React.createElement(
-					"button",
-					{
-						...props,
-						onClick: (event: React.MouseEvent<HTMLButtonElement>) =>
-							onSelect?.(event.nativeEvent),
-					},
-					children,
-				),
-			RadioGroup: ({
-				children,
-				...props
-			}: React.PropsWithChildren<Record<string, unknown>>) =>
-				React.createElement("div", props, children),
-			Root: ({
-				children,
-				...props
-			}: React.PropsWithChildren<Record<string, unknown>>) =>
-				React.createElement("div", props, children),
-		},
-		Poster: (props: Record<string, unknown>) =>
-			React.createElement("img", props),
-		isHLSProvider: () => false,
-		useChapterOptions: () => Object.assign([], { selectedValue: undefined }),
-		useMediaStore: () => ({ duration: 0 }),
-	};
-});
-
-vi.mock("@vidstack/react/player/layouts/default", async () => {
-	const React = await import("react");
-	const Chapters = (props: Record<string, unknown>) =>
-		React.createElement("svg", props);
-
-	return {
-		DefaultTooltip: ({ children }: { children?: React.ReactNode }) =>
-			React.createElement(React.Fragment, null, children),
-		DefaultVideoLayout: ({ slots }: { slots?: Record<string, unknown> }) =>
-			React.createElement("div", {
-				"data-large-mute-button-hidden": String(
-					(slots?.largeLayout as Record<string, unknown> | undefined)
-						?.muteButton === null,
-				),
-				"data-large-volume-slider-hidden": String(
-					(slots?.largeLayout as Record<string, unknown> | undefined)
-						?.volumeSlider === null,
-				),
-				"data-mute-button-hidden": String(slots?.muteButton === null),
-				"data-small-mute-button-hidden": String(
-					(slots?.smallLayout as Record<string, unknown> | undefined)
-						?.muteButton === null,
-				),
-				"data-small-volume-slider-hidden": String(
-					(slots?.smallLayout as Record<string, unknown> | undefined)
-						?.volumeSlider === null,
-				),
-				"data-testid": "mock-default-video-layout",
-				"data-volume-slider-hidden": String(slots?.volumeSlider === null),
-			}),
-		defaultLayoutIcons: {
-			Menu: {
-				Chapters,
-			},
-		},
-		useDefaultLayoutContext: () => ({ showMenuDelay: 0 }),
-	};
-});
-
 vi.mock("../../audio/engine/preview-audio-engine", async (importOriginal) => {
 	const actual =
 		await importOriginal<
@@ -274,24 +119,6 @@ import {
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { NativePreviewPlayer } from "../player/native-preview-player";
 
-function normalizeMockPlayerSrc(src: unknown): string | undefined {
-	if (typeof src === "string") {
-		return src;
-	}
-
-	if (Array.isArray(src)) {
-		return normalizeMockPlayerSrc(src[0]);
-	}
-
-	if (src && typeof src === "object" && "src" in src) {
-		const nestedSrc = (src as { src?: unknown }).src;
-
-		return typeof nestedSrc === "string" ? nestedSrc : undefined;
-	}
-
-	return undefined;
-}
-
 const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
 const play = vi.fn().mockResolvedValue(undefined);
@@ -309,7 +136,6 @@ beforeEach(() => {
 		revokeObjectURL,
 	});
 	adapterMockState.previewAudioEngines.length = 0;
-	adapterMockState.mediaPlayerRenderCount = 0;
 	scrubPreviewMockState.providers.length = 0;
 	adapterMockState.previewAudioEngineCreate.mockReset();
 	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
@@ -373,6 +199,53 @@ afterEach(() => {
 });
 
 describe("NativePreviewPlayer", () => {
+	it("routes viewer play, pause, and seek through the audio-master transport", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
+		render(<AudioMasterPlayerProbe />);
+		await waitFor(() =>
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1),
+		);
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+		const seek = screen.getByRole("slider", { name: "Seek preview" });
+		fireEvent.keyDown(seek, { key: "ArrowRight", code: "ArrowRight" });
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenCalledWith(1_000_000, { priority: "final" });
+		expect(video.currentTime).toBe(0);
+		fireEvent.click(screen.getByRole("button", { name: "Play preview" }));
+		await waitFor(() => {
+			expect(
+				adapterMockState.previewAudioEngines[0]?.play,
+			).toHaveBeenCalledOnce();
+			expect(
+				adapterMockState.previewAudioEngines[0]?.setTime,
+			).toHaveBeenCalledWith(1);
+		});
+		expect(video.muted).toBe(true);
+		fireEvent.click(screen.getByRole("button", { name: "Pause preview" }));
+		expect(adapterMockState.previewAudioEngines[0]?.pause).toHaveBeenCalled();
+		expect(screen.getByRole("button", { name: "Play preview" })).toBeTruthy();
+	});
+
+	it("replays from the start after seeking to the end in the viewer", async () => {
+		renderPlayer();
+		fireEvent.keyDown(screen.getByRole("slider", { name: "Seek preview" }), {
+			key: "End",
+			code: "End",
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Play preview" }));
+		await waitFor(() => expect(play).toHaveBeenCalledOnce());
+		expect(
+			(screen.getByLabelText("Preview for clip.mp4") as HTMLVideoElement)
+				.currentTime,
+		).toBe(0);
+	});
+
 	it("measures the preview aperture after Workspace mounts its panel portal", async () => {
 		const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
 		const measure = vi
@@ -620,7 +493,9 @@ describe("NativePreviewPlayer", () => {
 				"Preview for clip.mp4",
 			) as HTMLVideoElement;
 
-			fireEvent.mouseDown(screen.getByLabelText("Seek timeline ruler"), {
+			fireEvent.pointerDown(screen.getByLabelText("Seek timeline ruler"), {
+				pointerId: 1,
+				pointerType: "mouse",
 				clientX: 600,
 			});
 			expect(video.currentTime).toBe(0);
@@ -628,10 +503,16 @@ describe("NativePreviewPlayer", () => {
 			expect(onSelectionEndRequested).not.toHaveBeenCalled();
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
-			fireEvent.mouseDown(screen.getByLabelText("Playhead handle"), {
+			fireEvent.pointerDown(screen.getByLabelText("Playhead handle"), {
+				pointerId: 1,
+				pointerType: "mouse",
 				clientX: 600,
 			});
-			fireEvent.mouseMove(window, { clientX: 700 });
+			fireEvent.pointerMove(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 700,
+			});
 			await waitFor(() => {
 				expect(
 					scrubPreviewMockState.providers[0]?.requestFrame,
@@ -643,33 +524,55 @@ describe("NativePreviewPlayer", () => {
 			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
 				"00:00:07.000",
 			);
-			fireEvent.mouseUp(window, { clientX: 800 });
+			fireEvent.pointerUp(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 800,
+			});
 			expect(video.currentTime).toBe(0);
 			expect(
 				scrubPreviewMockState.providers[0]?.requestFrame,
 			).toHaveBeenLastCalledWith(8_000_000, { priority: "final" });
 
-			fireEvent.mouseDown(screen.getByLabelText("Selection start handle"), {
+			fireEvent.pointerDown(screen.getByLabelText("Selection start handle"), {
+				pointerId: 1,
+				pointerType: "mouse",
 				clientX: 200,
 			});
-			fireEvent.mouseUp(window, { clientX: 300 });
+			fireEvent.pointerUp(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 300,
+			});
 			expect(video.currentTime).toBe(0);
 			expect(onSelectionStartRequested).toHaveBeenCalledWith(3_000_000);
 			expect(onSelectionEndRequested).not.toHaveBeenCalled();
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
-			fireEvent.mouseDown(screen.getByLabelText("Selection end handle"), {
+			fireEvent.pointerDown(screen.getByLabelText("Selection end handle"), {
+				pointerId: 1,
+				pointerType: "mouse",
 				clientX: 800,
 			});
-			fireEvent.mouseUp(window, { clientX: 900 });
+			fireEvent.pointerUp(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 900,
+			});
 			expect(video.currentTime).toBe(0);
 			expect(onSelectionEndRequested).toHaveBeenCalledWith(9_000_000);
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
-			fireEvent.mouseDown(screen.getByLabelText("Move selection range"), {
+			fireEvent.pointerDown(screen.getByLabelText("Move selection range"), {
+				pointerId: 1,
+				pointerType: "mouse",
 				clientX: 200,
 			});
-			fireEvent.mouseUp(window, { clientX: 500 });
+			fireEvent.pointerUp(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 500,
+			});
 			expect(onSelectionRangeMoveRequested).toHaveBeenCalledWith(3_000_000);
 
 			fireEvent.click(screen.getByRole("button", { name: "Play" }));

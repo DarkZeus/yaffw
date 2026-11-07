@@ -76,7 +76,7 @@ vi.mock("mediabunny", () => {
 		}
 	}
 
-	const Input = vi.fn().mockImplementation(() => {
+	const Input = vi.fn().mockImplementation(function () {
 		const input: MockInput = {
 			dispose: vi.fn(),
 		};
@@ -85,36 +85,32 @@ vi.mock("mediabunny", () => {
 		return input;
 	});
 
-	const Output = vi
-		.fn()
-		.mockImplementation(
-			({
-				format,
-				target,
-			}: {
-				format: MockOutputFormat;
-				target: BufferTarget;
-			}) => {
-				const output: MockOutput = {
-					addAudioTrack: vi.fn(),
-					addVideoTrack: vi.fn(),
-					cancel: vi.fn(async () => {}),
-					finalize: vi.fn(async () => {
-						if (mediabunnyMock.outputFinalizeFailure) {
-							throw mediabunnyMock.outputFinalizeFailure;
-						}
+	const Output = vi.fn().mockImplementation(function ({
+		format,
+		target,
+	}: {
+		format: MockOutputFormat;
+		target: BufferTarget;
+	}) {
+		const output: MockOutput = {
+			addAudioTrack: vi.fn(),
+			addVideoTrack: vi.fn(),
+			cancel: vi.fn(async () => {}),
+			finalize: vi.fn(async () => {
+				if (mediabunnyMock.outputFinalizeFailure) {
+					throw mediabunnyMock.outputFinalizeFailure;
+				}
 
-						target.buffer = new Uint8Array([9, 8, 7]).buffer;
-					}),
-					format,
-					start: vi.fn(async () => {}),
-					target,
-				};
-				mediabunnyMock.outputs.push(output);
+				target.buffer = new Uint8Array([9, 8, 7]).buffer;
+			}),
+			format,
+			start: vi.fn(async () => {}),
+			target,
+		};
+		mediabunnyMock.outputs.push(output);
 
-				return output;
-			},
-		);
+		return output;
+	});
 
 	const Conversion = {
 		init: vi.fn(async (config: MockConversionConfig) => {

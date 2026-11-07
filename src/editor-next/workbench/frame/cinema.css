@@ -273,13 +273,6 @@
 	overflow: hidden;
 	padding: 0 40px;
 }
-/* Workbench owns speed and audio; also cover Vidstack's portaled mobile menu. */
-.vds-video-layout
-	.vds-settings-menu-items
-	:is(.vds-speed-menu, .vds-audio-menu) {
-	/* Submenu roots have an inline display: contents from Vidstack. */
-	display: none !important;
-}
 .cinema-transport-button,
 .cinema-play-button {
 	flex: none;

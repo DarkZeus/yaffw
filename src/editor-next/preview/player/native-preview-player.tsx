@@ -1,4 +1,3 @@
-import type { MediaPlayerInstance } from "@vidstack/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
@@ -66,7 +65,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	source,
 }: NativePreviewPlayerProps) {
 	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
-	const videoRef = useRef<MediaPlayerInstance | null>(null);
+	const videoRef = useRef<HTMLVideoElement | null>(null);
 	const mediaTransportRef = useMemo(
 		() => ({
 			get current() {
@@ -77,6 +76,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		}),
 		[],
 	);
+	const fullscreenRef = useRef<HTMLDivElement | null>(null);
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const audioMixRef = useRef(audioMix);
 	const audioMonitoringStatusRef = useRef<PreviewAudioMonitoringStatus>("idle");
@@ -268,8 +268,17 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		handleScrubNativeSeeked(videoRef.current?.currentTime ?? Number.NaN);
 	}, [handleScrubNativeSeeked, syncPlayheadWithNativeVideo]);
 	const togglePlaybackWithScrubPreview = useCallback(() => {
+		if (!playbackRequested && getPlayheadUs() >= asset.durationUs) {
+			previewScrubToUs(0);
+		}
 		void togglePlayback();
-	}, [togglePlayback]);
+	}, [
+		asset.durationUs,
+		getPlayheadUs,
+		playbackRequested,
+		previewScrubToUs,
+		togglePlayback,
+	]);
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
 	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
@@ -303,19 +312,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	});
 
 	const requestFullscreen = useCallback(() => {
-		const player = videoRef.current;
-
-		if (player?.enterFullscreen) {
-			void player.enterFullscreen();
-			return;
-		}
-
-		const nativeFullscreenTarget = player as
-			| (MediaPlayerInstance & {
-					requestFullscreen?: () => Promise<void>;
-			  })
-			| null;
-		void nativeFullscreenTarget?.requestFullscreen?.();
+		void fullscreenRef.current?.requestFullscreen().catch(() => undefined);
 	}, []);
 
 	usePreviewKeyboardShortcuts({
@@ -329,18 +326,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	});
 
 	const canFullscreen =
-		typeof videoRef.current?.enterFullscreen === "function" ||
-		typeof (
-			videoRef.current as
-				| (MediaPlayerInstance & {
-						requestFullscreen?: () => Promise<void>;
-				  })
-				| null
-		)?.requestFullscreen === "function" ||
-		(typeof HTMLVideoElement !== "undefined" &&
-			typeof HTMLVideoElement.prototype.requestFullscreen === "function") ||
-		(typeof document !== "undefined" &&
-			typeof document.documentElement.requestFullscreen === "function");
+		typeof document !== "undefined" &&
+		typeof document.documentElement.requestFullscreen === "function";
 
 	return (
 		<EditorWorkbenchLayout
@@ -349,6 +336,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 				<PreviewViewerRegion
 					asset={asset}
 					canFullscreen={canFullscreen}
+					fullscreenRef={fullscreenRef}
 					isPlaying={isPlaying}
 					mediaMuted={previewClockMode !== "native-video" || muted}
 					onChapterSelectionRequested={
@@ -360,6 +348,8 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onNativePlaying={scrubPreview.hide}
 					onNativeSeeked={handleNativeSeeked}
 					onRequestFullscreen={requestFullscreen}
+					onTogglePlayback={togglePlaybackWithScrubPreview}
+					onPlayheadSeekRequested={seekToUsWithScrubPreview}
 					onSyncPlayhead={syncPlayheadWithNativeVideo}
 					playbackRate={playbackRate}
 					playheadUs={playheadUs}

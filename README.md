@@ -48,7 +48,7 @@ Shortcuts pause while you're editing an input, using a dialog, or exporting.
 
 ## Run locally
 
-You'll need Node.js 24 or newer and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
+You'll need Node.js 24.15 or newer in the 24.x line, or Node.js 26+, and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
 
 ```sh
 git clone https://github.com/DarkZeus/yaffw.git

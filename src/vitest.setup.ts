@@ -1,142 +1,9 @@
-import type { MouseEvent, ReactNode } from "react";
 import { beforeEach, vi } from "vitest";
-
-type MockMediaPlayerProps = Record<string, unknown> & {
-	aspectRatio?: string;
-	children?: ReactNode;
-	className?: string;
-	crossOrigin?: boolean;
-	src?: unknown;
-};
-
-vi.mock("@vidstack/react", async () => {
-	const React = await import("react");
-	const MediaPlayer = React.forwardRef<HTMLVideoElement, MockMediaPlayerProps>(
-		function MockMediaPlayer(
-			{
-				aspectRatio,
-				children,
-				className,
-				crossOrigin,
-				onProviderChange: _onProviderChange,
-				src,
-				title: _title,
-				viewType: _viewType,
-				...props
-			},
-			ref,
-		) {
-			return React.createElement(
-				"div",
-				{
-					className,
-					"data-preview-aspect-ratio": aspectRatio,
-					"data-testid": "mock-vidstack-player",
-				},
-				React.createElement("video", {
-					...props,
-					className: "h-full w-full bg-black object-contain",
-					crossOrigin: crossOrigin ? "" : undefined,
-					ref,
-					src: normalizeMockPlayerSrc(src),
-				}),
-				children as ReactNode,
-			);
-		},
-	);
-
-	const passthrough = ({
-		children,
-		...props
-	}: {
-		children?: ReactNode;
-		[key: string]: unknown;
-	}) => React.createElement("div", props, children);
-
-	return {
-		VideoProviderLoader: class {},
-		MediaPlayer,
-		MediaProvider: ({ children }: { children?: ReactNode }) =>
-			React.createElement(React.Fragment, null, children),
-		Menu: {
-			Button: passthrough,
-			Items: passthrough,
-			Radio: ({
-				children,
-				onSelect,
-				...props
-			}: {
-				children?: ReactNode;
-				onSelect?: (event: Event) => void;
-				[key: string]: unknown;
-			}) =>
-				React.createElement(
-					"button",
-					{
-						...props,
-						onClick: (event: MouseEvent<HTMLButtonElement>) =>
-							onSelect?.(event.nativeEvent),
-					},
-					children,
-				),
-			RadioGroup: passthrough,
-			Root: passthrough,
-		},
-		Poster: (props: Record<string, unknown>) =>
-			React.createElement("img", props),
-		Thumbnail: {
-			Img: (props: Record<string, unknown>) =>
-				React.createElement("img", props),
-			Root: passthrough,
-		},
-		Track: () => null,
-		isHLSProvider: () => false,
-		useChapterOptions: () => Object.assign([], { selectedValue: undefined }),
-		useMediaStore: () => ({ duration: 0 }),
-		useVideoQualityOptions: () => [],
-	};
-});
-
-vi.mock("@vidstack/react/player/layouts/default", async () => {
-	const React = await import("react");
-	const Chapters = (props: Record<string, unknown>) =>
-		React.createElement("svg", props);
-
-	return {
-		DefaultTooltip: ({ children }: { children?: ReactNode }) =>
-			React.createElement(React.Fragment, null, children),
-		DefaultVideoLayout: () => null,
-		defaultLayoutIcons: {
-			Menu: {
-				Chapters,
-			},
-		},
-		useDefaultLayoutContext: () => ({ showMenuDelay: 0 }),
-	};
-});
 
 beforeEach(() => {
 	installTestStorage();
 	installTestBrowserApis();
 });
-
-function normalizeMockPlayerSrc(src: unknown): string | undefined {
-	if (typeof src === "string") {
-		return src;
-	}
-
-	if (Array.isArray(src)) {
-		return normalizeMockPlayerSrc(src[0]);
-	}
-
-	if (src && typeof src === "object" && "src" in src) {
-		const nestedSrc = (src as { src?: unknown }).src;
-
-		return typeof nestedSrc === "string" ? nestedSrc : undefined;
-	}
-
-	return undefined;
-}
 
 function installTestStorage() {
 	const localStorage = createTestStorage();
@@ -182,6 +49,31 @@ function createTestStorage(): Storage {
 function installTestBrowserApis() {
 	if (typeof window === "undefined") {
 		return;
+	}
+
+	// jsdom exposes audio/video track lists as plain arrays. Real browser lists
+	// are EventTargets; Video.js subscribes to their add/remove/change events.
+	for (const property of ["audioTracks", "videoTracks"]) {
+		const tracks: unknown = Reflect.get(
+			document.createElement("video"),
+			property,
+		);
+		if (!Array.isArray(tracks)) continue;
+		const lists = new WeakMap<HTMLMediaElement, EventTarget>();
+		Object.defineProperty(HTMLMediaElement.prototype, property, {
+			configurable: true,
+			get(this: HTMLMediaElement) {
+				let list = lists.get(this);
+				if (!list) {
+					list = Object.assign(new EventTarget(), {
+						length: 0,
+						[Symbol.iterator]: () => [][Symbol.iterator](),
+					});
+					lists.set(this, list);
+				}
+				return list;
+			},
+		});
 	}
 
 	const matchMedia = (query: string): MediaQueryList => ({

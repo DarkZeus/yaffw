@@ -133,7 +133,10 @@ class MockOffscreenCanvas {
 	}
 }
 
-import { createMediabunnyScrubFrameProvider } from "../scrub/mediabunny-scrub-frame-provider";
+import {
+	type ScrubFrame,
+	createMediabunnyScrubFrameProvider,
+} from "../scrub/mediabunny-scrub-frame-provider";
 
 beforeEach(() => {
 	mediabunnyMock.beforeKeyPacket = null;
@@ -303,7 +306,7 @@ function pauseFirstScrubOperation(stage: "packet" | "key packet" | "sample") {
 	return { entered: () => entered, resume: () => resume() };
 }
 
-function createProvider(onFrame: ReturnType<typeof vi.fn>) {
+function createProvider(onFrame: (frame: ScrubFrame) => void) {
 	return createMediabunnyScrubFrameProvider({
 		displayHeight: 2160,
 		displayWidth: 3840,

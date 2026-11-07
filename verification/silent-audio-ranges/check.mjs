@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { transformWithEsbuild } from "vite";
+import { transformWithOxc } from "vite";
 import { launchBrowser } from "../browser.cjs";
 import { inspect, probe } from "./artifact.mjs";
 import { prepareFixture } from "./fixtures.mjs";
@@ -43,10 +43,10 @@ try {
 				const timeline = transformed.match(
 					/from "([^"]*audio-packet-timeline[^"]*)"/,
 				)[1];
-				const { code } = await transformWithEsbuild(
+				const { code } = await transformWithOxc(
 					baseline,
 					"mediabunny-audio-buffer.ts",
-					{ target: "esnext", format: "esm" },
+					{ target: "esnext" },
 				);
 				const javascript = code
 					.replace('from "mediabunny"', `from "${dependency}"`)

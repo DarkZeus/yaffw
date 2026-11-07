@@ -1,24 +1,6 @@
-import {
-	type ChapterOption,
-	MediaPlayer,
-	type MediaPlayerInstance,
-	MediaProvider,
-	Menu,
-	type PlayerSrc,
-	useChapterOptions,
-	useMediaStore,
-} from "@vidstack/react";
-import {
-	DefaultTooltip,
-	DefaultVideoLayout,
-	defaultLayoutIcons,
-	useDefaultLayoutContext,
-} from "@vidstack/react/player/layouts/default";
+import { Video, VideoPlayer } from "@videojs/react/video";
 import { CircleDot, Maximize2 } from "lucide-react";
-import "@vidstack/react/player/styles/default/theme.css";
-import "@vidstack/react/player/styles/default/layouts/audio.css";
-import "@vidstack/react/player/styles/default/layouts/video.css";
-import { type RefObject, memo, useMemo } from "react";
+import { type RefObject, memo } from "react";
 import { Button } from "@/components/ui/button";
 import type {
 	MediaTimeUs,
@@ -27,7 +9,7 @@ import type {
 } from "@/editor-core/model";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
-import { localVideoProviderLoaders } from "../player/local-video-provider-loader";
+import { PreviewVideoSkin } from "../player/preview-video-skin";
 
 export type PreviewViewerRegionProps = {
 	asset: ReadyMediaAsset;
@@ -47,12 +29,16 @@ export type PreviewViewerRegionProps = {
 	previewUrl: string;
 	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
 	scrubFrameVisible: boolean;
-	videoRef: RefObject<MediaPlayerInstance | null>;
+	videoRef: RefObject<HTMLVideoElement | null>;
+	fullscreenRef: RefObject<HTMLDivElement | null>;
+	onTogglePlayback: () => void;
+	onPlayheadSeekRequested: (timeUs: MediaTimeUs) => void;
 };
 
 export function PreviewViewerRegion({
 	asset,
 	canFullscreen,
+	fullscreenRef,
 	isPlaying,
 	mediaMuted,
 	onChapterSelectionRequested,
@@ -62,6 +48,8 @@ export function PreviewViewerRegion({
 	onNativePlaying,
 	onNativeSeeked,
 	onRequestFullscreen,
+	onTogglePlayback,
+	onPlayheadSeekRequested,
 	onSyncPlayhead,
 	playbackRate,
 	playheadUs,
@@ -70,11 +58,6 @@ export function PreviewViewerRegion({
 	scrubFrameVisible,
 	videoRef,
 }: PreviewViewerRegionProps) {
-	const playerSrc = useMemo(
-		() => createPreviewPlayerSrc(previewUrl),
-		[previewUrl],
-	);
-
 	return (
 		<section
 			aria-label="Workbench center region"
@@ -132,7 +115,12 @@ export function PreviewViewerRegion({
 					onNativePlaying={onNativePlaying}
 					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
-					playerSrc={playerSrc}
+					previewUrl={previewUrl}
+					fullscreenRef={fullscreenRef}
+					isPlaying={isPlaying}
+					playheadUs={playheadUs}
+					onTogglePlayback={onTogglePlayback}
+					onPlayheadSeekRequested={onPlayheadSeekRequested}
 					scrubCanvasRef={scrubCanvasRef}
 					scrubFrameVisible={scrubFrameVisible}
 					videoRef={videoRef}
@@ -152,7 +140,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativePlaying,
 	onNativeSeeked,
 	onSyncPlayhead,
-	playerSrc,
+	previewUrl,
+	fullscreenRef,
+	isPlaying,
+	playheadUs,
+	onTogglePlayback,
+	onPlayheadSeekRequested,
 	scrubCanvasRef,
 	scrubFrameVisible,
 	videoRef,
@@ -166,12 +159,17 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativePlaying: () => void;
 	onNativeSeeked: () => void;
 	onSyncPlayhead: () => void;
-	playerSrc: PlayerSrc | undefined;
+	previewUrl: string;
+	fullscreenRef: PreviewViewerRegionProps["fullscreenRef"];
+	isPlaying: boolean;
+	playheadUs: MediaTimeUs;
+	onTogglePlayback: () => void;
+	onPlayheadSeekRequested: (timeUs: MediaTimeUs) => void;
 	scrubCanvasRef: PreviewViewerRegionProps["scrubCanvasRef"];
 	scrubFrameVisible: boolean;
 	videoRef: PreviewViewerRegionProps["videoRef"];
 }) {
-	const { previewApertureStyle, previewDisplayAspectRatio, previewSurfaceRef } =
+	const { previewApertureStyle, previewSurfaceRef } =
 		usePreviewApertureLayout(asset);
 	return (
 		<section
@@ -184,217 +182,45 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 				className="relative isolate max-h-full w-full overflow-hidden bg-black"
 				style={previewApertureStyle}
 			>
-				<MediaPlayer
-					aria-label={`Preview for ${asset.label}`}
-					aspectRatio={String(previewDisplayAspectRatio)}
-					className="h-full w-full bg-black text-white"
-					crossOrigin
-					muted={mediaMuted}
-					onEnded={onEnded}
-					onPause={onNativePause}
-					onPlay={onNativePlay}
-					onPlaying={onNativePlaying}
-					onSeeked={onNativeSeeked}
-					onTimeUpdate={onSyncPlayhead}
-					playsInline
-					preload="metadata"
-					ref={videoRef}
-					src={playerSrc}
-					title={asset.label}
-					viewType="video"
-				>
-					<MediaProvider
-						loaders={localVideoProviderLoaders}
-						mediaProps={{
-							className: "h-full w-full bg-black object-contain",
-						}}
-					/>
-					<DefaultVideoLayout
-						icons={defaultLayoutIcons}
-						noAudioGain
-						slots={{
-							chaptersMenu: (
-								<PreviewChaptersMenu
-									onChapterSelected={onChapterSelectionRequested}
-								/>
-							),
-							largeLayout: {
-								muteButton: null,
-								volumeSlider: null,
-							},
-							muteButton: null,
-							smallLayout: {
-								muteButton: null,
-								volumeSlider: null,
-							},
-							volumeSlider: null,
-						}}
-					/>
-				</MediaPlayer>
-				<canvas
-					className={`pointer-events-none absolute inset-0 z-[100] h-full w-full bg-black object-contain ${
-						scrubFrameVisible ? "block" : "hidden"
-					}`}
-					data-testid="scrub-preview-canvas"
-					ref={scrubCanvasRef}
-				/>
+				<VideoPlayer title={asset.label}>
+					<PreviewVideoSkin
+						durationUs={asset.durationUs}
+						fullscreenRef={fullscreenRef}
+						isPlaying={isPlaying}
+						onChapterSelected={onChapterSelectionRequested}
+						onSeek={onPlayheadSeekRequested}
+						onTogglePlayback={onTogglePlayback}
+						playheadUs={playheadUs}
+					>
+						<PreviewVideo
+							aria-label={`Preview for ${asset.label}`}
+							className="h-full w-full bg-black object-contain"
+							crossOrigin="anonymous"
+							muted={mediaMuted}
+							onEnded={onEnded}
+							onPause={onNativePause}
+							onPlay={onNativePlay}
+							onPlaying={onNativePlaying}
+							onSeeked={onNativeSeeked}
+							onTimeUpdate={onSyncPlayhead}
+							playsInline
+							preload="metadata"
+							ref={videoRef}
+							src={previewUrl || undefined}
+						/>
+
+						<canvas
+							className={`pointer-events-none absolute inset-0 z-[1] h-full w-full bg-black object-contain ${
+								scrubFrameVisible ? "block" : "hidden"
+							}`}
+							data-testid="scrub-preview-canvas"
+							ref={scrubCanvasRef}
+						/>
+					</PreviewVideoSkin>
+				</VideoPlayer>
 			</section>
 		</section>
 	);
 });
 
-type PreviewChapterSelection = Selection & {
-	durationText: string;
-	label: string;
-	startTimeText: string;
-	value: string;
-};
-
-function PreviewChaptersMenu({
-	onChapterSelected,
-}: {
-	onChapterSelected?: (selection: Selection) => void;
-}) {
-	const { showMenuDelay } = useDefaultLayoutContext();
-	const chapterOptions = useChapterOptions();
-	const store = useMediaStore();
-	const chapters = useMemo(
-		() => buildPreviewChapterSelections(chapterOptions, store.duration),
-		[chapterOptions, store.duration],
-	);
-
-	if (chapters.length === 0) {
-		return null;
-	}
-
-	return (
-		<Menu.Root className="vds-chapters-menu vds-menu" showDelay={showMenuDelay}>
-			<DefaultTooltip content="Chapters" placement="top">
-				<Menu.Button
-					aria-label="Chapters"
-					className="vds-menu-button vds-button"
-				>
-					<defaultLayoutIcons.Menu.Chapters className="vds-icon" />
-				</Menu.Button>
-			</DefaultTooltip>
-			<Menu.Items
-				className="vds-chapters-menu-items vds-menu-items"
-				placement="top end"
-			>
-				<Menu.RadioGroup
-					className="vds-chapters-radio-group vds-radio-group"
-					value={chapterOptions.selectedValue}
-				>
-					{chapters.map((chapter, index) => {
-						const option = chapterOptions[index];
-
-						return (
-							<Menu.Radio
-								className="vds-chapter-radio vds-radio"
-								key={chapter.value}
-								onSelect={(event) => {
-									onChapterSelected?.({
-										endUs: chapter.endUs,
-										startUs: chapter.startUs,
-									});
-									option?.select(event);
-								}}
-								ref={(element) => option?.setProgressVar(element)}
-								value={chapter.value}
-							>
-								<div className="vds-chapter-radio-content">
-									<span className="vds-chapter-radio-label">
-										{chapter.label}
-									</span>
-									<span className="vds-chapter-radio-start-time">
-										{chapter.startTimeText}
-									</span>
-									<span className="vds-chapter-radio-duration">
-										{chapter.durationText}
-									</span>
-								</div>
-							</Menu.Radio>
-						);
-					})}
-				</Menu.RadioGroup>
-			</Menu.Items>
-		</Menu.Root>
-	);
-}
-
-function buildPreviewChapterSelections(
-	chapterOptions: readonly ChapterOption[],
-	durationSeconds: number,
-): PreviewChapterSelection[] {
-	return chapterOptions.flatMap((option, index) => {
-		const startSeconds = option.cue.startTime;
-		const nextChapterStartSeconds = chapterOptions[index + 1]?.cue.startTime;
-		const endSeconds = resolveChapterEndSeconds({
-			cueEndSeconds: option.cue.endTime,
-			durationSeconds,
-			nextChapterStartSeconds,
-			startSeconds,
-		});
-
-		if (!Number.isFinite(startSeconds) || endSeconds <= startSeconds) {
-			return [];
-		}
-
-		return [
-			{
-				durationText: option.durationText,
-				endUs: secondsToMicroseconds(endSeconds),
-				label: option.label,
-				startTimeText: option.startTimeText,
-				startUs: secondsToMicroseconds(startSeconds),
-				value: option.value,
-			},
-		];
-	});
-}
-
-function resolveChapterEndSeconds({
-	cueEndSeconds,
-	durationSeconds,
-	nextChapterStartSeconds,
-	startSeconds,
-}: {
-	cueEndSeconds: number;
-	durationSeconds: number;
-	nextChapterStartSeconds?: number;
-	startSeconds: number;
-}): number {
-	if (
-		typeof nextChapterStartSeconds === "number" &&
-		Number.isFinite(nextChapterStartSeconds) &&
-		nextChapterStartSeconds > startSeconds
-	) {
-		return nextChapterStartSeconds;
-	}
-
-	if (Number.isFinite(durationSeconds) && durationSeconds > startSeconds) {
-		return durationSeconds;
-	}
-
-	if (Number.isFinite(cueEndSeconds) && cueEndSeconds > startSeconds) {
-		return cueEndSeconds;
-	}
-
-	return startSeconds;
-}
-
-function createPreviewPlayerSrc(previewUrl: string): PlayerSrc | undefined {
-	if (!previewUrl) {
-		return undefined;
-	}
-
-	return {
-		src: previewUrl,
-		// Ready media assets always have video; the local loader owns dispatch.
-		type: "video/object",
-	};
-}
-
-function secondsToMicroseconds(seconds: number): MediaTimeUs {
-	return Math.round(seconds * 1_000_000);
-}
+const PreviewVideo = memo(Video);

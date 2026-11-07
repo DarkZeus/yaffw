@@ -1,60 +1,34 @@
-import type { MediaPlayerInstance } from "@vidstack/react";
+/* @vitest-environment jsdom */
 import { describe, expect, it, vi } from "vitest";
 import { createPreviewMediaTransport } from "../transport/preview-media-transport";
 
 describe("createPreviewMediaTransport", () => {
-	it("resumes native playback when a seek hid its pause from the player store", async () => {
-		const { player, native, provider, transport } = createFixture();
-		player.paused = false;
-		native.paused = true;
-
+	it("always sends play and pause to the native element, independently of presentation state", async () => {
+		const video = document.createElement("video");
+		const play = vi.spyOn(video, "play").mockResolvedValue();
+		const pause = vi.spyOn(video, "pause").mockImplementation(() => undefined);
+		const transport = createPreviewMediaTransport(video);
 		await transport.play();
-
-		expect(native.paused).toBe(false);
-		expect(provider.play).toHaveBeenCalledOnce();
-		expect(player.play).not.toHaveBeenCalled();
+		await transport.pause();
+		expect(play).toHaveBeenCalledOnce();
+		expect(pause).toHaveBeenCalledOnce();
 	});
 
-	it("stops native playback even when the player store already reports paused", async () => {
-		const { player, native, provider, transport } = createFixture();
-		player.paused = true;
-		native.paused = false;
-
-		await transport.pause();
-
-		expect(native.paused).toBe(true);
-		expect(provider.pause).toHaveBeenCalledOnce();
-		expect(player.pause).not.toHaveBeenCalled();
+	it("forwards transport properties to the same video element", () => {
+		const video = document.createElement("video");
+		const transport = createPreviewMediaTransport(video);
+		transport.currentTime = 12;
+		transport.playbackRate = 1.5;
+		transport.volume = 0.25;
+		transport.muted = true;
+		expect(video.currentTime).toBe(12);
+		expect(video.playbackRate).toBe(1.5);
+		expect(video.volume).toBe(0.25);
+		expect(video.muted).toBe(true);
+		expect(transport.currentTime).toBe(12);
+		expect(transport.playbackRate).toBe(1.5);
+		expect(transport.volume).toBe(0.25);
+		expect(transport.muted).toBe(true);
+		expect(transport.seeking).toBe(video.seeking);
 	});
 });
-
-function createFixture() {
-	const native = { paused: true };
-	const provider = {
-		play: vi.fn(async () => {
-			native.paused = false;
-		}),
-		pause: vi.fn(async () => {
-			native.paused = true;
-		}),
-	};
-	const player = {
-		provider: provider as typeof provider | null,
-		currentTime: 0,
-		playbackRate: 1,
-		muted: false,
-		volume: 1,
-		paused: true,
-		state: { seeking: false },
-		play: vi.fn(async () => {
-			if (player.paused) await player.provider?.play();
-		}),
-		pause: vi.fn(async () => {
-			if (!player.paused) await player.provider?.pause();
-		}),
-	};
-	const transport = createPreviewMediaTransport(
-		player as unknown as MediaPlayerInstance,
-	);
-	return { player, native, provider, transport };
-}

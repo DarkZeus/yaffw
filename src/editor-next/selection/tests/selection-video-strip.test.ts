@@ -54,7 +54,9 @@ vi.mock("mediabunny", () => {
 
 	return {
 		ALL_FORMATS: [],
-		BlobSource: vi.fn().mockImplementation((blob: Blob) => ({ blob })),
+		BlobSource: vi.fn().mockImplementation(function (blob: Blob) {
+			return { blob };
+		}),
 		CanvasSink,
 		Input,
 	};
