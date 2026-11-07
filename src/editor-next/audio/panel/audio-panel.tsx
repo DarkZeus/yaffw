@@ -83,11 +83,11 @@ export const AudioPanel = memo(function AudioPanel({
 	return (
 		<section
 			aria-label="Audio panel"
-			className="flex min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:h-full xl:min-h-0 xl:rounded-none xl:border-0"
+			className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden rounded-md border border-workbench-border bg-workbench-inspector xl:rounded-none xl:border-0"
 		>
-			<div className="min-h-0 flex-1 overflow-auto overscroll-contain px-2 py-2">
+			<div className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain px-2 py-2">
 				{hasAutomaticChannelMode ? (
-					<p className="mb-3 text-xs leading-5 text-muted-foreground">
+					<p className="mb-3 shrink-0 text-xs leading-5 text-muted-foreground">
 						Auto-fix quiet side is approximate in Preview: it checks short
 						passages. Export analyzes the full Selection, so stereo placement
 						may differ. Choose an explicit channel mode for consistent
@@ -99,7 +99,7 @@ export const AudioPanel = memo(function AudioPanel({
 				) : (
 					<div
 						aria-label="Audio channel strip bank"
-						className="flex w-max items-start overflow-hidden rounded border border-workbench-border bg-workbench-viewer/35"
+						className="flex h-96 min-h-48 w-max shrink items-stretch overflow-hidden rounded border border-workbench-border bg-workbench-viewer/35"
 					>
 						{audioTracks.map((track, index) => (
 							<AudioTrackStrip
@@ -184,7 +184,7 @@ function AudioTrackStrip({
 	return (
 		<section
 			aria-label={`Audio track strip ${label}`}
-			className={`grid h-[24rem] w-32 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-2 border-r border-workbench-border bg-workbench-lane px-2 py-2 ${
+			className={`grid min-h-0 w-32 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto_auto] gap-2 border-r border-workbench-border bg-workbench-lane px-2 py-2 ${
 				meterDisplay.excluded ? "opacity-70" : ""
 			}`}
 			data-preview-meter-excluded={meterDisplay.excluded ? "true" : undefined}
@@ -209,7 +209,7 @@ function AudioTrackStrip({
 					<input
 						aria-label={`${label} track volume`}
 						aria-valuetext={`${volumePercent}%`}
-						className="h-full min-h-32 w-5 [accent-color:var(--workbench-border-strong)] [writing-mode:vertical-lr]"
+						className="h-full min-h-0 w-5 [accent-color:var(--workbench-border-strong)] [writing-mode:vertical-lr]"
 						disabled={audioEditingDisabled || !onAudioTrackVolumePercentChange}
 						max="100"
 						min="0"
@@ -396,7 +396,7 @@ function CombinedPreviewStrip({
 	return (
 		<section
 			aria-label="Master strip"
-			className="grid h-[24rem] w-28 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 border-r border-workbench-border-strong bg-workbench-lane-alt px-2 py-2"
+			className="grid min-h-0 w-28 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-2 border-r border-workbench-border-strong bg-workbench-lane-alt px-2 py-2"
 		>
 			<div className="grid min-w-0 gap-1">
 				<div className="flex min-w-0 items-center justify-between gap-2">

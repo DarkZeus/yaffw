@@ -65,7 +65,7 @@ export function PreviewLevelMeter({
 			className={cn(
 				"grid min-w-0 rounded-sm border border-workbench-border bg-workbench-viewer p-1",
 				orientation === "vertical"
-					? "h-full min-h-28 w-full"
+					? "h-full min-h-0 w-full"
 					: "min-h-16 w-full",
 			)}
 			data-orientation={orientation}
@@ -130,7 +130,10 @@ function ReadyPreviewLevelMeter({
 	);
 
 	return (
-		<div aria-label={`${label} channels`} className="min-w-0 overflow-x-auto">
+		<div
+			aria-label={`${label} channels`}
+			className="min-h-0 min-w-0 overflow-x-auto"
+		>
 			<div
 				className={cn(
 					"relative grid h-full min-h-0 gap-1",
@@ -245,7 +248,7 @@ function PreviewLevelMeterChannelBar({
 	return (
 		<div
 			className={cn(
-				"relative z-10 grid min-w-0 gap-1",
+				"relative z-10 grid min-h-0 min-w-0 gap-1",
 				orientation === "vertical"
 					? showChannelLabel
 						? "grid-rows-[minmax(0,1fr)_auto]"
@@ -268,7 +271,7 @@ function PreviewLevelMeterChannelBar({
 				aria-valuetext={`${peakText}${channel.clipHeld ? ", clip held" : ""}`}
 				className={cn(
 					"relative min-h-0 overflow-hidden rounded-sm border border-workbench-border/80 bg-workbench-lane",
-					orientation === "vertical" ? "min-h-20" : "h-4",
+					orientation === "horizontal" ? "h-4" : "",
 				)}
 				role="meter"
 			>
@@ -323,7 +326,7 @@ function NonReadyPreviewLevelMeter({
 		state === "preparing" ? "Preparing meter" : "Meter unavailable";
 
 	return (
-		<div className="grid min-h-24 place-items-center rounded-sm border border-workbench-border border-dashed bg-workbench-lane/60 p-2 text-center text-[10px] leading-4 text-muted-foreground">
+		<div className="grid min-h-0 place-items-center overflow-auto rounded-sm border border-workbench-border border-dashed bg-workbench-lane/60 p-2 text-center text-[10px] leading-4 text-muted-foreground">
 			{message ?? fallbackMessage}
 		</div>
 	);
