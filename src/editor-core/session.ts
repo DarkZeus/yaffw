@@ -108,13 +108,15 @@ export type EditorSessionAction =
 	  }
 	| {
 			asset: ReadyMediaAsset;
+			draftId: string;
 			selection: Selection;
 			type: "asset.ready";
 	  }
 	| {
+			draftId: string;
 			message: string;
 			technicalDetails?: string;
-			type: "session.failed";
+			type: "import.failed";
 	  }
 	| {
 			playheadUs: MediaTimeUs;
@@ -213,7 +215,7 @@ export function editorSessionReducer(
 ): EditorSessionState {
 	switch (action.type) {
 		case "import.started":
-			if (state.status !== "empty" && state.status !== "failure") {
+			if (!state.importEnabled && state.status !== "loading") {
 				return state;
 			}
 
@@ -224,7 +226,7 @@ export function editorSessionReducer(
 				status: "loading",
 			};
 		case "asset.ready":
-			if (state.status !== "loading") {
+			if (state.status !== "loading" || state.draft.id !== action.draftId) {
 				return state;
 			}
 
@@ -240,8 +242,8 @@ export function editorSessionReducer(
 				runtime: state.runtime,
 				status: "ready",
 			};
-		case "session.failed":
-			if (state.status === "unsupported-runtime") {
+		case "import.failed":
+			if (state.status !== "loading" || state.draft.id !== action.draftId) {
 				return state;
 			}
 

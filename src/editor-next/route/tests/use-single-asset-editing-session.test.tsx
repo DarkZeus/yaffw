@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("useSingleAssetEditingSession", () => {
-	it("ignores stale successful Media asset analysis after a newer Media asset is ready", async () => {
+	it("ignores stale successful Media asset analysis after confirmed Close file and re-import", async () => {
 		const inspections: Array<{
 			deferred: Deferred<LocalMediaAssetInspection>;
 			fileName: string;
@@ -60,6 +60,10 @@ describe("useSingleAssetEditingSession", () => {
 				"second.mp4",
 			]);
 		});
+		expect(sessionRef.current?.session).toMatchObject({
+			draft: { label: "second.mp4" },
+			status: "loading",
+		});
 
 		await act(async () => {
 			inspections[1]?.deferred.resolve(supportedInspection);
@@ -75,6 +79,30 @@ describe("useSingleAssetEditingSession", () => {
 			expect(session.asset.label).toBe("second.mp4");
 		});
 
+		const previousPreview = sessionRef.current?.preview;
+		act(() => {
+			sessionRef.current?.commands.requestCloseFile();
+		});
+		expect(previousPreview?.cleanupScope.isCurrent()).toBe(false);
+		expect(sessionRef.current?.preview).toBeNull();
+
+		let reopened: Promise<void> | undefined;
+		act(() => {
+			if (!previousPreview) throw new Error("Expected Preview resources.");
+			reopened = sessionRef.current?.commands.importLocalFile(
+				previousPreview.source,
+			);
+		});
+		await act(async () => {
+			inspections[2]?.deferred.resolve(supportedInspection);
+			await reopened;
+		});
+		const reopenedPreview = sessionRef.current?.preview;
+		expect(reopenedPreview?.source).toBe(previousPreview?.source);
+		expect(reopenedPreview?.cleanupScope).not.toBe(
+			previousPreview?.cleanupScope,
+		);
+
 		await act(async () => {
 			inspections[0]?.deferred.resolve({
 				...supportedInspection,
@@ -89,12 +117,42 @@ describe("useSingleAssetEditingSession", () => {
 				return;
 			}
 			expect(session.asset.label).toBe("second.mp4");
-			expect(sessionRef.current?.previewSource).toMatchObject({
-				name: "second.mp4",
-			});
-			expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
+			expect(sessionRef.current?.preview).toBe(reopenedPreview);
+			expect(reopenedPreview?.cleanupScope.isCurrent()).toBe(true);
+			expect(sessionRef.current?.preview?.cleanupScope?.assetId).toBe(
 				session.asset.id,
 			);
+		});
+	});
+
+	it("ignores an old import command while a newer Media asset is ready", async () => {
+		const inspect = vi.fn(async () => supportedInspection);
+		const sessionRef: { current: SingleAssetEditingSession | null } = {
+			current: null,
+		};
+		render(
+			<SingleAssetEditingSessionProbe
+				inspectLocalAsset={inspect}
+				sessionRef={sessionRef}
+			/>,
+		);
+		const emptyCommands = sessionRef.current?.commands;
+		const source = new File(["video"], "keep.mp4", { type: "video/mp4" });
+		await act(async () => {
+			await emptyCommands?.importLocalFile(source);
+		});
+		const scope = sessionRef.current?.preview?.cleanupScope;
+		await act(async () => {
+			await emptyCommands?.importLocalFile(
+				new File(["stale"], "stale.mp4", { type: "video/mp4" }),
+			);
+		});
+		expect(inspect).toHaveBeenCalledTimes(1);
+		expect(scope?.isCurrent()).toBe(true);
+		expect(sessionRef.current?.preview?.source).toBe(source);
+		expect(sessionRef.current?.session).toMatchObject({
+			asset: { label: "keep.mp4" },
+			status: "ready",
 		});
 	});
 
@@ -135,8 +193,7 @@ describe("useSingleAssetEditingSession", () => {
 			await secondImport;
 		});
 
-		const readyAssetId =
-			sessionRef.current?.activeMediaAssetCleanupScope?.assetId;
+		const readyAssetId = sessionRef.current?.preview?.cleanupScope?.assetId;
 		await act(async () => {
 			inspections[0]?.reject(new Error("First analysis failed late."));
 			await firstImport;
@@ -146,10 +203,10 @@ describe("useSingleAssetEditingSession", () => {
 			asset: { label: "second.mp4" },
 			status: "ready",
 		});
-		expect(sessionRef.current?.previewSource).toMatchObject({
+		expect(sessionRef.current?.preview?.source).toMatchObject({
 			name: "second.mp4",
 		});
-		expect(sessionRef.current?.activeMediaAssetCleanupScope?.assetId).toBe(
+		expect(sessionRef.current?.preview?.cleanupScope?.assetId).toBe(
 			readyAssetId,
 		);
 	});

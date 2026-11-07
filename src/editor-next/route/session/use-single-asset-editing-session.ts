@@ -9,6 +9,8 @@ import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import type {
 	AudioTrackChannelMode,
 	GeneratedMedia,
+	MediaAssetDraft,
+	ReadyMediaAsset,
 	OutputSettings,
 	Selection,
 } from "@/editor-core/model";
@@ -39,7 +41,6 @@ import type { DefaultExportRunner } from "../../export/types/default-export-runn
 import { inspectBrowserLocalMediaAssetDraft } from "../../media-asset/adapters/browser-local-asset-analyzer";
 import {
 	type ActiveMediaAssetCleanupScope,
-	type ActiveMediaAssetCleanupScopeController,
 	createActiveMediaAssetCleanupScopeController,
 } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 const closeFileConfirmationMessage =
@@ -65,12 +66,25 @@ export type SingleAssetEditingSessionCommands = {
 	startDefaultExport: () => Promise<void>;
 };
 
-export type SingleAssetEditingSession = {
-	activeMediaAssetCleanupScope: ActiveMediaAssetCleanupScope | null;
+type ReadyMediaPreview = {
+	asset: ReadyMediaAsset;
+	cleanupScope: ActiveMediaAssetCleanupScope;
+	source: File;
+};
+
+type EditingSessionView = {
+	preview: ReadyMediaPreview | null;
+	session: EditorSessionState;
+};
+
+type PendingMediaAnalysis = {
+	controller: AbortController;
+	draft: MediaAssetDraft;
+};
+
+export type SingleAssetEditingSession = EditingSessionView & {
 	commands: SingleAssetEditingSessionCommands;
 	localFileInputKey: number;
-	previewSource: Blob | null;
-	session: EditorSessionState;
 };
 
 export type UseSingleAssetEditingSessionOptions = {
@@ -98,22 +112,19 @@ export function useSingleAssetEditingSession({
 	now,
 	runtime,
 }: UseSingleAssetEditingSessionOptions): SingleAssetEditingSession {
-	const [session, setSession] = useState(() =>
-		createInitialEditorSession(runtime),
+	const [view, setView] = useState<EditingSessionView>(() => ({
+		preview: null,
+		session: createInitialEditorSession(runtime),
+	}));
+	const viewRef = useRef(view);
+	const [previewScopes] = useState(
+		createActiveMediaAssetCleanupScopeController,
 	);
-	const sessionRef = useRef(session);
-	const activeMediaAssetCleanupControllerRef =
-		useRef<ActiveMediaAssetCleanupScopeController | null>(null);
-	const activeImportAnalysisAbortControllerRef = useRef<AbortController | null>(
-		null,
-	);
+	const activeImportRef = useRef<PendingMediaAnalysis | null>(null);
 	const activeExportAbortControllerRef = useRef<AbortController | null>(null);
 	const generatedMediaArtifactRef = useRef<GeneratedMediaArtifact | null>(null);
-	const [activeMediaAssetCleanupScope, setActiveMediaAssetCleanupScope] =
-		useState<ActiveMediaAssetCleanupScope | null>(null);
-	const [previewSource, setPreviewSource] = useState<Blob | null>(null);
 	const [localFileInputKey, setLocalFileInputKey] = useState(0);
-	const protectBeforeUnload = shouldProtectEditorBeforeUnload(session);
+	const protectBeforeUnload = shouldProtectEditorBeforeUnload(view.session);
 
 	useEffect(() => {
 		if (!protectBeforeUnload) {
@@ -134,112 +145,105 @@ export function useSingleAssetEditingSession({
 
 	useEffect(() => {
 		return () => {
-			abortActiveImportAnalysis();
-			activeExportAbortControllerRef.current?.abort();
+			const analysis = activeImportRef.current;
+			const exportController = activeExportAbortControllerRef.current;
+			activeImportRef.current = null;
 			activeExportAbortControllerRef.current = null;
-			activeMediaAssetCleanupControllerRef.current?.disposeCurrentScope();
+			viewRef.current = { ...viewRef.current, preview: null };
 			generatedMediaArtifactRef.current = null;
+			analysis?.controller.abort();
+			exportController?.abort();
+			previewScopes.disposeCurrentScope();
 		};
-	}, []);
+	}, [previewScopes]);
 
 	function dispatch(
 		action: EditorSessionAction,
-		artifact = generatedMediaArtifactRef.current,
+		resources: {
+			artifact?: GeneratedMediaArtifact;
+			preview?: ReadyMediaPreview;
+		} = {},
 	) {
-		const current = sessionRef.current;
-		const next = editorSessionReducer(current, action);
-		if (next === current) return;
+		const current = viewRef.current;
+		const next = editorSessionReducer(current.session, action);
+		if (next === current.session) {
+			resources.preview?.cleanupScope.dispose();
+			return;
+		}
 
-		// Publish and retire the Blob with the exact result the reducer accepted.
+		// Publish browser resources with the exact asset and result the reducer accepted.
+		const candidate = resources.preview ?? current.preview;
+		const preview =
+			next.status === "ready" && candidate?.asset === next.asset
+				? candidate
+				: null;
+		const artifact = resources.artifact ?? generatedMediaArtifactRef.current;
 		generatedMediaArtifactRef.current =
 			next.status === "ready" &&
 			next.export.status === "succeeded" &&
 			artifact?.generatedMedia === next.export.generatedMedia
 				? artifact
 				: null;
-		sessionRef.current = next;
-		setSession(next);
-	}
-
-	function clearSessionLocalResources() {
-		abortActiveImportAnalysis();
-		activeExportAbortControllerRef.current?.abort();
-		activeExportAbortControllerRef.current = null;
-		getActiveMediaAssetCleanupController().disposeCurrentScope();
-		setActiveMediaAssetCleanupScope(null);
-		setPreviewSource(null);
+		const nextView = { preview, session: next };
+		viewRef.current = nextView;
+		setView(nextView);
+		if (current.preview !== preview) current.preview?.cleanupScope.dispose();
 	}
 
 	async function importLocalFile(file: File): Promise<void> {
-		if (!session.importEnabled) {
-			return;
-		}
-
-		clearSessionLocalResources();
+		const { session } = viewRef.current;
+		if (!session.importEnabled && session.status !== "loading") return;
 
 		const draft = createLocalMediaAssetDraft(
 			file,
 			createDraftId ? { createDraftId } : undefined,
 		);
-
-		dispatch({
-			draft,
-			type: "import.started",
-		});
-
-		const abortController = new AbortController();
-		activeImportAnalysisAbortControllerRef.current = abortController;
+		const request = { controller: new AbortController(), draft };
+		const previous = activeImportRef.current;
+		activeImportRef.current = request;
+		dispatch({ draft, type: "import.started" });
+		previous?.controller.abort();
 
 		try {
-			const result = await analyzeLocalMediaAssetDraft(draft, {
+			const result = await analyzeLocalMediaAssetDraft(request.draft, {
 				createAssetId,
 				inspect: inspectLocalAsset,
-				signal: abortController.signal,
+				signal: request.controller.signal,
 			});
 
-			if (
-				activeImportAnalysisAbortControllerRef.current !== abortController ||
-				abortController.signal.aborted
-			) {
-				return;
-			}
+			if (activeImportRef.current !== request) return;
 
 			if (result.status === "ready") {
-				const cleanupScope =
-					getActiveMediaAssetCleanupController().replaceCurrentScope(
-						result.asset.id,
-					);
-				setActiveMediaAssetCleanupScope(cleanupScope);
-				setPreviewSource(file);
-				dispatch({
-					asset: result.asset,
-					selection: result.selection,
-					type: "asset.ready",
-				});
+				dispatch(
+					{
+						asset: result.asset,
+						draftId: draft.id,
+						selection: result.selection,
+						type: "asset.ready",
+					},
+					{
+						preview: {
+							asset: result.asset,
+							cleanupScope: previewScopes.replaceCurrentScope(result.asset.id),
+							source: file,
+						},
+					},
+				);
 				return;
 			}
 
-			setPreviewSource(null);
-			dispatch({
-				message: result.failure.message,
-				technicalDetails: result.failure.technicalDetails,
-				type: "session.failed",
-			});
+			dispatch({ ...result.failure, draftId: draft.id, type: "import.failed" });
 		} finally {
-			if (activeImportAnalysisAbortControllerRef.current === abortController) {
-				activeImportAnalysisAbortControllerRef.current = null;
-			}
+			if (activeImportRef.current === request) activeImportRef.current = null;
 		}
 	}
 
 	async function startDefaultExport(): Promise<void> {
-		const current = sessionRef.current;
+		const { session: current, preview } = viewRef.current;
 		if (
+			!preview ||
 			current.status !== "ready" ||
-			current.export.status === "running" ||
-			session.status !== "ready" ||
-			current.asset !== session.asset ||
-			!previewSource
+			current.export.status === "running"
 		)
 			return;
 
@@ -289,7 +293,7 @@ export function useSingleAssetEditingSession({
 				resolvedOutput: review.resolvedOutput,
 				selection: current.selection,
 				signal: abortController.signal,
-				source: previewSource,
+				source: preview.source,
 			});
 
 			if (activeExportAbortControllerRef.current !== abortController) return;
@@ -314,7 +318,7 @@ export function useSingleAssetEditingSession({
 
 			dispatch(
 				{ generatedMedia, jobId, type: "export.succeeded" },
-				{ blob: result.blob, generatedMedia },
+				{ artifact: { blob: result.blob, generatedMedia } },
 			);
 		} catch (error) {
 			if (activeExportAbortControllerRef.current !== abortController) return;
@@ -344,7 +348,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	function cancelDefaultExport() {
-		const current = sessionRef.current;
+		const current = viewRef.current.session;
 		const controller = activeExportAbortControllerRef.current;
 		if (
 			!controller ||
@@ -381,34 +385,21 @@ export function useSingleAssetEditingSession({
 	}
 
 	function requestCloseFile() {
-		if (!canCloseEditorSession(sessionRef.current)) {
+		const current = viewRef.current;
+		if (
+			!canCloseEditorSession(current.session) ||
+			!confirmCloseFile(closeFileConfirmationMessage)
+		)
 			return;
-		}
 
-		const confirmed = confirmCloseFile(closeFileConfirmationMessage);
-
-		if (!confirmed) {
+		const latest = viewRef.current;
+		if (
+			latest.preview !== current.preview ||
+			!canCloseEditorSession(latest.session)
+		)
 			return;
-		}
-
-		if (!canCloseEditorSession(sessionRef.current)) return;
-		dispatch({ type: "session.closed" });
-		clearSessionLocalResources();
 		setLocalFileInputKey((currentKey) => currentKey + 1);
-	}
-
-	function getActiveMediaAssetCleanupController() {
-		if (!activeMediaAssetCleanupControllerRef.current) {
-			activeMediaAssetCleanupControllerRef.current =
-				createActiveMediaAssetCleanupScopeController();
-		}
-
-		return activeMediaAssetCleanupControllerRef.current;
-	}
-
-	function abortActiveImportAnalysis() {
-		activeImportAnalysisAbortControllerRef.current?.abort();
-		activeImportAnalysisAbortControllerRef.current = null;
+		dispatch({ type: "session.closed" });
 	}
 
 	function setSelectionStartFromPlayhead(playheadUs: number) {
@@ -473,7 +464,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	function applyOutputSettings(outputSettings: OutputSettings) {
-		const current = sessionRef.current;
+		const current = viewRef.current.session;
 		if (!canChangeEditingDecisions(current)) return false;
 
 		const plan = resolveOutputPlan({
@@ -491,7 +482,7 @@ export function useSingleAssetEditingSession({
 	}
 
 	return {
-		activeMediaAssetCleanupScope,
+		...view,
 		commands: {
 			applyOutputSettings,
 			cancelDefaultExport,
@@ -509,8 +500,6 @@ export function useSingleAssetEditingSession({
 			startDefaultExport,
 		},
 		localFileInputKey,
-		previewSource,
-		session,
 	};
 }
 

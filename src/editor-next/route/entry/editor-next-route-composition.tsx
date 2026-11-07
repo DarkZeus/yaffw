@@ -18,13 +18,7 @@ import type {
 } from "../session/use-single-asset-editing-session";
 
 export function EditorNextRouteComposition({
-	editingSession: {
-		activeMediaAssetCleanupScope,
-		commands,
-		localFileInputKey,
-		previewSource,
-		session,
-	},
+	editingSession: { commands, localFileInputKey, preview, session },
 	runtime,
 }: {
 	editingSession: SingleAssetEditingSession;
@@ -99,12 +93,12 @@ export function EditorNextRouteComposition({
 			: undefined;
 	}, [session, stableCommands, selectionEditingDisabled]);
 	const readyPreviewPlayer =
-		session.status === "ready" && previewSource ? (
+		session.status === "ready" && preview ? (
 			<NativePreviewPlayer
 				closeFileDisabled={!canCloseEditorSession(session)}
 				onCloseFileRequested={stableCommands.requestCloseFile}
 				inspector={readyInspector}
-				activeMediaAssetCleanupScope={activeMediaAssetCleanupScope ?? undefined}
+				activeMediaAssetCleanupScope={preview.cleanupScope}
 				asset={session.asset}
 				audioMix={session.audioMix}
 				onAudioTrackIncludedChange={stableCommands.setAudioTrackIncluded}
@@ -116,7 +110,7 @@ export function EditorNextRouteComposition({
 				selection={session.selection}
 				selectionEditingDisabled={selectionEditingDisabled}
 				shortcutsDisabled={selectionEditingDisabled}
-				source={previewSource}
+				source={preview.source}
 			/>
 		) : null;
 
@@ -140,7 +134,10 @@ export function EditorNextRouteComposition({
 	);
 
 	return session.status === "ready" ? (
-		<PreviewAudioMonitoringProvider assetId={session.asset.id}>
+		<PreviewAudioMonitoringProvider
+			key={session.asset.id}
+			assetId={session.asset.id}
+		>
 			<PreviewMeteringProvider
 				asset={session.asset}
 				audioMix={session.audioMix}

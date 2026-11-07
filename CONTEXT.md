@@ -307,6 +307,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - A **Media asset** may originate from local file selection or an external URL.
 - A file prepared or re-encoded outside YAFFW is still just a **Media asset draft** when imported.
 - **Close file** always asks for confirmation, then disposes active preview resources, clears analysis, editing decisions, and any generated media result, and returns to the empty import state.
+- Import analysis belongs to the current **Media asset draft**. The accepted **Ready media asset** is published with its Preview source and cleanup scope, which are released together when the session closes.
 - The first slice disables **Close file** while an **Export job** is running.
 - The first slice does not persist editor state across page refreshes, but uses **Unload protection** while an active media asset, running export, or generated media result exists.
 - Editor-next requires a **Supported runtime**; if WebCodecs is unavailable, the app should block access to the editor workflow with a clear unsupported-runtime message.

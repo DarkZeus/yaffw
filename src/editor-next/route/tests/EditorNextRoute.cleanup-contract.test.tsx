@@ -192,7 +192,9 @@ describe("EditorNextRoute cleanup contract", () => {
 			type: "video/mp4",
 		});
 		const deliverGeneratedMedia = vi.fn(() => true).mockReturnValueOnce(false);
-		vi.spyOn(window, "confirm").mockReturnValue(true);
+		vi.spyOn(window, "confirm")
+			.mockReturnValueOnce(false)
+			.mockReturnValue(true);
 
 		render(
 			<EditorNextRouteTestHarness
@@ -259,12 +261,24 @@ describe("EditorNextRoute cleanup contract", () => {
 			}),
 		});
 
-		fireEvent.click(
-			within(screen.getByLabelText("Preview viewer header")).getByRole(
-				"button",
-				{ name: "Close file" },
-			),
+		const closeFile = within(
+			screen.getByLabelText("Preview viewer header"),
+		).getByRole("button", { name: "Close file" });
+		const preview = screen.getByLabelText("Preview for close-contract.mp4");
+		fireEvent.click(closeFile);
+		expect(screen.getByLabelText("Preview for close-contract.mp4")).toBe(
+			preview,
 		);
+		expect(result.getByText("Delivered")).toBeTruthy();
+		expect(URL.revokeObjectURL).not.toHaveBeenCalledWith(
+			"blob:preview:close-contract.mp4",
+		);
+		expect(
+			adapterMockState.previewAudioEngines[0]?.destroy,
+		).not.toHaveBeenCalled();
+		expect(adapterMockState.wavesurfers[0]?.destroy).not.toHaveBeenCalled();
+
+		fireEvent.click(closeFile);
 
 		await waitFor(() => {
 			expect(screen.getByText("Open a video")).toBeTruthy();

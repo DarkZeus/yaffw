@@ -47,6 +47,7 @@ describe("editor-next session runtime gate", () => {
 		const ready = editorSessionReducer(loading, {
 			asset: readyAsset,
 			selection: defaultSelection,
+			draftId: localDraft.id,
 			type: "asset.ready",
 		});
 
@@ -61,7 +62,8 @@ describe("editor-next session runtime gate", () => {
 		const failed = editorSessionReducer(loading, {
 			message: "The media asset could not be analyzed.",
 			technicalDetails: "No readable duration was found.",
-			type: "session.failed",
+			draftId: localDraft.id,
+			type: "import.failed",
 		});
 
 		expect(failed.status).toBe("failure");
@@ -83,6 +85,31 @@ describe("editor-next session runtime gate", () => {
 		}
 
 		expect(retryLoading.draft).toBe(localDraft);
+
+		const replacementDraft = { ...localDraft, id: "replacement-draft" };
+		const replacement = editorSessionReducer(loading, {
+			draft: replacementDraft,
+			type: "import.started",
+		});
+		expect(replacement).toMatchObject({
+			draft: replacementDraft,
+			status: "loading",
+		});
+		expect(
+			editorSessionReducer(replacement, {
+				asset: readyAsset,
+				draftId: localDraft.id,
+				selection: defaultSelection,
+				type: "asset.ready",
+			}),
+		).toBe(replacement);
+		expect(
+			editorSessionReducer(replacement, {
+				draftId: localDraft.id,
+				message: "A previous analysis failed.",
+				type: "import.failed",
+			}),
+		).toBe(replacement);
 
 		const closed = editorSessionReducer(ready, { type: "session.closed" });
 
@@ -109,6 +136,7 @@ describe("editor-next session runtime gate", () => {
 					endUs: 800_000,
 					startUs: 200_000,
 				},
+				draftId: localDraft.id,
 				type: "asset.ready",
 			},
 		);
@@ -218,6 +246,7 @@ describe("editor-next session runtime gate", () => {
 					endUs: 600_000,
 					startUs: 200_000,
 				},
+				draftId: localDraft.id,
 				type: "asset.ready",
 			},
 		);
@@ -677,6 +706,7 @@ function createReadySessionWithAsset(
 		{
 			asset,
 			selection,
+			draftId: localDraft.id,
 			type: "asset.ready",
 		},
 	);
