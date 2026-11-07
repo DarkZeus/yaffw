@@ -22,24 +22,25 @@ export type ExportPresetDocument = {
 export type ExportPresetStorage = Pick<Storage, "getItem" | "setItem">;
 
 export type SaveExportPresetResult =
-	| { kind: "collision"; preset: ExportPreset }
-	| { kind: "saved"; preset: ExportPreset };
+	| { kind: "collision"; name: string }
+	| {
+			kind: "created" | "overwritten";
+			document: ExportPresetDocument;
+			name: string;
+	  };
 
 export function readExportPresetDocument(
 	storage: ExportPresetStorage,
 ): ExportPresetDocument {
-	const stored = storage.getItem(EXPORT_PRESET_STORAGE_KEY);
-	if (!stored) {
-		return emptyExportPresetDocument();
-	}
-
 	try {
+		const stored = storage.getItem(EXPORT_PRESET_STORAGE_KEY);
+		if (stored === null) return emptyExportPresetDocument();
 		const parsed: unknown = JSON.parse(stored);
-		return isExportPresetDocument(parsed)
-			? cloneExportPresetDocument(parsed)
-			: emptyExportPresetDocument();
-	} catch {
-		return emptyExportPresetDocument();
+		if (!isExportPresetDocument(parsed))
+			throw new Error("Invalid Export preset document.");
+		return cloneExportPresetDocument(parsed);
+	} catch (cause) {
+		throw new Error("Saved Export presets could not be read.", { cause });
 	}
 }
 
@@ -61,11 +62,10 @@ export function saveExportPreset({
 	);
 
 	if (existingIndex >= 0 && !overwrite) {
-		return {
-			kind: "collision",
-			preset: cloneExportPreset(document.userPresets[existingIndex]),
-		};
+		return { kind: "collision", name: normalizedName };
 	}
+	if (existingIndex < 0 && overwrite)
+		throw new Error("The Export preset no longer exists.");
 
 	const preset = {
 		name: normalizedName,
@@ -78,8 +78,21 @@ export function saveExportPreset({
 		document.userPresets.push(preset);
 	}
 
-	writeExportPresetDocument(storage, document);
-	return { kind: "saved", preset: cloneExportPreset(preset) };
+	try {
+		writeExportPresetDocument(storage, document);
+	} catch (cause) {
+		throw new Error(
+			overwrite
+				? "The Export preset could not be updated."
+				: "The Export preset could not be saved.",
+			{ cause },
+		);
+	}
+	return {
+		kind: overwrite ? "overwritten" : "created",
+		document,
+		name: normalizedName,
+	};
 }
 
 export function deleteExportPreset(
@@ -91,7 +104,7 @@ export function deleteExportPreset(
 		(preset) => preset.name !== name,
 	);
 	writeExportPresetDocument(storage, document);
-	return cloneExportPresetDocument(document);
+	return document;
 }
 
 export function saveLastUsedSettings(
@@ -104,7 +117,7 @@ export function saveLastUsedSettings(
 	return cloneExportPresetDocument(document);
 }
 
-export function validateExportPresetName(name: string): string {
+function validateExportPresetName(name: string): string {
 	const normalizedName = name.trim();
 	if (!normalizedName) {
 		throw new Error("Enter a preset name.");
