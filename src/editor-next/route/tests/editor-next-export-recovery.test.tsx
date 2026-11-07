@@ -6,12 +6,15 @@ import {
 	fireEvent,
 	render,
 	screen,
-	waitFor,
 	within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalMediaAssetInspection } from "@/editor-core/local-file-analysis";
 import { evaluateRuntimeSupport } from "@/editor-core/runtime-capabilities";
+import type {
+	DefaultExportRunner,
+	DefaultExportRunnerResult,
+} from "../../export/types/default-export-runner.types";
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
 
 const originalCreateObjectURL = URL.createObjectURL;
@@ -37,10 +40,13 @@ afterEach(() => {
 });
 
 describe("editor-next export recovery", () => {
-	it("keeps the active media asset editable after a default export failure", async () => {
-		const exportRun = vi.fn(() =>
-			Promise.reject(new Error("Encoder rejected the source video.")),
-		);
+	it("handles failure from an uncancellable runner and starts a fresh job after editing", async () => {
+		const first = deferredExport();
+		const second = deferredExport();
+		const exportRun = vi
+			.fn<DefaultExportRunner["run"]>()
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise);
 
 		render(
 			<EditorNextRouteTestHarness
@@ -48,7 +54,7 @@ describe("editor-next export recovery", () => {
 				createDraftId={() => "draft-export-failure"}
 				createExportJobId={() => "export-failure"}
 				defaultExportRunner={{
-					cancelSupported: true,
+					cancelSupported: false,
 					run: exportRun,
 				}}
 				initialRuntime={supportedRuntime}
@@ -62,18 +68,20 @@ describe("editor-next export recovery", () => {
 			},
 		});
 
-		await waitFor(() => {
-			expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
-		});
+		await screen.findByLabelText("Preview for failure.mp4");
 
 		openExportTab();
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
+		const firstRequest = exportRun.mock.calls[0][0];
+		expect(screen.queryByRole("button", { name: "Cancel export" })).toBeNull();
+		expect(screen.getByText("Cancellation unavailable")).toBeTruthy();
 		await act(async () => {
-			fireEvent.click(screen.getByRole("button", { name: "Start export" }));
+			first.reject(
+				new DOMException("Encoder rejected the source video.", "AbortError"),
+			);
 		});
-
-		await waitFor(() => {
-			expect(screen.getByText("Default export failed.")).toBeTruthy();
-		});
+		expect(screen.getByText("Default export failed.")).toBeTruthy();
+		expect(firstRequest.signal.aborted).toBe(false);
 
 		const technicalDetails = screen
 			.getByText("Technical details")
@@ -88,47 +96,46 @@ describe("editor-next export recovery", () => {
 		);
 		expect(technicalDetails?.open).toBe(true);
 		expect(screen.getByLabelText("Preview for failure.mp4")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Retry export" })).toBeTruthy();
 
-		const localFileInput = screen.queryByLabelText("Local media file");
-		if (localFileInput instanceof HTMLElement) {
-			fireEvent.blur(localFileInput);
-		}
-
-		fireEvent.keyDown(window, { code: "KeyL", key: "l" });
+		fireEvent.click(
+			screen.getByRole("button", { name: "Seek forward 1 second" }),
+		);
 		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
-
-		await waitFor(() => {
-			expect(screen.getByText("Standard export")).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
+		const secondRequest = exportRun.mock.calls[1][0];
+		expect(secondRequest.selection.startUs).toBe(1_000_000);
+		act(() => {
+			secondRequest.onProgress({ completedRatio: 0.2, phase: "encoding" });
+			firstRequest.onProgress({ completedRatio: 0.95, phase: "muxing" });
 		});
-		expect(screen.queryByText("Default export failed.")).toBeNull();
+		expect(
+			screen
+				.getByRole("progressbar", { name: "Export progress" })
+				.getAttribute("aria-valuenow"),
+		).toBe("20");
+		await act(async () => {
+			second.resolve({ blob: new Blob(["retry output"]) });
+		});
+		expect(
+			screen.getByRole("button", { name: "Download export" }),
+		).toBeTruthy();
 	});
 
-	it("cancels a supported export without clearing the active media asset", async () => {
-		const exportRun = vi.fn(
-			({ signal }: { signal: AbortSignal }) =>
-				new Promise<{ blob: Blob }>((_resolve, reject) => {
-					signal.addEventListener(
-						"abort",
-						() => {
-							const error = new Error("Export was aborted.");
-							error.name = "AbortError";
-							reject(error);
-						},
-						{ once: true },
-					);
-				}),
-		);
+	it("keeps cancellation pending until settlement and ignores late progress after retry", async () => {
+		const first = deferredExport();
+		const second = deferredExport();
+		const exportRun = vi
+			.fn<DefaultExportRunner["run"]>()
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise);
 
 		render(
 			<EditorNextRouteTestHarness
 				createAssetId={() => "asset-export-cancelled"}
 				createDraftId={() => "draft-export-cancelled"}
-				createExportJobId={() => "export-cancelled"}
-				defaultExportRunner={{
-					cancelSupported: true,
-					run: exportRun,
-				}}
+				createExportJobId={() => "same-job-id"}
+				defaultExportRunner={{ cancelSupported: true, run: exportRun }}
 				initialRuntime={supportedRuntime}
 				inspectLocalAsset={async () => supportedInspection}
 			/>,
@@ -139,30 +146,91 @@ describe("editor-next export recovery", () => {
 				files: [new File(["video"], "cancel.mp4", { type: "video/mp4" })],
 			},
 		});
+		await screen.findByLabelText("Preview for cancel.mp4");
 
-		await waitFor(() => {
-			expect(screen.getByLabelText("Preview for cancel.mp4")).toBeTruthy();
-		});
-
+		fireEvent.click(
+			screen.getByRole("button", { name: "Seek forward 1 second" }),
+		);
+		fireEvent.keyDown(window, { code: "BracketLeft", key: "[" });
 		openExportTab();
 		fireEvent.click(screen.getByRole("button", { name: "Start export" }));
-
-		await waitFor(() => {
-			expect(
-				screen.getByRole("button", { name: "Cancel export" }),
-			).toBeTruthy();
-		});
+		const firstRequest = exportRun.mock.calls[0][0];
+		expect(firstRequest.selection.startUs).toBe(1_000_000);
 		fireEvent.click(screen.getByRole("button", { name: "Cancel export" }));
 
-		await waitFor(() => {
-			expect(screen.getByText("Export cancelled.")).toBeTruthy();
-		});
+		expect(firstRequest.signal.aborted).toBe(true);
+		expect(screen.getByText("Cancelling export…")).toBeTruthy();
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", { name: "Cancel export" })
+				.disabled,
+		).toBe(true);
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", { name: "Output settings" })
+				.disabled,
+		).toBe(true);
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", { name: "Close file" })
+				.disabled,
+		).toBe(true);
+		expect(screen.queryByRole("button", { name: "Retry export" })).toBeNull();
 
+		act(() => {
+			firstRequest.onProgress({ completedRatio: 0.95, phase: "muxing" });
+		});
+		expect(screen.getByText("Cancelling export…")).toBeTruthy();
+		expect(
+			screen
+				.getByRole("progressbar", { name: "Export progress" })
+				.getAttribute("aria-valuenow"),
+		).not.toBe("95");
+
+		await act(async () => {
+			// A runner can still resolve after cancellation was requested.
+			first.resolve({ blob: new Blob(["cancelled output"]) });
+		});
+		expect(screen.getByText("Export cancelled.")).toBeTruthy();
 		expect(screen.getByLabelText("Preview for cancel.mp4")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Start export" })).toBeTruthy();
-		expect(exportRun).toHaveBeenCalledTimes(1);
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", { name: "Output settings" })
+				.disabled,
+		).toBe(false);
+		expect(
+			screen.getByRole<HTMLButtonElement>("button", { name: "Close file" })
+				.disabled,
+		).toBe(false);
+
+		fireEvent.click(screen.getByRole("button", { name: "Retry export" }));
+		const secondRequest = exportRun.mock.calls[1][0];
+		expect(secondRequest.selection).toEqual(firstRequest.selection);
+		act(() => {
+			secondRequest.onProgress({ completedRatio: 0.2, phase: "encoding" });
+			firstRequest.onProgress({ completedRatio: 0.95, phase: "muxing" });
+		});
+		expect(
+			screen
+				.getByRole("progressbar", { name: "Export progress" })
+				.getAttribute("aria-valuenow"),
+		).toBe("20");
+		await act(async () => {
+			second.resolve({ blob: new Blob(["retry output"]) });
+		});
+		expect(
+			screen.getByRole("button", { name: "Download export" }),
+		).toBeTruthy();
 	});
 });
+
+function deferredExport() {
+	let resolve: (value: DefaultExportRunnerResult) => void = () => {};
+	let reject: (error: Error) => void = () => {};
+	const promise = new Promise<DefaultExportRunnerResult>(
+		(onResolve, onReject) => {
+			resolve = onResolve;
+			reject = onReject;
+		},
+	);
+	return { promise, reject, resolve };
+}
 
 const supportedRuntime = evaluateRuntimeSupport({
 	fileApi: true,

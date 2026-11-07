@@ -307,16 +307,32 @@ describe("editor-next session runtime gate", () => {
 		}
 
 		expect(exporting.export.job.id).toBe("export-1");
-		expect(exporting.export.job.cancelSupported).toBe(true);
+		expect(exporting.export.job.cancellation).toBe("available");
 		expect(canChangeEditingDecisions(exporting)).toBe(false);
 		expect(canCloseEditorSession(exporting)).toBe(false);
 
-		const ignoredSelectionEdit = editorSessionReducer(exporting, {
+		const cancelling = editorSessionReducer(exporting, {
+			jobId: "export-1",
+			type: "export.cancellation-requested",
+		});
+		expect(cancelling).toMatchObject({
+			export: { status: "running", job: { cancellation: "requested" } },
+		});
+		expect(canChangeEditingDecisions(cancelling)).toBe(false);
+		expect(canCloseEditorSession(cancelling)).toBe(false);
+		const ignoredSelectionEdit = editorSessionReducer(cancelling, {
 			playheadUs: 400_000,
 			type: "selection.start.setFromPlayhead",
 		});
 
-		expect(ignoredSelectionEdit).toBe(exporting);
+		expect(ignoredSelectionEdit).toBe(cancelling);
+		expect(
+			editorSessionReducer(cancelling, {
+				generatedMedia,
+				jobId: "export-1",
+				type: "export.succeeded",
+			}),
+		).toBe(cancelling);
 	});
 
 	it("owns Output settings as editing decisions and blocks changes while export is running", () => {
@@ -545,6 +561,12 @@ describe("editor-next session runtime gate", () => {
 		});
 
 		expect(ignoredCancellation).toBe(exporting);
+		expect(
+			editorSessionReducer(exporting, {
+				jobId: "export-uncancellable",
+				type: "export.cancellation-requested",
+			}),
+		).toBe(exporting);
 	});
 });
 

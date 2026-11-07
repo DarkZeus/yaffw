@@ -47,7 +47,7 @@ export type LoadingSession = {
 } & BaseSessionState;
 
 export type ExportJob = {
-	cancelSupported: boolean;
+	cancellation: "unavailable" | "available" | "requested";
 	id: string;
 	progress: ExportProgress;
 };
@@ -178,7 +178,7 @@ export type EditorSessionAction =
 	  }
 	| {
 			jobId: string;
-			type: "export.cancelled";
+			type: "export.cancellation-requested" | "export.cancelled";
 	  }
 	| {
 			generatedMediaId: string;
@@ -423,7 +423,7 @@ export function editorSessionReducer(
 				...state,
 				export: {
 					job: {
-						cancelSupported: action.cancelSupported,
+						cancellation: action.cancelSupported ? "available" : "unavailable",
 						id: action.jobId,
 						progress: {
 							phase: "preparing",
@@ -437,7 +437,8 @@ export function editorSessionReducer(
 			if (
 				state.status !== "ready" ||
 				state.export.status !== "running" ||
-				state.export.job.id !== action.jobId
+				state.export.job.id !== action.jobId ||
+				state.export.job.cancellation === "requested"
 			) {
 				return state;
 			}
@@ -457,7 +458,8 @@ export function editorSessionReducer(
 			if (
 				state.status !== "ready" ||
 				state.export.status !== "running" ||
-				state.export.job.id !== action.jobId
+				state.export.job.id !== action.jobId ||
+				state.export.job.cancellation === "requested"
 			) {
 				return state;
 			}
@@ -496,12 +498,30 @@ export function editorSessionReducer(
 				},
 			};
 		}
+		case "export.cancellation-requested": {
+			if (
+				state.status !== "ready" ||
+				state.export.status !== "running" ||
+				state.export.job.id !== action.jobId ||
+				state.export.job.cancellation !== "available"
+			) {
+				return state;
+			}
+
+			return {
+				...state,
+				export: {
+					...state.export,
+					job: { ...state.export.job, cancellation: "requested" },
+				},
+			};
+		}
 		case "export.cancelled": {
 			if (
 				state.status !== "ready" ||
 				state.export.status !== "running" ||
 				state.export.job.id !== action.jobId ||
-				!state.export.job.cancelSupported
+				state.export.job.cancellation === "unavailable"
 			) {
 				return state;
 			}

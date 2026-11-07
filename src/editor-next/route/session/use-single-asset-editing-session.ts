@@ -275,6 +275,11 @@ export function useSingleAssetEditingSession({
 			const result = await defaultExportRunner.run({
 				audioMix: current.audioMix,
 				onProgress: (progress) => {
+					if (
+						activeExportAbortControllerRef.current !== abortController ||
+						abortController.signal.aborted
+					)
+						return;
 					dispatch({
 						jobId,
 						progress,
@@ -315,7 +320,8 @@ export function useSingleAssetEditingSession({
 			if (activeExportAbortControllerRef.current !== abortController) return;
 			if (
 				abortController.signal.aborted ||
-				isDefaultExportCancelledError(error)
+				(defaultExportRunner.cancelSupported &&
+					isDefaultExportCancelledError(error))
 			) {
 				dispatch({
 					jobId,
@@ -338,15 +344,21 @@ export function useSingleAssetEditingSession({
 	}
 
 	function cancelDefaultExport() {
+		const current = sessionRef.current;
+		const controller = activeExportAbortControllerRef.current;
 		if (
-			session.status !== "ready" ||
-			session.export.status !== "running" ||
-			!session.export.job.cancelSupported
-		) {
+			!controller ||
+			current.status !== "ready" ||
+			current.export.status !== "running" ||
+			current.export.job.cancellation !== "available"
+		)
 			return;
-		}
 
-		activeExportAbortControllerRef.current?.abort();
+		dispatch({
+			jobId: current.export.job.id,
+			type: "export.cancellation-requested",
+		});
+		controller.abort();
 	}
 
 	function downloadGeneratedMedia(generatedMedia: GeneratedMedia) {

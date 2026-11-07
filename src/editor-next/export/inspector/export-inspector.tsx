@@ -261,10 +261,11 @@ function ExportJobSection({
 			return (
 				<>
 					<RunningExportStatus job={exportState.job} />
-					{exportState.job.cancelSupported ? (
+					{exportState.job.cancellation !== "unavailable" ? (
 						<ExportActionShell>
 							<Button
 								className="h-10 w-full"
+								disabled={exportState.job.cancellation === "requested"}
 								onClick={onCancelExport}
 								type="button"
 								variant="outline"
@@ -283,16 +284,20 @@ function ExportJobSection({
 					<StartExportAction
 						disabled={!reviewSupported}
 						onStartExport={onStartExport}
+						retry
 					/>
 				</>
 			);
 		case "cancelled":
 			return (
 				<>
-					<div className="text-sm text-muted-foreground">Export cancelled.</div>
+					<output className="text-sm text-muted-foreground">
+						Export cancelled.
+					</output>
 					<StartExportAction
 						disabled={!reviewSupported}
 						onStartExport={onStartExport}
+						retry
 					/>
 				</>
 			);
@@ -310,9 +315,11 @@ function RunningExportStatus({ job }: { job: ExportJob }) {
 	return (
 		<div className="grid min-w-0 gap-3">
 			<div className="flex min-w-0 items-center justify-between gap-3 text-sm">
-				<span className="font-medium">
-					{formatExportProgressPhase(job.progress.phase)}
-				</span>
+				<output className="font-medium">
+					{job.cancellation === "requested"
+						? "Cancelling export…"
+						: formatExportProgressPhase(job.progress.phase)}
+				</output>
 				<Badge className="max-w-32 truncate" variant="outline">
 					{job.id}
 				</Badge>
@@ -321,11 +328,11 @@ function RunningExportStatus({ job }: { job: ExportJob }) {
 				aria-label="Export progress"
 				value={progressPercent(job.progress)}
 			/>
-			{job.cancelSupported ? null : (
+			{job.cancellation === "unavailable" ? (
 				<p className="text-xs text-muted-foreground">
 					Cancellation unavailable
 				</p>
-			)}
+			) : null}
 		</div>
 	);
 }
@@ -419,9 +426,11 @@ function GeneratedMediaStatus({
 function StartExportAction({
 	disabled,
 	onStartExport,
+	retry = false,
 }: {
 	disabled: boolean;
 	onStartExport: () => void;
+	retry?: boolean;
 }) {
 	return (
 		<ExportActionShell>
@@ -431,7 +440,7 @@ function StartExportAction({
 				onClick={onStartExport}
 				type="button"
 			>
-				Start export
+				{retry ? "Retry export" : "Start export"}
 			</Button>
 		</ExportActionShell>
 	);

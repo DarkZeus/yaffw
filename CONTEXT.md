@@ -513,6 +513,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - An **Export job** runs from a snapshot of the **Media asset** and **Editing decisions** captured when the job starts.
 - A running **Export job** reports minimal **Export progress** such as preparing, processing, muxing, or finalizing. Conversion progress uses neutral Processing wording because it does not establish whether video is copied or transcoded, and the **Generated audio mix** is encoded independently.
 - **Export cancellation** is available only when the active export runner can stop safely; the UI should not imply cancellation when it is unsupported.
+- A cancellation request keeps its **Export job** running and editing locked until the runner settles. After cancellation or failure, the active **Media asset** and its **Editing decisions** remain available for retry.
 - The first slice disables editing changes while an **Export job** is running.
 - The **Output settings modal** and **Export preset** mutations are blocked while an **Export job** is running.
 - **Runtime capability** determines which import, preview, analysis, and export paths are available; it does not create a separate editor model.
