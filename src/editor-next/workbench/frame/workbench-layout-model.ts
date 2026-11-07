@@ -22,8 +22,18 @@ export const workbenchPanelTitles = {
 	export: "Export",
 } as const;
 export type WorkbenchPanelId = keyof typeof workbenchPanelTitles;
+type WorkbenchInspectorTab = keyof WorkbenchInspectorPanels;
 export type WorkbenchLayoutModel = WorkspaceModel<null>;
+type SavedWorkbenchLayout = WorkbenchLayoutModel & {
+	narrowInspectorTab?: WorkbenchInspectorTab;
+};
 export const workbenchLayoutStorageKey = "yaffw-workbench-layout-v1";
+
+export function isWorkbenchInspectorTab(
+	id: unknown,
+): id is WorkbenchInspectorTab {
+	return id === "media" || id === "audio" || id === "export";
+}
 
 function panel(id: WorkbenchPanelId): TabNode<null> {
 	return {
@@ -92,11 +102,15 @@ export function createDefaultWorkbenchLayout(
 
 export function createNarrowWorkbenchLayout(
 	withInspector = true,
-	desktopModel = createDefaultWorkbenchLayout(withInspector),
+	desktopModel: SavedWorkbenchLayout = createDefaultWorkbenchLayout(
+		withInspector,
+	),
 ): WorkbenchLayoutModel {
-	const selectedId = workbenchTabsets(desktopModel.root)
-		.map((group) => group.selectedId)
-		.find((id) => id === "media" || id === "audio" || id === "export");
+	const selectedId =
+		desktopModel.narrowInspectorTab ??
+		workbenchTabsets(desktopModel.root)
+			.map((group) => group.selectedId)
+			.find(isWorkbenchInspectorTab);
 	return {
 		version: 1,
 		root: {
@@ -117,6 +131,23 @@ export function createNarrowWorkbenchLayout(
 			],
 		},
 	};
+}
+
+export function rememberNarrowInspectorTab(
+	desktopModel: SavedWorkbenchLayout,
+	narrowModel: WorkbenchLayoutModel,
+): SavedWorkbenchLayout | null {
+	const selectedId = workbenchTabsets(narrowModel.root).find(
+		(group) => group.id === "narrow-inspector",
+	)?.selectedId;
+	if (!isWorkbenchInspectorTab(selectedId)) return null;
+	const desktop = structuredClone(desktopModel);
+	const group = workbenchTabsets(desktop.root).find((group) =>
+		group.tabs.some((tab) => tab.id === selectedId),
+	);
+	if (group) group.selectedId = selectedId;
+	desktop.narrowInspectorTab = selectedId;
+	return desktop;
 }
 
 export function workbenchTabsets(
@@ -158,12 +189,27 @@ export function restoreWorkbenchLayout(
 
 export function readWorkbenchLayout(
 	withInspector = true,
-): WorkbenchLayoutModel {
+): SavedWorkbenchLayout {
 	try {
 		const stored = localStorage.getItem(workbenchLayoutStorageKey);
 		if (stored) {
-			const model = restoreWorkbenchLayout(JSON.parse(stored), withInspector);
-			if (model) return model;
+			const value: unknown = JSON.parse(stored);
+			const model: SavedWorkbenchLayout | null = restoreWorkbenchLayout(
+				value,
+				withInspector,
+			);
+			if (model) {
+				if (
+					withInspector &&
+					value &&
+					typeof value === "object" &&
+					"narrowInspectorTab" in value &&
+					isWorkbenchInspectorTab(value.narrowInspectorTab)
+				) {
+					model.narrowInspectorTab = value.narrowInspectorTab;
+				}
+				return model;
+			}
 		}
 	} catch {
 		// A corrupt preference or unavailable storage must not block editing.
@@ -171,7 +217,7 @@ export function readWorkbenchLayout(
 	return createDefaultWorkbenchLayout(withInspector);
 }
 
-export function saveWorkbenchLayout(model: WorkbenchLayoutModel) {
+export function saveWorkbenchLayout(model: SavedWorkbenchLayout) {
 	try {
 		localStorage.setItem(workbenchLayoutStorageKey, JSON.stringify(model));
 	} catch {

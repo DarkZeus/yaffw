@@ -3,7 +3,6 @@ import {
 	type ReactNode,
 	createContext,
 	useContext,
-	useEffect,
 	useLayoutEffect,
 	useMemo,
 	useState,
@@ -51,7 +50,11 @@ export function WorkbenchPanelsProvider({
 }) {
 	const [dragHandlers] = useState(() => new Map<string, DragHandler>());
 	const [altPressed, setAltPressed] = useState(false);
-	useEffect(() => {
+	useLayoutEffect(() => {
+		if (disabled) {
+			setAltPressed(false);
+			return;
+		}
 		function syncModifier(event: KeyboardEvent | globalThis.PointerEvent) {
 			setAltPressed(event.altKey);
 		}
@@ -71,7 +74,7 @@ export function WorkbenchPanelsProvider({
 			window.removeEventListener("blur", clearModifier);
 			document.removeEventListener("visibilitychange", clearModifier);
 		};
-	}, []);
+	}, [disabled]);
 	const value = useMemo(
 		() => ({ panels, dragHandlers, disabled, altPressed }),
 		[panels, dragHandlers, disabled, altPressed],

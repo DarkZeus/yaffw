@@ -90,6 +90,36 @@ function panelContent(id: string): HTMLElement {
 	return element;
 }
 
+function mockNarrowViewport() {
+	let narrow = false;
+	const listeners = new Set<() => void>();
+	vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+		media: query,
+		get matches() {
+			return narrow;
+		},
+		onchange: null,
+		addEventListener: (
+			_event: string,
+			listener: EventListenerOrEventListenerObject,
+		) => listeners.add(listener as () => void),
+		removeEventListener: (
+			_event: string,
+			listener: EventListenerOrEventListenerObject,
+		) => listeners.delete(listener as () => void),
+		addListener() {},
+		removeListener() {},
+		dispatchEvent: () => true,
+	}));
+	function setNarrow(next: boolean) {
+		act(() => {
+			narrow = next;
+			for (const listener of listeners) listener();
+		});
+	}
+	return setNarrow;
+}
+
 describe("customizable workbench layout", () => {
 	it("arms panel hover feedback only while Alt is held and clears it on focus loss", () => {
 		render(<Workbench />);
@@ -348,29 +378,11 @@ describe("customizable workbench layout", () => {
 	});
 
 	it("restores the desktop arrangement after a narrow viewport without remounting media", async () => {
-		let narrow = false;
-		const listeners = new Set<() => void>();
-		vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-			media: query,
-			get matches() {
-				return narrow;
-			},
-			onchange: null,
-			addEventListener: (
-				_event: string,
-				listener: EventListenerOrEventListenerObject,
-			) => listeners.add(listener as () => void),
-			removeEventListener: (
-				_event: string,
-				listener: EventListenerOrEventListenerObject,
-			) => listeners.delete(listener as () => void),
-			addListener() {},
-			removeListener() {},
-			dispatchEvent: () => true,
-		}));
+		const setNarrow = mockNarrowViewport();
 		const onMount = vi.fn();
-		render(<Workbench onMount={onMount} />);
-		const media = screen.getByLabelText("Test media");
+		const view = render(<Workbench onMount={onMount} />);
+		const media = screen.getByLabelText<HTMLVideoElement>("Test media");
+		media.currentTime = 3;
 		fireEvent.click(
 			screen.getByRole("button", { name: "Dock Audio with Preview" }),
 		);
@@ -382,10 +394,8 @@ describe("customizable workbench layout", () => {
 			).toHaveLength(2),
 		);
 		const desktop = readWorkbenchLayout();
-		act(() => {
-			narrow = true;
-			for (const listener of listeners) listener();
-		});
+		fireEvent.keyDown(window, { key: "Alt", altKey: true });
+		setNarrow(true);
 		await waitFor(() =>
 			expect(
 				document.querySelector('[data-tabset-id="narrow-preview"]'),
@@ -397,23 +407,82 @@ describe("customizable workbench layout", () => {
 		expect(screen.queryByRole("menu")).toBeNull();
 		fireEvent.keyDown(window, { key: "Alt", altKey: true });
 		expect(document.querySelector("[data-layout-drag-ready]")).toBeNull();
-		fireEvent.keyUp(window, { key: "Alt", altKey: false });
 		fireEvent.click(screen.getByRole("tab", { name: "Export" }));
 		const inspector = workbenchTabsets(desktop.root).find(
 			(group) => group.id === "inspector",
 		);
 		if (!inspector) throw new Error("Missing inspector");
 		inspector.selectedId = "export";
+		desktop.narrowInspectorTab = "export";
 		await waitFor(() => expect(readWorkbenchLayout()).toEqual(desktop));
-		act(() => {
-			narrow = false;
-			for (const listener of listeners) listener();
-		});
+		setNarrow(false);
 		await waitFor(() =>
 			expect(document.querySelector('[data-tabset-id="viewer"]')).toBeTruthy(),
 		);
 		expect(readWorkbenchLayout()).toEqual(desktop);
 		expect(screen.getByLabelText("Test media")).toBe(media);
+		expect(media.currentTime).toBe(3);
+		expect(document.querySelector("[data-layout-drag-ready]")).toBeNull();
+		setNarrow(true);
+		expect(
+			screen.getByRole("tab", { name: "Export", selected: true }),
+		).toBeTruthy();
 		expect(onMount).toHaveBeenCalledTimes(1);
+		view.unmount();
+		render(<Workbench />);
+		expect(
+			screen.getByRole("tab", { name: "Export", selected: true }),
+		).toBeTruthy();
+		expect(readWorkbenchLayout()).toEqual(desktop);
 	});
+	it.each([false, true])(
+		"cancels a pending desktop drop when the viewport narrows (return to desktop: %s)",
+		(returnToDesktop) => {
+			const setNarrow = mockNarrowViewport();
+			render(<Workbench />);
+			const before = readWorkbenchLayout();
+			const hitTest = document.elementFromPoint;
+			document.elementFromPoint = () => panelContent("selection");
+			try {
+				const pointer = { pointerId: 7, pointerType: "mouse" };
+				fireEvent.pointerDown(panelContent("transport"), {
+					...pointer,
+					altKey: true,
+					button: 0,
+					clientX: 10,
+					clientY: 10,
+				});
+				fireEvent.pointerMove(document, {
+					...pointer,
+					clientX: 300,
+					clientY: 300,
+				});
+				expect(
+					document.querySelector(".workbench-drag-preview"),
+				).not.toBeNull();
+				setNarrow(true);
+				expect(document.querySelector(".workbench-drag-preview")).toBeNull();
+				if (returnToDesktop) setNarrow(false);
+				fireEvent.pointerMove(document, {
+					...pointer,
+					clientX: 310,
+					clientY: 310,
+				});
+				fireEvent.pointerUp(document, {
+					...pointer,
+					clientX: 310,
+					clientY: 310,
+				});
+				expect(readWorkbenchLayout()).toEqual(before);
+				expect(
+					panelContent("transport")
+						.closest("[data-tabset-id]")
+						?.getAttribute("data-tabset-id"),
+				).toBe(returnToDesktop ? "dock-transport" : "narrow-transport");
+			} finally {
+				if (hitTest) document.elementFromPoint = hitTest;
+				else Reflect.deleteProperty(document, "elementFromPoint");
+			}
+		},
+	);
 });

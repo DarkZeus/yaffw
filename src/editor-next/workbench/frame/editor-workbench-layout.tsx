@@ -11,13 +11,18 @@ import {
 	type TabNode,
 	type TabRenderProps,
 	Workspace,
+	type WorkspaceChangedMeta,
 	useWorkspaceRef,
 } from "react-resizable-panels";
+import { useWorkspacePointer } from "./use-workspace-pointer";
 import {
 	type WorkbenchInspectorPanels,
+	type WorkbenchLayoutModel,
 	type WorkbenchPanelId,
 	createNarrowWorkbenchLayout,
+	isWorkbenchInspectorTab,
 	readWorkbenchLayout,
+	rememberNarrowInspectorTab,
 	saveWorkbenchLayout,
 	workbenchTabsets,
 } from "./workbench-layout-model";
@@ -65,32 +70,77 @@ export function EditorWorkbenchLayout({
 		isNarrow,
 		() => false,
 	);
+	const viewport = narrow ? "narrow" : "desktop";
+	const withInspector = !!inspector;
 	const workspaceRef = useWorkspaceRef<null>();
-	const [desktopModel] = useState(() => readWorkbenchLayout(!!inspector));
-	const savedDesktop = useRef(desktopModel);
-	const previousNarrow = useRef(narrow);
-	const mode = useRef(narrow);
-	mode.current = narrow;
-	const [initialModel] = useState(() =>
-		narrow
-			? createNarrowWorkbenchLayout(!!inspector, desktopModel)
-			: desktopModel,
-	);
+	const workspaceElement = useRef<HTMLDivElement>(null);
+	const cancelWorkspacePointer = useWorkspacePointer(workspaceElement, !narrow);
+	const [initial] = useState(() => {
+		const desktop = readWorkbenchLayout(withInspector);
+		return {
+			viewport,
+			desktop,
+			model: narrow
+				? createNarrowWorkbenchLayout(withInspector, desktop)
+				: desktop,
+		};
+	});
+	const layout = useRef({
+		viewport: initial.viewport,
+		desktop: initial.desktop,
+	});
 	const panels = useMemo(
 		() => ({ preview: viewer, transport, selection, ...inspector }),
 		[viewer, transport, selection, inspector],
 	);
 
 	useLayoutEffect(() => {
-		if (previousNarrow.current === narrow) return;
-		previousNarrow.current = narrow;
+		const active = layout.current;
+		const workspace = workspaceRef.current;
+		if (!workspace || active.viewport === viewport) return;
+		if (viewport === "narrow") cancelWorkspacePointer();
 		// setModel moves the existing portals; switching viewport never remounts media.
-		workspaceRef.current?.setModel(
-			narrow
-				? createNarrowWorkbenchLayout(!!inspector, savedDesktop.current)
-				: savedDesktop.current,
+		workspace.setModel(
+			viewport === "narrow"
+				? createNarrowWorkbenchLayout(withInspector, active.desktop)
+				: active.desktop,
 		);
-	}, [narrow, inspector, workspaceRef]);
+		active.viewport = viewport;
+	}, [cancelWorkspacePointer, viewport, withInspector, workspaceRef]);
+
+	function handleModelChange(
+		model: WorkbenchLayoutModel,
+		{ reason }: WorkspaceChangedMeta,
+	) {
+		const active = layout.current;
+		// The model replacement during a viewport switch is not a layout edit.
+		if (active.viewport !== viewport) return;
+		if (viewport === "narrow") {
+			if (reason !== "select") return;
+			const desktop = rememberNarrowInspectorTab(active.desktop, model);
+			if (!desktop) return;
+			active.desktop = desktop;
+		} else {
+			let narrowInspectorTab = active.desktop.narrowInspectorTab;
+			if (reason === "set-model") narrowInspectorTab = undefined;
+			if (reason === "select") {
+				const previousSelections = new Set(
+					workbenchTabsets(active.desktop.root).map(
+						(group) => group.selectedId,
+					),
+				);
+				const selectedTab = workbenchTabsets(model.root)
+					.map((group) => group.selectedId)
+					.find((id) => !previousSelections.has(id));
+				if (isWorkbenchInspectorTab(selectedTab))
+					narrowInspectorTab = selectedTab;
+			}
+			active.desktop = narrowInspectorTab
+				? { ...model, narrowInspectorTab }
+				: model;
+		}
+		saveWorkbenchLayout(active.desktop);
+	}
 
 	return (
 		<WorkbenchPanelsProvider panels={panels} disabled={narrow}>
@@ -98,29 +148,12 @@ export function EditorWorkbenchLayout({
 				aria-label="Editor workbench layout"
 				className="workbench-workspace"
 				classNames={workspaceClasses}
-				defaultModel={initialModel}
+				defaultModel={initial.model}
+				disableDrop={narrow}
 				disabled={narrow}
+				elementRef={workspaceElement}
 				hiddenTabBehavior="keep-mounted"
-				onModelChanged={(model, meta) => {
-					if (mode.current) {
-						// Save narrow-screen tab choices without replacing desktop placement.
-						if (meta.reason !== "select") return;
-						const selectedId = workbenchTabsets(model.root).find(
-							(group) => group.id === "narrow-inspector",
-						)?.selectedId;
-						if (!selectedId) return;
-						const desktop = structuredClone(savedDesktop.current);
-						const group = workbenchTabsets(desktop.root).find((group) =>
-							group.tabs.some((tab) => tab.id === selectedId),
-						);
-						if (group) group.selectedId = selectedId;
-						savedDesktop.current = desktop;
-						saveWorkbenchLayout(desktop);
-						return;
-					}
-					savedDesktop.current = model;
-					saveWorkbenchLayout(model);
-				}}
+				onModelChanged={handleModelChange}
 				renderSeparator={renderSeparator}
 				renderTab={renderTab}
 				renderTabContent={renderTabContent}
