@@ -1,125 +1,81 @@
-# YAFFW
+# <img src="./public/icon-512.png" alt="" width="48" height="48"> YAFFW
 
-YAFFW is a local-first media editor for personal video editing workflows. Its primary editor is `editor-next`: a single-asset editor workbench for loading a local video, previewing it, choosing a media-time Selection, reviewing export capability, running a browser export job, and explicitly delivering the Generated media.
+YAFFW is a video editor that runs in your browser, built around my own editing workflow. Open a local video, pick the part you want, adjust the audio, and export it. Media processing stays on your device—your video isn't uploaded to a server.
 
-The product is no longer an FFmpeg-wrapper UI. Browser-local editor processing is the primary path. New editor work should follow the domain language in [CONTEXT.md](./CONTEXT.md).
+**[Try YAFFW](https://yaffw.serhii-resnyanskyi.workers.dev/)**
 
-## Current Surface
+> **⚠️ Personal Project Disclaimer**
+>
+> This project is highly opinionated and was built specifically to address my personal video editing workflow needs. While it's open source and you're welcome to use or fork it, please note that feature requests, extensive customizations, or significant architectural changes may not align with the project's focused scope. Consider it a reference implementation rather than a general-purpose solution.
 
-- `/`: canonical editor-next surface for local-file editing.
-- `/editor-next`: compatibility redirect to `/`.
+![YAFFW workbench showing a video preview, export settings, audio controls, and the selection timeline](./docs/images/workbench.png)
 
-## Editor-Next Capabilities
+## Getting started
 
-- Local file import into a Ready media asset.
-- Customizable Cinema workbench powered by react-resizable-panels Workspace: resize, drag panels to split or share tabs, and maximize panel groups. Preview, Transport, Selection, Media, Audio, and Export remain inside the editor frame.
-- Browser-local layout restoration. Single-panel groups have no tab row or floating controls. Alt-drag panel content to rearrange it; right-click a panel for maximize, restore, and Reset workbench layout. Shared groups retain tabs. Narrow screens stack Preview, Transport, Selection, then the inspector without replacing the saved desktop arrangement.
-- Runtime gate for browser media APIs, with Chromium/WebCodecs as the primary target.
-- Native video preview with playhead, frame stepping, playback speed, volume, fullscreen, and keyboard controls.
-- Web Audio preview engine for audio monitoring and playback timing when active; native video follows that clock. Includes per-track preview solo and level meters.
-- Audio mix decisions for track inclusion, volume, and channel handling, separate from preview-only solo and global preview volume.
-- Media-time Selection represented as half-open integer microsecond ranges.
-- Selection handles, range dragging, read-only time labels, zoom, video thumbnails, and waveform lanes for audio tracks when available.
-- Session-owned Output settings for documented container, video codec, Generated
-  audio mix codec, downscale resolution, and independent video/audio quality or
-  custom bitrate choices.
-- No audio output option for exporting video without an audio track.
-- Browser-local Export presets with draft-only loading, explicit Apply, and a
-  system-managed Last used settings entry.
-- Export review for the applied documented output profile, including its
-  resolved resolution and Generated audio mix.
-- Browser export through Mediabunny/WebCodecs with matching Generated media
-  metadata and explicit delivery.
-- Export failure and cancellation recovery that keeps the active media asset and Selection retryable.
+1. **Open a video.** Drop a file into the editor or use the file picker. The Media panel shows its details and tracks.
+2. **Choose what to keep.** Drag the selection handles, inspect the thumbnails and audio waveforms, and preview the range. Use the Audio panel to adjust which tracks contribute to the output and how loud they are.
+3. **Export and download.** In the Export panel, open Output settings to choose the format and quality, then Apply. Review the output, start the export, and use Download when it's ready.
 
-## NLE Prototype
+The initial selection covers the whole video, so you can also use YAFFW to change a file's format or audio without cutting it.
 
-The standalone [NLE editor prototype](./prototypes/nle/README.md) is preserved for timeline exploration. Run it with `pnpm exec vite --config prototypes/nle/vite.config.ts`. It has its own media, tests, and build configuration and is not part of the deployed app.
+## What it can do
 
-## Export Correctness
+- **Preview and select:** seek through video thumbnails and waveforms, zoom the timeline, step through frames, loop the selection, change playback speed, and open fullscreen preview.
+- **Adjust audio:** include or exclude embedded audio tracks, change their volume, handle one-sided stereo recordings, and monitor individual tracks or the combined output with level meters. Included tracks are mixed into one output audio track. Preview solo, global preview volume, and mute only change what you hear while editing; track inclusion, track volume, and channel handling affect the export.
+- **Choose the output:** export to MP4, MOV, MKV, WebM, or MPEG-TS with compatible video and audio codecs. Keep the source resolution or downscale, choose video and audio quality independently, set custom bitrates, or select No audio. Available combinations depend on the format and your browser's codec support.
+- **Reuse settings:** save export presets in your browser, or load Last used settings. Loading a preset updates the settings draft; Apply commits it to the current edit.
+- **Arrange the workbench:** resize Preview, Transport, Selection, Media, Audio, and Export panels. Hold **Alt / Option** and drag panel content to move it into a split or a shared tab group. Right-click a panel to maximize, restore, or reset the layout. Your layout is remembered locally; small screens use a stacked arrangement.
 
-The current export truth is documented in [docs/export-correctness-browser-baseline.md](./docs/export-correctness-browser-baseline.md).
+## Keyboard shortcuts
 
-Short version:
+| Key | Action |
+| --- | --- |
+| Space or K | Play / pause |
+| ← / → | Seek backward / forward one second |
+| J / L | Seek backward / forward ten seconds |
+| Shift + ← / → | Step backward / forward one frame |
+| [ / ] | Set the selection start / end at the playhead |
 
-- Full-asset browser export is the strongest current path when the default profile is supported.
-- Selected-range browser export uses Mediabunny conversion as the intended precision path, but it should not be described as proven precise until real-runner generated-media evidence proves requested duration plus start/end boundaries.
-- Native FFmpeg is not the next step. It should be considered only if real Mediabunny boundary or audio/video alignment measurements expose a browser limitation that cannot be fixed in the browser runner.
+Shortcuts pause while you're editing an input, using a dialog, or exporting.
 
-## Project Docs
+## A few limitations
 
-- [CONTEXT.md](./CONTEXT.md): domain language and current product model.
-- [docs/adr](./docs/adr): architectural decision records. Keep these as durable decision history; add a new ADR or mark one superseded instead of deleting useful decisions.
-- [docs/export-correctness-browser-baseline.md](./docs/export-correctness-browser-baseline.md): current browser export evidence and follow-up direction.
-- [docs/editor-next-future-subtitles.md](./docs/editor-next-future-subtitles.md): deferred subtitle support notes.
+- **Chromium comes first.** Use a browser with WebCodecs support, such as Chrome or Edge. Individual codecs and export formats can still be unavailable in your browser.
+- **One local video at a time.** Audio-only files and multi-video compositions aren't supported.
+- **The current edit isn't saved across refreshes.** Your layout and export presets are remembered, but the loaded video, selection, applied output settings, and export result are not. Download the result before closing or refreshing the page.
+- **Export boundaries are best effort.** A carefully placed selection doesn't guarantee exact exported start and end frames. Variable frame rates can also make frame stepping repeat or skip a displayed frame.
+- **Large exports need memory.** The generated output is currently buffered in memory before download, so file size and available browser memory matter.
 
-Completed PRDs and issue implementation plans should stay in GitHub issue history rather than as long-lived repo docs once their decisions are captured in ADRs, `CONTEXT.md`, tests, or current baseline docs.
+## Run locally
 
-## Tech Stack
+You'll need Node.js and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
 
-- React 19 and TypeScript.
-- TanStack Router.
-- Tailwind CSS and shadcn-style Radix components.
-- Mediabunny and WebCodecs for browser media analysis/export.
-- Web Audio for preview audio scheduling and metering; WaveSurfer for waveform rendering.
-- Vitest for tests.
-
-## Development
-
-Use Node.js and **pnpm 10.33.0**, pinned in `package.json` through the `packageManager` field. Keep `pnpm-workspace.yaml` and `pnpm-lock.yaml` together: the workspace configuration contains dependency overrides used by the lockfile.
-
-Install dependencies:
-
-```bash
-pnpm install
-```
-
-Run the Vite frontend on port 3000:
-
-```bash
+```sh
+git clone https://github.com/DarkZeus/yaffw.git
+cd yaffw
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The editor runs entirely in the browser; no upload server or FFmpeg installation is required.
+Open [localhost:3000](http://localhost:3000).
 
-Verify the editor-next TypeScript boundary:
+Useful development commands:
 
-```bash
-pnpm run typecheck
-```
+| Command | Purpose |
+| --- | --- |
+| `pnpm run check` | Check formatting and lint rules with Biome |
+| `pnpm run typecheck` | Check TypeScript |
+| `pnpm test` | Run the test suite |
+| `pnpm run build` | Build to `dist` and check TypeScript |
+| `pnpm run serve` | Preview the production build locally |
 
-Run tests:
+The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 
-```bash
-pnpm run test
-```
+## Acknowledgements
 
-Build:
+Thank you to the developers and contributors behind the libraries that make YAFFW possible:
 
-```bash
-pnpm run build
-```
-
-The build produces `dist` and runs the editor-next TypeScript check. Preview the built frontend locally with `pnpm run serve`.
-
-## Deployment
-
-The Cloudflare deployment serves the built frontend as static assets. [wrangler.jsonc](./wrangler.jsonc) points to `dist` and enables single-page application fallback for client-side routes.
-
-The configured build and deploy commands are:
-
-```bash
-pnpm run build
-npx wrangler deploy
-```
-
-Dependency installation should use the pinned pnpm version and `pnpm install --frozen-lockfile`. Commit dependency configuration and lockfile changes together so the frozen installation remains reproducible.
-
-## Working Rules
-
-- Prefer browser-local editor processing for editor-next.
-- Future acquisition features must enter through import adapters outside the editor core.
-- Model generated media separately from delivery actions.
-- Preserve the single-asset editing session model until a future feature earns a broader model.
-- Do not add server export fallback, native FFmpeg, smart rendering, or
-  Generated media preview without a concrete decision record.
+- [Mediabunny](https://mediabunny.dev/) by [David P. (Vanilagy)](https://github.com/Vanilagy), for media reading, conversion, and export in the browser.
+- [shadcn/ui](https://ui.shadcn.com/) by [shadcn](https://shadcn.com/), for the UI components.
+- [Tailwind CSS](https://tailwindcss.com/) by [Adam Wathan](https://adamwathan.me/) and the [Tailwind CSS team and contributors](https://github.com/tailwindlabs/tailwindcss/graphs/contributors), for the styling toolkit.
+- [wavesurfer.js](https://wavesurfer.xyz/) by [Ivan K. (katspaugh)](https://github.com/katspaugh), for interactive audio waveforms.

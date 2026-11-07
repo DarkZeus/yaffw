@@ -425,6 +425,9 @@ docs/*
 !docs/agents/*.md
 !docs/adr/
 !docs/adr/*.md
+!docs/images/
+docs/images/*
+!docs/images/workbench.png
 !docs/verification/
 docs/verification/*
 !docs/verification/test-suite-reduction.md
