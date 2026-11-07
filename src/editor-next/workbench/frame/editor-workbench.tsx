@@ -6,7 +6,6 @@ import {
 	Scissors,
 	Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +14,8 @@ import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { RuntimeSupport } from "@/editor-core/runtime-capabilities";
 import type { EditorSessionState } from "@/editor-core/session";
 import { cn } from "@/lib/utils";
+import { localVideoFileAccept, useLocalFileDrop } from "./use-local-file-drop";
+import type { LocalFileDropFeedback } from "./use-local-file-drop";
 
 export type EditorWorkbenchFrameProps = {
 	activeAsset: ReadyMediaAsset | null;
@@ -40,19 +41,12 @@ type NonReadyEditorSession = Exclude<
 >;
 
 const supportedFormatLabels = ["MP4", "AVI", "MOV", "MKV", "WebM"];
-const supportedVideoExtensions = [
-	".mp4",
-	".avi",
-	".mov",
-	".mkv",
-	".webm",
-	".m4v",
-	".3gp",
-];
-const supportedVideoAcceptAttribute = [
-	"video/*",
-	...supportedVideoExtensions,
-].join(",");
+const dragPrompts = {
+	accepted: "Release to open",
+	rejected: "Invalid file type",
+	unverified: "Release to check file type",
+};
+
 export function EditorWorkbenchFrame({
 	activeAsset,
 	children,
@@ -166,62 +160,7 @@ function NonReadyImportSurface({
 }) {
 	const copy = workbenchNonReadyStateCopy(session);
 	const isProcessing = session.status === "loading";
-	const [dragState, setDragState] = useState<"idle" | "active" | "reject">(
-		"idle",
-	);
-	useEffect(() => {
-		let dragDepth = 0;
-		function resetDragState() {
-			dragDepth = 0;
-			setDragState("idle");
-		}
-		function handleDragEnter(event: DragEvent) {
-			if (!isFileTransfer(event.dataTransfer)) return;
-			event.preventDefault();
-			if (!session.importEnabled) return;
-			dragDepth += 1;
-			setDragState(
-				isRejectedDataTransfer(event.dataTransfer) ? "reject" : "active",
-			);
-		}
-		function handleDragOver(event: DragEvent) {
-			if (!isFileTransfer(event.dataTransfer)) return;
-			event.preventDefault();
-			const rejected = isRejectedDataTransfer(event.dataTransfer);
-			event.dataTransfer.dropEffect =
-				!session.importEnabled || rejected ? "none" : "copy";
-			if (session.importEnabled) setDragState(rejected ? "reject" : "active");
-		}
-		function handleDragLeave() {
-			dragDepth = Math.max(0, dragDepth - 1);
-			if (dragDepth === 0) setDragState("idle");
-		}
-		function handleDrop(event: DragEvent) {
-			if (!isFileTransfer(event.dataTransfer)) return;
-			event.preventDefault();
-			resetDragState();
-			const file = event.dataTransfer.files[0];
-			if (session.importEnabled && file && isSupportedVideoFile(file)) {
-				onLocalFileDropped(file);
-			}
-		}
-
-		resetDragState();
-		window.addEventListener("dragenter", handleDragEnter, true);
-		window.addEventListener("dragover", handleDragOver, true);
-		window.addEventListener("dragleave", handleDragLeave, true);
-		window.addEventListener("drop", handleDrop, true);
-		window.addEventListener("dragend", resetDragState);
-		window.addEventListener("blur", resetDragState);
-		return () => {
-			window.removeEventListener("dragenter", handleDragEnter, true);
-			window.removeEventListener("dragover", handleDragOver, true);
-			window.removeEventListener("dragleave", handleDragLeave, true);
-			window.removeEventListener("drop", handleDrop, true);
-			window.removeEventListener("dragend", resetDragState);
-			window.removeEventListener("blur", resetDragState);
-		};
-	}, [session.importEnabled, onLocalFileDropped]);
+	const dragState = useLocalFileDrop(session.importEnabled, onLocalFileDropped);
 
 	return (
 		<div className="cinema-import">
@@ -241,9 +180,9 @@ function NonReadyImportSurface({
 					aria-busy={isProcessing}
 					className={cn(
 						"relative grid min-h-48 cursor-pointer overflow-hidden rounded-md border border-dashed border-workbench-border-strong bg-workbench-hover px-6 py-8 text-left transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-workbench-focus",
-						dragState === "active" &&
+						dragState === "accepted" &&
 							"border-solid border-workbench-selected bg-workbench-selected/5",
-						dragState === "reject" &&
+						dragState === "rejected" &&
 							"border-solid border-destructive bg-destructive/10",
 						isProcessing && "cursor-wait border-solid bg-workbench-disabled/25",
 						!isProcessing &&
@@ -254,7 +193,7 @@ function NonReadyImportSurface({
 					htmlFor="editor-next-local-file"
 				>
 					<Input
-						accept={supportedVideoAcceptAttribute}
+						accept={localVideoFileAccept}
 						aria-label="Local media file"
 						className="sr-only"
 						disabled={!session.importEnabled}
@@ -267,8 +206,8 @@ function NonReadyImportSurface({
 						<div
 							className={cn(
 								"grid size-9 place-items-center text-muted-foreground transition-[color,transform] duration-200",
-								dragState === "reject" && "text-destructive",
-								dragState === "active" &&
+								dragState === "rejected" && "text-destructive",
+								dragState === "accepted" &&
 									"scale-[1.04] text-workbench-selected",
 								isProcessing && "text-workbench-selected",
 							)}
@@ -284,20 +223,18 @@ function NonReadyImportSurface({
 								aria-live="polite"
 								className={cn(
 									"text-sm font-semibold tracking-[-0.01em] transition-colors duration-200",
-									dragState === "reject" && "text-destructive",
-									dragState === "active" && "text-workbench-selected",
+									dragState === "rejected" && "text-destructive",
+									dragState === "accepted" && "text-workbench-selected",
 									isProcessing && "text-workbench-selected",
 								)}
 							>
-								{dragState === "reject"
-									? "Invalid file type"
-									: dragState === "active"
-										? "Release to open"
-										: isProcessing
-											? "Opening video…"
-											: "Drop your video or click to browse"}
+								{dragState !== "idle"
+									? dragPrompts[dragState]
+									: isProcessing
+										? "Opening video…"
+										: "Drop your video or click to browse"}
 							</h4>
-							{dragState === "reject" && (
+							{dragState === "rejected" && (
 								<p className="text-xs leading-5 text-muted-foreground">
 									Choose a video file.
 								</p>
@@ -325,14 +262,14 @@ function ImportSurfaceIcon({
 	dragState,
 	isProcessing,
 }: {
-	dragState: "idle" | "active" | "reject";
+	dragState: LocalFileDropFeedback;
 	isProcessing: boolean;
 }) {
-	if (dragState === "reject") {
+	if (dragState === "rejected") {
 		return <AlertCircle aria-hidden="true" className="size-6" />;
 	}
 
-	if (dragState === "active") {
+	if (dragState === "accepted") {
 		return <FileVideo aria-hidden="true" className="size-6" />;
 	}
 
@@ -341,40 +278,6 @@ function ImportSurfaceIcon({
 	}
 
 	return <Upload aria-hidden="true" className="size-6" />;
-}
-
-function isFileTransfer(
-	dataTransfer: DataTransfer | null,
-): dataTransfer is DataTransfer {
-	return (
-		!!dataTransfer &&
-		(Array.from(dataTransfer.types ?? []).includes("Files") ||
-			Array.from(dataTransfer.items ?? []).some(
-				(item) => item.kind === "file",
-			) ||
-			dataTransfer.files?.length > 0)
-	);
-}
-
-function isRejectedDataTransfer(dataTransfer: DataTransfer): boolean {
-	const fileItems = Array.from(dataTransfer.items).filter(
-		(item) => item.kind === "file",
-	);
-
-	return fileItems.some(
-		(item) => item.type !== "" && !item.type.startsWith("video/"),
-	);
-}
-
-function isSupportedVideoFile(file: File): boolean {
-	if (file.type.startsWith("video/")) {
-		return true;
-	}
-
-	const normalizedName = file.name.toLowerCase();
-	return supportedVideoExtensions.some((extension) =>
-		normalizedName.endsWith(extension),
-	);
 }
 
 function workbenchNonReadyStateCopy(session: NonReadyEditorSession) {
