@@ -17,18 +17,30 @@ import {
 	createScrubFrameCache,
 } from "./scrub-frame-cache";
 
-type PendingScrubTarget = {
+type ScrubTarget = {
+	awaitingNativeSeek: boolean;
 	requestId: number;
 	timestampUs: MediaTimeUs;
 };
 
-export type ScrubPreview = {
+type ScrubSession = {
+	cache: ScrubFrameCache;
+	provider: ScrubFrameProvider;
+	target: ScrubTarget | null;
+};
+
+export type ScrubPreviewTransport = {
+	capturePlaybackHandoff: () => (() => void) | undefined;
+	hasTarget: () => boolean;
+	onNativeSeekRequested: (timestampUs: MediaTimeUs) => void;
+};
+
+type ScrubPreview = ScrubPreviewTransport & {
 	canvasRef: RefObject<HTMLCanvasElement | null>;
-	handleNativeSeeked: (currentTimeSeconds: number) => void;
-	hide: () => void;
+	handleNativeSeeked: (video: HTMLVideoElement) => void;
 	requestFrame: (
 		timestampUs: MediaTimeUs,
-		options?: ScrubFrameRequestOptions,
+		options: ScrubFrameRequestOptions,
 	) => void;
 	visible: boolean;
 };
@@ -43,57 +55,47 @@ export function useScrubPreview({
 	source: Blob;
 }): ScrubPreview {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
-	const cacheRef = useRef<ScrubFrameCache | null>(null);
-	const latestTargetRef = useRef<PendingScrubTarget | null>(null);
-	const nativeSettledThroughRequestIdRef = useRef(0);
-	const providerRef = useRef<ScrubFrameProvider | null>(null);
+	const sessionRef = useRef<ScrubSession | null>(null);
 	const [visible, setVisible] = useState(false);
-	const frameDurationUs = asset.frameTiming.frameDurationUs;
 	const primaryVideoTrack = asset.tracks.video[0];
 
 	useEffect(() => {
-		const cache = createScrubFrameCache({ frameDurationUs });
-		cacheRef.current = cache;
-		latestTargetRef.current = null;
-		nativeSettledThroughRequestIdRef.current = 0;
+		const cache = createScrubFrameCache();
 		setVisible(false);
 
 		const provider = createMediabunnyScrubFrameProvider({
 			displayHeight: primaryVideoTrack?.height,
 			displayWidth: primaryVideoTrack?.width,
-			frameDurationUs,
 			onFrame(frame) {
-				const latestTarget = latestTargetRef.current;
-				if (!latestTarget || frame.requestId !== latestTarget.requestId) {
+				const session = sessionRef.current;
+				const target = session?.target;
+				if (
+					session?.provider !== provider ||
+					!target ||
+					target.requestId !== frame.requestId ||
+					target.timestampUs !== frame.timestampUs
+				) {
 					return;
 				}
 
-				cache.set(frame.timestampUs, frame.canvas);
-				if (frame.requestId <= nativeSettledThroughRequestIdRef.current) {
-					return;
-				}
-
+				cache.set(target.timestampUs, frame.canvas);
 				if (drawScrubFrame(canvasRef.current, frame.canvas)) {
 					setVisible(true);
 				}
 			},
 			onUnavailable() {
-				setVisible(false);
+				if (sessionRef.current?.provider === provider) setVisible(false);
 			},
 			source,
 		});
-		providerRef.current = provider;
+		const session: ScrubSession = { cache, provider, target: null };
+		sessionRef.current = session;
 		provider.warm();
 
 		const dispose = () => {
+			if (sessionRef.current === session) sessionRef.current = null;
 			provider.dispose();
 			cache.clear();
-			if (providerRef.current === provider) {
-				providerRef.current = null;
-			}
-			if (cacheRef.current === cache) {
-				cacheRef.current = null;
-			}
 		};
 		const registration = activeMediaAssetCleanupScope?.registerCleanup(dispose);
 
@@ -106,81 +108,70 @@ export function useScrubPreview({
 		};
 	}, [
 		activeMediaAssetCleanupScope,
-		frameDurationUs,
 		primaryVideoTrack?.height,
 		primaryVideoTrack?.width,
 		source,
 	]);
 
-	const hide = useCallback(() => {
-		const latestTarget = latestTargetRef.current;
-		if (latestTarget) {
-			nativeSettledThroughRequestIdRef.current = Math.max(
-				nativeSettledThroughRequestIdRef.current,
-				latestTarget.requestId,
-			);
-		}
+	const retireTarget = useCallback((target: ScrubTarget) => {
+		const session = sessionRef.current;
+		if (session?.target !== target) return;
+		session.target = null;
 		setVisible(false);
 	}, []);
 
 	const requestFrame = useCallback(
-		(timestampUs: MediaTimeUs, options?: ScrubFrameRequestOptions) => {
-			const provider = providerRef.current;
-			if (!provider) {
-				return;
-			}
-			const previousTarget = latestTargetRef.current;
-			if (
-				(options?.priority ?? "final") === "interactive" &&
-				previousTarget &&
-				Math.abs(previousTarget.timestampUs - timestampUs) < frameDurationUs / 2
-			) {
-				return;
-			}
+		(timestampUs: MediaTimeUs, options: ScrubFrameRequestOptions) => {
+			const session = sessionRef.current;
+			if (!session) return;
 
-			const requestId = provider.requestFrame(timestampUs, options);
-			latestTargetRef.current = { requestId, timestampUs };
+			const requestId = session.provider.requestFrame(timestampUs, options);
+			session.target = { awaitingNativeSeek: false, requestId, timestampUs };
 
-			const cached = cacheRef.current?.get(timestampUs);
+			const cached = session.cache.get(timestampUs);
 			if (cached && drawScrubFrame(canvasRef.current, cached)) {
 				setVisible(true);
 			}
 		},
-		[frameDurationUs],
+		[],
 	);
 
+	const hasTarget = useCallback(() => Boolean(sessionRef.current?.target), []);
+	const onNativeSeekRequested = useCallback((timestampUs: MediaTimeUs) => {
+		const target = sessionRef.current?.target;
+		if (target?.timestampUs === timestampUs) target.awaitingNativeSeek = true;
+	}, []);
 	const handleNativeSeeked = useCallback(
-		(currentTimeSeconds: number) => {
-			const latestTarget = latestTargetRef.current;
-			if (!latestTarget || !Number.isFinite(currentTimeSeconds)) {
-				return;
+		(video: HTMLVideoElement) => {
+			const target = sessionRef.current?.target;
+			if (
+				target?.awaitingNativeSeek &&
+				!video.seeking &&
+				video.readyState >= video.HAVE_CURRENT_DATA &&
+				Math.round(video.currentTime * 1_000_000) === target.timestampUs
+			) {
+				retireTarget(target);
 			}
-
-			const toleranceUs = Math.max(1, frameDurationUs * 2);
-			const nativeTimeUs = Math.round(currentTimeSeconds * 1_000_000);
-			if (Math.abs(nativeTimeUs - latestTarget.timestampUs) > toleranceUs) {
-				return;
-			}
-
-			nativeSettledThroughRequestIdRef.current = Math.max(
-				nativeSettledThroughRequestIdRef.current,
-				latestTarget.requestId,
-			);
-			setVisible(false);
 		},
-		[frameDurationUs],
+		[retireTarget],
 	);
+	const capturePlaybackHandoff = useCallback(() => {
+		const target = sessionRef.current?.target;
+		return target ? () => retireTarget(target) : undefined;
+	}, [retireTarget]);
 
 	return {
 		canvasRef,
+		capturePlaybackHandoff,
 		handleNativeSeeked,
-		hide,
+		hasTarget,
+		onNativeSeekRequested,
 		requestFrame,
 		visible,
 	};
 }
 
-export function drawScrubFrame(
+function drawScrubFrame(
 	target: HTMLCanvasElement | null,
 	source: CanvasImageSource,
 ) {

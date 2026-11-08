@@ -1,6 +1,6 @@
 import { Video, VideoPlayer } from "@videojs/react/video";
 import { CircleDot, FileX2, Maximize2 } from "lucide-react";
-import { type RefObject, memo } from "react";
+import { type ReactEventHandler, type Ref, type RefObject, memo } from "react";
 import { Button } from "@/components/ui/button";
 import type {
 	MediaTimeUs,
@@ -22,8 +22,7 @@ export type PreviewViewerRegionProps = {
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
-	onNativePlaying: () => void;
-	onNativeSeeked: () => void;
+	onNativeSeeked: ReactEventHandler<HTMLVideoElement>;
 	onRequestFullscreen: () => void;
 	onSyncPlayhead: () => void;
 	playbackRate: number;
@@ -31,7 +30,7 @@ export type PreviewViewerRegionProps = {
 	previewUrl: string;
 	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
 	scrubFrameVisible: boolean;
-	videoRef: RefObject<HTMLVideoElement | null>;
+	videoRef: Ref<HTMLVideoElement>;
 	fullscreenRef: RefObject<HTMLDivElement | null>;
 	onTogglePlayback: () => void;
 	onPlayheadSeekRequested: (timeUs: MediaTimeUs) => void;
@@ -49,7 +48,6 @@ export function PreviewViewerRegion({
 	onEnded,
 	onNativePause,
 	onNativePlay,
-	onNativePlaying,
 	onNativeSeeked,
 	onRequestFullscreen,
 	onTogglePlayback,
@@ -130,7 +128,6 @@ export function PreviewViewerRegion({
 					onEnded={onEnded}
 					onNativePause={onNativePause}
 					onNativePlay={onNativePlay}
-					onNativePlaying={onNativePlaying}
 					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
 					previewUrl={previewUrl}
@@ -155,7 +152,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded,
 	onNativePause,
 	onNativePlay,
-	onNativePlaying,
 	onNativeSeeked,
 	onSyncPlayhead,
 	previewUrl,
@@ -174,8 +170,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
-	onNativePlaying: () => void;
-	onNativeSeeked: () => void;
+	onNativeSeeked: PreviewViewerRegionProps["onNativeSeeked"];
 	onSyncPlayhead: () => void;
 	previewUrl: string;
 	fullscreenRef: PreviewViewerRegionProps["fullscreenRef"];
@@ -218,7 +213,6 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 							onEnded={onEnded}
 							onPause={onNativePause}
 							onPlay={onNativePlay}
-							onPlaying={onNativePlaying}
 							onSeeked={onNativeSeeked}
 							onTimeUpdate={onSyncPlayhead}
 							playsInline

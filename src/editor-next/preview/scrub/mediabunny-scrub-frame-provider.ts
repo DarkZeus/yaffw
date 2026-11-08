@@ -39,7 +39,6 @@ export type ScrubFrameRequestOptions = {
 export type ScrubFrameProviderRequest = {
 	displayHeight?: number;
 	displayWidth?: number;
-	frameDurationUs: MediaTimeUs;
 	onFrame: (frame: ScrubFrame) => void;
 	onUnavailable?: (reason: string) => void;
 	source: Blob;
@@ -56,7 +55,6 @@ type PendingScrubFrameRequest = {
 export function createMediabunnyScrubFrameProvider({
 	displayHeight,
 	displayWidth,
-	frameDurationUs,
 	onFrame,
 	onUnavailable,
 	source,
@@ -65,7 +63,6 @@ export function createMediabunnyScrubFrameProvider({
 	const sourceFailure = createMediaSourceFailureBoundary();
 	const decodedFrames = createScrubFrameCache({
 		byteBudget: 96 * 1024 * 1024,
-		frameDurationUs,
 	});
 	const dimensions = resolveScrubFrameDimensions({
 		displayHeight,

@@ -186,7 +186,7 @@ beforeEach(() => {
 	});
 	createObjectURL.mockClear();
 	revokeObjectURL.mockClear();
-	play.mockClear();
+	play.mockReset().mockResolvedValue(undefined);
 	pause.mockClear();
 	preparePreviewAudioResourcesMock.mockReset();
 });
@@ -230,13 +230,20 @@ describe("NativePreviewPlayer", () => {
 		expect(screen.getByRole("button", { name: "Play preview" })).toBeTruthy();
 	});
 
-	it("replays from the start after seeking to the end in the viewer", async () => {
+	it("requests the start frame when replaying from the end, even if paused before playback", async () => {
+		const playback = createDeferredPlayback();
+		play.mockReturnValueOnce(playback.promise);
 		renderPlayer();
 		fireEvent.keyDown(screen.getByRole("slider", { name: "Seek preview" }), {
 			key: "End",
 			code: "End",
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Play preview" }));
+		expect(
+			scrubPreviewMockState.providers[0]?.requestFrame,
+		).toHaveBeenLastCalledWith(0, { priority: "final" });
+		fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+		await act(async () => playback.resolve());
 		await waitFor(() => expect(play).toHaveBeenCalledOnce());
 		expect(
 			(screen.getByLabelText("Preview for clip.mp4") as HTMLVideoElement)
@@ -326,7 +333,9 @@ describe("NativePreviewPlayer", () => {
 		expect(video.muted).toBe(true);
 	});
 
-	it("retains the displayed scrub frame through a pending seek and native playback handoff", async () => {
+	it("retains the displayed scrub frame until the requested native seek settles", async () => {
+		const playback = createDeferredPlayback();
+		play.mockReturnValueOnce(playback.promise);
 		const context = {
 			clearRect: vi.fn(),
 			drawImage: vi.fn(),
@@ -401,15 +410,117 @@ describe("NativePreviewPlayer", () => {
 			);
 			expect(overlay.className).toContain("block");
 
+			const nativeSeek = vi
+				.spyOn(video, "seeking", "get")
+				.mockReturnValue(false);
+			const nativeReadyState = vi
+				.spyOn(video, "readyState", "get")
+				.mockReturnValue(video.HAVE_CURRENT_DATA);
+			video.currentTime = 9;
+			fireEvent.seeked(video);
+			expect(overlay.className).toContain("block");
+			video.currentTime = 0;
+
 			fireEvent.click(screen.getByRole("button", { name: "Play" }));
 			expect(video.currentTime).toBe(9);
 			expect(overlay.className).toContain("block");
 
+			video.currentTime = 9.033333;
+			fireEvent.seeked(video);
+			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+				"00:00:09.000",
+			);
+			expect(overlay.className).toContain("block");
 			fireEvent.playing(video);
+			expect(overlay.className).toContain("block");
 
+			video.currentTime = 9;
+			nativeSeek.mockReturnValue(true);
+			fireEvent.seeked(video);
+			expect(overlay.className).toContain("block");
+			nativeSeek.mockReturnValue(false);
+			nativeReadyState.mockReturnValue(video.HAVE_METADATA);
+			fireEvent.seeked(video);
+			expect(overlay.className).toContain("block");
+			nativeReadyState.mockReturnValue(video.HAVE_CURRENT_DATA);
+			fireEvent.seeked(video);
 			await waitFor(() => {
 				expect(overlay.className).toContain("hidden");
 			});
+			context.drawImage.mockClear();
+			act(() => {
+				provider?.onFrame({
+					actualTimestampUs: 9_000_000,
+					canvas: nextCanvas,
+					requestId: 2,
+					requestedAtMs: 0,
+					timestampUs: 9_000_000,
+				});
+			});
+			expect(context.drawImage).not.toHaveBeenCalled();
+			expect(overlay.className).toContain("hidden");
+			nativeSeek.mockRestore();
+			nativeReadyState.mockRestore();
+			await act(async () => playback.resolve());
+		} finally {
+			getContext.mockRestore();
+		}
+	});
+
+	it("hands off to confirmed playback only for the target that started it", async () => {
+		const stalePlayback = createDeferredPlayback();
+		const currentPlayback = createDeferredPlayback();
+		play
+			.mockReturnValueOnce(stalePlayback.promise)
+			.mockReturnValueOnce(currentPlayback.promise);
+		const drawImage = vi.fn();
+		const getContext = vi
+			.spyOn(HTMLCanvasElement.prototype, "getContext")
+			.mockReturnValue({
+				clearRect: vi.fn(),
+				drawImage,
+			} as unknown as CanvasRenderingContext2D);
+
+		try {
+			renderPlayer();
+			const overlay = screen.getByTestId("scrub-preview-canvas");
+			const provider = scrubPreviewMockState.providers[0];
+			function deliverFrame(requestId: number, timestampUs: number) {
+				const canvas = document.createElement("canvas");
+				act(() => {
+					provider?.onFrame({
+						actualTimestampUs: timestampUs,
+						canvas,
+						requestId,
+						requestedAtMs: 0,
+						timestampUs,
+					});
+				});
+			}
+
+			fireEvent.click(
+				screen.getByRole("button", { name: "Seek forward 10 seconds" }),
+			);
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			fireEvent.click(
+				screen.getByRole("button", { name: "Step forward one frame" }),
+			);
+			deliverFrame(2, 10_033_333);
+			expect(overlay.className).toContain("block");
+			drawImage.mockClear();
+			deliverFrame(1, 10_000_000);
+			expect(drawImage).not.toHaveBeenCalled();
+
+			await act(async () => stalePlayback.resolve());
+			expect(overlay.className).toContain("block");
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			await act(async () => currentPlayback.resolve());
+			expect(overlay.className).toContain("hidden");
+
+			deliverFrame(2, 10_033_333);
+			expect(overlay.className).toContain("hidden");
+			expect(drawImage).not.toHaveBeenCalled();
 		} finally {
 			getContext.mockRestore();
 		}
@@ -525,6 +636,18 @@ describe("NativePreviewPlayer", () => {
 			expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
 				"00:00:07.000",
 			);
+			fireEvent.pointerMove(window, {
+				pointerId: 1,
+				pointerType: "mouse",
+				clientX: 701,
+			});
+			await waitFor(() => {
+				expect(
+					scrubPreviewMockState.providers[0]?.requestFrame,
+				).toHaveBeenLastCalledWith(7_010_000, {
+					priority: "interactive",
+				});
+			});
 			fireEvent.pointerUp(window, {
 				pointerId: 1,
 				pointerType: "mouse",
@@ -660,6 +783,14 @@ describe("NativePreviewPlayer", () => {
 });
 
 const previewSource = new File(["video"], "clip.mp4", { type: "video/mp4" });
+
+function createDeferredPlayback() {
+	let resolve!: () => void;
+	const promise = new Promise<void>((complete) => {
+		resolve = complete;
+	});
+	return { promise, resolve };
+}
 
 function renderPlayer(
 	props: Partial<React.ComponentProps<typeof NativePreviewPlayer>> = {},

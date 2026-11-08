@@ -1,9 +1,9 @@
 import {
+	type SyntheticEvent,
 	memo,
 	useCallback,
 	useEffect,
 	useLayoutEffect,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -33,7 +33,10 @@ import { PreviewViewerRegion } from "../regions/preview-viewer-region";
 import { useScrubPreview } from "../scrub/use-scrub-preview";
 import { resolvePreviewClockMode } from "../transport/preview-clock-mode";
 import { createPreviewMediaTransport } from "../transport/preview-media-transport";
-import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
+import {
+	type PreviewMediaTransportHandle,
+	useNativePreviewTransport,
+} from "../transport/use-native-preview-transport";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 
@@ -78,16 +81,13 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 }: NativePreviewPlayerProps) {
 	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const videoRef = useRef<HTMLVideoElement | null>(null);
-	const mediaTransportRef = useMemo(
-		() => ({
-			get current() {
-				return videoRef.current
-					? createPreviewMediaTransport(videoRef.current)
-					: null;
-			},
-		}),
-		[],
-	);
+	const mediaTransportRef = useRef<PreviewMediaTransportHandle | null>(null);
+	const setVideoRef = useCallback((video: HTMLVideoElement | null) => {
+		videoRef.current = video;
+		mediaTransportRef.current = video
+			? createPreviewMediaTransport(video)
+			: null;
+	}, []);
 	const fullscreenRef = useRef<HTMLDivElement | null>(null);
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const audioMixRef = useRef(audioMix);
@@ -175,6 +175,11 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		previewAudioResources,
 		audioPreviewTransportSupported,
 	});
+	const scrubPreview = useScrubPreview({
+		activeMediaAssetCleanupScope,
+		asset,
+		source,
+	});
 
 	const {
 		getPlaybackRate,
@@ -204,14 +209,10 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		frameDurationUs: asset.frameTiming.frameDurationUs,
 		previewAudioEngineRef,
 		previewClockMode,
+		scrubPreview,
 		selection,
 		source,
 		videoRef: mediaTransportRef,
-	});
-	const scrubPreview = useScrubPreview({
-		activeMediaAssetCleanupScope,
-		asset,
-		source,
 	});
 	const {
 		requestFrame: requestScrubFrame,
@@ -275,20 +276,25 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			requestScrubFrame,
 		],
 	);
-	const handleNativeSeeked = useCallback(() => {
-		syncPlayheadWithNativeVideo();
-		handleScrubNativeSeeked(videoRef.current?.currentTime ?? Number.NaN);
-	}, [handleScrubNativeSeeked, syncPlayheadWithNativeVideo]);
+	const handleNativeSeeked = useCallback(
+		(event: SyntheticEvent<HTMLVideoElement>) => {
+			const video = event.currentTarget;
+			if (video !== videoRef.current) return;
+			handleScrubNativeSeeked(video);
+			syncPlayheadWithNativeVideo();
+		},
+		[handleScrubNativeSeeked, syncPlayheadWithNativeVideo],
+	);
 	const togglePlaybackWithScrubPreview = useCallback(() => {
 		if (!playbackRequested && getPlayheadUs() >= asset.durationUs) {
-			previewScrubToUs(0);
+			seekToUsWithScrubPreview(0);
 		}
 		void togglePlayback();
 	}, [
 		asset.durationUs,
 		getPlayheadUs,
 		playbackRequested,
-		previewScrubToUs,
+		seekToUsWithScrubPreview,
 		togglePlayback,
 	]);
 	getPlaybackRateRef.current = getPlaybackRate;
@@ -358,7 +364,6 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onEnded={handleEnded}
 					onNativePause={handleNativePause}
 					onNativePlay={handleNativePlay}
-					onNativePlaying={scrubPreview.hide}
 					onNativeSeeked={handleNativeSeeked}
 					onRequestFullscreen={requestFullscreen}
 					onTogglePlayback={togglePlaybackWithScrubPreview}
@@ -369,7 +374,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					previewUrl={previewUrl}
 					scrubCanvasRef={scrubPreview.canvasRef}
 					scrubFrameVisible={scrubPreview.visible}
-					videoRef={videoRef}
+					videoRef={setVideoRef}
 				/>
 			}
 			transport={

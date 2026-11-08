@@ -11,6 +11,7 @@ const mediabunnyMock = vi.hoisted(() => ({
 	inputDisposals: [] as Array<ReturnType<typeof vi.fn>>,
 	keyPacketInterval: 10,
 	primaryVideoTrack: {} as object | null,
+	sampleStepUs: 1_000_000,
 	sampleCloses: 0,
 	sampleIteratorReturns: 0,
 	sampleIteratorStarts: [] as number[],
@@ -40,7 +41,11 @@ vi.mock("mediabunny", () => {
 			mediabunnyMock.sampleCloses += 1;
 		}
 
-		drawWithFit(_context: unknown, options: { fit: string }) {
+		drawWithFit(
+			context: MockOffscreenCanvas["context"],
+			options: { fit: string },
+		) {
+			context.canvas.sampleTimestampUs = this.microsecondTimestamp;
 			mediabunnyMock.drawnSamples.push(options);
 		}
 	}
@@ -72,8 +77,14 @@ vi.mock("mediabunny", () => {
 
 			async getPacket(timestamp: number) {
 				await mediabunnyMock.beforePacket?.(timestamp);
-				const sequenceNumber = Math.max(0, Math.floor(timestamp));
-				return new MockPacket(sequenceNumber, sequenceNumber);
+				const step = mediabunnyMock.sampleStepUs;
+				const sequenceNumber = Math.floor(
+					Math.round(timestamp * 1_000_000) / step,
+				);
+				return new MockPacket(
+					(sequenceNumber * step) / 1_000_000,
+					sequenceNumber,
+				);
 			}
 		},
 		Input: class Input {
@@ -101,12 +112,13 @@ vi.mock("mediabunny", () => {
 				mediabunnyMock.sampleIteratorStarts.push(startTimestamp);
 				try {
 					for (
-						let timestamp = Math.ceil(startTimestamp);
-						timestamp <= 100;
-						timestamp += 1
+						let timestampUs = Math.round(startTimestamp * 1_000_000);
+						timestampUs <= 100_000_000;
+						timestampUs += mediabunnyMock.sampleStepUs
 					) {
+						const timestamp = timestampUs / 1_000_000;
 						await mediabunnyMock.beforeSample?.(timestamp);
-						mediabunnyMock.decodedTimestampsUs.push(timestamp * 1_000_000);
+						mediabunnyMock.decodedTimestampsUs.push(timestampUs);
 						yield new MockSample(timestamp);
 					}
 				} finally {
@@ -118,9 +130,13 @@ vi.mock("mediabunny", () => {
 });
 
 class MockOffscreenCanvas {
+	sampleTimestampUs: number | null = null;
 	readonly context = {
+		canvas: this,
 		clearRect: vi.fn(),
-		drawImage: vi.fn(),
+		drawImage: vi.fn((source: MockOffscreenCanvas) => {
+			this.sampleTimestampUs = source.sampleTimestampUs;
+		}),
 	};
 
 	constructor(
@@ -149,6 +165,7 @@ beforeEach(() => {
 	mediabunnyMock.inputDisposals = [];
 	mediabunnyMock.keyPacketInterval = 10;
 	mediabunnyMock.primaryVideoTrack = {};
+	mediabunnyMock.sampleStepUs = 1_000_000;
 	mediabunnyMock.sampleCloses = 0;
 	mediabunnyMock.sampleIteratorReturns = 0;
 	mediabunnyMock.sampleIteratorStarts = [];
@@ -228,7 +245,6 @@ describe("Mediabunny scrub frame provider", () => {
 			const onFrame = vi.fn();
 			const onUnavailable = vi.fn();
 			const provider = createMediabunnyScrubFrameProvider({
-				frameDurationUs: 1_000_000,
 				onFrame,
 				onUnavailable,
 				source: new Blob(["video"]),
@@ -282,6 +298,33 @@ describe("Mediabunny scrub frame provider", () => {
 		).toEqual([5_000_000, 40_000_000, 1_000_000]);
 		provider.dispose();
 	});
+
+	it("returns the matching cached sample when nearby packet timestamps are distinct", async () => {
+		mediabunnyMock.sampleStepUs = 10_000;
+		const presented: Array<{ targetUs: number; sampleUs: number | null }> = [];
+		const provider = createProvider((frame) => {
+			presented.push({
+				targetUs: frame.timestampUs,
+				sampleUs: (frame.canvas as unknown as MockOffscreenCanvas)
+					.sampleTimestampUs,
+			});
+		});
+
+		try {
+			provider.requestFrame(1_010_000);
+			await waitForCondition(() => presented.length === 1);
+			provider.requestFrame(1_001_000, { priority: "interactive" });
+			await waitForCondition(() => presented.length === 2);
+
+			expect(presented).toEqual([
+				{ targetUs: 1_010_000, sampleUs: 1_010_000 },
+				{ targetUs: 1_001_000, sampleUs: 1_000_000 },
+			]);
+			expect(mediabunnyMock.sampleIteratorStarts).toEqual([0]);
+		} finally {
+			provider.dispose();
+		}
+	});
 });
 
 function pauseFirstScrubOperation(stage: "packet" | "key packet" | "sample") {
@@ -310,7 +353,6 @@ function createProvider(onFrame: (frame: ScrubFrame) => void) {
 	return createMediabunnyScrubFrameProvider({
 		displayHeight: 2160,
 		displayWidth: 3840,
-		frameDurationUs: 1_000_000,
 		onFrame,
 		source: new Blob(["video"]),
 	});

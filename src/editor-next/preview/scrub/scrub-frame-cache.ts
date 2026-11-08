@@ -16,12 +16,10 @@ export type ScrubFrameCache = {
 
 export function createScrubFrameCache({
 	byteBudget = DEFAULT_CACHE_BUDGET_BYTES,
-	frameDurationUs,
 }: {
 	byteBudget?: number;
-	frameDurationUs: MediaTimeUs;
-}): ScrubFrameCache {
-	const entries = new Map<number, CachedScrubFrame>();
+} = {}): ScrubFrameCache {
+	const entries = new Map<MediaTimeUs, CachedScrubFrame>();
 	const maximumBytes = Math.max(0, Math.floor(byteBudget));
 	let retainedBytes = 0;
 
@@ -36,14 +34,13 @@ export function createScrubFrameCache({
 	return {
 		clear,
 		get(timestampUs) {
-			const key = scrubFrameCacheKey(timestampUs, frameDurationUs);
-			const entry = entries.get(key);
+			const entry = entries.get(timestampUs);
 			if (!entry) {
 				return null;
 			}
 
-			entries.delete(key);
-			entries.set(key, entry);
+			entries.delete(timestampUs);
+			entries.set(timestampUs, entry);
 			return entry.canvas;
 		},
 		set(timestampUs, source) {
@@ -69,15 +66,14 @@ export function createScrubFrameCache({
 			}
 			context.drawImage(source, 0, 0, width, height);
 
-			const key = scrubFrameCacheKey(timestampUs, frameDurationUs);
-			const previous = entries.get(key);
+			const previous = entries.get(timestampUs);
 			if (previous) {
-				entries.delete(key);
+				entries.delete(timestampUs);
 				retainedBytes -= previous.byteSize;
 				releaseCanvas(previous.canvas);
 			}
 
-			entries.set(key, { byteSize, canvas });
+			entries.set(timestampUs, { byteSize, canvas });
 			retainedBytes += byteSize;
 
 			while (retainedBytes > maximumBytes) {
@@ -94,15 +90,6 @@ export function createScrubFrameCache({
 			}
 		},
 	};
-}
-
-export function scrubFrameCacheKey(
-	timestampUs: MediaTimeUs,
-	frameDurationUs: MediaTimeUs,
-) {
-	return Math.floor(
-		Math.max(0, timestampUs) / Math.max(1, Math.round(frameDurationUs)),
-	);
 }
 
 function releaseCanvas(canvas: ScrubCanvas) {

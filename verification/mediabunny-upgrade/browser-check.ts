@@ -42,7 +42,6 @@ export async function checkVideo(base64: string) {
 		let reject: ((reason: Error) => void) | null = null;
 		const provider = createMediabunnyScrubFrameProvider({
 			source,
-			frameDurationUs: 100_000,
 			displayWidth: 160,
 			displayHeight: 90,
 			onFrame: (frame) => deliver?.(frame.actualTimestampUs / 1_000_000),

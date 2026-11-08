@@ -16,6 +16,7 @@ import type {
 	PreviewAudioEngine,
 	PreviewAudioPlaybackState,
 } from "../../audio/types/preview-audio-engine.types";
+import type { ScrubPreviewTransport } from "../scrub/use-scrub-preview";
 import type { PreviewClockMode } from "./preview-clock-mode";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
@@ -38,6 +39,7 @@ export type UseNativePreviewTransportOptions = {
 	frameDurationUs: MediaTimeUs;
 	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	previewClockMode: PreviewClockMode;
+	scrubPreview?: ScrubPreviewTransport;
 	selection: Selection;
 	source: Blob;
 	videoRef: RefObject<PreviewMediaTransportHandle | null>;
@@ -61,10 +63,14 @@ export function useNativePreviewTransport({
 	frameDurationUs,
 	previewAudioEngineRef,
 	previewClockMode,
+	scrubPreview,
 	selection,
 	source,
 	videoRef,
 }: UseNativePreviewTransportOptions) {
+	const capturePlaybackHandoff = scrubPreview?.capturePlaybackHandoff;
+	const hasScrubTarget = scrubPreview?.hasTarget;
+	const onNativeSeekRequested = scrubPreview?.onNativeSeekRequested;
 	const playheadRef = useRef<MediaTimeUs>(0);
 	const renderingPlayheadRef = useRef<MediaTimeUs>(0);
 	const playbackRateRef = useRef(1);
@@ -179,6 +185,7 @@ export function useNativePreviewTransport({
 			const video = videoRef.current;
 
 			if (video) {
+				onNativeSeekRequested?.(nextPlayheadUs);
 				pendingVideoFollowerSeekSecondsRef.current = setVideoFollowerTime(
 					video,
 					nextPlayheadUs,
@@ -198,6 +205,7 @@ export function useNativePreviewTransport({
 		},
 		[
 			audioMasterClockActive,
+			onNativeSeekRequested,
 			previewAudioEngineRef,
 			selection.endUs,
 			selectionLoopEnabled,
@@ -342,12 +350,22 @@ export function useNativePreviewTransport({
 					await engine.play();
 					return;
 				}
-				if (previewScrubActiveRef.current)
-					setVideoFollowerTime(video, playheadRef.current);
+				if (previewScrubActiveRef.current || hasScrubTarget?.()) {
+					const targetUs = playheadRef.current;
+					onNativeSeekRequested?.(targetUs);
+					setVideoFollowerTime(video, targetUs);
+				}
 				previewScrubActiveRef.current = false;
 				renderingPlayheadRef.current = secondsToMicroseconds(video.currentTime);
+				const completeHandoff = capturePlaybackHandoff?.();
 				await video.play();
-				if (requestId === playbackStartRequestIdRef.current) setIsPlaying(true);
+				if (
+					requestId === playbackStartRequestIdRef.current &&
+					videoRef.current === video
+				) {
+					completeHandoff?.();
+					setIsPlaying(true);
+				}
 			} catch {
 				if (requestId !== playbackStartRequestIdRef.current) return;
 				engine?.pause();
@@ -361,7 +379,10 @@ export function useNativePreviewTransport({
 		},
 		[
 			audioMasterClockActive,
+			capturePlaybackHandoff,
 			durationUs,
+			hasScrubTarget,
+			onNativeSeekRequested,
 			previewAudioEngineRef,
 			previewClockMode,
 			selection.endUs,
@@ -463,7 +484,11 @@ export function useNativePreviewTransport({
 				following = false;
 				setIsPlaying(false);
 				if (state === "closed") setPlaybackRequested(false);
-				if (state !== "paused" && !previewScrubActiveRef.current) {
+				if (
+					state !== "paused" &&
+					!previewScrubActiveRef.current &&
+					!hasScrubTarget?.()
+				) {
 					const time = secondsToMicroseconds(engine.getCurrentTime());
 					const loop = selectionLoopConfigRef.current;
 					if (
@@ -485,18 +510,21 @@ export function useNativePreviewTransport({
 			following = true;
 			const request = ++followerRequest;
 			video.muted = true;
-			setVideoFollowerTime(
-				video,
-				secondsToMicroseconds(engine.getPresentationTime()),
+			const followerTimeUs = secondsToMicroseconds(
+				engine.getPresentationTime(),
 			);
+			onNativeSeekRequested?.(followerTimeUs);
+			setVideoFollowerTime(video, followerTimeUs);
+			const completeHandoff = capturePlaybackHandoff?.();
 			void video
 				.play()
 				.then(() => {
-					if (disposed) return;
+					if (disposed || videoRef.current !== video) return;
 					if (request !== followerRequest) {
 						if (!following) void video.pause();
 						return;
 					}
+					completeHandoff?.();
 					setIsPlaying(true);
 				})
 				.catch(() => {
@@ -518,6 +546,9 @@ export function useNativePreviewTransport({
 		};
 	}, [
 		audioMasterClockActive,
+		capturePlaybackHandoff,
+		hasScrubTarget,
+		onNativeSeekRequested,
 		previewAudioEngineRef,
 		setPlaybackRequested,
 		setPlayheadUs,
@@ -538,7 +569,7 @@ export function useNativePreviewTransport({
 
 	const syncPlayheadWithNativeVideo = useCallback(
 		(options?: PreviewSyncOptions) => {
-			if (previewScrubActiveRef.current) {
+			if (previewScrubActiveRef.current || hasScrubTarget?.()) {
 				return;
 			}
 
@@ -681,6 +712,7 @@ export function useNativePreviewTransport({
 			audioMasterClockActive,
 			durationUs,
 			frameDurationUs,
+			hasScrubTarget,
 			isPlaying,
 			previewAudioEngineRef,
 			selection,
@@ -807,6 +839,7 @@ export function useNativePreviewTransport({
 			return;
 		}
 
+		if (previewScrubActiveRef.current) return;
 		setPlaybackRequested(true);
 		setIsPlaying(true);
 	}, [

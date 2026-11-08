@@ -51,7 +51,6 @@ export async function compare({
 		source,
 		displayWidth: 160,
 		displayHeight: 90,
-		frameDurationUs: 100_000,
 		onFrame(frame) {
 			if (disposed) afterDispose++;
 			else deliver?.(frame);
