@@ -19,8 +19,8 @@ import type {
 } from "@/editor-core/model";
 import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
+import type { BeginSelectionGesture } from "../timeline/use-selection-gesture";
 import type { WaveformLaneState } from "../types/selection-waveform-lanes.types";
-import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
 import {
 	type WaveformLaneIdentityViewModel,
 	createWaveformLaneIdentityViewModel,
@@ -42,9 +42,7 @@ export type WaveformLaneProps = {
 	onAudioTrackIncludedChange?: (trackId: string, include: boolean) => void;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onPointerDown: (event: WaveformLanePointerEvent) => void;
-	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
-	onSelectionEditActivityChange: (editing: boolean) => void;
-	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionGestureStart: BeginSelectionGesture;
 	onSelectionRegionAvailabilityChange: (
 		trackId: string,
 		available: boolean,
@@ -66,9 +64,7 @@ export const WaveformLane = memo(function WaveformLane({
 	onAudioTrackIncludedChange,
 	onPlayheadSeekRequested,
 	onPointerDown,
-	onSelectionCommitRequested,
-	onSelectionEditActivityChange,
-	onSelectionPreviewRequested,
+	onSelectionGestureStart,
 	onSelectionRegionAvailabilityChange,
 	selection,
 	selectionEditingDisabled,
@@ -197,9 +193,7 @@ export const WaveformLane = memo(function WaveformLane({
 						label={identity.title}
 						minimumSelectionDurationUs={minimumSelectionDurationUs}
 						onPlayheadSeekRequested={onPlayheadSeekRequested}
-						onSelectionCommitRequested={onSelectionCommitRequested}
-						onSelectionEditActivityChange={onSelectionEditActivityChange}
-						onSelectionPreviewRequested={onSelectionPreviewRequested}
+						onSelectionGestureStart={onSelectionGestureStart}
 						onSelectionRegionAvailabilityChange={
 							publishSelectionRegionAvailability
 						}

@@ -1,12 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
-import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
+import type { Region } from "wavesurfer.js/dist/plugins/regions.js";
 import type { MediaTimeUs, Selection } from "@/editor-core/model";
-import {
-	cancelBrowserFrame,
-	requestBrowserFrame,
-} from "@/lib/browser-animation-frame";
 import { clamp } from "@/lib/clamp";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
@@ -14,11 +10,8 @@ import {
 	mediaTimeToPercent,
 	selectionBoundaryTrackStyle,
 } from "../timeline/selection-timeline-geometry";
+import type { BeginSelectionGesture } from "../timeline/use-selection-gesture";
 import type { WaveformSamples } from "../types/selection-waveform-lanes.types";
-import type {
-	WaveformRegionSelectionChange,
-	WaveformRegionUpdateSide,
-} from "../types/selection-waveform-surface.types";
 import { createWavesurferPeaksFromSamples } from "./selection-waveform-surface.peaks";
 
 const WAVEFORM_HEIGHT_PX = 48;
@@ -33,9 +26,7 @@ export type WaveformSurfaceProps = {
 	label: string;
 	minimumSelectionDurationUs: MediaTimeUs;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
-	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
-	onSelectionEditActivityChange?: (editing: boolean) => void;
-	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionGestureStart: BeginSelectionGesture;
 	onSelectionRegionAvailabilityChange?: (available: boolean) => void;
 	samples: WaveformSamples;
 	selection: Selection;
@@ -51,9 +42,7 @@ export function WaveformSurface({
 	label,
 	minimumSelectionDurationUs,
 	onPlayheadSeekRequested,
-	onSelectionCommitRequested,
-	onSelectionEditActivityChange,
-	onSelectionPreviewRequested,
+	onSelectionGestureStart,
 	onSelectionRegionAvailabilityChange,
 	samples,
 	selection,
@@ -74,9 +63,7 @@ export function WaveformSurface({
 			minimumSelectionDurationUs,
 		),
 		onPlayheadSeekRequested,
-		onSelectionCommitRequested,
-		onSelectionEditActivityChange,
-		onSelectionPreviewRequested,
+		onSelectionGestureStart,
 		onSelectionRegionAvailabilityChange,
 		peaks,
 		selection,
@@ -119,9 +106,7 @@ function useWavesurferWaveform({
 	durationSeconds,
 	minimumSelectionDurationSeconds,
 	onPlayheadSeekRequested,
-	onSelectionCommitRequested,
-	onSelectionEditActivityChange,
-	onSelectionPreviewRequested,
+	onSelectionGestureStart,
 	onSelectionRegionAvailabilityChange,
 	peaks,
 	selection,
@@ -133,9 +118,7 @@ function useWavesurferWaveform({
 	durationSeconds: number;
 	minimumSelectionDurationSeconds: number;
 	onPlayheadSeekRequested: (playheadUs: number) => void;
-	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
-	onSelectionEditActivityChange?: (editing: boolean) => void;
-	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionGestureStart: BeginSelectionGesture;
 	onSelectionRegionAvailabilityChange?: (available: boolean) => void;
 	peaks: Float32Array;
 	selection: Selection;
@@ -146,31 +129,15 @@ function useWavesurferWaveform({
 		useState<WaveformRendererStatus>("loading");
 	const rendererRef = useRef<{
 		regions: RegionsPlugin;
+		lifecycle: ReturnType<typeof createSynchronousMediaWorkScope>;
 		fail: () => void;
 	} | null>(null);
 	const selectionRegionRef = useRef<Region | null>(null);
-	const selectionRef = useRef(selection);
-	const regionUpdateInitialSelectionRef = useRef<Selection | null>(null);
-	const pendingRegionChangeRef = useRef<WaveformRegionSelectionChange | null>(
-		null,
-	);
-	const regionPreviewFrameRef = useRef<number | null>(null);
-	const syncingRegionRef = useRef(false);
 	const onPlayheadSeekRequestedRef = useLatestValueRef(onPlayheadSeekRequested);
-	const onSelectionCommitRequestedRef = useLatestValueRef(
-		onSelectionCommitRequested,
-	);
-	const onSelectionPreviewRequestedRef = useLatestValueRef(
-		onSelectionPreviewRequested,
-	);
-	useLayoutEffect(() => {
-		selectionRef.current = selection;
-	}, [selection]);
 
 	useLayoutEffect(() => {
 		const container = containerRef.current;
 		const lifecycle = createSynchronousMediaWorkScope();
-		let regionPreviewFrameCleanup: { dispose: () => void } | null = null;
 
 		if (!container) {
 			setRendererStatus("fallback");
@@ -181,14 +148,9 @@ function useWavesurferWaveform({
 		container.replaceChildren();
 		lifecycle.registerCleanup(() => container.replaceChildren());
 		lifecycle.registerCleanup(() => {
-			clearScheduledRegionPreviewFrame();
-			pendingRegionChangeRef.current = null;
-			const hadSelectionEdit = regionUpdateInitialSelectionRef.current !== null;
-			regionUpdateInitialSelectionRef.current = null;
 			const hadSelectionRegion = selectionRegionRef.current !== null;
 			selectionRegionRef.current = null;
 			rendererRef.current = null;
-			if (hadSelectionEdit) onSelectionEditActivityChange?.(false);
 			if (hadSelectionRegion) onSelectionRegionAvailabilityChange?.(false);
 		});
 		const registration = activeMediaAssetCleanupScope?.registerCleanup(() =>
@@ -249,7 +211,7 @@ function useWavesurferWaveform({
 					),
 				});
 				lifecycle.registerCleanup(() => wavesurfer.destroy());
-				rendererRef.current = { regions, fail: failRenderer };
+				rendererRef.current = { regions, lifecycle, fail: failRenderer };
 				lifecycle.registerCleanup(wavesurfer.on("error", failRenderer));
 				lifecycle.registerCleanup(
 					wavesurfer.on("redrawcomplete", () => {
@@ -273,103 +235,8 @@ function useWavesurferWaveform({
 						event.stopPropagation();
 					}),
 				);
-				lifecycle.registerCleanup(
-					regions.on("region-update", (region, side) => {
-						if (lifecycle.isDisposed() || syncingRegionRef.current) {
-							return;
-						}
-
-						if (region !== selectionRegionRef.current) {
-							return;
-						}
-
-						const change = createRegionSelectionChange({
-							initialSelection:
-								regionUpdateInitialSelectionRef.current ?? selectionRef.current,
-							region,
-							side,
-						});
-						const startsEdit = regionUpdateInitialSelectionRef.current === null;
-						regionUpdateInitialSelectionRef.current = change.initialSelection;
-						if (startsEdit) onSelectionEditActivityChange?.(true);
-						scheduleRegionPreview(change);
-					}),
-				);
-				lifecycle.registerCleanup(
-					regions.on("region-updated", (region, side) => {
-						if (lifecycle.isDisposed() || syncingRegionRef.current) {
-							return;
-						}
-
-						if (region !== selectionRegionRef.current) {
-							return;
-						}
-
-						const change = createRegionSelectionChange({
-							initialSelection:
-								regionUpdateInitialSelectionRef.current ?? selectionRef.current,
-							region,
-							side,
-						});
-						flushRegionPreview(change);
-						regionUpdateInitialSelectionRef.current = null;
-						onSelectionEditActivityChange?.(false);
-						callLatestCallback(onSelectionCommitRequestedRef, change);
-					}),
-				);
 			})
 			.catch(failRenderer);
-
-		function scheduleRegionPreview(change: WaveformRegionSelectionChange) {
-			pendingRegionChangeRef.current = change;
-
-			if (regionPreviewFrameRef.current !== null) {
-				return;
-			}
-
-			let frameFired = false;
-			let frameId: number | null = null;
-			frameId = requestBrowserFrame(() => {
-				frameFired = true;
-				regionPreviewFrameCleanup?.dispose();
-				regionPreviewFrameCleanup = null;
-				regionPreviewFrameRef.current = null;
-				const pendingChange = pendingRegionChangeRef.current;
-				pendingRegionChangeRef.current = null;
-
-				if (pendingChange) {
-					callLatestCallback(onSelectionPreviewRequestedRef, pendingChange);
-				}
-			});
-
-			const scheduledFrameId = frameId;
-			if (!frameFired && scheduledFrameId !== null) {
-				regionPreviewFrameRef.current = scheduledFrameId;
-				regionPreviewFrameCleanup = lifecycle.registerCleanup(() =>
-					cancelBrowserFrame(scheduledFrameId),
-				);
-			}
-		}
-
-		function flushRegionPreview(change: WaveformRegionSelectionChange) {
-			clearScheduledRegionPreviewFrame();
-			pendingRegionChangeRef.current = null;
-			callLatestCallback(onSelectionPreviewRequestedRef, change);
-		}
-
-		function clearScheduledRegionPreviewFrame() {
-			if (regionPreviewFrameCleanup) {
-				regionPreviewFrameCleanup.dispose();
-				regionPreviewFrameCleanup = null;
-				regionPreviewFrameRef.current = null;
-				return;
-			}
-
-			if (regionPreviewFrameRef.current !== null) {
-				cancelBrowserFrame(regionPreviewFrameRef.current);
-				regionPreviewFrameRef.current = null;
-			}
-		}
 
 		return disposeRenderer;
 	}, [
@@ -377,9 +244,6 @@ function useWavesurferWaveform({
 		containerRef,
 		durationSeconds,
 		onPlayheadSeekRequestedRef,
-		onSelectionCommitRequestedRef,
-		onSelectionEditActivityChange,
-		onSelectionPreviewRequestedRef,
 		onSelectionRegionAvailabilityChange,
 		peaks,
 	]);
@@ -405,13 +269,10 @@ function useWavesurferWaveform({
 		const region = selectionRegionRef.current;
 		if (!renderer || !region) return;
 
-		syncingRegionRef.current = true;
 		try {
 			region.setOptions(regionOptions);
 		} catch {
 			renderer.fail();
-		} finally {
-			syncingRegionRef.current = false;
 		}
 	}, [regionOptions]);
 
@@ -427,16 +288,23 @@ function useWavesurferWaveform({
 		}
 
 		try {
-			selectionRegionRef.current = renderer.regions.addRegion({
+			const region = renderer.regions.addRegion({
 				...regionOptions,
 				id: SELECTION_REGION_ID,
 				color: SELECTION_REGION_COLOR,
 			});
+			if (!region.element)
+				throw new Error("The Waveform region has no element.");
+			renderer.lifecycle.registerCleanup(
+				bindWaveformRegionGesture(region.element, onSelectionGestureStart),
+			);
+			selectionRegionRef.current = region;
 			onSelectionRegionAvailabilityChange?.(true);
 		} catch {
 			renderer.fail();
 		}
 	}, [
+		onSelectionGestureStart,
 		onSelectionRegionAvailabilityChange,
 		regionOptions,
 		rendererStatus,
@@ -588,33 +456,37 @@ function createSelectionRegionOptions({
 	};
 }
 
-function createRegionSelectionChange({
-	initialSelection,
-	region,
-	side,
-}: {
-	initialSelection: Selection;
-	region: Region;
-	side: UpdateSide | undefined;
-}): WaveformRegionSelectionChange {
-	return {
-		initialSelection,
-		selection: {
-			endUs: secondsToMediaTimeUs(region.end),
-			startUs: secondsToMediaTimeUs(region.start),
-		},
-		side: regionUpdateSide(side),
-	};
-}
-
-function regionUpdateSide(
-	side: UpdateSide | undefined,
-): WaveformRegionUpdateSide {
-	if (side === "start" || side === "end") {
-		return side;
+function bindWaveformRegionGesture(
+	element: HTMLElement,
+	beginGesture: BeginSelectionGesture,
+) {
+	let cancelGesture: (() => void) | undefined;
+	const tracking = new AbortController();
+	function start(event: MouseEvent | PointerEvent) {
+		// WaveSurfer supplies the region and grip elements. The timeline owns
+		// pointer release and cancellation for the Selection they represent.
+		event.stopImmediatePropagation();
+		const handle =
+			event.target instanceof Element
+				? event.target.closest('[part~="region-handle"]')
+				: null;
+		const parts = handle?.getAttribute("part")?.split(/\s+/);
+		const kind = parts?.includes("region-handle-left")
+			? "start"
+			: parts?.includes("region-handle-right")
+				? "end"
+				: "range";
+		cancelGesture =
+			beginGesture(event, element, kind, "waveform") ?? cancelGesture;
 	}
-
-	return "range";
+	const listeners = { capture: true, signal: tracking.signal };
+	element.addEventListener("pointerdown", start, listeners);
+	if (typeof window.PointerEvent === "undefined")
+		element.addEventListener("mousedown", start, listeners);
+	return () => {
+		tracking.abort();
+		cancelGesture?.();
+	};
 }
 
 function cssTokenColor(

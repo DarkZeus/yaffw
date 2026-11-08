@@ -26,12 +26,7 @@ import type {
 	ReadyMediaAsset,
 	Selection,
 } from "@/editor-core/model";
-import {
-	minimumSelectionDurationUs,
-	moveSelectionRangeByDelta,
-	setSelectionEndFromPlayhead,
-	setSelectionStartFromPlayhead,
-} from "@/editor-core/selection";
+import { minimumSelectionDurationUs } from "@/editor-core/selection";
 import {
 	cancelBrowserFrame,
 	requestBrowserFrame,
@@ -46,7 +41,6 @@ import type {
 	VideoStripThumbnailViewport,
 } from "../types/selection-video-strip.types";
 import type { WaveformLaneLoader } from "../types/selection-waveform-lanes.types";
-import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
 import {
 	VIDEO_STRIP_THUMBNAIL_COUNT,
 	VIDEO_STRIP_THUMBNAIL_HEIGHT_PX,
@@ -66,12 +60,15 @@ import {
 	MINIMUM_TIMELINE_ZOOM,
 	centeredTimelineScrollLeft,
 	clampTimelineZoom,
-	clientXToMediaDelta,
 	clientXToMediaTime,
 	createSelectionTimelineMarkers,
 	mediaTimeToPercent,
 	selectionBoundaryTrackStyle,
 } from "./selection-timeline-geometry";
+import {
+	type SelectionGestureKind,
+	useSelectionGesture,
+} from "./use-selection-gesture";
 
 const EMPTY_AUDIO_PREVIEW_PREPARING_TRACK_IDS = new Set<string>();
 const VIDEO_STRIP_PLACEHOLDER_KEYS = Array.from(
@@ -102,26 +99,6 @@ export type SelectionTimelineProps = {
 	waveformLaneLoader?: WaveformLaneLoader;
 };
 
-export type DragState =
-	| {
-			type: "playhead";
-	  }
-	| {
-			initialSelection: Selection;
-			pointerOffsetPx: number;
-			type: "end";
-	  }
-	| {
-			initialSelection: Selection;
-			startClientX: number;
-			type: "range";
-	  }
-	| {
-			initialSelection: Selection;
-			pointerOffsetPx: number;
-			type: "start";
-	  };
-
 export function SelectionTimeline({
 	activeMediaAssetCleanupScope,
 	asset,
@@ -146,15 +123,7 @@ export function SelectionTimeline({
 	const trackRef = useRef<HTMLButtonElement | null>(null);
 	const playheadHandleRef = useRef<HTMLButtonElement | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-	const dragAnimationFrameRef = useRef<number | null>(null);
-	const latestDragClientXRef = useRef<number | null>(null);
-	const [dragState, setDragState] = useState<DragState | null>(null);
-	const [draftPlayheadUs, setDraftPlayheadUs] = useState<MediaTimeUs | null>(
-		null,
-	);
-	const [draftSelection, setDraftSelection] = useState<Selection | null>(null);
 	const [playheadFollowEnabled, setPlayheadFollowEnabled] = useState(false);
-	const [regionSelectionEditing, setRegionSelectionEditing] = useState(false);
 	const [lanesWithSelectionRegion, setLanesWithSelectionRegion] = useState(
 		() => new Set<string>(),
 	);
@@ -189,8 +158,6 @@ export function SelectionTimeline({
 		thumbnailWindow: videoStripThumbnailWindow,
 		videoStripThumbnailLoader,
 	});
-	const visibleSelection = draftSelection ?? selection;
-	const selectionEditInProgress = dragState !== null || regionSelectionEditing;
 	const selectionContext = useMemo(
 		() => ({
 			durationUs: asset.durationUs,
@@ -216,324 +183,41 @@ export function SelectionTimeline({
 		},
 		[],
 	);
-	const updateRegionSelectionEditing = useCallback((editing: boolean) => {
-		setRegionSelectionEditing(editing);
-		if (!editing) setDraftSelection(null);
-	}, []);
 	const minimumDurationUs = minimumSelectionDurationUs(selectionContext);
-	const normalizeRegionSelectionChange = useCallback(
-		(change: WaveformRegionSelectionChange): Selection => {
-			if (change.side === "start") {
-				return setSelectionStartFromPlayhead(
-					change.initialSelection,
-					change.selection.startUs,
-					selectionContext,
-				);
-			}
-
-			if (change.side === "end") {
-				return setSelectionEndFromPlayhead(
-					change.initialSelection,
-					change.selection.endUs,
-					selectionContext,
-				);
-			}
-
-			return moveSelectionRangeByDelta(
-				change.initialSelection,
-				change.selection.startUs - change.initialSelection.startUs,
-				selectionContext,
-			);
-		},
-		[selectionContext],
-	);
-	const previewRegionSelectionChange = useCallback(
-		(change: WaveformRegionSelectionChange) => {
-			const nextSelection = normalizeRegionSelectionChange(change);
-
-			setDraftSelection(nextSelection);
-
-			if (change.side === "start") {
-				onPlayheadPreviewRequested(nextSelection.startUs);
-			}
-
-			if (change.side === "end") {
-				onPlayheadPreviewRequested(nextSelection.endUs);
-			}
-		},
-		[normalizeRegionSelectionChange, onPlayheadPreviewRequested],
-	);
-	const commitRegionSelectionChange = useCallback(
-		(change: WaveformRegionSelectionChange) => {
-			const nextSelection = normalizeRegionSelectionChange(change);
-
-			if (change.side === "start") {
-				onPlayheadSeekRequested(nextSelection.startUs);
-				onSelectionStartCommitRequested(nextSelection.startUs);
-				return;
-			}
-
-			if (change.side === "end") {
-				onPlayheadSeekRequested(nextSelection.endUs);
-				onSelectionEndCommitRequested(nextSelection.endUs);
-				return;
-			}
-
-			onSelectionRangeMoveRequested(
-				nextSelection.startUs - change.initialSelection.startUs,
-			);
-		},
-		[
-			normalizeRegionSelectionChange,
-			onPlayheadSeekRequested,
-			onSelectionEndCommitRequested,
-			onSelectionRangeMoveRequested,
-			onSelectionStartCommitRequested,
-		],
-	);
-
-	useEffect(() => {
-		if (!dragState) {
-			return;
-		}
-
-		function applyDragMove(clientX: number) {
-			if (!dragState) {
-				return;
-			}
-
-			if (dragState.type === "playhead") {
-				const nextPlayheadUs = clientXToMediaTime({
-					clientX,
-					durationUs: asset.durationUs,
-					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
+	const { beginGesture, draft, isGestureActive } = useSelectionGesture({
+		activeMediaAssetCleanupScope,
+		source,
+		context: selectionContext,
+		selection,
+		selectionEditingDisabled,
+		readGeometry: () => timelineTrackGeometryFromElement(trackRef.current),
+		readPlayheadUs: () => readLivePlayheadUs?.() ?? playheadUs,
+		onGestureStarted: () => {
+			const scrollContainer = scrollContainerRef.current;
+			if (playheadFollowEnabled && scrollContainer) {
+				scrollContainer.scroll?.({
+					left: scrollContainer.scrollLeft,
+					behavior: "instant",
 				});
-				setDraftPlayheadUs(nextPlayheadUs);
-				onPlayheadPreviewRequested(nextPlayheadUs);
-				return;
 			}
-
-			if (dragState.type === "start") {
-				const nextSelection = setSelectionStartFromPlayhead(
-					dragState.initialSelection,
-					clientXToMediaTime({
-						clientX: clientX - dragState.pointerOffsetPx,
-						durationUs: asset.durationUs,
-						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-					}),
-					selectionContext,
-				);
-				setDraftSelection(nextSelection);
-				onPlayheadPreviewRequested(nextSelection.startUs);
-				return;
-			}
-
-			if (dragState.type === "end") {
-				const nextSelection = setSelectionEndFromPlayhead(
-					dragState.initialSelection,
-					clientXToMediaTime({
-						clientX: clientX - dragState.pointerOffsetPx,
-						durationUs: asset.durationUs,
-						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-					}),
-					selectionContext,
-				);
-				setDraftSelection(nextSelection);
-				onPlayheadPreviewRequested(nextSelection.endUs);
-				return;
-			}
-
-			const deltaUs = clientXToMediaDelta({
-				clientX,
-				durationUs: asset.durationUs,
-				startClientX: dragState.startClientX,
-				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-			});
-			setDraftSelection(
-				moveSelectionRangeByDelta(
-					dragState.initialSelection,
-					deltaUs,
-					selectionContext,
-				),
-			);
-		}
-
-		function handlePointerMove(event: MouseEvent | PointerEvent) {
-			if (!dragState) {
-				return;
-			}
-
-			latestDragClientXRef.current = event.clientX;
-
-			if (dragAnimationFrameRef.current !== null) {
-				return;
-			}
-
-			dragAnimationFrameRef.current = requestBrowserFrame(() => {
-				dragAnimationFrameRef.current = null;
-				const latestClientX = latestDragClientXRef.current;
-
-				if (latestClientX === null) {
-					return;
-				}
-
-				applyDragMove(latestClientX);
-			});
-		}
-
-		function handlePointerUp(event: MouseEvent | PointerEvent) {
-			if (!dragState) {
-				return;
-			}
-
-			if (dragAnimationFrameRef.current !== null) {
-				cancelBrowserFrame(dragAnimationFrameRef.current);
-				dragAnimationFrameRef.current = null;
-			}
-			latestDragClientXRef.current = null;
-
-			if (dragState.type === "playhead") {
-				const nextPlayheadUs = clientXToMediaTime({
-					clientX: event.clientX,
-					durationUs: asset.durationUs,
-					trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-				});
-				onPlayheadSeekRequested(nextPlayheadUs);
-			}
-
-			if (dragState.type === "start") {
-				const nextSelection = setSelectionStartFromPlayhead(
-					dragState.initialSelection,
-					clientXToMediaTime({
-						clientX: event.clientX - dragState.pointerOffsetPx,
-						durationUs: asset.durationUs,
-						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-					}),
-					selectionContext,
-				);
-				onPlayheadSeekRequested(nextSelection.startUs);
-				onSelectionStartCommitRequested(nextSelection.startUs);
-			}
-
-			if (dragState.type === "end") {
-				const nextSelection = setSelectionEndFromPlayhead(
-					dragState.initialSelection,
-					clientXToMediaTime({
-						clientX: event.clientX - dragState.pointerOffsetPx,
-						durationUs: asset.durationUs,
-						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-					}),
-					selectionContext,
-				);
-				onPlayheadSeekRequested(nextSelection.endUs);
-				onSelectionEndCommitRequested(nextSelection.endUs);
-			}
-
-			if (dragState.type === "range") {
-				onSelectionRangeMoveRequested(
-					clientXToMediaDelta({
-						clientX: event.clientX,
-						durationUs: asset.durationUs,
-						startClientX: dragState.startClientX,
-						trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-					}),
-				);
-			}
-
-			setDraftSelection(null);
-			setDraftPlayheadUs(null);
-			setDragState(null);
-		}
-
-		window.addEventListener("pointermove", handlePointerMove);
-		window.addEventListener("pointerup", handlePointerUp);
-		window.addEventListener("mousemove", handlePointerMove);
-		window.addEventListener("mouseup", handlePointerUp);
-
-		return () => {
-			window.removeEventListener("pointermove", handlePointerMove);
-			window.removeEventListener("pointerup", handlePointerUp);
-			window.removeEventListener("mousemove", handlePointerMove);
-			window.removeEventListener("mouseup", handlePointerUp);
-			if (dragAnimationFrameRef.current !== null) {
-				cancelBrowserFrame(dragAnimationFrameRef.current);
-				dragAnimationFrameRef.current = null;
-			}
-			latestDragClientXRef.current = null;
-			setDraftPlayheadUs(null);
-		};
-	}, [
-		asset.durationUs,
-		dragState,
+		},
 		onPlayheadPreviewRequested,
 		onPlayheadSeekRequested,
 		onSelectionEndCommitRequested,
 		onSelectionRangeMoveRequested,
 		onSelectionStartCommitRequested,
-		selectionContext,
-	]);
+	});
+	const visibleSelection = draft?.selection ?? selection;
+	const selectionEditInProgress = draft !== null;
 
-	function beginHandleDrag(
+	function beginTimelineGesture(
 		event:
 			| ReactMouseEvent<HTMLButtonElement>
 			| ReactPointerEvent<HTMLButtonElement>,
-		type: "end" | "start",
+		kind: SelectionGestureKind,
 	) {
-		event.preventDefault();
 		event.stopPropagation();
-		if (selectionEditingDisabled) {
-			return;
-		}
-		const geometry = timelineTrackGeometryFromElement(trackRef.current);
-		if (!geometry) return;
-		const boundaryUs = type === "start" ? selection.startUs : selection.endUs;
-		const boundaryX =
-			geometry.leftPx +
-			(geometry.widthPx * mediaTimeToPercent(boundaryUs, asset.durationUs)) /
-				100;
-		setDraftSelection(selection);
-		setDragState({
-			initialSelection: selection,
-			pointerOffsetPx: event.clientX - boundaryX,
-			type,
-		});
-	}
-
-	function beginPlayheadDrag(
-		event:
-			| ReactMouseEvent<HTMLButtonElement>
-			| ReactPointerEvent<HTMLButtonElement>,
-	) {
-		event.preventDefault();
-		event.stopPropagation();
-		setDraftPlayheadUs(
-			clientXToMediaTime({
-				clientX: event.clientX,
-				durationUs: asset.durationUs,
-				trackGeometry: timelineTrackGeometryFromElement(trackRef.current),
-			}),
-		);
-		setDragState({
-			type: "playhead",
-		});
-	}
-
-	function beginRangeDrag(
-		event:
-			| ReactMouseEvent<HTMLButtonElement>
-			| ReactPointerEvent<HTMLButtonElement>,
-	) {
-		event.preventDefault();
-		event.stopPropagation();
-		if (selectionEditingDisabled) {
-			return;
-		}
-		setDraftSelection(selection);
-		setDragState({
-			initialSelection: selection,
-			startClientX: event.clientX,
-			type: "range",
-		});
+		beginGesture(event.nativeEvent, event.currentTarget, kind, "timeline");
 	}
 
 	const seekFromLanePointer = useCallback(
@@ -542,6 +226,12 @@ export function SelectionTimeline({
 				| ReactMouseEvent<HTMLButtonElement>
 				| ReactPointerEvent<HTMLButtonElement>,
 		) => {
+			if (
+				isGestureActive() ||
+				event.button !== 0 ||
+				("isPrimary" in event && !event.isPrimary)
+			)
+				return;
 			onPlayheadSeekRequested(
 				clientXToMediaTime({
 					clientX: event.clientX,
@@ -550,7 +240,7 @@ export function SelectionTimeline({
 				}),
 			);
 		},
-		[asset.durationUs, onPlayheadSeekRequested],
+		[asset.durationUs, isGestureActive, onPlayheadSeekRequested],
 	);
 	const seekFromLaneMouseFallback = useCallback(
 		(event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -559,6 +249,12 @@ export function SelectionTimeline({
 			}
 		},
 		[seekFromLanePointer],
+	);
+	const seekFromWaveform = useCallback(
+		(playheadUs: MediaTimeUs) => {
+			if (!isGestureActive()) onPlayheadSeekRequested(playheadUs);
+		},
+		[isGestureActive, onPlayheadSeekRequested],
 	);
 	const zoomOutTimeline = useCallback(() => {
 		setZoom((currentZoom) => clampTimelineZoom(currentZoom - 0.5));
@@ -579,7 +275,7 @@ export function SelectionTimeline({
 		asset.durationUs,
 	);
 	const playheadPercent = mediaTimeToPercent(
-		draftPlayheadUs ?? playheadUs,
+		draft?.playheadUs ?? playheadUs,
 		asset.durationUs,
 	);
 	const selectionMotionClassName = !selectionEditInProgress
@@ -591,6 +287,7 @@ export function SelectionTimeline({
 			: "transition-none";
 	const centerPlayheadInScrollContainer = useCallback(
 		(targetPlayheadPercent: number, behavior: ScrollBehavior) => {
+			if (isGestureActive()) return;
 			const scrollContainer = scrollContainerRef.current;
 			const track = trackRef.current;
 
@@ -637,7 +334,7 @@ export function SelectionTimeline({
 
 			scrollContainer.scrollLeft = nextScrollLeft;
 		},
-		[zoom],
+		[isGestureActive, zoom],
 	);
 	useLayoutEffect(() => {
 		const playheadHandle = playheadHandleRef.current;
@@ -829,13 +526,9 @@ export function SelectionTimeline({
 											laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 											minimumSelectionDurationUs={minimumDurationUs}
 											onAudioTrackIncludedChange={onAudioTrackIncludedChange}
-											onPlayheadSeekRequested={onPlayheadSeekRequested}
+											onPlayheadSeekRequested={seekFromWaveform}
 											onPointerDown={seekFromLanePointer}
-											onSelectionCommitRequested={commitRegionSelectionChange}
-											onSelectionEditActivityChange={
-												updateRegionSelectionEditing
-											}
-											onSelectionPreviewRequested={previewRegionSelectionChange}
+											onSelectionGestureStart={beginGesture}
 											onSelectionRegionAvailabilityChange={
 												updateLaneSelectionRegionAvailability
 											}
@@ -859,7 +552,8 @@ export function SelectionTimeline({
 									right: 0,
 								}}
 							>
-								{selectionIsRegionBacked && dragState === null ? null : (
+								{selectionIsRegionBacked &&
+								draft?.origin !== "timeline" ? null : (
 									<>
 										<div
 											aria-hidden="true"
@@ -873,13 +567,16 @@ export function SelectionTimeline({
 										<button
 											aria-label="Move selection range"
 											className={`pointer-events-auto absolute inset-y-0 z-20 cursor-grab border-0 bg-transparent active:cursor-grabbing ${selectionMotionClassName}`}
+											data-selection-gesture="range"
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
-													beginRangeDrag(event);
+													beginTimelineGesture(event, "range");
 												}
 											}}
-											onPointerDown={beginRangeDrag}
+											onPointerDown={(event) =>
+												beginTimelineGesture(event, "range")
+											}
 											style={{
 												left: `${selectionStartPercent}%`,
 												width: `${selectionEndPercent - selectionStartPercent}%`,
@@ -889,25 +586,31 @@ export function SelectionTimeline({
 										<button
 											aria-label="Selection start handle"
 											className={`selection-boundary-handle selection-boundary-start pointer-events-auto absolute inset-y-0 z-40 cursor-ew-resize border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											data-selection-gesture="start"
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
-													beginHandleDrag(event, "start");
+													beginTimelineGesture(event, "start");
 												}
 											}}
-											onPointerDown={(event) => beginHandleDrag(event, "start")}
+											onPointerDown={(event) =>
+												beginTimelineGesture(event, "start")
+											}
 											type="button"
 										/>
 										<button
 											aria-label="Selection end handle"
 											className={`selection-boundary-handle selection-boundary-end pointer-events-auto absolute inset-y-0 z-40 cursor-ew-resize border-0 bg-transparent p-0 ${selectionMotionClassName}`}
+											data-selection-gesture="end"
 											disabled={selectionEditingDisabled}
 											onMouseDown={(event) => {
 												if (shouldUseMouseFallback()) {
-													beginHandleDrag(event, "end");
+													beginTimelineGesture(event, "end");
 												}
 											}}
-											onPointerDown={(event) => beginHandleDrag(event, "end")}
+											onPointerDown={(event) =>
+												beginTimelineGesture(event, "end")
+											}
 											type="button"
 										/>
 									</>
@@ -915,12 +618,15 @@ export function SelectionTimeline({
 								<button
 									aria-label="Playhead handle"
 									className={`pointer-events-auto absolute -top-2 bottom-0 z-30 flex w-5 -translate-x-1/2 cursor-ew-resize items-stretch justify-center border-0 bg-transparent p-0 ${playheadMotionClassName}`}
+									data-selection-gesture="playhead"
 									onMouseDown={(event) => {
 										if (shouldUseMouseFallback()) {
-											beginPlayheadDrag(event);
+											beginTimelineGesture(event, "playhead");
 										}
 									}}
-									onPointerDown={beginPlayheadDrag}
+									onPointerDown={(event) =>
+										beginTimelineGesture(event, "playhead")
+									}
 									ref={playheadHandleRef}
 									style={{ left: `${playheadPercent}%` }}
 									type="button"

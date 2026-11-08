@@ -351,6 +351,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Keyboard shortcuts** work at the page level, but are disabled while typing into inputs, while a dialog is active, or while an export job is running.
 - First-slice selection editing uses handles, range-body drag, and keyboard commands; start/end timecode inputs are deferred.
 - Selection boundary drag may scrub the **Playhead** to the boundary being edited during preview, but the committed **Selection** changes when the boundary edit is completed.
+- A Selection or Playhead drag owns one pointer from press to release across the timeline and **Waveform lanes**. Cancellation discards the draft, and Playhead following yields until the gesture ends.
 - The selection surface starts with one editable **Selection** affordance for the current **Selection**; a newly loaded **Ready media asset** therefore presents a full-duration selection affordance by default.
 - The first slice may show read-only **Selection** start, end, and duration labels in `HH:MM:SS.mmm` format.
 - A timeline control may display a **Waveform**, **Playhead**, and **Selection**, but "timeline" is not a domain object in the single-asset editor.

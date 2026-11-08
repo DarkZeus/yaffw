@@ -101,6 +101,7 @@ vi.mock("wavesurfer.js/plugins/regions", () => ({
 	default: {
 		create: () => ({
 			addRegion: vi.fn(() => ({
+				element: document.createElement("div"),
 				end: 12,
 				setOptions: vi.fn(),
 				start: 0,

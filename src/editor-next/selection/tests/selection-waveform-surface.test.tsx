@@ -1,6 +1,13 @@
 /* @vitest-environment jsdom */
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WaveformSurface } from "../waveform/selection-waveform-surface";
 
@@ -21,6 +28,7 @@ const mockState = vi.hoisted(() => ({
 }));
 
 type MockRegion = {
+	element: HTMLElement;
 	end: number;
 	setOptions: (options: { end?: number; start?: number }) => void;
 	start: number;
@@ -94,7 +102,14 @@ vi.mock("wavesurfer.js/plugins/regions", () => {
 		}
 
 		addRegion(options: Record<string, unknown>) {
+			const element = document.createElement("div");
+			for (const side of ["left", "right"]) {
+				const handle = document.createElement("div");
+				handle.setAttribute("part", `region-handle region-handle-${side}`);
+				element.append(handle);
+			}
 			const region = {
+				element,
 				end: Number(options.end),
 				setOptions(nextOptions: { end?: number; start?: number }) {
 					if (nextOptions.start !== undefined) {
@@ -135,14 +150,13 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-describe("createWavesurferPeaksFromSamples", () => {
+describe("WaveformSurface", () => {
 	const surfaceProps = {
 		durationUs: 12_000_000,
 		label: "Voice",
 		minimumSelectionDurationUs: 33_333,
 		onPlayheadSeekRequested: vi.fn(),
-		onSelectionCommitRequested: vi.fn(),
-		onSelectionPreviewRequested: vi.fn(),
+		onSelectionGestureStart: vi.fn(),
 		samples: [0.2, 0.7, 0.4],
 		selection: { startUs: 2_000_000, endUs: 6_000_000 },
 		selectionEditingDisabled: false,
@@ -194,175 +208,86 @@ describe("createWavesurferPeaksFromSamples", () => {
 		expect(mockState.regionsPlugins[0]?.regions).toHaveLength(0);
 	});
 
-	it("creates one editable Regions selection and emits live preview plus commit changes", async () => {
+	it("uses native region grips as entry points for the timeline gesture", async () => {
 		const onPlayheadSeekRequested = vi.fn();
-		const onSelectionCommitRequested = vi.fn();
-		const onSelectionEditActivityChange = vi.fn();
-		const onSelectionPreviewRequested = vi.fn();
-
-		render(
+		const onSelectionGestureStart = vi.fn();
+		const { rerender } = render(
 			<WaveformSurface
-				durationUs={12_000_000}
-				label="Voice"
-				minimumSelectionDurationUs={33_333}
+				{...surfaceProps}
 				onPlayheadSeekRequested={onPlayheadSeekRequested}
-				onSelectionCommitRequested={onSelectionCommitRequested}
-				onSelectionEditActivityChange={onSelectionEditActivityChange}
-				onSelectionPreviewRequested={onSelectionPreviewRequested}
-				samples={[0.2, 0.7, 0.4]}
-				selection={{
-					endUs: 6_000_000,
-					startUs: 2_000_000,
-				}}
-				selectionEditingDisabled={false}
-				selectionEditInProgress={false}
+				onSelectionGestureStart={onSelectionGestureStart}
 			/>,
 		);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
 		expect(mockState.wavesurfers[0]?.options.height).toBe(48);
-		act(() => {
-			mockState.wavesurfers[0]?.emit("redrawcomplete");
-		});
-		await waitFor(() => {
-			expect(mockState.regionsPlugins[0]?.regions).toHaveLength(1);
-		});
+		act(() => mockState.wavesurfers[0]?.emit("redrawcomplete"));
+		const [region] = mockState.regionsPlugins[0]?.regions ?? [];
+		if (!region) throw new Error("Expected a Waveform region.");
+		const left = region.element.firstElementChild;
+		const right = region.element.lastElementChild;
+		if (!left || !right) throw new Error("Expected Waveform grips.");
+		const nativeDrag = vi.fn();
+		left.addEventListener("pointerdown", nativeDrag);
 
-		const regionsPlugin = mockState.regionsPlugins[0];
-		const region = regionsPlugin?.regions[0];
+		fireEvent.pointerDown(left);
+		fireEvent.pointerDown(right);
+		fireEvent.pointerDown(region.element);
+		expect(nativeDrag).not.toHaveBeenCalled();
+		expect(
+			onSelectionGestureStart.mock.calls.map(([, element, kind, origin]) => [
+				element,
+				kind,
+				origin,
+			]),
+		).toEqual([
+			[region.element, "start", "waveform"],
+			[region.element, "end", "waveform"],
+			[region.element, "range", "waveform"],
+		]);
 
-		expect(region).toMatchObject({
-			end: 6,
-			start: 2,
-		});
-
-		if (!region || !regionsPlugin) {
-			throw new Error("Expected mocked selection region.");
-		}
-
-		region.start = 3;
-		act(() => {
-			regionsPlugin.emit("region-update", region, "start");
-		});
-
-		expect(onSelectionPreviewRequested).toHaveBeenLastCalledWith({
-			initialSelection: {
-				endUs: 6_000_000,
-				startUs: 2_000_000,
-			},
-			selection: {
-				endUs: 6_000_000,
-				startUs: 3_000_000,
-			},
-			side: "start",
-		});
-
-		act(() => {
-			regionsPlugin.emit("region-updated", region, "start");
-		});
-		expect(onSelectionEditActivityChange.mock.calls).toEqual([[true], [false]]);
-
-		expect(onSelectionCommitRequested).toHaveBeenLastCalledWith({
-			initialSelection: {
-				endUs: 6_000_000,
-				startUs: 2_000_000,
-			},
-			selection: {
-				endUs: 6_000_000,
-				startUs: 3_000_000,
-			},
-			side: "start",
-		});
-
-		act(() => {
-			mockState.wavesurfers[0]?.emit("click", 0.25);
-		});
-
+		rerender(
+			<WaveformSurface
+				{...surfaceProps}
+				onPlayheadSeekRequested={onPlayheadSeekRequested}
+				onSelectionGestureStart={onSelectionGestureStart}
+				selection={{ startUs: 3_000_000, endUs: 7_000_000 }}
+				selectionEditInProgress
+			/>,
+		);
+		expect(region).toMatchObject({ start: 3, end: 7 });
+		act(() => mockState.wavesurfers[0]?.emit("click", 0.25));
 		expect(onPlayheadSeekRequested).toHaveBeenCalledWith(3_000_000);
 	});
 
-	it("cleans up renderer events, pending previews, and hidden container content when waveform data changes", async () => {
-		const cancelAnimationFrame = vi.fn();
-		vi.stubGlobal("requestAnimationFrame", () => 41);
-		vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
-		const onSelectionEditActivityChange = vi.fn();
-		const onSelectionPreviewRequested = vi.fn();
-		const samples = [0.2, 0.7, 0.4];
-		const props = {
-			durationUs: 12_000_000,
-			label: "Voice",
-			minimumSelectionDurationUs: 33_333,
-			onPlayheadSeekRequested: vi.fn(),
-			onSelectionCommitRequested: vi.fn(),
-			onSelectionEditActivityChange,
-			onSelectionPreviewRequested,
-			selection: {
-				endUs: 6_000_000,
-				startUs: 2_000_000,
-			},
-			selectionEditingDisabled: false,
-			selectionEditInProgress: false,
-		};
-		const { container, rerender } = render(
-			<WaveformSurface {...props} samples={samples} />,
-		);
+	it("cancels a region gesture and detaches its listeners when waveform data changes", async () => {
+		const cancelGesture = vi.fn();
+		const onSelectionGestureStart = vi.fn(() => cancelGesture);
+		const props = { ...surfaceProps, onSelectionGestureStart };
+		const { container, rerender } = render(<WaveformSurface {...props} />);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
-		act(() => {
-			mockState.wavesurfers[0]?.emit("redrawcomplete");
-		});
-		await waitFor(() => {
-			expect(mockState.regionsPlugins[0]?.regions).toHaveLength(1);
-		});
+		act(() => mockState.wavesurfers[0]?.emit("redrawcomplete"));
 		const hiddenContainer = container.querySelector("[aria-hidden='true']");
 		hiddenContainer?.append(document.createElement("wave"));
-		const regionsPlugin = mockState.regionsPlugins[0];
-		const region = regionsPlugin?.regions[0];
-
-		if (!regionsPlugin || !region) {
-			throw new Error("Expected mocked waveform region.");
-		}
-
-		region.end = 7;
-		act(() => {
-			regionsPlugin.emit("region-update", region, "end");
-		});
-		expect(onSelectionPreviewRequested).not.toHaveBeenCalled();
-		expect(onSelectionEditActivityChange).toHaveBeenCalledExactlyOnceWith(true);
-		rerender(
-			<WaveformSurface {...props} samples={samples} selectionEditInProgress />,
-		);
-		expect(region.end).toBe(7);
+		const [region] = mockState.regionsPlugins[0]?.regions ?? [];
+		if (!region) throw new Error("Expected a Waveform region.");
+		fireEvent.pointerDown(region.element);
+		expect(onSelectionGestureStart).toHaveBeenCalledTimes(1);
 
 		rerender(<WaveformSurface {...props} samples={[0.4, 0.9, 0.1]} />);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(2));
-		expect(cancelAnimationFrame).toHaveBeenCalledWith(41);
-		expect(onSelectionEditActivityChange.mock.calls).toEqual([[true], [false]]);
+		expect(cancelGesture).toHaveBeenCalledTimes(1);
+		fireEvent.pointerDown(region.element);
+		expect(onSelectionGestureStart).toHaveBeenCalledTimes(1);
 		expect(mockState.wavesurfers[0]?.destroyed).toBe(true);
 		expect(mockState.wavesurfers[0]?.listenerCount("click")).toBe(0);
-		expect(mockState.regionsPlugins[0]?.listenerCount("region-update")).toBe(0);
 		expect(hiddenContainer?.childElementCount).toBe(0);
 	});
 
 	it("does not create a Wavesurfer renderer when async imports resolve after unmount", async () => {
-		const { unmount } = render(
-			<WaveformSurface
-				durationUs={12_000_000}
-				label="Voice"
-				minimumSelectionDurationUs={33_333}
-				onPlayheadSeekRequested={vi.fn()}
-				onSelectionCommitRequested={vi.fn()}
-				onSelectionPreviewRequested={vi.fn()}
-				samples={[0.2, 0.7, 0.4]}
-				selection={{
-					endUs: 6_000_000,
-					startUs: 2_000_000,
-				}}
-				selectionEditingDisabled={false}
-				selectionEditInProgress={false}
-			/>,
-		);
+		const { unmount } = render(<WaveformSurface {...surfaceProps} />);
 
 		unmount();
 		await Promise.resolve();

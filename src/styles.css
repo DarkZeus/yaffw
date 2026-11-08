@@ -267,6 +267,7 @@ code {
 @layer components {
 	.selection-waveform-surface ::part(editor-selection-region) {
 		box-sizing: border-box;
+		touch-action: none;
 		border-top: 2px solid var(--workbench-selected);
 		border-bottom: 2px solid var(--workbench-selected);
 		border-radius: 0;

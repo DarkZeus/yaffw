@@ -493,6 +493,7 @@ describe("NativePreviewPlayer", () => {
 			) as HTMLVideoElement;
 
 			fireEvent.pointerDown(screen.getByLabelText("Seek timeline ruler"), {
+				isPrimary: true,
 				pointerId: 1,
 				pointerType: "mouse",
 				clientX: 600,
@@ -503,6 +504,7 @@ describe("NativePreviewPlayer", () => {
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
 			fireEvent.pointerDown(screen.getByLabelText("Playhead handle"), {
+				isPrimary: true,
 				pointerId: 1,
 				pointerType: "mouse",
 				clientX: 600,
@@ -534,6 +536,7 @@ describe("NativePreviewPlayer", () => {
 			).toHaveBeenLastCalledWith(8_000_000, { priority: "final" });
 
 			fireEvent.pointerDown(screen.getByLabelText("Selection start handle"), {
+				isPrimary: true,
 				pointerId: 1,
 				pointerType: "mouse",
 				clientX: 205,
@@ -549,6 +552,7 @@ describe("NativePreviewPlayer", () => {
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
 			fireEvent.pointerDown(screen.getByLabelText("Selection end handle"), {
+				isPrimary: true,
 				pointerId: 1,
 				pointerType: "mouse",
 				clientX: 795,
@@ -563,6 +567,7 @@ describe("NativePreviewPlayer", () => {
 			expect(onSelectionRangeMoveRequested).not.toHaveBeenCalled();
 
 			fireEvent.pointerDown(screen.getByLabelText("Move selection range"), {
+				isPrimary: true,
 				pointerId: 1,
 				pointerType: "mouse",
 				clientX: 200,

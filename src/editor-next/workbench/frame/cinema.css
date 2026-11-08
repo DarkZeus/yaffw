@@ -19,6 +19,9 @@
 .workbench :is(button, a) {
 	touch-action: manipulation;
 }
+.workbench [data-selection-gesture] {
+	touch-action: none;
+}
 .cinema-header {
 	height: 48px;
 	flex: none;
