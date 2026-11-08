@@ -37,6 +37,9 @@ export function createPreviewMediaTransport(
 		get ended() {
 			return player.ended;
 		},
+		get paused() {
+			return player.paused;
+		},
 		play() {
 			return player.play();
 		},

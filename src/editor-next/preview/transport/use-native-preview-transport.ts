@@ -28,6 +28,7 @@ const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 50_000;
 export type PreviewMediaTransportHandle = {
 	currentTime: number;
 	readonly ended: boolean;
+	readonly paused: boolean;
 	readonly seeking?: boolean;
 	muted: boolean;
 	pause: () => Promise<void> | void;
@@ -60,6 +61,17 @@ type PreviewSyncOptions = {
 	timestampMs?: number;
 };
 
+type PlaybackRequest = { origin: "command" | "native" };
+
+type PreviewPlayback =
+	| { phase: "paused"; request: null }
+	| {
+			phase: "starting" | "playing" | "resuming";
+			request: PlaybackRequest;
+	  };
+
+const PAUSED_PLAYBACK: PreviewPlayback = { phase: "paused", request: null };
+
 export function useNativePreviewTransport({
 	durationUs,
 	frameDurationUs,
@@ -75,16 +87,17 @@ export function useNativePreviewTransport({
 	const onNativeSeekRequested = scrubPreview?.onNativeSeekRequested;
 	const playheadRef = useRef<MediaTimeUs>(0);
 	const playbackRateRef = useRef(1);
-	const playbackStartRequestIdRef = useRef(0);
-	const playbackStartPendingRef = useRef(false);
-	const playbackRequestedRef = useRef(false);
-	const [playbackRequested, setPlaybackRequestedState] = useState(false);
+	const playbackRef = useRef<PreviewPlayback>(PAUSED_PLAYBACK);
+	const [playbackPhase, setPlaybackPhase] =
+		useState<PreviewPlayback["phase"]>("paused");
+	const playbackRequested = playbackPhase !== "paused";
+	const isPlaying = playbackPhase === "playing";
+	const setPlayback = useCallback((next: PreviewPlayback) => {
+		playbackRef.current = next;
+		setPlaybackPhase(next.phase);
+	}, []);
 	const [audioPlaybackState, setAudioPlaybackState] =
 		useState<PreviewAudioPlaybackState>("paused");
-	const setPlaybackRequested = useCallback((requested: boolean) => {
-		playbackRequestedRef.current = requested;
-		setPlaybackRequestedState(requested);
-	}, []);
 	const previewScrubActiveRef = useRef(false);
 	const playheadAnimationFrameRef = useRef<number | null>(null);
 	const playheadStateCommitTimestampRef = useRef<number | null>(null);
@@ -92,7 +105,6 @@ export function useNativePreviewTransport({
 	const pendingVideoFollowerSeekSecondsRef = useRef<number | null>(null);
 	const pausedAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const [selectionLoop] = useState(() => createSelectionLoop(selection));
-	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
 	const [playbackRate, setPlaybackRate] = useState(1);
 	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
@@ -114,19 +126,17 @@ export function useNativePreviewTransport({
 		playheadStateCommitTimestampRef.current = null;
 		pendingVideoFollowerSeekSecondsRef.current = null;
 		pausedAudioEngineRef.current = null;
-		playbackStartRequestIdRef.current += 1;
-		playbackStartPendingRef.current = false;
-		setPlaybackRequested(false);
+		setPlayback(PAUSED_PLAYBACK);
 		previewScrubActiveRef.current = false;
 		selectionLoop.setEnabled(false, 0);
 		setPlayheadUsState(0);
-		setIsPlaying(false);
 		setSelectionLoopEnabled(false);
+		const video = videoRef.current;
 		return () => {
-			playbackStartRequestIdRef.current += 1;
-			playbackRequestedRef.current = false;
+			playbackRef.current = PAUSED_PLAYBACK;
+			pauseVideo(video);
 		};
-	}, [source, selectionLoop, setPlaybackRequested]);
+	}, [source, selectionLoop, setPlayback, videoRef]);
 
 	const commitPlayheadState = useCallback(
 		(nextPlayheadUs: MediaTimeUs, options: PlayheadCommitOptions) => {
@@ -238,6 +248,12 @@ export function useNativePreviewTransport({
 		[durationUs, setPlayheadUs, setPreviewTransportTime],
 	);
 
+	const pausePlayback = useCallback(() => {
+		setPlayback(PAUSED_PLAYBACK);
+		pauseVideo(videoRef.current);
+		previewAudioEngineRef.current?.pause();
+	}, [previewAudioEngineRef, setPlayback, videoRef]);
+
 	const previewScrubToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
 			const clampedPlayheadUs = clamp(
@@ -247,17 +263,9 @@ export function useNativePreviewTransport({
 			);
 
 			if (!previewScrubActiveRef.current) {
-				const nativePlaybackShouldPause =
-					isPlaying || playbackStartPendingRef.current;
-				playbackStartRequestIdRef.current += 1;
-				playbackStartPendingRef.current = false;
-				previewAudioEngineRef.current?.pause();
-				if (nativePlaybackShouldPause && !audioMasterClockActive) {
-					void videoRef.current?.pause();
-				}
-				setPlaybackRequested(false);
 				previewScrubActiveRef.current = true;
-				setIsPlaying(false);
+				pausedAudioEngineRef.current = null;
+				pausePlayback();
 			}
 			pendingVideoFollowerSeekSecondsRef.current =
 				clampedPlayheadUs / 1_000_000;
@@ -265,16 +273,18 @@ export function useNativePreviewTransport({
 			selectionLoop.reposition(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
 		},
-		[
-			audioMasterClockActive,
-			setPlaybackRequested,
-			durationUs,
-			isPlaying,
-			previewAudioEngineRef,
-			selectionLoop,
-			setPlayheadUs,
-			videoRef,
-		],
+		[durationUs, pausePlayback, selectionLoop, setPlayheadUs],
+	);
+
+	const seekWithScrubPreview = useCallback(
+		(nextPlayheadUs: MediaTimeUs) => {
+			if (audioMasterClockActive && playbackRef.current.phase === "resuming") {
+				seekToUs(nextPlayheadUs);
+			} else {
+				previewScrubToUs(nextPlayheadUs);
+			}
+		},
+		[audioMasterClockActive, previewScrubToUs, seekToUs],
 	);
 
 	const seekByUs = useCallback(
@@ -286,22 +296,10 @@ export function useNativePreviewTransport({
 
 	const stepFrame = useCallback(
 		(direction: -1 | 1) => {
-			playbackStartRequestIdRef.current += 1;
-			playbackStartPendingRef.current = false;
-			previewAudioEngineRef.current?.pause();
-			if (!audioMasterClockActive) void videoRef.current?.pause();
-			setPlaybackRequested(false);
-			setIsPlaying(false);
+			pausePlayback();
 			seekByUs(direction * frameDurationUs);
 		},
-		[
-			audioMasterClockActive,
-			frameDurationUs,
-			previewAudioEngineRef,
-			seekByUs,
-			setPlaybackRequested,
-			videoRef,
-		],
+		[frameDurationUs, pausePlayback, seekByUs],
 	);
 
 	const startPlayback = useCallback(
@@ -309,13 +307,27 @@ export function useNativePreviewTransport({
 			const video = videoRef.current;
 			if (!video || previewClockMode === "audio-master-pending") return;
 			const engine = previewAudioEngineRef.current;
-			if (audioMasterClockActive && engine?.getPlaybackState() === "closed")
+			if (audioMasterClockActive && !engine) return;
+			const audioState = audioMasterClockActive
+				? engine?.getPlaybackState()
+				: undefined;
+			if (audioState === "closed") return;
+			if (
+				recover &&
+				(!playbackRef.current.request ||
+					(audioState !== "interrupted" && audioState !== "recovery-required"))
+			)
 				return;
 			const pausedAudioEngine = pausedAudioEngineRef.current;
 			pausedAudioEngineRef.current = null;
-			const requestId = ++playbackStartRequestIdRef.current;
-			playbackStartPendingRef.current = true;
-			setPlaybackRequested(true);
+			const request: PlaybackRequest = { origin: "command" };
+			setPlayback({
+				phase:
+					recover && playbackRef.current.phase === "resuming"
+						? "resuming"
+						: "starting",
+				request,
+			});
 			try {
 				if (audioMasterClockActive && engine) {
 					video.muted = true;
@@ -350,22 +362,24 @@ export function useNativePreviewTransport({
 				selectionLoop.reposition(secondsToMicroseconds(video.currentTime));
 				const completeHandoff = capturePlaybackHandoff?.();
 				await video.play();
-				if (
-					requestId === playbackStartRequestIdRef.current &&
-					videoRef.current === video
-				) {
-					completeHandoff?.();
-					setIsPlaying(true);
+				if (videoRef.current !== video) return;
+				if (playbackRef.current.request !== request) {
+					if (!playbackRef.current.request) pauseVideo(video);
+					return;
 				}
+				if (video.ended) return;
+				if (video.paused) {
+					pausePlayback();
+					return;
+				}
+				completeHandoff?.();
+				setPlayback({ phase: "playing", request });
 			} catch {
-				if (requestId !== playbackStartRequestIdRef.current) return;
-				engine?.pause();
-				void video.pause();
-				setPlaybackRequested(false);
-				setIsPlaying(false);
-			} finally {
-				if (requestId === playbackStartRequestIdRef.current)
-					playbackStartPendingRef.current = false;
+				if (
+					playbackRef.current.request === request &&
+					videoRef.current === video
+				)
+					pausePlayback();
 			}
 		},
 		[
@@ -377,33 +391,29 @@ export function useNativePreviewTransport({
 			previewAudioEngineRef,
 			previewClockMode,
 			selectionLoop,
-			setPlaybackRequested,
+			pausePlayback,
+			setPlayback,
 			syncAudioLoopEnd,
 			videoRef,
 		],
 	);
 
 	const togglePlayback = useCallback(async () => {
-		if (playbackRequestedRef.current || isPlaying) {
-			playbackStartRequestIdRef.current += 1;
-			playbackStartPendingRef.current = false;
-			setPlaybackRequested(false);
-			const engine = previewAudioEngineRef.current;
-			engine?.pause();
-			pausedAudioEngineRef.current = audioMasterClockActive ? engine : null;
-			if (!audioMasterClockActive) void videoRef.current?.pause();
-			setIsPlaying(false);
+		if (playbackRef.current.request) {
+			pausedAudioEngineRef.current = audioMasterClockActive
+				? previewAudioEngineRef.current
+				: null;
+			pausePlayback();
 			return;
 		}
 		await startPlayback();
 	}, [
 		audioMasterClockActive,
-		isPlaying,
+		pausePlayback,
 		previewAudioEngineRef,
-		setPlaybackRequested,
 		startPlayback,
-		videoRef,
 	]);
+
 	const recoverAudio = useCallback(() => startPlayback(true), [startPlayback]);
 
 	const setPreviewPlaybackRate = useCallback(
@@ -463,18 +473,26 @@ export function useNativePreviewTransport({
 			return;
 		}
 		let disposed = false;
-		let followerRequest = 0;
-		let following = false;
+		let followerStart: { request: PlaybackRequest } | null = null;
 		function syncAudioPlayback() {
 			if (disposed || !engine || !video) return;
 			const state = engine.getPlaybackState();
 			setAudioPlaybackState(state);
+			const { phase, request } = playbackRef.current;
+
+			if (!request) {
+				followerStart = null;
+				pauseVideo(video);
+				if (state === "playing") engine.pause();
+				return;
+			}
+
 			if (state !== "playing") {
-				followerRequest++;
-				if (following || state !== "paused") void video.pause();
-				following = false;
-				setIsPlaying(false);
-				if (state === "closed") setPlaybackRequested(false);
+				followerStart = null;
+				pauseVideo(video);
+				if (state === "closed") setPlayback(PAUSED_PLAYBACK);
+				else if (phase === "playing")
+					setPlayback({ phase: "resuming", request });
 				if (
 					state !== "paused" &&
 					!previewScrubActiveRef.current &&
@@ -486,9 +504,10 @@ export function useNativePreviewTransport({
 				}
 				return;
 			}
-			if (!playbackRequestedRef.current || following) return;
-			following = true;
-			const request = ++followerRequest;
+
+			if (followerStart?.request === request) return;
+			const start = { request };
+			followerStart = start;
 			video.muted = true;
 			const followerTimeUs = secondsToMicroseconds(
 				engine.getPresentationTime(),
@@ -496,41 +515,47 @@ export function useNativePreviewTransport({
 			onNativeSeekRequested?.(followerTimeUs);
 			setVideoFollowerTime(video, followerTimeUs);
 			const completeHandoff = capturePlaybackHandoff?.();
+			const ownsStart = () =>
+				!disposed &&
+				videoRef.current === video &&
+				playbackRef.current.request === request &&
+				followerStart === start;
 			void video
 				.play()
 				.then(() => {
-					if (disposed || videoRef.current !== video) return;
-					if (request !== followerRequest) {
-						if (!following) void video.pause();
+					if (!ownsStart()) {
+						if (!disposed && videoRef.current === video && !followerStart)
+							pauseVideo(video);
+						return;
+					}
+					if (video.paused) {
+						pausePlayback();
 						return;
 					}
 					completeHandoff?.();
-					setIsPlaying(true);
+					setPlayback({ phase: "playing", request });
 				})
 				.catch(() => {
-					if (disposed || request !== followerRequest) return;
-					engine.pause();
-					setPlaybackRequested(false);
-					setIsPlaying(false);
+					if (ownsStart()) pausePlayback();
 				});
 		}
 		const unsubscribe = engine.subscribe(syncAudioPlayback);
 		syncAudioPlayback();
 		return () => {
 			disposed = true;
-			following = false;
-			followerRequest++;
+			followerStart = null;
 			unsubscribe();
 			engine.pause();
-			void video.pause();
+			pauseVideo(video);
 		};
 	}, [
 		audioMasterClockActive,
 		capturePlaybackHandoff,
 		hasScrubTarget,
 		onNativeSeekRequested,
+		pausePlayback,
 		previewAudioEngineRef,
-		setPlaybackRequested,
+		setPlayback,
 		setPlayheadUs,
 		source,
 		videoRef,
@@ -539,7 +564,7 @@ export function useNativePreviewTransport({
 	const readLoopPositionUs = useCallback(() => {
 		const playheadUs = playheadRef.current;
 		if (
-			!playbackRequestedRef.current ||
+			!playbackRef.current.request ||
 			previewScrubActiveRef.current ||
 			hasScrubTarget?.()
 		) {
@@ -575,7 +600,7 @@ export function useNativePreviewTransport({
 				? previewAudioEngineRef.current
 				: null;
 			const renderingPlaybackActive =
-				playbackRequestedRef.current &&
+				playbackRef.current.request &&
 				(engine ? engine.getPlaybackState() === "playing" : isPlaying);
 			const scrubOwnsPlayhead = hasScrubTarget?.();
 			if (scrubOwnsPlayhead && !(engine && renderingPlaybackActive)) return;
@@ -585,7 +610,7 @@ export function useNativePreviewTransport({
 			if (
 				audioMasterClockActive &&
 				!isPlaying &&
-				!playbackRequestedRef.current &&
+				!playbackRef.current.request &&
 				audioPlaybackState !== "closed"
 			) {
 				const pendingVideoFollowerSeekSeconds =
@@ -630,11 +655,9 @@ export function useNativePreviewTransport({
 			) {
 				// Media end supersedes any still-pending follower seek from a loop.
 				pendingVideoFollowerSeekSecondsRef.current = durationUs / 1_000_000;
-				engine?.pause();
-				setPlaybackRequested(false);
+				pausePlayback();
 				setVideoFollowerTime(video, durationUs);
 				setPlayheadUs(durationUs);
-				setIsPlaying(false);
 				return;
 			}
 			if (scrubOwnsPlayhead) return;
@@ -673,7 +696,7 @@ export function useNativePreviewTransport({
 			}
 
 			if (!isPlaying) {
-				if (!playbackRequestedRef.current)
+				if (!playbackRef.current.request)
 					selectionLoop.reposition(nativePlayheadUs);
 				setPlayheadUs(nativePlayheadUs);
 				return;
@@ -686,13 +709,13 @@ export function useNativePreviewTransport({
 		},
 		[
 			audioPlaybackState,
-			setPlaybackRequested,
 			audioMasterClockActive,
 			durationUs,
 			frameDurationUs,
 			hasScrubTarget,
 			isPlaying,
 			nativeVideoClockActive,
+			pausePlayback,
 			previewAudioEngineRef,
 			selectionLoop,
 			setPlayheadUs,
@@ -767,21 +790,18 @@ export function useNativePreviewTransport({
 
 		// Native video can emit ended between playback samples. The terminal
 		// position can cross both Selection boundaries in one observation.
-		if (playbackRequestedRef.current && wrapSelectionLoopAt(durationUs)) {
+		if (playbackRef.current.request && wrapSelectionLoopAt(durationUs)) {
 			void startPlayback();
 			return;
 		}
 
-		previewAudioEngineRef.current?.pause();
-		setPlaybackRequested(false);
-		setIsPlaying(false);
+		pausePlayback();
 		setPlayheadUs(durationUs);
 	}, [
 		durationUs,
 		hasScrubTarget,
 		nativeVideoClockActive,
-		previewAudioEngineRef,
-		setPlaybackRequested,
+		pausePlayback,
 		setPlayheadUs,
 		startPlayback,
 		videoRef,
@@ -789,35 +809,49 @@ export function useNativePreviewTransport({
 	]);
 
 	const handleNativePause = useCallback(() => {
+		const video = videoRef.current;
 		// A natural end fires pause before ended, which owns the wrap decision.
-		if (!nativeVideoClockActive || videoRef.current?.ended) return;
-
-		previewAudioEngineRef.current?.pause();
-		setPlaybackRequested(false);
-		setIsPlaying(false);
-	}, [
-		previewAudioEngineRef,
-		nativeVideoClockActive,
-		setPlaybackRequested,
-		videoRef,
-	]);
+		if (!nativeVideoClockActive || !video?.paused || video.ended) return;
+		const { phase, request } = playbackRef.current;
+		// The owned play promise reports cancellation during a pending start.
+		if (!request || (phase === "starting" && request.origin === "command"))
+			return;
+		pausePlayback();
+	}, [nativeVideoClockActive, pausePlayback, videoRef]);
 
 	const handleNativePlay = useCallback(() => {
+		const video = videoRef.current;
+		if (!video || video.paused || video.ended) return;
 		if (!nativeVideoClockActive) {
-			if (previewAudioEngineRef.current?.getPlaybackState() !== "playing")
-				void videoRef.current?.pause();
+			if (
+				!playbackRef.current.request ||
+				previewAudioEngineRef.current?.getPlaybackState() !== "playing"
+			)
+				pauseVideo(video);
 			return;
 		}
+		if (previewScrubActiveRef.current) {
+			pauseVideo(video);
+			return;
+		}
+		if (!playbackRef.current.request)
+			setPlayback({ phase: "starting", request: { origin: "native" } });
+	}, [nativeVideoClockActive, previewAudioEngineRef, setPlayback, videoRef]);
 
-		if (previewScrubActiveRef.current) return;
-		setPlaybackRequested(true);
-		setIsPlaying(true);
-	}, [
-		nativeVideoClockActive,
-		previewAudioEngineRef,
-		setPlaybackRequested,
-		videoRef,
-	]);
+	const handleNativePlaying = useCallback(() => {
+		const video = videoRef.current;
+		const { phase, request } = playbackRef.current;
+		if (
+			nativeVideoClockActive &&
+			video &&
+			!video.paused &&
+			!video.ended &&
+			phase === "starting" &&
+			request?.origin === "native"
+		) {
+			setPlayback({ phase: "playing", request });
+		}
+	}, [nativeVideoClockActive, setPlayback, videoRef]);
 
 	return {
 		getPlaybackRate,
@@ -825,6 +859,7 @@ export function useNativePreviewTransport({
 		handleEnded,
 		handleNativePause,
 		handleNativePlay,
+		handleNativePlaying,
 		isPlaying,
 		playbackRequested,
 		audioPlaybackState,
@@ -836,6 +871,7 @@ export function useNativePreviewTransport({
 		previewScrubToUs,
 		seekByUs,
 		seekToUs,
+		seekWithScrubPreview,
 		selectionLoopEnabled,
 		setPreviewPlaybackRate,
 		setPreviewVolume,
@@ -846,6 +882,10 @@ export function useNativePreviewTransport({
 		toggleSelectionLoop,
 		volume,
 	};
+}
+
+function pauseVideo(video: PreviewMediaTransportHandle | null) {
+	if (video && !video.paused) void video.pause();
 }
 
 function secondsToMicroseconds(seconds: number): MediaTimeUs {

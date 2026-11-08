@@ -20,7 +20,10 @@ import { PreviewMeteringProvider } from "../../audio/meters/preview-metering-pro
 import { AudioPanel } from "../../audio/panel/audio-panel";
 /* @vitest-environment jsdom */
 import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
-import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
+import type {
+	PreviewAudioEngineMeterSnapshot,
+	PreviewAudioPlaybackState,
+} from "../../audio/types/preview-audio-engine.types";
 
 const adapterMockState = vi.hoisted(() => ({
 	previewAudioEngineCreate: vi.fn(),
@@ -28,8 +31,9 @@ const adapterMockState = vi.hoisted(() => ({
 		destroy: ReturnType<typeof vi.fn>;
 		getCurrentTime: ReturnType<typeof vi.fn>;
 		getPresentationTime: ReturnType<typeof vi.fn>;
+		getPlaybackState: () => PreviewAudioPlaybackState;
 		pause: ReturnType<typeof vi.fn>;
-		play: ReturnType<typeof vi.fn>;
+		play: ReturnType<typeof vi.fn<() => Promise<void>>>;
 		getStatus: ReturnType<typeof vi.fn>;
 		retryTrack: ReturnType<typeof vi.fn>;
 		subscribe: ReturnType<typeof vi.fn>;
@@ -37,6 +41,7 @@ const adapterMockState = vi.hoisted(() => ({
 		setOutputGain: ReturnType<typeof vi.fn>;
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
+		setPlaybackState: (state: PreviewAudioPlaybackState) => void;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackChannelMode: ReturnType<typeof vi.fn>;
 		setTrackGain: ReturnType<typeof vi.fn>;
@@ -117,6 +122,7 @@ import {
 } from "../../audio/engine/preview-audio-resources";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { NativePreviewPlayer } from "../player/native-preview-player";
+import { stubNativeMediaPlayback } from "./native-media-playback-fixture";
 
 const createObjectURL = vi.fn(() => "blob:preview-source");
 const revokeObjectURL = vi.fn();
@@ -139,9 +145,9 @@ beforeEach(() => {
 	adapterMockState.previewAudioEngineCreate.mockReset();
 	adapterMockState.previewAudioEngineCreate.mockImplementation(async () => {
 		let currentTimeSeconds = 0;
-		let playbackState = "paused";
+		let playbackState: PreviewAudioPlaybackState = "paused";
 		const listeners = new Set<() => void>();
-		const setPlaybackState = (state: string) => {
+		const setPlaybackState = (state: PreviewAudioPlaybackState) => {
 			playbackState = state;
 			for (const listener of listeners) listener();
 		};
@@ -167,6 +173,7 @@ beforeEach(() => {
 			setCurrentTimeSeconds(nextCurrentTimeSeconds: number) {
 				currentTimeSeconds = nextCurrentTimeSeconds;
 			},
+			setPlaybackState,
 			setOutputGain: vi.fn(),
 			setTime: vi.fn(),
 			setTrackChannelMode: vi.fn(),
@@ -176,14 +183,7 @@ beforeEach(() => {
 
 		return previewAudioEngine;
 	});
-	Object.defineProperty(HTMLMediaElement.prototype, "play", {
-		configurable: true,
-		value: play,
-	});
-	Object.defineProperty(HTMLMediaElement.prototype, "pause", {
-		configurable: true,
-		value: pause,
-	});
+	stubNativeMediaPlayback(play, pause);
 	createObjectURL.mockClear();
 	revokeObjectURL.mockClear();
 	play.mockReset().mockResolvedValue(undefined);
@@ -193,10 +193,107 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
 describe("NativePreviewPlayer", () => {
+	it.each(["native video", "audio master"])(
+		"keeps the latest Play through old video events and start promises in %s mode",
+		async (mode) => {
+			const first = createDeferredPlayback();
+			const second = createDeferredPlayback();
+			play
+				.mockReturnValueOnce(first.promise)
+				.mockReturnValueOnce(second.promise);
+			if (mode === "audio master") {
+				vi.stubGlobal("AudioContext", class AudioContext {});
+				preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+					createPreparedPreviewAudioResourcesForRequest(request),
+				);
+				render(<AudioMasterPlayerProbe />);
+				await waitFor(() =>
+					expect(adapterMockState.previewAudioEngines).toHaveLength(1),
+				);
+			} else {
+				renderPlayer();
+			}
+
+			const video = screen.getByLabelText(
+				"Preview for clip.mp4",
+			) as HTMLVideoElement;
+			const header = screen.getByLabelText("Preview viewer header");
+			fireEvent.click(screen.getByRole("button", { name: "Play preview" }));
+			expect(play).toHaveBeenCalledOnce();
+			expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+			expect(header.querySelector(".text-workbench-progress")).toBeNull();
+
+			fireEvent.click(screen.getByRole("button", { name: "Pause preview" }));
+			expect(video.paused).toBe(true);
+			fireEvent.play(video);
+			fireEvent.playing(video);
+			expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			expect(play).toHaveBeenCalledTimes(2);
+			fireEvent.pause(video);
+			fireEvent.playing(video);
+			await act(async () => first.resolve());
+			expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+			expect(
+				screen.getByRole("button", { name: "Pause preview" }),
+			).toBeTruthy();
+			expect(header.querySelector(".text-workbench-progress")).toBeNull();
+			expect(video.paused).toBe(false);
+
+			await act(async () => second.resolve());
+			expect(header.querySelector(".text-workbench-progress")).toBeTruthy();
+			expect(video.paused).toBe(false);
+		},
+	);
+
+	it.each(["seek", "frame step"])(
+		"cancels a pending audio start when a %s takes over Preview",
+		async (action) => {
+			vi.stubGlobal("AudioContext", class AudioContext {});
+			preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+				createPreparedPreviewAudioResourcesForRequest(request),
+			);
+			render(<AudioMasterPlayerProbe />);
+			await waitFor(() =>
+				expect(adapterMockState.previewAudioEngines).toHaveLength(1),
+			);
+			const [engine] = adapterMockState.previewAudioEngines;
+			const start = createDeferredPlayback();
+			engine.play.mockImplementationOnce(async () => {
+				engine.setPlaybackState("buffering");
+				await start.promise;
+				engine.setPlaybackState("playing");
+			});
+
+			fireEvent.click(screen.getByRole("button", { name: "Play" }));
+			expect(play).not.toHaveBeenCalled();
+			if (action === "seek") {
+				fireEvent.keyDown(
+					screen.getByRole("slider", { name: "Seek preview" }),
+					{
+						key: "ArrowRight",
+						code: "ArrowRight",
+					},
+				);
+			} else {
+				fireEvent.click(
+					screen.getByRole("button", { name: "Step forward one frame" }),
+				);
+			}
+			expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+			await act(async () => start.resolve());
+			expect(engine.getPlaybackState()).toBe("paused");
+			expect(play).not.toHaveBeenCalled();
+			expect(screen.getByRole("button", { name: "Play preview" })).toBeTruthy();
+		},
+	);
+
 	it("routes viewer play, pause, and seek through the audio-master transport", async () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
 		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>

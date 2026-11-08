@@ -22,10 +22,12 @@ export type PreviewViewerRegionProps = {
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
+	onNativePlaying: () => void;
 	onNativeSeeked: ReactEventHandler<HTMLVideoElement>;
 	onRequestFullscreen: () => void;
 	onSyncPlayhead: () => void;
 	playbackRate: number;
+	playbackRequested: boolean;
 	playheadUs: MediaTimeUs;
 	previewUrl: string;
 	scrubCanvasRef: RefObject<HTMLCanvasElement | null>;
@@ -48,12 +50,14 @@ export function PreviewViewerRegion({
 	onEnded,
 	onNativePause,
 	onNativePlay,
+	onNativePlaying,
 	onNativeSeeked,
 	onRequestFullscreen,
 	onTogglePlayback,
 	onPlayheadSeekRequested,
 	onSyncPlayhead,
 	playbackRate,
+	playbackRequested,
 	playheadUs,
 	previewUrl,
 	scrubCanvasRef,
@@ -128,11 +132,12 @@ export function PreviewViewerRegion({
 					onEnded={onEnded}
 					onNativePause={onNativePause}
 					onNativePlay={onNativePlay}
+					onNativePlaying={onNativePlaying}
 					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
 					previewUrl={previewUrl}
 					fullscreenRef={fullscreenRef}
-					isPlaying={isPlaying}
+					playbackRequested={playbackRequested}
 					playheadUs={playheadUs}
 					onTogglePlayback={onTogglePlayback}
 					onPlayheadSeekRequested={onPlayheadSeekRequested}
@@ -152,11 +157,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded,
 	onNativePause,
 	onNativePlay,
+	onNativePlaying,
 	onNativeSeeked,
 	onSyncPlayhead,
 	previewUrl,
 	fullscreenRef,
-	isPlaying,
+	playbackRequested,
 	playheadUs,
 	onTogglePlayback,
 	onPlayheadSeekRequested,
@@ -170,11 +176,12 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onEnded: () => void;
 	onNativePause: () => void;
 	onNativePlay: () => void;
+	onNativePlaying: () => void;
 	onNativeSeeked: PreviewViewerRegionProps["onNativeSeeked"];
 	onSyncPlayhead: () => void;
 	previewUrl: string;
 	fullscreenRef: PreviewViewerRegionProps["fullscreenRef"];
-	isPlaying: boolean;
+	playbackRequested: boolean;
 	playheadUs: MediaTimeUs;
 	onTogglePlayback: () => void;
 	onPlayheadSeekRequested: (timeUs: MediaTimeUs) => void;
@@ -199,7 +206,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					<PreviewVideoSkin
 						durationUs={asset.durationUs}
 						fullscreenRef={fullscreenRef}
-						isPlaying={isPlaying}
+						playbackRequested={playbackRequested}
 						onChapterSelected={onChapterSelectionRequested}
 						onSeek={onPlayheadSeekRequested}
 						onTogglePlayback={onTogglePlayback}
@@ -213,6 +220,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 							onEnded={onEnded}
 							onPause={onNativePause}
 							onPlay={onNativePlay}
+							onPlaying={onNativePlaying}
 							onSeeked={onNativeSeeked}
 							onTimeUpdate={onSyncPlayhead}
 							playsInline

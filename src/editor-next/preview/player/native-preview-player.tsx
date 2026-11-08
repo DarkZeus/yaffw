@@ -187,6 +187,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		handleEnded,
 		handleNativePause,
 		handleNativePlay,
+		handleNativePlaying,
 		isPlaying,
 		playbackRequested,
 		audioPlaybackState,
@@ -195,7 +196,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		playbackRate,
 		playheadUs,
 		previewScrubToUs,
-		seekToUs,
+		seekWithScrubPreview,
 		selectionLoopEnabled,
 		setPreviewPlaybackRate,
 		setPreviewVolume,
@@ -225,17 +226,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 				asset.durationUs,
 			);
 			requestScrubFrame(clampedPlayheadUs, { priority: "final" });
-			if (playbackRequested && !isPlaying) seekToUs(clampedPlayheadUs);
-			else previewScrubToUs(clampedPlayheadUs);
+			seekWithScrubPreview(clampedPlayheadUs);
 		},
-		[
-			asset.durationUs,
-			previewScrubToUs,
-			requestScrubFrame,
-			playbackRequested,
-			isPlaying,
-			seekToUs,
-		],
+		[asset.durationUs, requestScrubFrame, seekWithScrubPreview],
 	);
 	const seekByUsWithScrubPreview = useCallback(
 		(deltaUs: MediaTimeUs) => {
@@ -364,12 +357,14 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onEnded={handleEnded}
 					onNativePause={handleNativePause}
 					onNativePlay={handleNativePlay}
+					onNativePlaying={handleNativePlaying}
 					onNativeSeeked={handleNativeSeeked}
 					onRequestFullscreen={requestFullscreen}
 					onTogglePlayback={togglePlaybackWithScrubPreview}
 					onPlayheadSeekRequested={seekToUsWithScrubPreview}
 					onSyncPlayhead={syncPlayheadWithNativeVideo}
 					playbackRate={playbackRate}
+					playbackRequested={playbackRequested}
 					playheadUs={playheadUs}
 					previewUrl={previewUrl}
 					scrubCanvasRef={scrubPreview.canvasRef}

@@ -17,25 +17,21 @@ import type {
 	PreviewAudioPlaybackState,
 } from "../../audio/types/preview-audio-engine.types";
 import { useNativePreviewTransport } from "../transport/use-native-preview-transport";
+import { stubNativeMediaPlayback } from "./native-media-playback-fixture";
 
 const play = vi.fn().mockResolvedValue(undefined);
 const pause = vi.fn();
+let nativePaused: WeakMap<HTMLMediaElement, boolean>;
 
 beforeEach(() => {
-	Object.defineProperty(HTMLMediaElement.prototype, "play", {
-		configurable: true,
-		value: play,
-	});
-	Object.defineProperty(HTMLMediaElement.prototype, "pause", {
-		configurable: true,
-		value: pause,
-	});
+	nativePaused = stubNativeMediaPlayback(play, pause);
 	play.mockReset().mockResolvedValue(undefined);
 	pause.mockClear();
 });
 
 afterEach(() => {
 	cleanup();
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
@@ -210,6 +206,7 @@ describe("useNativePreviewTransport", () => {
 	});
 
 	it("ignores native video playback events while audio-master owns preview state", async () => {
+		stubPreviewAnimationFrames();
 		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 3,
 		});
@@ -274,10 +271,15 @@ describe("useNativePreviewTransport", () => {
 			expect(readState()).toContain("playing:true");
 		});
 
+		nativePaused.set(video, true);
 		fireEvent.pause(video);
 		expect(readState()).toContain("playing:false");
 
+		nativePaused.set(video, false);
 		fireEvent.play(video);
+		expect(readState()).toContain("playing:false");
+		expect(readState()).toContain("requested:true");
+		fireEvent.playing(video);
 		expect(readState()).toContain("playing:true");
 
 		video.currentTime = 12;
@@ -438,6 +440,7 @@ function NativePreviewTransportProbe({
 				onEnded={transport.handleEnded}
 				onPause={transport.handleNativePause}
 				onPlay={transport.handleNativePlay}
+				onPlaying={transport.handleNativePlaying}
 				onSeeked={() => transport.syncPlayheadWithNativeVideo()}
 				onTimeUpdate={() => transport.syncPlayheadWithNativeVideo()}
 				ref={videoRef}
