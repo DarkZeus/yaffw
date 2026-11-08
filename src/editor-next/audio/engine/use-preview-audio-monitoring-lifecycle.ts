@@ -67,7 +67,9 @@ export function usePreviewAudioMonitoringLifecycle({
 		) {
 			previewAudioEngineRef.current?.destroy();
 			previewAudioEngineRef.current = null;
-			reportStatus("idle");
+			reportStatus(
+				previewAudioResources.status === "failed" ? "failed" : "idle",
+			);
 			return;
 		}
 

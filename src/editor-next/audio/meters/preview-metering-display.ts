@@ -118,7 +118,10 @@ export function previewMeterDisplaysEqual(
 			leftTrack.status === "unavailable" &&
 			rightTrack.status === "unavailable"
 		) {
-			return leftTrack.reason === rightTrack.reason;
+			return (
+				leftTrack.reason === rightTrack.reason &&
+				leftTrack.retryStatus === rightTrack.retryStatus
+			);
 		}
 		return true;
 	});

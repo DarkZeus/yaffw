@@ -73,6 +73,7 @@ export type PreviewAudioEngineTrackMeterState =
 	  }
 	| {
 			reason: string;
+			retryStatus?: "available" | "retrying";
 			status: "unavailable";
 			trackId: string;
 	  };

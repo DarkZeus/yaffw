@@ -225,11 +225,14 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 		const selectedDescriptors = this.descriptors.filter((descriptor) =>
 			selectedTrackIdSet.has(descriptor.trackId),
 		);
-		const previousCancellation = Promise.all(
+		// Retire old cursors synchronously. Returning a sink iterator may wait for
+		// its pending read, so cleanup must not gate the new window.
+		void settleCleanup(
 			[...this.activeGenerations].map((generation) =>
 				generation.cancelTracks(selectedTrackIdSet),
 			),
-		).then(async () => {
+		).catch(reportGenerationCleanupFailure);
+		const prepareTracks = Promise.resolve().then(async () => {
 			if (this.disposed || signal.aborted) return;
 			const retries = new Set(retryTrackIds);
 			await Promise.all(
@@ -239,6 +242,11 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 							retries.has(descriptor.trackId) && descriptor.failureReason,
 					)
 					.map(async (descriptor) => {
+						const ownsTrack = () =>
+							!this.disposed &&
+							!signal.aborted &&
+							generation.ownsTrack(descriptor.trackId);
+						if (!ownsTrack()) return;
 						try {
 							const track =
 								descriptor.track ??
@@ -253,11 +261,9 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 									sampleRate: descriptor.format.sampleRate,
 								},
 							);
-							if (!this.disposed && !signal.aborted)
-								Object.assign(descriptor, updated);
+							if (ownsTrack()) Object.assign(descriptor, updated);
 						} catch (error) {
-							if (!this.disposed && !signal.aborted)
-								descriptor.failureReason = errorMessage(error);
+							if (ownsTrack()) descriptor.failureReason = errorMessage(error);
 						}
 					}),
 			);
@@ -269,7 +275,7 @@ class MediabunnyMediaWindowProvider implements MediaWindowProvider {
 			onCancel: () => {
 				this.activeGenerations.delete(generation);
 			},
-			previousCancellation,
+			prepareTracks,
 			signal,
 			startSeconds,
 		});
@@ -306,13 +312,13 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 			descriptors: readonly TrackDescriptor[];
 			id: number;
 			onCancel: () => void;
-			previousCancellation: Promise<void>;
+			prepareTracks: Promise<void>;
 			signal: AbortSignal;
 			startSeconds: number;
 		},
 	) {
 		this.coveredThroughSeconds = options.startSeconds;
-		this.pullQueue = options.previousCancellation;
+		this.pullQueue = options.prepareTracks;
 		for (const descriptor of options.descriptors) {
 			this.cursors.set(
 				descriptor.trackId,
@@ -339,6 +345,10 @@ class MediabunnyMediaWindowGeneration implements MediaWindowGeneration {
 
 	get trackIds() {
 		return [...this.cursors.keys()];
+	}
+
+	ownsTrack(trackId: string) {
+		return !this.cancelled && this.cursors.has(trackId);
 	}
 
 	pullThrough(endSeconds: number): Promise<readonly MediaWindowTrackState[]> {
@@ -441,7 +451,7 @@ class TrackWindowCursor {
 	private iteratorEnded = false;
 	private packetCursor: EncodedPacket | null = null;
 	private packetCursorInitialized = false;
-	private readonly packetTimeline: AudioPacketTimeline;
+	private packetTimelineValue: AudioPacketTimeline | null = null;
 	private packetSink: EncodedPacketSink | null = null;
 	private cancelPromise: Promise<void> | null = null;
 	private initialized = false;
@@ -457,13 +467,17 @@ class TrackWindowCursor {
 	) {
 		this.decodedThroughSeconds = generationStartSeconds;
 		this.failureReason = descriptor.failureReason;
-		this.packetTimeline = new AudioPacketTimeline({
-			packetDurationsMaySpanGaps: descriptor.packetDurationsMaySpanGaps,
-			sampleRate: descriptor.format.sampleRate,
-		});
 		this.timestampProjector = new DecodedAudioTimestampProjector(
 			generationStartSeconds,
 		);
+	}
+
+	private get packetTimeline() {
+		// A retry may refresh the descriptor before the first packet read.
+		return (this.packetTimelineValue ??= new AudioPacketTimeline({
+			packetDurationsMaySpanGaps: this.descriptor.packetDurationsMaySpanGaps,
+			sampleRate: this.descriptor.format.sampleRate,
+		}));
 	}
 
 	pull(options: {
@@ -571,7 +585,7 @@ class TrackWindowCursor {
 		if (this.cancelPromise) return this.cancelPromise;
 		this.cancelled = true;
 		this.pcmSegments.length = 0;
-		this.packetTimeline.clear();
+		this.packetTimelineValue?.clear();
 		this.packetCursor = null;
 		this.cancelPromise = settleCleanup([
 			this.releaseIterator(),
@@ -615,6 +629,7 @@ class TrackWindowCursor {
 			this.packetCursor = await packetSink.getNextPacket(packet, options);
 		}
 		// The already-read packet past the horizon bounds a trailing gap.
+		this.throwIfUnavailable(isGenerationCancelled);
 		if (this.packetCursor) this.addPacketToTimeline(this.packetCursor);
 
 		this.packetTimeline.sort();

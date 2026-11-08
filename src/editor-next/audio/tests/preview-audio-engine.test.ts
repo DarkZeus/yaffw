@@ -359,6 +359,9 @@ describe("bounded production Preview audio engine", () => {
 		const { engine, context } = await setup(provider);
 		await engine.play();
 		const old = engine.setTime(4);
+		await vi.waitFor(() =>
+			expect(provider.pulls.some((pull) => pull.start === 4)).toBe(true),
+		);
 		const latest = engine.setTime(8);
 		engine.pause();
 		await latest;
@@ -369,6 +372,30 @@ describe("bounded production Preview audio engine", () => {
 		expect(
 			context.createdSources.every((source) => source.buffer === null),
 		).toBe(true);
+		expect(engine.getMetrics().stalePullResults).toBe(1);
+	});
+	it("lets a pending Play use the current seek without waiting for an obsolete decode", async () => {
+		const late = deferred<MediaWindowTrackState[]>();
+		const provider = createProvider((options, end) =>
+			options.startSeconds === 4
+				? late.promise
+				: states(options.startSeconds, end, ["audio-1", "audio-2"]),
+		);
+		const { engine } = await setup(provider);
+		const obsolete = engine.setTime(4);
+		await vi.waitFor(() =>
+			expect(provider.pulls.some((pull) => pull.start === 4)).toBe(true),
+		);
+		const playing = vi.fn();
+		const pendingPlay = engine.play().then(playing);
+		await flushMicrotasks();
+		await engine.setTime(8);
+		await vi.waitFor(() => expect(playing).toHaveBeenCalledOnce());
+		expect(engine.getPlaybackState()).toBe("playing");
+		expect(engine.getCurrentTime()).toBe(8);
+		late.resolve(states(4, 6, ["audio-1", "audio-2"]));
+		await obsolete;
+		await pendingPlay;
 		expect(engine.getMetrics().stalePullResults).toBe(1);
 	});
 	it("cancels a pending AudioContext resume when paused", async () => {
@@ -451,6 +478,47 @@ describe("bounded production Preview audio engine", () => {
 		expect(
 			provider.pulls.filter((pull) => pull.trackIds.length === 1).length,
 		).toBeGreaterThanOrEqual(4);
+	});
+	it("replenishes the healthy window while an isolated retry is still decoding", async () => {
+		vi.useFakeTimers();
+		const retry = deferred<MediaWindowTrackState[]>();
+		const provider = createProvider((options, end) =>
+			options.retryTrackIds
+				? retry.promise
+				: [
+						...states(options.startSeconds, end, ["audio-1"]),
+						{
+							kind: "failure",
+							reason: "Desktop decode failed",
+							trackId: "audio-2",
+							startSeconds: options.startSeconds,
+							endSeconds: end,
+						},
+					],
+		);
+		const { engine, context } = await setup(provider);
+		await engine.play();
+		const recovering = engine.retryTrack("audio-2");
+		await engine.retryTrack("audio-2");
+		expect(engine.readMeterSnapshot().trackStates["audio-2"]).toMatchObject({
+			status: "unavailable",
+			retryStatus: "retrying",
+			reason: "Desktop decode failed",
+		});
+		for (const time of [0.6, 1.2, 1.8, 2.4]) {
+			context.currentTime = time;
+			await vi.advanceTimersByTimeAsync(50);
+		}
+		expect(
+			provider.pulls.filter((pull) => pull.trackIds.length === 2).length,
+		).toBeGreaterThanOrEqual(4);
+		expect(
+			provider.pulls.filter((pull) => pull.trackIds.length === 1),
+		).toHaveLength(1);
+		retry.resolve(states(0, 2, ["audio-2"]));
+		await recovering;
+		expect(engine.getStatus()).toBe("ready");
+		expect(engine.getMetrics().trackRetries).toBe(1);
 	});
 	it("keeps total failures retryable and rejects playback until a track recovers", async () => {
 		const provider = createProvider((options, end) =>

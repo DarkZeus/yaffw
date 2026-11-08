@@ -1,4 +1,7 @@
-import type { PreviewAudioEngineMeterSnapshot } from "../types/preview-audio-engine.types";
+import type {
+	PreviewAudioEngineMeterSnapshot,
+	PreviewAudioEngineTrackMeterState,
+} from "../types/preview-audio-engine.types";
 import type { PreviewLevelMeterChannel } from "../types/preview-level-meter.types";
 import { previewPeakMeterVisualRange } from "./preview-level-meter.constants";
 
@@ -14,7 +17,7 @@ export type LivePreviewMeteringSourceStatus =
 export type LivePreviewMeteringTrackState<Channel = PreviewLevelMeterChannel> =
 	| { status: "preparing"; trackId: string }
 	| { channels: Channel[]; status: "ready"; trackId: string }
-	| { reason: string; status: "unavailable"; trackId: string };
+	| Extract<PreviewAudioEngineTrackMeterState, { status: "unavailable" }>;
 
 export type LivePreviewMeteringCombinedState<
 	Channel = PreviewLevelMeterChannel,
@@ -69,7 +72,7 @@ export function createPreviewMeterTarget({
 	previousTarget: PreviewMeterTarget | null;
 	sampleSignal: boolean;
 }): PreviewMeterTarget {
-	if (meteringStatus === "failed") {
+	if (meteringStatus === "failed" && !meterSnapshot) {
 		const reason = "Preview audio engine meter taps unavailable";
 		return {
 			combinedState: { reason, status: "unavailable" },

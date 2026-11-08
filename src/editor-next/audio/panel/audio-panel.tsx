@@ -236,10 +236,12 @@ function AudioTrackStrip({
 				</div>
 			</div>
 			<div className="grid min-w-0 gap-1">
-				{meterDisplay.state === "unavailable" && onPreviewMeteringRetry ? (
+				{meterDisplay.retryStatus && onPreviewMeteringRetry ? (
 					<Button
+						aria-busy={meterDisplay.retryStatus === "retrying"}
 						aria-label={`Retry ${label} preview meter`}
 						className="h-6 rounded border-workbench-border bg-workbench-viewer px-1.5 text-[10px] text-muted-foreground hover:bg-workbench-hover"
+						disabled={meterDisplay.retryStatus === "retrying"}
 						onClick={() => {
 							onPreviewMeteringRetry(track.id);
 						}}
@@ -248,7 +250,7 @@ function AudioTrackStrip({
 						variant="outline"
 					>
 						<RefreshCcw data-icon="inline-start" />
-						Retry
+						{meterDisplay.retryStatus === "retrying" ? "Retrying…" : "Retry"}
 					</Button>
 				) : null}
 				{meterDisplay.reason ? (
@@ -508,6 +510,7 @@ function createTrackMeterDisplay({
 	excluded: boolean;
 	message?: string;
 	reason?: string;
+	retryStatus?: "available" | "retrying";
 	state: PreviewLevelMeterState;
 	statusLabel: string;
 } {
@@ -536,6 +539,7 @@ function createTrackMeterDisplay({
 			excluded: false,
 			message: "Meter unavailable",
 			reason: state.reason,
+			retryStatus: state.retryStatus,
 			state: "unavailable",
 			statusLabel: "Unavailable",
 		};

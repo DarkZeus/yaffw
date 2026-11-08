@@ -66,7 +66,8 @@ export function PreviewMeteringProvider({
 		[],
 	);
 	const retryUnavailableTrack = useCallback((trackId: string) => {
-		if (trackStatesRef.current[trackId]?.status !== "unavailable") {
+		const track = trackStatesRef.current[trackId];
+		if (track?.status !== "unavailable" || track.retryStatus !== "available") {
 			return;
 		}
 

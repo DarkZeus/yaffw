@@ -246,6 +246,8 @@ describe("createMediaWindowProvider", () => {
 			startSeconds: 0,
 			trackIds: new Set(["audio-2"]),
 		});
+		const retry = await retryGeneration.pullThrough(0.2);
+		expect(staleSample.close).not.toHaveBeenCalled();
 		stalePending.resolve({ done: false, value: staleSample });
 
 		await expect(staleResult).resolves.toEqual([
@@ -254,7 +256,6 @@ describe("createMediaWindowProvider", () => {
 				trackId: "audio-1",
 			}),
 		]);
-		const retry = await retryGeneration.pullThrough(0.2);
 
 		expect(retryGeneration.trackIds).toEqual(["audio-2"]);
 		expect(retry).toEqual([
@@ -269,7 +270,7 @@ describe("createMediaWindowProvider", () => {
 
 		await provider.dispose();
 	});
-	it.each(["metadata"])(
+	it.each(["capability", "metadata"])(
 		"re-reads failed %s on isolated retry while retaining the healthy iterator",
 		async (failure) => {
 			const healthy = createTrack({
@@ -287,7 +288,8 @@ describe("createMediaWindowProvider", () => {
 			});
 			const failed = createTrack({
 				id: "embedded-2",
-				packets: [createPacket(0, 0.2)],
+				// The refreshed AAC metadata lets a later packet bound this unknown duration.
+				packets: [createPacket(0, 0), createPacket(0.2, 0.2)],
 				iterators: [
 					createSampleIterator([
 						createAudioSample({

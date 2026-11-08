@@ -19,6 +19,8 @@ import type { ScheduledWindowEngine } from "./scheduled-window-engine";
 type OwnedGeneration = {
 	generation: MediaWindowGeneration;
 	abort: AbortController;
+	pendingPull: Promise<void> | null;
+	phase: "priming" | "established";
 	version: number;
 	trackId?: string;
 	throughSeconds: number;
@@ -36,10 +38,8 @@ export function createPreviewAudioWindowController(
 	let desiredPlaying = false;
 	let active: OwnedGeneration | null = null;
 	const retries = new Map<string, OwnedGeneration>();
-	const failures = new Map<string, string>();
 	const listeners = new Set<() => void>();
 	let readiness: Promise<void> = Promise.resolve();
-	let lookahead: Promise<void> | null = null;
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let playbackRate = initialPlaybackRate;
 	let playbackState: PreviewAudioPlaybackState =
@@ -127,7 +127,6 @@ export function createPreviewAudioWindowController(
 		active = null;
 		for (const owned of retries.values()) cancel(owned);
 		retries.clear();
-		lookahead = null;
 		version++;
 		stopTimer();
 	}
@@ -149,18 +148,34 @@ export function createPreviewAudioWindowController(
 		const filtered = states.filter(
 			(state) => owned.trackId || !retries.has(state.trackId),
 		);
-		for (const state of filtered) {
-			if (state.kind === "failure") failures.set(state.trackId, state.reason);
-			else failures.delete(state.trackId);
-		}
 		const generationId = engine.getGenerationId();
-		if (generationId !== null)
-			engine.applyTrackStates({ generationId, tracks: filtered });
+		if (
+			generationId === null ||
+			!engine.applyTrackStates({ generationId, tracks: filtered })
+		)
+			return;
+		owned.phase = "established";
 		notify();
 	}
-	async function pull(owned: OwnedGeneration, through: number) {
-		if (!current(owned) || through <= owned.throughSeconds) return;
-		owned.throughSeconds = through;
+	function pull(
+		owned: OwnedGeneration,
+		through: number,
+	): Promise<void> | undefined {
+		if (!current(owned) || owned.pendingPull || through <= owned.throughSeconds)
+			return;
+		// A recovering decoder can lag behind the playhead. Bound each pull as it catches up.
+		const end = Math.min(
+			through,
+			owned.throughSeconds + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+		);
+		owned.throughSeconds = end;
+		const pending = readWindow(owned, end).finally(() => {
+			owned.pendingPull = null;
+		});
+		owned.pendingPull = pending;
+		return pending;
+	}
+	async function readWindow(owned: OwnedGeneration, through: number) {
 		try {
 			const result = await owned.generation.pullThrough(through);
 			publish(owned, result);
@@ -189,26 +204,40 @@ export function createPreviewAudioWindowController(
 		return {
 			generation,
 			abort,
+			pendingPull: null,
+			phase: "priming",
 			version,
 			trackId,
 			throughSeconds: startSeconds,
 		};
 	}
-	async function tick() {
+	function tick() {
 		if (destroyed || !engine.isPlaying()) return;
 		const next = engine.tick();
-		if (!next.needsLookahead || !active || lookahead) return;
-		const pending = Promise.all(
-			[active, ...retries.values()].map((owned) =>
-				pull(owned, next.throughSeconds),
-			),
-		).then(() => undefined);
-		lookahead = pending;
-		try {
-			await pending;
-		} finally {
-			if (lookahead === pending) lookahead = null;
+		if (!next.needsLookahead || !active) return;
+		// Each generation owns its own in-flight pull, including track retries.
+		for (const owned of [active, ...retries.values()])
+			void pull(owned, next.throughSeconds);
+	}
+	function prime(owned: OwnedGeneration, startSeconds: number) {
+		if (startSeconds < provider.durationSeconds) {
+			return pull(
+				owned,
+				Math.min(
+					provider.durationSeconds,
+					startSeconds + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
+				),
+			);
 		}
+		publish(
+			owned,
+			owned.generation.trackIds.map((trackId) => ({
+				kind: "silence",
+				trackId,
+				startSeconds,
+				endSeconds: startSeconds,
+			})),
+		);
 	}
 	async function resume() {
 		if (destroyed || !desiredPlaying) return;
@@ -217,9 +246,7 @@ export function createPreviewAudioWindowController(
 		if (!destroyed && desiredPlaying && engine.isPlaying()) {
 			setPlaybackState("playing");
 			if (timer === null)
-				timer = setInterval(() => {
-					void tick();
-				}, PREVIEW_AUDIO_WINDOW_PULL_INTERVAL_MS);
+				timer = setInterval(tick, PREVIEW_AUDIO_WINDOW_PULL_INTERVAL_MS);
 		}
 	}
 	function prepare(timeSeconds: number) {
@@ -233,42 +260,36 @@ export function createPreviewAudioWindowController(
 		);
 		engine.pause();
 		invalidate();
-		failures.clear();
 		const owned = open(startSeconds);
 		active = owned;
 		engine.beginGeneration({ generationId: owned.generation.id, startSeconds });
+		const pending = Promise.resolve().then(async () => {
+			if (!current(owned)) return;
+			await prime(owned, startSeconds);
+			const status = engine.getStatus();
+			if (
+				current(owned) &&
+				desiredPlaying &&
+				(status === "ready" || status === "degraded")
+			)
+				await resume();
+		});
+		const retired = new Promise<void>((resolve) => {
+			owned.abort.signal.addEventListener("abort", () => resolve(), {
+				once: true,
+			});
+		});
+		readiness = Promise.race([pending, retired]);
 		if (desiredPlaying && contextLifecycle.isRunning())
 			setPlaybackState("buffering");
 		notify();
-		const pending = (async () => {
-			if (startSeconds >= provider.durationSeconds) {
-				publish(
-					owned,
-					provider.trackIds.map((trackId) => ({
-						trackId,
-						kind: "silence",
-						startSeconds,
-						endSeconds: startSeconds,
-					})),
-				);
-			} else
-				await pull(
-					owned,
-					Math.min(
-						provider.durationSeconds,
-						startSeconds + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
-					),
-				);
-			if (current(owned) && desiredPlaying && engine.getStatus() !== "failed")
-				await resume();
-		})();
-		readiness = pending;
 		return pending;
 	}
 	return {
 		prepare,
 		getPlaybackState: () => playbackState,
-		getFailures: () => failures as ReadonlyMap<string, string>,
+		isTrackRetrying: (trackId: string) =>
+			retries.get(trackId)?.phase === "priming",
 		subscribe(listener: () => void) {
 			listeners.add(listener);
 			return () => {
@@ -292,7 +313,6 @@ export function createPreviewAudioWindowController(
 			invalidate();
 			listeners.clear();
 			playbackState = "closed";
-			failures.clear();
 			void engine.destroy();
 			metrics.cleanupCount++;
 		},
@@ -333,7 +353,6 @@ export function createPreviewAudioWindowController(
 			if (
 				active &&
 				!engine.isPlaying() &&
-				engine.getStatus() !== "preparing" &&
 				Math.round(timeSeconds * 1_000_000) ===
 					Math.round(engine.getCurrentTime() * 1_000_000)
 			)
@@ -355,25 +374,17 @@ export function createPreviewAudioWindowController(
 			return prepare(engine.getCurrentTime());
 		},
 		async retryTrack(trackId: string) {
-			if (
-				destroyed ||
-				!provider.trackIds.includes(trackId) ||
-				!failures.has(trackId)
-			)
+			if (destroyed || engine.getTrackReadiness(trackId)?.kind !== "failure")
 				return;
 			const previous = retries.get(trackId);
+			if (previous?.phase === "priming") return;
 			if (previous) cancel(previous);
 			const start = engine.getCurrentTime();
 			const owned = open(start, trackId);
 			retries.set(trackId, owned);
 			metrics.trackRetries++;
-			await pull(
-				owned,
-				Math.min(
-					provider.durationSeconds,
-					start + PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
-				),
-			);
+			notify();
+			if (current(owned)) await prime(owned, start);
 		},
 		tick,
 	};

@@ -441,6 +441,7 @@ describe("NativePreviewPlayer", () => {
 				},
 				"audio-2": {
 					reason: "Desktop source failed",
+					retryStatus: "available",
 					status: "unavailable",
 					trackId: "audio-2",
 				},

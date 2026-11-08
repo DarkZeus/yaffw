@@ -147,7 +147,9 @@ describe("useLivePreviewMetering", () => {
 	it("refreshes preparing, unavailable, and ready presentations without sampling while paused", () => {
 		let status: ReturnType<LivePreviewMeteringClock["getMeteringStatus"]> =
 			"preparing";
-		const readMeterSnapshot = vi.fn(() => createReadySnapshot(1));
+		const readMeterSnapshot = vi.fn(() =>
+			status === "failed" ? null : createReadySnapshot(1),
+		);
 		const clock = createMeteringClock({
 			getIsPlaying: () => false,
 			getMeteringStatus: () => status,
@@ -168,12 +170,12 @@ describe("useLivePreviewMetering", () => {
 		expect(screen.getByLabelText("combined state").textContent).toBe(
 			"unavailable",
 		);
-		expect(readMeterSnapshot).not.toHaveBeenCalled();
+		expect(readMeterSnapshot).toHaveBeenCalledExactlyOnceWith(false);
 		act(() => {
 			status = "ready";
 			timeoutCallbacks.shift()?.callback();
 		});
-		expect(readMeterSnapshot).toHaveBeenCalledExactlyOnceWith(false);
+		expect(readMeterSnapshot.mock.calls).toEqual([[false], [false]]);
 		expect(screen.getByLabelText("voice state").textContent).toBe("ready");
 		expect(screen.getByLabelText("combined state").textContent).toBe("ready");
 		expect(screen.getByLabelText("voice peak").textContent).toBe("-90");

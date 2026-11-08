@@ -175,47 +175,68 @@ export function createPreviewAudioGraph(
 		readMeterSnapshot(
 			playing: boolean,
 			failures: ReadonlyMap<string, string>,
+			isTrackRetrying: (trackId: string) => boolean = () => false,
 		): PreviewAudioEngineMeterSnapshot {
 			const trackStates: Record<string, PreviewAudioEngineTrackMeterState> = {};
 			for (const track of tracks) {
-				const reason =
-					failures.get(track.resource.trackId) ??
-					(track.meterTap.status === "unavailable"
-						? track.meterTap.reason
-						: null);
-				trackStates[track.resource.trackId] = reason
-					? { status: "unavailable", reason, trackId: track.resource.trackId }
-					: {
-							status: "ready",
-							trackId: track.resource.trackId,
-							channels:
-								track.meterTap.status === "ready"
-									? readPreviewAudioMeterTapChannels({
-											playing,
-											tap: track.meterTap.tap,
-										})
-									: [],
-						};
+				const trackId = track.resource.trackId;
+				const failure = failures.get(trackId);
+				if (failure !== undefined) {
+					trackStates[trackId] = {
+						reason: failure,
+						retryStatus: isTrackRetrying(trackId) ? "retrying" : "available",
+						status: "unavailable",
+						trackId,
+					};
+				} else if (track.meterTap.status === "unavailable") {
+					trackStates[trackId] = {
+						reason: track.meterTap.reason,
+						status: "unavailable",
+						trackId,
+					};
+				} else {
+					trackStates[trackId] = {
+						channels: readPreviewAudioMeterTapChannels({
+							playing,
+							tap: track.meterTap.tap,
+						}),
+						status: "ready",
+						trackId,
+					};
+				}
 			}
+
+			if (failures.size > 0 && failures.size === tracks.length) {
+				return {
+					trackStates,
+					combinedState: {
+						status: "unavailable",
+						reason: "All Preview audio tracks are unavailable.",
+					},
+				};
+			}
+			if (combinedTap.status === "unavailable")
+				return { trackStates, combinedState: combinedTap };
+
 			const reasons = tracks
-				.filter((t) => t.monitorGain > 0 && failures.has(t.resource.trackId))
-				.map((t) => failures.get(t.resource.trackId));
+				.filter(
+					(track) =>
+						track.monitorGain > 0 && failures.has(track.resource.trackId),
+				)
+				.map((track) => failures.get(track.resource.trackId));
 			return {
 				trackStates,
-				combinedState:
-					combinedTap.status === "unavailable"
-						? combinedTap
-						: {
-								status: "ready",
-								channels: readPreviewAudioMeterTapChannels({
-									playing,
-									tap: combinedTap.tap,
-								}),
-								partial: reasons.length > 0,
-								reason: reasons.length
-									? `Some monitored tracks are unavailable: ${reasons.join(", ")}`
-									: undefined,
-							},
+				combinedState: {
+					status: "ready",
+					channels: readPreviewAudioMeterTapChannels({
+						playing,
+						tap: combinedTap.tap,
+					}),
+					partial: reasons.length > 0,
+					reason: reasons.length
+						? `Some monitored tracks are unavailable: ${reasons.join(", ")}`
+						: undefined,
+				},
 			};
 		},
 		destroy() {

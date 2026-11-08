@@ -5,6 +5,50 @@ import {
 } from "../engine/scheduled-window-engine";
 
 describe("createScheduledWindowEngine", () => {
+	it("counts playable PCM, established silence, and explicit failure before allowing degraded playback", async () => {
+		const context = createAudioContextSpy();
+		const engine = createScheduledWindowEngine({
+			createAudioContext: () => context,
+			durationSeconds: 30,
+			horizonSeconds: 2,
+			lowWaterSeconds: 1.5,
+			trackIds: ["pcm", "silent", "failed"],
+		});
+		engine.beginGeneration({ generationId: 1, startSeconds: 0 });
+		engine.applyTrackStates({
+			generationId: 1,
+			tracks: [
+				playableTrack("pcm", 0, 2, [chunk(0, 2)]),
+				{ kind: "silence", trackId: "silent", startSeconds: 0, endSeconds: 2 },
+			],
+		});
+		expect(engine.getTrackReadiness("pcm")).toEqual({ kind: "playable" });
+		expect(engine.getTrackReadiness("silent")).toEqual({ kind: "silence" });
+		expect(engine.getTrackReadiness("failed")).toEqual({ kind: "preparing" });
+		expect(engine.getStatus()).toBe("preparing");
+		await expect(engine.play()).rejects.toThrow("still preparing");
+		engine.applyTrackStates({
+			generationId: 1,
+			tracks: [
+				{
+					kind: "failure",
+					trackId: "failed",
+					startSeconds: 0,
+					endSeconds: 2,
+					reason: "Decoder failed",
+				},
+			],
+		});
+		expect(engine.getTrackReadiness("failed")).toEqual({
+			kind: "failure",
+			reason: "Decoder failed",
+		});
+		expect(engine.getStatus()).toBe("degraded");
+		await engine.play();
+		expect(context.createdSources).toHaveLength(1);
+		await engine.destroy();
+	});
+
 	it("invalidates scheduled nodes across pause, speed, routing, and generation changes", async () => {
 		const context = createAudioContextSpy();
 		const engine = createScheduledWindowEngine({

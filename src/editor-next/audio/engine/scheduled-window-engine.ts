@@ -38,6 +38,10 @@ export type ScheduledWindowEngineStatus =
 	| "preparing"
 	| "ready";
 
+export type ScheduledWindowTrackReadiness =
+	| { kind: "preparing" | "playable" | "silence" }
+	| { kind: "failure"; reason: string };
+
 export type ScheduledWindowEngineMetrics = {
 	cleanupCount: number;
 	generationResets: number;
@@ -83,6 +87,9 @@ export type ScheduledWindowEngine = {
 	getGenerationId: () => number | null;
 	getMetrics: () => ScheduledWindowEngineMetrics;
 	getStatus: () => ScheduledWindowEngineStatus;
+	getTrackReadiness: (
+		trackId: string,
+	) => ScheduledWindowTrackReadiness | undefined;
 	isPlaying: () => boolean;
 	pause: () => void;
 	play: () => Promise<void>;
@@ -124,7 +131,7 @@ type TrackRuntime = {
 	coverageEndSeconds: number;
 	gain: number;
 	gainNode: ScheduledWindowGainNodeLike;
-	lastState: Pick<MediaWindowTrackState, "kind"> | null;
+	readiness: ScheduledWindowTrackReadiness;
 	retainedChunks: RetainedChunk[];
 	trackId: string;
 };
@@ -156,7 +163,7 @@ export function createScheduledWindowEngine({
 					coverageEndSeconds: 0,
 					gain: 1,
 					gainNode,
-					lastState: null,
+					readiness: { kind: "preparing" },
 					retainedChunks: [],
 					trackId,
 				} as TrackRuntime,
@@ -301,7 +308,7 @@ export function createScheduledWindowEngine({
 		const mediaTimeSeconds = getCurrentTime();
 		const effectivePlaybackEndSeconds = playbackEndSeconds ?? durationSeconds;
 		for (const track of tracks.values()) {
-			if (track.lastState?.kind === "failure") {
+			if (track.readiness.kind === "failure") {
 				continue;
 			}
 
@@ -416,7 +423,7 @@ export function createScheduledWindowEngine({
 		activeUnderrunDurations.clear();
 		for (const track of tracks.values()) {
 			track.coverageEndSeconds = currentTimeSeconds;
-			track.lastState = null;
+			track.readiness = { kind: "preparing" };
 		}
 		metrics.generationResets += 1;
 	}
@@ -474,7 +481,10 @@ export function createScheduledWindowEngine({
 					nextState.kind === "failure" ? durationSeconds : nextState.endSeconds,
 				);
 			}
-			track.lastState = { kind: nextState.kind };
+			track.readiness =
+				nextState.kind === "failure"
+					? { kind: "failure", reason: nextState.reason }
+					: { kind: nextState.kind };
 			track.coverageEndSeconds = Math.max(
 				track.coverageEndSeconds,
 				nextState.endSeconds,
@@ -499,13 +509,13 @@ export function createScheduledWindowEngine({
 	}
 
 	function getStatus(): ScheduledWindowEngineStatus {
-		const states = Array.from(tracks.values(), (track) => track.lastState);
-		if (states.some((state) => state === null)) {
+		const states = Array.from(tracks.values(), (track) => track.readiness);
+		if (states.some((state) => state.kind === "preparing")) {
 			return "preparing";
 		}
 
 		const failureCount = states.filter(
-			(state) => state?.kind === "failure",
+			(state) => state.kind === "failure",
 		).length;
 		if (failureCount === states.length && states.length > 0) {
 			return "failed";
@@ -528,7 +538,7 @@ export function createScheduledWindowEngine({
 			let gapStartSeconds: number | null = null;
 			if (
 				playing &&
-				track.lastState?.kind !== "failure" &&
+				track.readiness.kind !== "failure" &&
 				mediaTimeSeconds < effectivePlaybackEndSeconds &&
 				track.coverageEndSeconds + TIME_EPSILON_SECONDS < mediaTimeSeconds
 			) {
@@ -581,7 +591,7 @@ export function createScheduledWindowEngine({
 		compactReleasedChunks();
 
 		const activeTracks = Array.from(tracks.values()).filter(
-			(track) => track.lastState?.kind !== "failure",
+			(track) => track.readiness.kind !== "failure",
 		);
 		const minimumCoverageSeconds = Math.min(
 			...activeTracks.map((track) => track.coverageEndSeconds),
@@ -636,6 +646,7 @@ export function createScheduledWindowEngine({
 			return { ...metrics };
 		},
 		getStatus,
+		getTrackReadiness: (trackId) => tracks.get(trackId)?.readiness,
 		isPlaying: () => playing,
 		pause() {
 			playIntent += 1;

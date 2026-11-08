@@ -83,6 +83,7 @@ export function useNativePreviewTransport({
 	const playheadStateCommitTimestampRef = useRef<number | null>(null);
 	const playheadStateRef = useRef<MediaTimeUs>(0);
 	const pendingVideoFollowerSeekSecondsRef = useRef<number | null>(null);
+	const pausedAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	const selectionLoopEnteredRef = useRef(false);
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
@@ -111,6 +112,7 @@ export function useNativePreviewTransport({
 		playheadStateRef.current = 0;
 		playheadStateCommitTimestampRef.current = null;
 		pendingVideoFollowerSeekSecondsRef.current = null;
+		pausedAudioEngineRef.current = null;
 		playbackStartRequestIdRef.current += 1;
 		playbackStartPendingRef.current = false;
 		setPlaybackRequested(false);
@@ -306,6 +308,8 @@ export function useNativePreviewTransport({
 			const engine = previewAudioEngineRef.current;
 			if (audioMasterClockActive && engine?.getPlaybackState() === "closed")
 				return;
+			const pausedAudioEngine = pausedAudioEngineRef.current;
+			pausedAudioEngineRef.current = null;
 			const requestId = ++playbackStartRequestIdRef.current;
 			playbackStartPendingRef.current = true;
 			setPlaybackRequested(true);
@@ -313,11 +317,17 @@ export function useNativePreviewTransport({
 				if (audioMasterClockActive && engine) {
 					video.muted = true;
 					if (!recover) {
+						const pendingSeekSeconds =
+							pendingVideoFollowerSeekSecondsRef.current;
+						const resumingPausedWindow =
+							pausedAudioEngine === engine && pendingSeekSeconds === null;
 						const start = resolveAudioMasterPlaybackStartSeconds({
 							durationUs,
-							pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
+							pendingSeekSeconds,
 							playheadUs: playheadRef.current,
-							video,
+							currentTime: resumingPausedWindow
+								? engine.getCurrentTime()
+								: video.currentTime,
 						});
 						renderingPlayheadRef.current = secondsToMicroseconds(start);
 						engine.setPlaybackEnd(
@@ -325,7 +335,7 @@ export function useNativePreviewTransport({
 								? selection.endUs / 1_000_000
 								: null,
 						);
-						void engine.setTime(start);
+						if (!resumingPausedWindow) void engine.setTime(start);
 					}
 					previewScrubActiveRef.current = false;
 					// Call in the user gesture; the engine owns resume and bounded preparation.
@@ -366,7 +376,9 @@ export function useNativePreviewTransport({
 			playbackStartRequestIdRef.current += 1;
 			playbackStartPendingRef.current = false;
 			setPlaybackRequested(false);
-			previewAudioEngineRef.current?.pause();
+			const engine = previewAudioEngineRef.current;
+			engine?.pause();
+			pausedAudioEngineRef.current = audioMasterClockActive ? engine : null;
 			if (!audioMasterClockActive) void videoRef.current?.pause();
 			setIsPlaying(false);
 			return;
@@ -944,15 +956,15 @@ function videoFollowerIsSeeking(video: unknown) {
 }
 
 function resolveAudioMasterPlaybackStartSeconds({
+	currentTime,
 	durationUs,
 	pendingSeekSeconds,
 	playheadUs,
-	video,
 }: {
+	currentTime: number;
 	durationUs: MediaTimeUs;
 	pendingSeekSeconds: number | null;
 	playheadUs: MediaTimeUs;
-	video: { currentTime: number };
 }) {
 	if (pendingSeekSeconds !== null && Number.isFinite(pendingSeekSeconds)) {
 		return (
@@ -961,10 +973,8 @@ function resolveAudioMasterPlaybackStartSeconds({
 		);
 	}
 
-	if (Number.isFinite(video.currentTime)) {
-		return (
-			clamp(secondsToMicroseconds(video.currentTime), 0, durationUs) / 1_000_000
-		);
+	if (Number.isFinite(currentTime)) {
+		return clamp(secondsToMicroseconds(currentTime), 0, durationUs) / 1_000_000;
 	}
 
 	return clamp(playheadUs, 0, durationUs) / 1_000_000;

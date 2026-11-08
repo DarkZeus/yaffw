@@ -135,11 +135,19 @@ export async function createPreviewAudioEngine({
 		setTime: (...args) => controller.setTime(...args),
 		setPlaybackRate: (...args) => controller.setPlaybackRate(...args),
 		setPlaybackEnd: scheduler.setPlaybackEnd,
-		readMeterSnapshot: (sampleSignal = true) =>
-			graph.readMeterSnapshot(
+		readMeterSnapshot(sampleSignal = true) {
+			const failures = new Map<string, string>();
+			for (const trackId of provider.trackIds) {
+				const readiness = scheduler.getTrackReadiness(trackId);
+				if (readiness?.kind === "failure")
+					failures.set(trackId, readiness.reason);
+			}
+			return graph.readMeterSnapshot(
 				sampleSignal && scheduler.isPlaying(),
-				controller.getFailures(),
-			),
+				failures,
+				controller.isTrackRetrying,
+			);
+		},
 		setOutputGain(gain) {
 			if (destroyed) return;
 			graph.setOutputGain(gain, gainChangeMode());

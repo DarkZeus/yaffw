@@ -40,6 +40,28 @@ afterEach(() => {
 });
 
 describe("useNativePreviewTransport", () => {
+	it("resumes the paused audio window even when the native video follower drifted", async () => {
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		const { container } = render(
+			<NativePreviewTransportProbe previewAudioEngine={engine} />,
+		);
+		const toggle = screen.getByText("Toggle playback");
+		fireEvent.click(toggle);
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		engine.setCurrentTimeSeconds(1.2);
+		fireEvent.click(toggle);
+		const video = container.querySelector("video");
+		if (!video) throw new Error("Expected the Preview follower.");
+		video.currentTime = 1.17;
+		engine.setTime.mockClear();
+		fireEvent.click(toggle);
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		expect(engine.getCurrentTime()).toBe(1.2);
+		expect(engine.setTime).not.toHaveBeenCalled();
+	});
+
 	it("ignores keyboard Play when the audio context is closed", async () => {
 		const engine = createPreviewAudioEngineSpy();
 		render(<NativePreviewTransportProbe previewAudioEngine={engine} />);

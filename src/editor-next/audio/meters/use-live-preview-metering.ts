@@ -93,7 +93,10 @@ export function useLivePreviewMetering({
 			const sampleSignal = ready && source.getIsPlaying();
 			const nowMs = readNow();
 			// Paused reads only refresh readiness, channel layout, and failure details.
-			const snapshot = ready ? source.readMeterSnapshot(sampleSignal) : null;
+			const snapshot =
+				ready || status === "failed"
+					? source.readMeterSnapshot(sampleSignal)
+					: null;
 			if (owner !== generation) return;
 
 			target = createPreviewMeterTarget({
