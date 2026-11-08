@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WaveformSurface } from "../waveform/selection-waveform-surface";
 
@@ -136,9 +136,68 @@ afterEach(() => {
 });
 
 describe("createWavesurferPeaksFromSamples", () => {
+	const surfaceProps = {
+		durationUs: 12_000_000,
+		label: "Voice",
+		minimumSelectionDurationUs: 33_333,
+		onPlayheadSeekRequested: vi.fn(),
+		onSelectionCommitRequested: vi.fn(),
+		onSelectionPreviewRequested: vi.fn(),
+		samples: [0.2, 0.7, 0.4],
+		selection: { startUs: 2_000_000, endUs: 6_000_000 },
+		selectionEditingDisabled: false,
+		selectionEditInProgress: false,
+	};
+
+	it("waits for the committed selection when a drag begins before the renderer is ready", async () => {
+		const onSelectionRegionAvailabilityChange = vi.fn();
+		const props = { ...surfaceProps, onSelectionRegionAvailabilityChange };
+		const { rerender } = render(<WaveformSurface {...props} />);
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+
+		rerender(
+			<WaveformSurface
+				{...props}
+				selection={{ startUs: 3_000_000, endUs: 6_000_000 }}
+				selectionEditInProgress
+			/>,
+		);
+		act(() => mockState.wavesurfers[0]?.emit("redrawcomplete"));
+		expect(mockState.regionsPlugins[0]?.regions).toHaveLength(0);
+		expect(onSelectionRegionAvailabilityChange).not.toHaveBeenCalled();
+
+		rerender(
+			<WaveformSurface
+				{...props}
+				selection={{ startUs: 4_000_000, endUs: 6_000_000 }}
+			/>,
+		);
+		expect(mockState.regionsPlugins[0]?.regions).toMatchObject([
+			{ start: 4, end: 6 },
+		]);
+		expect(onSelectionRegionAvailabilityChange).toHaveBeenCalledExactlyOnceWith(
+			true,
+		);
+	});
+
+	it("keeps the canvas fallback after a renderer initialization error", async () => {
+		render(<WaveformSurface {...surfaceProps} />);
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+		const renderer = mockState.wavesurfers[0];
+		act(() => renderer?.emit("error", new Error("Initialization failed")));
+		act(() => renderer?.emit("redrawcomplete"));
+
+		const surface = screen.getByLabelText("Voice waveform detail");
+		expect(surface.getAttribute("data-renderer")).toBe("fallback");
+		expect(surface.querySelector("canvas")).not.toBeNull();
+		expect(renderer?.destroyed).toBe(true);
+		expect(mockState.regionsPlugins[0]?.regions).toHaveLength(0);
+	});
+
 	it("creates one editable Regions selection and emits live preview plus commit changes", async () => {
 		const onPlayheadSeekRequested = vi.fn();
 		const onSelectionCommitRequested = vi.fn();
+		const onSelectionEditActivityChange = vi.fn();
 		const onSelectionPreviewRequested = vi.fn();
 
 		render(
@@ -148,6 +207,7 @@ describe("createWavesurferPeaksFromSamples", () => {
 				minimumSelectionDurationUs={33_333}
 				onPlayheadSeekRequested={onPlayheadSeekRequested}
 				onSelectionCommitRequested={onSelectionCommitRequested}
+				onSelectionEditActivityChange={onSelectionEditActivityChange}
 				onSelectionPreviewRequested={onSelectionPreviewRequested}
 				samples={[0.2, 0.7, 0.4]}
 				selection={{
@@ -200,6 +260,7 @@ describe("createWavesurferPeaksFromSamples", () => {
 		act(() => {
 			regionsPlugin.emit("region-updated", region, "start");
 		});
+		expect(onSelectionEditActivityChange.mock.calls).toEqual([[true], [false]]);
 
 		expect(onSelectionCommitRequested).toHaveBeenLastCalledWith({
 			initialSelection: {
@@ -224,13 +285,16 @@ describe("createWavesurferPeaksFromSamples", () => {
 		const cancelAnimationFrame = vi.fn();
 		vi.stubGlobal("requestAnimationFrame", () => 41);
 		vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
+		const onSelectionEditActivityChange = vi.fn();
 		const onSelectionPreviewRequested = vi.fn();
+		const samples = [0.2, 0.7, 0.4];
 		const props = {
 			durationUs: 12_000_000,
 			label: "Voice",
 			minimumSelectionDurationUs: 33_333,
 			onPlayheadSeekRequested: vi.fn(),
 			onSelectionCommitRequested: vi.fn(),
+			onSelectionEditActivityChange,
 			onSelectionPreviewRequested,
 			selection: {
 				endUs: 6_000_000,
@@ -240,7 +304,7 @@ describe("createWavesurferPeaksFromSamples", () => {
 			selectionEditInProgress: false,
 		};
 		const { container, rerender } = render(
-			<WaveformSurface {...props} samples={[0.2, 0.7, 0.4]} />,
+			<WaveformSurface {...props} samples={samples} />,
 		);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
@@ -264,11 +328,17 @@ describe("createWavesurferPeaksFromSamples", () => {
 			regionsPlugin.emit("region-update", region, "end");
 		});
 		expect(onSelectionPreviewRequested).not.toHaveBeenCalled();
+		expect(onSelectionEditActivityChange).toHaveBeenCalledExactlyOnceWith(true);
+		rerender(
+			<WaveformSurface {...props} samples={samples} selectionEditInProgress />,
+		);
+		expect(region.end).toBe(7);
 
 		rerender(<WaveformSurface {...props} samples={[0.4, 0.9, 0.1]} />);
 
 		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(2));
 		expect(cancelAnimationFrame).toHaveBeenCalledWith(41);
+		expect(onSelectionEditActivityChange.mock.calls).toEqual([[true], [false]]);
 		expect(mockState.wavesurfers[0]?.destroyed).toBe(true);
 		expect(mockState.wavesurfers[0]?.listenerCount("click")).toBe(0);
 		expect(mockState.regionsPlugins[0]?.listenerCount("region-update")).toBe(0);

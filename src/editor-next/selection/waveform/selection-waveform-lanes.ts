@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
-import type { ReadyMediaAsset } from "@/editor-core/model";
-import { errorMessage } from "@/lib/error-message";
 import { runWorkerJob } from "../../media-work/workers/worker-job";
 import type {
-	WaveformLaneLoader,
 	WaveformLaneRequest,
 	WaveformLaneResult,
-	WaveformLaneState,
 	WaveformWorkerRequest,
 } from "../types/selection-waveform-lanes.types";
 import {
@@ -28,81 +23,6 @@ let waveformLaneResultCache = new WeakMap<
 	Blob,
 	Map<string, WaveformLaneResult>
 >();
-
-export function useWaveformLaneStates({
-	asset,
-	source,
-	waveformLaneLoader,
-}: {
-	asset: ReadyMediaAsset;
-	source: Blob;
-	waveformLaneLoader: WaveformLaneLoader;
-}) {
-	const [laneStates, setLaneStates] = useState<
-		Record<string, WaveformLaneState>
-	>({});
-
-	useEffect(() => {
-		let cancelled = false;
-		const abortController = new AbortController();
-
-		setLaneStates(
-			Object.fromEntries(
-				asset.tracks.audio.map((track) => [
-					track.id,
-					{
-						status: "loading",
-						track,
-					} satisfies WaveformLaneState,
-				]),
-			),
-		);
-
-		asset.tracks.audio.forEach((track, trackIndex) => {
-			void waveformLaneLoader({
-				assetDurationUs: asset.durationUs,
-				signal: abortController.signal,
-				source,
-				track,
-				trackIndex,
-			})
-				.then((result) => {
-					if (cancelled) {
-						return;
-					}
-
-					setLaneStates((currentStates) => ({
-						...currentStates,
-						[track.id]: {
-							...result,
-							track,
-						},
-					}));
-				})
-				.catch((error: unknown) => {
-					if (cancelled) {
-						return;
-					}
-
-					setLaneStates((currentStates) => ({
-						...currentStates,
-						[track.id]: {
-							reason: errorMessage(error),
-							status: "unavailable",
-							track,
-						},
-					}));
-				});
-		});
-
-		return () => {
-			cancelled = true;
-			abortController.abort();
-		};
-	}, [asset.durationUs, asset.tracks.audio, source, waveformLaneLoader]);
-
-	return laneStates;
-}
 
 export async function loadBrowserWaveformLane({
 	assetDurationUs,
@@ -151,7 +71,9 @@ export async function loadBrowserWaveformLane({
 		});
 	}
 
-	if (result.status === "ready" && !signal?.aborted) {
+	if (signal?.aborted) throw createWaveformAbortError();
+
+	if (result.status === "ready") {
 		writeCachedWaveformLaneResult(
 			{
 				assetDurationUs,

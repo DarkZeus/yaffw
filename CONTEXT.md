@@ -497,6 +497,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Waveform lane** extraction failure does not block readiness or export; unavailable lanes should be shown as unavailable selection context without a selection affordance.
 - **Waveform lanes** use the shared audio packet timeline and decoded timestamp projection to preserve leading offsets and real packet gaps, matching Preview and Generated audio mix timing. Worker extraction scans compressed-audio packet metadata incrementally and prunes consumed ranges; only the compact 8,192 buckets and per-sample PCM are retained. PCM, μ-law, and A-law retain decoded media timestamps because their packet durations may be unknown or variable.
 - Supported Chromium should decode **Waveform lane** samples and calculate the compact waveform buckets in a dedicated worker. A domain-level unavailable result from a functioning worker is final; current-thread generation is only a runtime fallback when worker infrastructure is absent or cannot start.
+- Each **Waveform lane** settles independently, and closing the active **Media asset** retires its lane loading and rendering work.
 - The first slice shows all available **Waveform lanes** and uses vertical scrolling if the lanes exceed the available viewport.
 - All **Waveform lanes** align to the same **Media time** ruler and share one **Selection** and **Playhead** overlay.
 - When the waveform adapter can preserve existing behavior, the **Waveform**, mirrored **Selection** affordances, **Playhead** cursor, time ruler, and **Timeline zoom**/scroll should be rendered by the same media-time surface rather than split across independent overlays.
@@ -507,6 +508,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - During active selection dragging, all ready-lane selection affordances should mirror the draft range as local draft UI on `requestAnimationFrame`, while the session-owned **Selection** is committed only after the drag completes.
 - A loading or failed **Waveform lane** does not show a mirrored selection affordance; when a lane finishes loading, its selection affordance is synchronized to the current shared **Selection**.
 - If a **Waveform lane** finishes loading while another lane is actively editing a draft selection, the newly loaded lane waits for the committed **Selection** before showing its mirrored selection affordance.
+- Ready samples can be displayed with the canvas waveform while WaveSurfer initializes or after it fails. The timeline retains its shared **Selection** controls until a lane has an interactive Selection region.
 - Clicking a **Waveform lane** seeks the shared **Playhead** to that media time.
 - Dragging empty **Waveform lane** space does not create or replace **Selection**; selection changes use the existing selection affordance edges/body or keyboard commands.
 - The first slice includes minimal **Timeline zoom** with horizontal scrolling while keeping waveform lanes, selection, and playhead aligned.

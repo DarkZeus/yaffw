@@ -3,6 +3,7 @@ import {
 	type MouseEvent as ReactMouseEvent,
 	type PointerEvent as ReactPointerEvent,
 	memo,
+	useCallback,
 } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type { WaveformLaneState } from "../types/selection-waveform-lanes.types";
 import type { WaveformRegionSelectionChange } from "../types/selection-waveform-surface.types";
 import {
@@ -30,6 +32,7 @@ export type WaveformLanePointerEvent =
 	| ReactPointerEvent<HTMLButtonElement>;
 
 export type WaveformLaneProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioDecision?: AudioMixTrackDecision;
 	audioPreviewPreparing: boolean;
 	durationUs: MediaTimeUs;
@@ -40,7 +43,12 @@ export type WaveformLaneProps = {
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onPointerDown: (event: WaveformLanePointerEvent) => void;
 	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionEditActivityChange: (editing: boolean) => void;
 	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionRegionAvailabilityChange: (
+		trackId: string,
+		available: boolean,
+	) => void;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
 	selectionEditInProgress: boolean;
@@ -48,6 +56,7 @@ export type WaveformLaneProps = {
 };
 
 export const WaveformLane = memo(function WaveformLane({
+	activeMediaAssetCleanupScope,
 	audioDecision,
 	audioPreviewPreparing,
 	durationUs,
@@ -58,7 +67,9 @@ export const WaveformLane = memo(function WaveformLane({
 	onPlayheadSeekRequested,
 	onPointerDown,
 	onSelectionCommitRequested,
+	onSelectionEditActivityChange,
 	onSelectionPreviewRequested,
+	onSelectionRegionAvailabilityChange,
 	selection,
 	selectionEditingDisabled,
 	selectionEditInProgress,
@@ -74,6 +85,11 @@ export const WaveformLane = memo(function WaveformLane({
 	const metadataLabel = identity.metadata.join(" / ");
 	const audioIncluded = audioDecision?.include ?? true;
 	const soloActive = soloedAudioTrackId === lane.track.id;
+	const publishSelectionRegionAvailability = useCallback(
+		(available: boolean) =>
+			onSelectionRegionAvailabilityChange(lane.track.id, available),
+		[lane.track.id, onSelectionRegionAvailabilityChange],
+	);
 
 	return (
 		<div
@@ -162,51 +178,44 @@ export const WaveformLane = memo(function WaveformLane({
 					) : null}
 				</div>
 			</div>
-			{lane.status === "ready" ? (
-				<button
-					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-full min-h-14 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
-					type="button"
-				>
-					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
+			<button
+				aria-label={`Seek ${identity.title} waveform lane`}
+				className="relative block h-full min-h-14 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
+				onMouseDown={(event) => {
+					if (typeof window.PointerEvent === "undefined") {
+						onPointerDown(event);
+					}
+				}}
+				onPointerDown={onPointerDown}
+				type="button"
+			>
+				<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
+				{lane.status === "ready" ? (
 					<WaveformSurface
+						activeMediaAssetCleanupScope={activeMediaAssetCleanupScope}
 						durationUs={durationUs}
 						label={identity.title}
 						minimumSelectionDurationUs={minimumSelectionDurationUs}
 						onPlayheadSeekRequested={onPlayheadSeekRequested}
 						onSelectionCommitRequested={onSelectionCommitRequested}
+						onSelectionEditActivityChange={onSelectionEditActivityChange}
 						onSelectionPreviewRequested={onSelectionPreviewRequested}
+						onSelectionRegionAvailabilityChange={
+							publishSelectionRegionAvailability
+						}
 						samples={lane.samples}
 						selection={selection}
 						selectionEditingDisabled={selectionEditingDisabled}
 						selectionEditInProgress={selectionEditInProgress}
 					/>
-				</button>
-			) : (
-				<button
-					aria-label={`Seek ${identity.title} waveform lane`}
-					className="relative block h-full min-h-14 min-w-0 cursor-crosshair overflow-hidden border-0 bg-workbench-lane-alt text-left"
-					onMouseDown={(event) => {
-						if (typeof window.PointerEvent === "undefined") {
-							onPointerDown(event);
-						}
-					}}
-					onPointerDown={onPointerDown}
-					type="button"
-				>
-					<div className="absolute inset-x-0 top-1/2 h-px bg-workbench-border" />
-					{lane.status === "loading" ? (
-						<div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">
-							Loading waveform
-						</div>
-					) : null}
-					{lane.status === "unavailable" ? (
-						<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
-							Waveform generation failed
-						</div>
-					) : null}
-				</button>
-			)}
+				) : (
+					<div className="absolute inset-0 grid place-items-center px-4 text-xs text-muted-foreground">
+						{lane.status === "loading"
+							? "Loading waveform"
+							: "Waveform generation failed"}
+					</div>
+				)}
+			</button>
 		</div>
 	);
 });

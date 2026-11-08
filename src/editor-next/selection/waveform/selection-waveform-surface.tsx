@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type RegionsPlugin from "wavesurfer.js/dist/plugins/regions.js";
 import type { Region, UpdateSide } from "wavesurfer.js/dist/plugins/regions.js";
@@ -8,6 +8,7 @@ import {
 	requestBrowserFrame,
 } from "@/lib/browser-animation-frame";
 import { clamp } from "@/lib/clamp";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
 import {
 	mediaTimeToPercent,
@@ -27,12 +28,15 @@ const SELECTION_REGION_COLOR = "oklch(0.728857 0.092883 191.748299 / 0.22)";
 const SELECTION_REGION_ID = "editor-selection-region";
 
 export type WaveformSurfaceProps = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	durationUs: MediaTimeUs;
 	label: string;
 	minimumSelectionDurationUs: MediaTimeUs;
 	onPlayheadSeekRequested: (playheadUs: MediaTimeUs) => void;
 	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionEditActivityChange?: (editing: boolean) => void;
 	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionRegionAvailabilityChange?: (available: boolean) => void;
 	samples: WaveformSamples;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
@@ -42,12 +46,15 @@ export type WaveformSurfaceProps = {
 export type WaveformRendererStatus = "fallback" | "loading" | "wavesurfer";
 
 export function WaveformSurface({
+	activeMediaAssetCleanupScope,
 	durationUs,
 	label,
 	minimumSelectionDurationUs,
 	onPlayheadSeekRequested,
 	onSelectionCommitRequested,
+	onSelectionEditActivityChange,
 	onSelectionPreviewRequested,
+	onSelectionRegionAvailabilityChange,
 	samples,
 	selection,
 	selectionEditingDisabled,
@@ -60,6 +67,7 @@ export function WaveformSurface({
 		[samples],
 	);
 	const rendererStatus = useWavesurferWaveform({
+		activeMediaAssetCleanupScope,
 		containerRef,
 		durationSeconds,
 		minimumSelectionDurationSeconds: mediaTimeUsToSeconds(
@@ -67,7 +75,9 @@ export function WaveformSurface({
 		),
 		onPlayheadSeekRequested,
 		onSelectionCommitRequested,
+		onSelectionEditActivityChange,
 		onSelectionPreviewRequested,
+		onSelectionRegionAvailabilityChange,
 		peaks,
 		selection,
 		selectionEditingDisabled,
@@ -88,8 +98,12 @@ export function WaveformSurface({
 			<div
 				aria-hidden="true"
 				className={`absolute inset-0 ${
-					rendererStatus === "wavesurfer" ? "opacity-100" : "opacity-0"
+					rendererStatus === "wavesurfer"
+						? "opacity-100"
+						: "pointer-events-none opacity-0"
 				}`}
+				onMouseDown={(event) => event.stopPropagation()}
+				onPointerDown={(event) => event.stopPropagation()}
 				ref={containerRef}
 			/>
 			{rendererStatus !== "wavesurfer" ? (
@@ -100,23 +114,29 @@ export function WaveformSurface({
 }
 
 function useWavesurferWaveform({
+	activeMediaAssetCleanupScope,
 	containerRef,
 	durationSeconds,
 	minimumSelectionDurationSeconds,
 	onPlayheadSeekRequested,
 	onSelectionCommitRequested,
+	onSelectionEditActivityChange,
 	onSelectionPreviewRequested,
+	onSelectionRegionAvailabilityChange,
 	peaks,
 	selection,
 	selectionEditingDisabled,
 	selectionEditInProgress,
 }: {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	containerRef: RefObject<HTMLDivElement | null>;
 	durationSeconds: number;
 	minimumSelectionDurationSeconds: number;
 	onPlayheadSeekRequested: (playheadUs: number) => void;
 	onSelectionCommitRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionEditActivityChange?: (editing: boolean) => void;
 	onSelectionPreviewRequested: (change: WaveformRegionSelectionChange) => void;
+	onSelectionRegionAvailabilityChange?: (available: boolean) => void;
 	peaks: Float32Array;
 	selection: Selection;
 	selectionEditingDisabled: boolean;
@@ -124,7 +144,10 @@ function useWavesurferWaveform({
 }): WaveformRendererStatus {
 	const [rendererStatus, setRendererStatus] =
 		useState<WaveformRendererStatus>("loading");
-	const regionsRef = useRef<RegionsPlugin | null>(null);
+	const rendererRef = useRef<{
+		regions: RegionsPlugin;
+		fail: () => void;
+	} | null>(null);
 	const selectionRegionRef = useRef<Region | null>(null);
 	const selectionRef = useRef(selection);
 	const regionUpdateInitialSelectionRef = useRef<Selection | null>(null);
@@ -140,21 +163,11 @@ function useWavesurferWaveform({
 	const onSelectionPreviewRequestedRef = useLatestValueRef(
 		onSelectionPreviewRequested,
 	);
-	const [regionSuppressed, setRegionSuppressed] = useState(
-		selectionEditInProgress,
-	);
-
-	useEffect(() => {
+	useLayoutEffect(() => {
 		selectionRef.current = selection;
 	}, [selection]);
 
-	useEffect(() => {
-		if (!selectionEditInProgress) {
-			setRegionSuppressed(false);
-		}
-	}, [selectionEditInProgress]);
-
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const container = containerRef.current;
 		const lifecycle = createSynchronousMediaWorkScope();
 		let regionPreviewFrameCleanup: { dispose: () => void } | null = null;
@@ -170,9 +183,32 @@ function useWavesurferWaveform({
 		lifecycle.registerCleanup(() => {
 			clearScheduledRegionPreviewFrame();
 			pendingRegionChangeRef.current = null;
+			const hadSelectionEdit = regionUpdateInitialSelectionRef.current !== null;
+			regionUpdateInitialSelectionRef.current = null;
+			const hadSelectionRegion = selectionRegionRef.current !== null;
 			selectionRegionRef.current = null;
-			regionsRef.current = null;
+			rendererRef.current = null;
+			if (hadSelectionEdit) onSelectionEditActivityChange?.(false);
+			if (hadSelectionRegion) onSelectionRegionAvailabilityChange?.(false);
 		});
+		const registration = activeMediaAssetCleanupScope?.registerCleanup(() =>
+			lifecycle.dispose(),
+		);
+		if (lifecycle.isDisposed()) return;
+
+		function disposeRenderer() {
+			if (registration) registration.dispose();
+			else lifecycle.dispose();
+		}
+
+		function failRenderer() {
+			if (lifecycle.isDisposed()) return;
+			try {
+				disposeRenderer();
+			} finally {
+				setRendererStatus("fallback");
+			}
+		}
 
 		void Promise.all([
 			import("wavesurfer.js"),
@@ -185,12 +221,6 @@ function useWavesurferWaveform({
 
 				const style = getComputedStyle(container);
 				const regions = RegionsFactory.create();
-				regionsRef.current = regions;
-				lifecycle.registerCleanup(() => {
-					if (regionsRef.current === regions) {
-						regionsRef.current = null;
-					}
-				});
 
 				const wavesurfer = WaveSurferFactory.create({
 					barGap: 0,
@@ -219,13 +249,8 @@ function useWavesurferWaveform({
 					),
 				});
 				lifecycle.registerCleanup(() => wavesurfer.destroy());
-				lifecycle.registerCleanup(
-					wavesurfer.on("error", () => {
-						if (!lifecycle.isDisposed()) {
-							setRendererStatus("fallback");
-						}
-					}),
-				);
+				rendererRef.current = { regions, fail: failRenderer };
+				lifecycle.registerCleanup(wavesurfer.on("error", failRenderer));
 				lifecycle.registerCleanup(
 					wavesurfer.on("redrawcomplete", () => {
 						if (!lifecycle.isDisposed()) {
@@ -264,7 +289,9 @@ function useWavesurferWaveform({
 							region,
 							side,
 						});
+						const startsEdit = regionUpdateInitialSelectionRef.current === null;
 						regionUpdateInitialSelectionRef.current = change.initialSelection;
+						if (startsEdit) onSelectionEditActivityChange?.(true);
 						scheduleRegionPreview(change);
 					}),
 				);
@@ -285,18 +312,13 @@ function useWavesurferWaveform({
 							side,
 						});
 						flushRegionPreview(change);
-						callLatestCallback(onSelectionCommitRequestedRef, change);
 						regionUpdateInitialSelectionRef.current = null;
+						onSelectionEditActivityChange?.(false);
+						callLatestCallback(onSelectionCommitRequestedRef, change);
 					}),
 				);
 			})
-			.catch(() => {
-				if (!lifecycle.isDisposed()) {
-					regionsRef.current = null;
-					selectionRegionRef.current = null;
-					setRendererStatus("fallback");
-				}
-			});
+			.catch(failRenderer);
 
 		function scheduleRegionPreview(change: WaveformRegionSelectionChange) {
 			pendingRegionChangeRef.current = change;
@@ -349,54 +371,76 @@ function useWavesurferWaveform({
 			}
 		}
 
-		return () => {
-			lifecycle.dispose();
-		};
+		return disposeRenderer;
 	}, [
+		activeMediaAssetCleanupScope,
 		containerRef,
 		durationSeconds,
 		onPlayheadSeekRequestedRef,
 		onSelectionCommitRequestedRef,
+		onSelectionEditActivityChange,
 		onSelectionPreviewRequestedRef,
+		onSelectionRegionAvailabilityChange,
 		peaks,
 	]);
 
-	useEffect(() => {
-		const regions = regionsRef.current;
-
-		if (!regions || rendererStatus !== "wavesurfer" || regionSuppressed) {
-			return;
-		}
-
-		const nextRegionOptions = createSelectionRegionOptions({
+	const regionOptions = useMemo(
+		() =>
+			createSelectionRegionOptions({
+				durationSeconds,
+				minimumSelectionDurationSeconds,
+				selection,
+				selectionEditingDisabled,
+			}),
+		[
 			durationSeconds,
 			minimumSelectionDurationSeconds,
 			selection,
 			selectionEditingDisabled,
-		});
-		const existingRegion = selectionRegionRef.current;
+		],
+	);
+
+	useLayoutEffect(() => {
+		const renderer = rendererRef.current;
+		const region = selectionRegionRef.current;
+		if (!renderer || !region) return;
 
 		syncingRegionRef.current = true;
 		try {
-			if (existingRegion) {
-				existingRegion.setOptions(nextRegionOptions);
-			} else {
-				selectionRegionRef.current = regions.addRegion({
-					...nextRegionOptions,
-					id: SELECTION_REGION_ID,
-					color: SELECTION_REGION_COLOR,
-				});
-			}
+			region.setOptions(regionOptions);
+		} catch {
+			renderer.fail();
 		} finally {
 			syncingRegionRef.current = false;
 		}
+	}, [regionOptions]);
+
+	useLayoutEffect(() => {
+		const renderer = rendererRef.current;
+		if (
+			!renderer ||
+			rendererStatus !== "wavesurfer" ||
+			selectionRegionRef.current ||
+			selectionEditInProgress
+		) {
+			return;
+		}
+
+		try {
+			selectionRegionRef.current = renderer.regions.addRegion({
+				...regionOptions,
+				id: SELECTION_REGION_ID,
+				color: SELECTION_REGION_COLOR,
+			});
+			onSelectionRegionAvailabilityChange?.(true);
+		} catch {
+			renderer.fail();
+		}
 	}, [
-		durationSeconds,
-		minimumSelectionDurationSeconds,
-		regionSuppressed,
+		onSelectionRegionAvailabilityChange,
+		regionOptions,
 		rendererStatus,
-		selection,
-		selectionEditingDisabled,
+		selectionEditInProgress,
 	]);
 
 	return rendererStatus;

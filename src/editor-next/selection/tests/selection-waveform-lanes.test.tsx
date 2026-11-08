@@ -183,6 +183,10 @@ vi.mock("../waveform/selection-waveform-lanes.worker?worker", () => {
 });
 
 import type { ReadyMediaAsset } from "@/editor-core/model";
+import {
+	type ActiveMediaAssetCleanupScope,
+	createActiveMediaAssetCleanupScopeController,
+} from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import type {
 	WaveformLaneLoader,
 	WaveformLaneResult,
@@ -192,8 +196,8 @@ import {
 	addAudioSampleToBuckets,
 	clearWaveformLaneCache,
 	loadBrowserWaveformLane,
-	useWaveformLaneStates,
 } from "../waveform/selection-waveform-lanes";
+import { useWaveformLaneStates } from "../waveform/use-waveform-lane-states";
 
 beforeEach(() => {
 	clearWaveformLaneCache();
@@ -224,6 +228,37 @@ afterEach(() => {
 });
 
 describe("useWaveformLaneStates", () => {
+	it("settles lanes independently and aborts pending publication when the asset closes", async () => {
+		const scopeController = createActiveMediaAssetCleanupScopeController();
+		const scope = scopeController.replaceCurrentScope(readyAsset.id);
+		const voice = createDeferred<WaveformLaneResult>();
+		const desktop = createDeferred<WaveformLaneResult>();
+		const loader = vi.fn<WaveformLaneLoader>(({ trackIndex }) =>
+			trackIndex === 0 ? voice.promise : desktop.promise,
+		);
+		render(
+			<WaveformLaneStateProbe
+				activeMediaAssetCleanupScope={scope}
+				waveformLaneLoader={loader}
+			/>,
+		);
+
+		await act(async () => {
+			voice.resolve({ status: "ready", samples: [1] });
+		});
+		expect(readLaneStates()).toMatchObject({
+			"audio-voice": { status: "ready", samples: [1] },
+			"audio-desktop": { status: "loading" },
+		});
+
+		scopeController.disposeCurrentScope();
+		expect(loader.mock.calls[1][0].signal?.aborted).toBe(true);
+		await act(async () => {
+			desktop.resolve({ status: "unavailable", reason: "obsolete" });
+		});
+		expect(readLaneStates()["audio-desktop"].status).toBe("loading");
+	});
+
 	it("ignores obsolete lane completion after asset replacement", async () => {
 		const stale = createDeferred<WaveformLaneResult>();
 		const current = createDeferred<WaveformLaneResult>();
@@ -307,22 +342,28 @@ describe("loadBrowserWaveformLane", () => {
 
 	it("closes a sample delivered after cancellation and returns its iterator", async () => {
 		const controller = new AbortController();
+		const reachedRead = createDeferred<void>();
+		const continueRead = createDeferred<void>();
 		const track = createMockAudioTrack();
 		const sample = createAudioSampleLike([[1]], 100);
 		mediabunnyMock.audioTracks = [track];
 		mediabunnyMock.samplesByTrack.set(track, [sample]);
-		mediabunnyMock.sampleReadHook = async () => {
-			controller.abort();
+		mediabunnyMock.sampleReadHook = () => {
+			reachedRead.resolve();
+			return continueRead.promise;
 		};
-		await expect(
-			loadBrowserWaveformLane({
-				assetDurationUs: readyAsset.durationUs,
-				signal: controller.signal,
-				source,
-				track: readyAsset.tracks.audio[0],
-				trackIndex: 0,
-			}),
-		).rejects.toMatchObject({ name: "AbortError" });
+		const result = loadBrowserWaveformLane({
+			assetDurationUs: readyAsset.durationUs,
+			signal: controller.signal,
+			source,
+			track: readyAsset.tracks.audio[0],
+			trackIndex: 0,
+		});
+		await reachedRead.promise;
+		controller.abort();
+		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
+		continueRead.resolve();
+		await expect(result).rejects.toMatchObject({ name: "AbortError" });
 		expect(sample.close).toHaveBeenCalledTimes(1);
 		expect(mediabunnyMock.iterators[0]?.return).toHaveBeenCalledTimes(1);
 		expect(lastMediaInput().dispose).toHaveBeenCalledTimes(1);
@@ -425,13 +466,16 @@ describe("addAudioSampleToBuckets", () => {
 const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
 
 function WaveformLaneStateProbe({
+	activeMediaAssetCleanupScope,
 	waveformLaneLoader,
 	laneSource = source,
 }: {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	waveformLaneLoader: WaveformLaneLoader;
 	laneSource?: Blob;
 }) {
 	const laneStates = useWaveformLaneStates({
+		activeMediaAssetCleanupScope,
 		asset: readyAsset,
 		source: laneSource,
 		waveformLaneLoader,

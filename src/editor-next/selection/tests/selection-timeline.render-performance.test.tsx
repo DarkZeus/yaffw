@@ -160,6 +160,33 @@ describe("SelectionTimeline live playhead render isolation", () => {
 	});
 });
 
+it("keeps the shared Selection controls when the waveform renderer fails", async () => {
+	const { default: WaveSurfer } = await import("wavesurfer.js");
+	vi.spyOn(WaveSurfer, "create").mockImplementation(() => {
+		throw new Error("Waveform renderer failed to initialize");
+	});
+	const view = render(createTimelineElement({ playheadUs: 0 }));
+	await waitFor(() => {
+		expect(
+			screen
+				.getByLabelText("Voice waveform detail")
+				.getAttribute("data-renderer"),
+		).toBe("fallback");
+	});
+	expect(screen.getByLabelText("Selection start handle")).toBeTruthy();
+	expect(screen.getByLabelText("Selection end handle")).toBeTruthy();
+
+	view.rerender(
+		createTimelineElement({
+			playheadUs: 0,
+			currentSelection: { startUs: 3_000_000, endUs: 9_000_000 },
+		}),
+	);
+	const rangeOutline = screen.getByTestId("selection-range-outline");
+	expect(rangeOutline.style.left).toBe("25%");
+	expect(rangeOutline.style.width).toBe("50%");
+});
+
 const source = new File(["video"], "clip.mp4", { type: "video/mp4" });
 const selection = {
 	endUs: 12_000_000,
@@ -175,9 +202,11 @@ const timelineCallbacks = {
 };
 
 function createTimelineElement({
+	currentSelection = selection,
 	playheadUs,
 	readLivePlayheadUs,
 }: {
+	currentSelection?: Selection;
 	playheadUs: number;
 	readLivePlayheadUs?: () => number;
 }) {
@@ -203,7 +232,7 @@ function createTimelineElement({
 				playheadUpdatesAreLive
 				playheadUs={playheadUs}
 				readLivePlayheadUs={readLivePlayheadUs}
-				selection={selection}
+				selection={currentSelection}
 				source={source}
 				videoStripThumbnailLoader={videoStripThumbnailLoader}
 				waveformLaneLoader={waveformLaneLoader}

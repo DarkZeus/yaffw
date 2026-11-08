@@ -38,6 +38,13 @@ export async function loadDecodedWaveformLane({
 			handleUnhandledError: sourceFailure.handleUnhandledError,
 		}),
 	});
+	let disposed = false;
+	function disposeInput() {
+		if (disposed) return;
+		disposed = true;
+		input.dispose();
+	}
+	signal?.addEventListener("abort", disposeInput, { once: true });
 
 	try {
 		return await sourceFailure.run(
@@ -53,7 +60,8 @@ export async function loadDecodedWaveformLane({
 			status: "unavailable",
 		};
 	} finally {
-		input.dispose();
+		signal?.removeEventListener("abort", disposeInput);
+		disposeInput();
 	}
 }
 

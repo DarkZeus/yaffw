@@ -55,10 +55,8 @@ import {
 } from "../video-strip/selection-video-strip";
 import { useVideoStripThumbnails } from "../video-strip/use-video-strip-thumbnails";
 import { WaveformLane } from "../waveform/selection-waveform-lane";
-import {
-	loadBrowserWaveformLane,
-	useWaveformLaneStates,
-} from "../waveform/selection-waveform-lanes";
+import { loadBrowserWaveformLane } from "../waveform/selection-waveform-lanes";
+import { useWaveformLaneStates } from "../waveform/use-waveform-lane-states";
 import type {
 	SelectionTimelineMarkerPlacement,
 	TimelineTrackGeometry,
@@ -157,6 +155,9 @@ export function SelectionTimeline({
 	const [draftSelection, setDraftSelection] = useState<Selection | null>(null);
 	const [playheadFollowEnabled, setPlayheadFollowEnabled] = useState(false);
 	const [regionSelectionEditing, setRegionSelectionEditing] = useState(false);
+	const [lanesWithSelectionRegion, setLanesWithSelectionRegion] = useState(
+		() => new Set<string>(),
+	);
 	const [zoom, setZoom] = useState(1);
 	const timelineViewport = useTimelineViewport({
 		laneHeaderWidthPx: TIMELINE_LANE_HEADER_WIDTH_PX,
@@ -176,6 +177,7 @@ export function SelectionTimeline({
 		[asset.durationUs, asset.frameTiming.frameDurationUs, timelineViewport],
 	);
 	const laneStates = useWaveformLaneStates({
+		activeMediaAssetCleanupScope,
 		asset,
 		source,
 		waveformLaneLoader,
@@ -200,11 +202,24 @@ export function SelectionTimeline({
 		() => createSelectionTimelineMarkers(asset.durationUs, zoom),
 		[asset.durationUs, zoom],
 	);
-	const readyWaveformLaneCount = Object.values(laneStates).filter(
-		(laneState) => laneState.status === "ready",
-	).length;
 	const hasAudioTracks = asset.tracks.audio.length > 0;
-	const selectionIsRegionBacked = readyWaveformLaneCount > 0;
+	const selectionIsRegionBacked = lanesWithSelectionRegion.size > 0;
+	const updateLaneSelectionRegionAvailability = useCallback(
+		(trackId: string, available: boolean) => {
+			setLanesWithSelectionRegion((current) => {
+				if (current.has(trackId) === available) return current;
+				const next = new Set(current);
+				if (available) next.add(trackId);
+				else next.delete(trackId);
+				return next;
+			});
+		},
+		[],
+	);
+	const updateRegionSelectionEditing = useCallback((editing: boolean) => {
+		setRegionSelectionEditing(editing);
+		if (!editing) setDraftSelection(null);
+	}, []);
 	const minimumDurationUs = minimumSelectionDurationUs(selectionContext);
 	const normalizeRegionSelectionChange = useCallback(
 		(change: WaveformRegionSelectionChange): Selection => {
@@ -236,7 +251,6 @@ export function SelectionTimeline({
 		(change: WaveformRegionSelectionChange) => {
 			const nextSelection = normalizeRegionSelectionChange(change);
 
-			setRegionSelectionEditing(true);
 			setDraftSelection(nextSelection);
 
 			if (change.side === "start") {
@@ -252,9 +266,6 @@ export function SelectionTimeline({
 	const commitRegionSelectionChange = useCallback(
 		(change: WaveformRegionSelectionChange) => {
 			const nextSelection = normalizeRegionSelectionChange(change);
-
-			setDraftSelection(null);
-			setRegionSelectionEditing(false);
 
 			if (change.side === "start") {
 				onPlayheadSeekRequested(nextSelection.startUs);
@@ -805,22 +816,29 @@ export function SelectionTimeline({
 								<div className="relative" data-testid="selection-audio-lanes">
 									{asset.tracks.audio.map((track, trackIndex) => (
 										<WaveformLane
+											activeMediaAssetCleanupScope={
+												activeMediaAssetCleanupScope
+											}
 											audioDecision={audioMix.tracks[track.id]}
 											audioPreviewPreparing={audioPreviewPreparingTrackIds.has(
 												track.id,
 											)}
 											durationUs={asset.durationUs}
 											key={track.id}
-											lane={
-												laneStates[track.id] ?? { status: "loading", track }
-											}
+											lane={laneStates[track.id]}
 											laneHeaderWidthPx={TIMELINE_LANE_HEADER_WIDTH_PX}
 											minimumSelectionDurationUs={minimumDurationUs}
 											onAudioTrackIncludedChange={onAudioTrackIncludedChange}
 											onPlayheadSeekRequested={onPlayheadSeekRequested}
 											onPointerDown={seekFromLanePointer}
 											onSelectionCommitRequested={commitRegionSelectionChange}
+											onSelectionEditActivityChange={
+												updateRegionSelectionEditing
+											}
 											onSelectionPreviewRequested={previewRegionSelectionChange}
+											onSelectionRegionAvailabilityChange={
+												updateLaneSelectionRegionAvailability
+											}
 											selection={visibleSelection}
 											selectionEditingDisabled={selectionEditingDisabled}
 											selectionEditInProgress={selectionEditInProgress}

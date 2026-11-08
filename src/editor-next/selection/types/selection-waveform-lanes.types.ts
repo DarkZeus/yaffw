@@ -26,19 +26,7 @@ export type WaveformLaneResult =
 
 export type WaveformLaneState = {
 	track: AudioMediaTrack;
-} & (
-	| {
-			status: "loading";
-	  }
-	| {
-			samples: WaveformSamples;
-			status: "ready";
-	  }
-	| {
-			reason: string;
-			status: "unavailable";
-	  }
-);
+} & ({ status: "loading" } | WaveformLaneResult);
 
 export type WaveformWorkerRequest = Omit<
 	WaveformLaneRequest,
