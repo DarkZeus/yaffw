@@ -15,7 +15,10 @@ import {
 } from "../../audio/engine/preview-audio-resources";
 /* @vitest-environment jsdom */
 import { createPreviewAudioProviderStub } from "../../audio/tests/preview-audio-test-fixtures";
-import type { PreviewAudioEngineMeterSnapshot } from "../../audio/types/preview-audio-engine.types";
+import type {
+	PreviewAudioEngine,
+	PreviewAudioEngineMeterSnapshot,
+} from "../../audio/types/preview-audio-engine.types";
 import type { PreviewAudioResource } from "../../audio/types/preview-audio-resources.types";
 import { loadBrowserWaveformLane } from "../../selection/waveform/selection-waveform-lanes";
 import { EditorNextRouteTestHarness } from "./editor-next-route-test-harness";
@@ -25,7 +28,9 @@ const adapterMockState = vi.hoisted(() => ({
 	previewAudioEngines: [] as Array<{
 		destroy: ReturnType<typeof vi.fn>;
 		getCurrentTime: ReturnType<typeof vi.fn>;
+		getPlaybackState: ReturnType<typeof vi.fn>;
 		getPresentationTime: ReturnType<typeof vi.fn>;
+		getStatus: ReturnType<typeof vi.fn>;
 		pause: ReturnType<typeof vi.fn>;
 		play: ReturnType<typeof vi.fn>;
 		readMeterSnapshot: ReturnType<typeof vi.fn>;
@@ -33,8 +38,8 @@ const adapterMockState = vi.hoisted(() => ({
 		setPlaybackRate: ReturnType<typeof vi.fn>;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackChannelMode: ReturnType<typeof vi.fn>;
-		setTrackMonitorGain: ReturnType<typeof vi.fn>;
-		setTrackVolumeGain: ReturnType<typeof vi.fn>;
+		setTrackGain: ReturnType<typeof vi.fn>;
+		subscribe: ReturnType<typeof vi.fn>;
 	}>,
 	wavesurferCreate: vi.fn(),
 	wavesurfers: [] as Array<{
@@ -135,17 +140,22 @@ beforeEach(() => {
 		const previewAudioEngine = {
 			destroy: vi.fn(),
 			getCurrentTime: vi.fn(() => 0),
+			getMetrics: vi.fn(),
+			getPlaybackState: vi.fn(() => "paused" as const),
 			getPresentationTime: vi.fn(() => 0),
+			getStatus: vi.fn(() => "ready" as const),
 			pause: vi.fn(),
 			play: vi.fn(),
 			readMeterSnapshot: vi.fn(() => emptyMeterSnapshot),
+			retryTrack: vi.fn(),
 			setOutputGain: vi.fn(),
+			setPlaybackEnd: vi.fn(),
 			setPlaybackRate: vi.fn(),
 			setTime: vi.fn(),
 			setTrackChannelMode: vi.fn(),
-			setTrackMonitorGain: vi.fn(),
-			setTrackVolumeGain: vi.fn(),
-		};
+			setTrackGain: vi.fn(),
+			subscribe: vi.fn(() => vi.fn()),
+		} satisfies PreviewAudioEngine;
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 
 		return previewAudioEngine;
@@ -231,6 +241,9 @@ describe("EditorNextRoute cleanup contract", () => {
 			expect(preparePreviewAudioResourcesMock).toHaveBeenCalledTimes(1);
 			expect(loadBrowserWaveformLaneMock).toHaveBeenCalledTimes(1);
 			expect(adapterMockState.previewAudioEngines).toHaveLength(1);
+			expect(
+				adapterMockState.previewAudioEngines[0]?.setOutputGain,
+			).toHaveBeenCalled();
 			expect(adapterMockState.wavesurfers).toHaveLength(1);
 		});
 

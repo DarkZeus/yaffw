@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
@@ -9,6 +9,10 @@ import type {
 	MediaTimeUs,
 	ReadyMediaAsset,
 } from "@/editor-core/model";
+import {
+	type ActiveMediaAssetCleanupScope,
+	createActiveMediaAssetCleanupScopeController,
+} from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import {
 	type PreviewAudioEngineFactory,
 	usePreviewAudioMonitoringLifecycle,
@@ -40,6 +44,43 @@ afterEach(() => {
 });
 
 describe("usePreviewAudioMonitoringLifecycle", () => {
+	it("releases the established engine when the asset closes before the component unmounts", async () => {
+		const scopes = createActiveMediaAssetCleanupScopeController();
+		const scope = scopes.replaceCurrentScope(readyAssetWithAudio.id);
+		const state = readyPreviewAudioResourcesState([
+			createPreviewAudioResource("audio-1"),
+		]);
+		const { unmount } = render(
+			<PreviewAudioMonitoringProbe
+				activeMediaAssetCleanupScope={scope}
+				state={state}
+			/>,
+		);
+		await act(async () => {});
+		const engine = createdPreviewAudioEngines[0];
+		expect(engine.setOutputGain).toHaveBeenCalled();
+		act(() => scopes.disposeCurrentScope());
+		expect(createPreviewAudioEngineMock.mock.calls[0][0].signal?.aborted).toBe(
+			true,
+		);
+		expect(engine.destroy).toHaveBeenCalledTimes(1);
+		unmount();
+		expect(engine.destroy).toHaveBeenCalledTimes(1);
+	});
+
+	it("applies current controls to an established engine while it is preparing again", async () => {
+		const state = readyPreviewAudioResourcesState([
+			createPreviewAudioResource("audio-1"),
+		]);
+		const { rerender } = render(<PreviewAudioMonitoringProbe state={state} />);
+		await act(async () => {});
+		const engine = createdPreviewAudioEngines[0];
+		engine.getStatus.mockReturnValue("preparing");
+		act(() => engine.subscribe.mock.calls[0][0]());
+		rerender(<PreviewAudioMonitoringProbe state={state} volume={0.4} />);
+		expect(engine.setOutputGain).toHaveBeenLastCalledWith(0.4);
+	});
+
 	it("destroys late async Preview audio engines after cleanup", async () => {
 		const deferred = createDeferred<PreviewAudioEngineSpy>();
 		createPreviewAudioEngineMock.mockReturnValueOnce(
@@ -64,6 +105,7 @@ describe("usePreviewAudioMonitoringLifecycle", () => {
 });
 
 function PreviewAudioMonitoringProbe({
+	activeMediaAssetCleanupScope,
 	audioMix = createDefaultAudioMix(readyAssetWithAudio),
 	getPlaybackRate = DEFAULT_GET_PLAYBACK_RATE,
 	getPlayheadUs = DEFAULT_GET_PLAYHEAD_US,
@@ -72,6 +114,7 @@ function PreviewAudioMonitoringProbe({
 	state,
 	volume = 1,
 }: {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix?: AudioMix;
 	getPlaybackRate?: () => number;
 	getPlayheadUs?: () => MediaTimeUs;
@@ -82,6 +125,7 @@ function PreviewAudioMonitoringProbe({
 }) {
 	const previewAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
 	usePreviewAudioMonitoringLifecycle({
+		activeMediaAssetCleanupScope,
 		audioMix,
 		previewAudioResources: state,
 		createPreviewAudioEngine: createPreviewAudioEngineMock,
@@ -139,8 +183,7 @@ function createPreviewAudioEngineSpy({
 		setPlaybackRate: vi.fn(),
 		setTime: vi.fn(),
 		setTrackChannelMode: vi.fn(),
-		setTrackMonitorGain: vi.fn(),
-		setTrackVolumeGain: vi.fn(),
+		setTrackGain: vi.fn(),
 	};
 }
 

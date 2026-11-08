@@ -15,6 +15,7 @@ import {
 	PREVIEW_AUDIO_WINDOW_HORIZON_SECONDS,
 	PREVIEW_AUDIO_WINDOW_LOW_WATER_SECONDS,
 } from "./preview-audio-window-policy";
+import type { PreviewGainChangeMode } from "./preview-gain-transition";
 import { createPreviewOutputTime } from "./preview-output-time";
 import { PREVIEW_OUTPUT_TIMING_ENABLED } from "./preview-output-timing-enabled";
 import { createScheduledWindowEngine } from "./scheduled-window-engine";
@@ -76,6 +77,8 @@ export async function createPreviewAudioEngine({
 	const unsubscribeGainLifecycle = controller.subscribe(() => {
 		if (!scheduler.isPlaying()) graph.settleGains();
 	});
+	const gainChangeMode = (): PreviewGainChangeMode =>
+		scheduler.isPlaying() ? "ramp" : "immediate";
 	const destroy = () => {
 		if (destroyed) return;
 		destroyed = true;
@@ -126,10 +129,7 @@ export async function createPreviewAudioEngine({
 		getPlaybackState: controller.getPlaybackState,
 		subscribe: (...args) => controller.subscribe(...args),
 		getMetrics: controller.getMetrics,
-		pause() {
-			controller.pause();
-			graph.settleGains();
-		},
+		pause: () => controller.pause(),
 		play: (...args) => controller.play(...args),
 		retryTrack: (...args) => controller.retryTrack(...args),
 		setTime: (...args) => controller.setTime(...args),
@@ -142,15 +142,11 @@ export async function createPreviewAudioEngine({
 			),
 		setOutputGain(gain) {
 			if (destroyed) return;
-			graph.setOutputGain(gain, scheduler.isPlaying());
+			graph.setOutputGain(gain, gainChangeMode());
 		},
-		setTrackMonitorGain(index, gain) {
+		setTrackGain(index, controls) {
 			if (destroyed) return;
-			graph.setTrackMonitorGain(index, gain, scheduler.isPlaying());
-		},
-		setTrackVolumeGain(index, gain) {
-			if (destroyed) return;
-			graph.setTrackVolumeGain(index, gain, scheduler.isPlaying());
+			graph.setTrackGain(index, controls, gainChangeMode());
 		},
 		setTrackChannelMode(index, mode) {
 			if (destroyed) return;
@@ -207,16 +203,12 @@ export function applyPreviewAudioEngineMix({
 			resourceIndex,
 			trackPlan?.channelMode ?? "preserve",
 		);
-		previewAudioEngine.setTrackVolumeGain(
-			resourceIndex,
-			trackPlan?.trackVolumeGain ?? 1,
-		);
-		previewAudioEngine.setTrackMonitorGain(
-			resourceIndex,
-			previewTrackMonitorGainForAudioMixPlanTrack({
+		previewAudioEngine.setTrackGain(resourceIndex, {
+			volumeGain: trackPlan?.trackVolumeGain ?? 1,
+			monitorGain: previewTrackMonitorGainForAudioMixPlanTrack({
 				soloedAudioTrackId,
 				trackPlan,
 			}),
-		);
+		});
 	});
 }

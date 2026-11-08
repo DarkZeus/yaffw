@@ -1,11 +1,6 @@
-import {
-	type RefObject,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from "react";
+import { type RefObject, useEffect, useEffectEvent } from "react";
 import type { AudioMix, MediaTimeUs } from "@/editor-core/model";
+import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { createSynchronousMediaWorkScope } from "../../media-work/scopes/synchronous-media-work-scope";
 import type {
 	CreatePreviewAudioEngineOptions,
@@ -29,6 +24,7 @@ export type PreviewAudioMonitoringStatus =
 	| "ready";
 
 export type UsePreviewAudioMonitoringLifecycleOptions = {
+	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix: AudioMix;
 	previewAudioResources: PreviewAudioResourcesState;
 	createPreviewAudioEngine?: PreviewAudioEngineFactory;
@@ -42,6 +38,7 @@ export type UsePreviewAudioMonitoringLifecycleOptions = {
 };
 
 export function usePreviewAudioMonitoringLifecycle({
+	activeMediaAssetCleanupScope,
 	audioMix,
 	previewAudioResources,
 	createPreviewAudioEngine = createDefaultPreviewAudioEngine,
@@ -53,51 +50,49 @@ export function usePreviewAudioMonitoringLifecycle({
 	soloedAudioTrackId = null,
 	volume,
 }: UsePreviewAudioMonitoringLifecycleOptions) {
-	const [status, setStatus] = useState<PreviewAudioMonitoringStatus>("idle");
-	const audioControlsRef = useRef({
+	const readAudioControls = useEffectEvent(() => ({
 		audioMix,
 		muted,
 		soloedAudioTrackId,
 		volume,
-	});
-	const setMonitoringStatus = useCallback(
-		(nextStatus: PreviewAudioMonitoringStatus) => {
-			setStatus(nextStatus);
-			onStatusChange?.(nextStatus);
-		},
-		[onStatusChange],
+	}));
+	const reportStatus = useEffectEvent((status: PreviewAudioMonitoringStatus) =>
+		onStatusChange?.(status),
 	);
-	audioControlsRef.current = {
-		audioMix,
-		muted,
-		soloedAudioTrackId,
-		volume,
-	};
 
 	useEffect(() => {
-		const lifecycle = createSynchronousMediaWorkScope();
-		const abortController = new AbortController();
-		lifecycle.registerCleanup(() => abortController.abort());
-
 		if (
 			previewAudioResources.status !== "ready" ||
 			previewAudioResources.resources.length === 0
 		) {
 			previewAudioEngineRef.current?.destroy();
 			previewAudioEngineRef.current = null;
-			setMonitoringStatus("idle");
+			reportStatus("idle");
 			return;
 		}
 
-		setMonitoringStatus("preparing");
-		lifecycle.registerCleanup(() => setMonitoringStatus("idle"));
+		const lifecycle = createSynchronousMediaWorkScope();
+		const abortController = new AbortController();
+		lifecycle.registerCleanup(() => abortController.abort());
+		lifecycle.registerCleanup(() => reportStatus("idle"));
+		const registration = activeMediaAssetCleanupScope?.registerCleanup(() =>
+			lifecycle.dispose(),
+		);
+		if (lifecycle.isDisposed()) return;
+
+		function disposeMonitoring() {
+			if (registration) registration.dispose();
+			else lifecycle.dispose();
+		}
+
+		reportStatus("preparing");
 
 		void createPreviewAudioEngine({
 			provider: previewAudioResources.provider,
 			initialTimeSeconds: getPlayheadUs() / 1_000_000,
 			initialPlaybackRate: getPlaybackRate(),
 			signal: abortController.signal,
-			outputChannels: audioControlsRef.current.audioMix.outputChannels,
+			outputChannels: readAudioControls().audioMix.outputChannels,
 			resources: previewAudioResources.resources,
 		})
 			.then((previewAudioEngine) => {
@@ -116,44 +111,38 @@ export function usePreviewAudioMonitoringLifecycle({
 				lifecycle.registerCleanup(
 					previewAudioEngine.subscribe(() => {
 						if (!lifecycle.isDisposed()) {
-							setMonitoringStatus(previewAudioEngine.getStatus());
+							reportStatus(previewAudioEngine.getStatus());
 						}
 					}),
 				);
 				applyPreviewAudioEngineMix({
-					...audioControlsRef.current,
+					...readAudioControls(),
 					previewAudioEngine,
 					resources: previewAudioResources.resources,
 				});
-				setMonitoringStatus(previewAudioEngine.getStatus());
+				reportStatus(previewAudioEngine.getStatus());
 			})
 			.catch(() => {
 				if (!lifecycle.isDisposed()) {
-					previewAudioEngineRef.current = null;
-					setMonitoringStatus("failed");
+					disposeMonitoring();
+					reportStatus("failed");
 				}
 			});
 
-		return () => {
-			lifecycle.dispose();
-		};
+		return disposeMonitoring;
 	}, [
+		activeMediaAssetCleanupScope,
 		previewAudioResources,
 		createPreviewAudioEngine,
 		getPlaybackRate,
 		getPlayheadUs,
 		previewAudioEngineRef,
-		setMonitoringStatus,
 	]);
 
 	useEffect(() => {
 		const previewAudioEngine = previewAudioEngineRef.current;
 
-		if (
-			previewAudioResources.status !== "ready" ||
-			!previewAudioMonitoringStatusIsReady(status) ||
-			!previewAudioEngine
-		) {
+		if (previewAudioResources.status !== "ready" || !previewAudioEngine) {
 			return;
 		}
 
@@ -171,13 +160,6 @@ export function usePreviewAudioMonitoringLifecycle({
 		muted,
 		previewAudioEngineRef,
 		soloedAudioTrackId,
-		status,
 		volume,
 	]);
-}
-
-function previewAudioMonitoringStatusIsReady(
-	status: PreviewAudioMonitoringStatus,
-) {
-	return status === "ready" || status === "degraded";
 }

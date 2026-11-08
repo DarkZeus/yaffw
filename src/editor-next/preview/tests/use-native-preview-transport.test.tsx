@@ -462,8 +462,7 @@ function createPreviewAudioEngineSpy({
 			}
 		}),
 		setTrackChannelMode: vi.fn(),
-		setTrackMonitorGain: vi.fn(),
-		setTrackVolumeGain: vi.fn(),
+		setTrackGain: vi.fn(),
 	};
 }
 

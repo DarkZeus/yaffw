@@ -362,9 +362,9 @@ export async function runProductionAudioFunctionalChecks(
 		});
 		await check("Track volume affects its tap", async () => {
 			const before = await sampleMeters(run.engine);
-			run.engine.setTrackVolumeGain(0, 0.5);
+			run.engine.setTrackGain(0, { volumeGain: 0.5 });
 			const after = await sampleMeters(run.engine);
-			run.engine.setTrackVolumeGain(0, 1);
+			run.engine.setTrackGain(0, { volumeGain: 1 });
 			const ratio = (after.tracks[ids[0]] ?? 0) / (before.tracks[ids[0]] ?? 1);
 			return {
 				passed: ratio > 0.4 && ratio < 0.6,
@@ -374,9 +374,9 @@ export async function runProductionAudioFunctionalChecks(
 		await check(
 			"Include/exclude and solo gain boundary isolates a track",
 			async () => {
-				run.engine.setTrackMonitorGain(0, 0);
+				run.engine.setTrackGain(0, { monitorGain: 0 });
 				const peaks = await sampleMeters(run.engine);
-				run.engine.setTrackMonitorGain(0, 1);
+				run.engine.setTrackGain(0, { monitorGain: 1 });
 				return {
 					passed:
 						peaks.tracks[ids[0]] === 0 && (peaks.tracks[ids[1]] ?? 0) > 0.001,

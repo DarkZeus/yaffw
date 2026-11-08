@@ -164,7 +164,7 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => transition.setTarget(target, ctx.currentTime, true),
+						run: () => transition.setTarget(target, ctx.currentTime, "ramp"),
 					},
 				]),
 				(frame) => ramp(frame, START, initial, target),
@@ -184,11 +184,11 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => transition.setTarget(0, ctx.currentTime, true),
+						run: () => transition.setTarget(0, ctx.currentTime, "ramp"),
 					},
 					{
 						frame: RETARGET,
-						run: () => transition.setTarget(1, ctx.currentTime, true),
+						run: () => transition.setTarget(1, ctx.currentTime, "ramp"),
 					},
 				]),
 				(frame) =>
@@ -201,17 +201,17 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
-		audioGraph.setTrackVolumeGain(0, 0.5);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
+		audioGraph.setTrackGain(0, { volumeGain: 0.5 });
 		graphSource(ctx, audioGraph, 0, 1024);
 		graphSource(ctx, audioGraph, 1024, LENGTH - 1024);
 		checks.push(
 			measure(
 				"production graph composition, repeated target and chunk continuity",
 				await render(ctx, [
-					{ frame: START, run: () => audioGraph.setOutputGain(0.4, true) },
-					{ frame: RETARGET, run: () => audioGraph.setOutputGain(0.4, true) },
-					{ frame: 768, run: () => audioGraph.setOutputGain(0.4, true) },
+					{ frame: START, run: () => audioGraph.setOutputGain(0.4, "ramp") },
+					{ frame: RETARGET, run: () => audioGraph.setOutputGain(0.4, "ramp") },
+					{ frame: 768, run: () => audioGraph.setOutputGain(0.4, "ramp") },
 				]),
 				(frame, channel) =>
 					[0.75, 0.25][channel] * 0.5 * ramp(frame, START, 1, 0.4),
@@ -222,7 +222,7 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		audioGraph.setOutputGain(0.25);
 		audioGraph.setTrackChannelMode(0, "duplicate-right-to-stereo");
 		graphSource(ctx, audioGraph);
@@ -238,13 +238,13 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph);
 		checks.push(
 			measure(
 				"settle cancels pending global ramp at target",
 				await render(ctx, [
-					{ frame: START, run: () => audioGraph.setOutputGain(0, true) },
+					{ frame: START, run: () => audioGraph.setOutputGain(0, "ramp") },
 					{ frame: RETARGET, run: () => audioGraph.settleGains() },
 				]),
 				(frame, channel) =>
@@ -257,20 +257,20 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph);
 		let replacement: ReturnType<typeof graph> | undefined;
 		checks.push(
 			measure(
 				"destroy during ramp and recreate without stale automation",
 				await render(ctx, [
-					{ frame: START, run: () => audioGraph.setOutputGain(0, true) },
+					{ frame: START, run: () => audioGraph.setOutputGain(0, "ramp") },
 					{
 						frame: RETARGET,
 						run: () => {
 							audioGraph.destroy();
 							replacement = graph(ctx);
-							replacement.setTrackMonitorGain(0, 1);
+							replacement.setTrackGain(0, { monitorGain: 1 });
 							replacement.setOutputGain(0.2);
 							graphSource(ctx, replacement, RETARGET, LENGTH - RETARGET);
 						},
@@ -288,7 +288,7 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph, 0, 768);
 		graphSource(ctx, audioGraph, 768, LENGTH - 768);
 		const held = ramp(RETARGET, START, 1, 0.2);
@@ -301,27 +301,27 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => audioGraph.setTrackVolumeGain(0, 0.2, true),
+						run: () => audioGraph.setTrackGain(0, { volumeGain: 0.2 }, "ramp"),
 					},
 					{
 						frame: RETARGET,
 						run: () => {
-							audioGraph.setTrackMonitorGain(0, 0, true);
-							audioGraph.setOutputGain(0.4, true);
+							audioGraph.setTrackGain(0, { monitorGain: 0 }, "ramp");
+							audioGraph.setOutputGain(0.4, "ramp");
 						},
 					},
 					{
 						frame: 768,
 						run: () => {
-							audioGraph.setTrackVolumeGain(0, 0.6, true);
-							audioGraph.setTrackMonitorGain(0, 1, true);
+							audioGraph.setTrackGain(0, { volumeGain: 0.6 }, "ramp");
+							audioGraph.setTrackGain(0, { monitorGain: 1 }, "ramp");
 						},
 					},
 					{
 						frame: 896,
 						run: () => {
-							audioGraph.setTrackVolumeGain(0, 0, true);
-							audioGraph.setOutputGain(0.8, true);
+							audioGraph.setTrackGain(0, { volumeGain: 0 }, "ramp");
+							audioGraph.setOutputGain(0.8, "ramp");
 						},
 					},
 				]),
@@ -355,8 +355,8 @@ export async function runPreviewGainTransitionChecks() {
 		const ctx = context();
 		const audioGraph = graph(ctx);
 		audioGraph.setTrackChannelMode(0, mode);
-		audioGraph.setTrackVolumeGain(0, 0.6);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { volumeGain: 0.6 });
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph);
 		checks.push(
 			measure(
@@ -364,16 +364,16 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => audioGraph.setTrackMonitorGain(0, 0, true),
+						run: () => audioGraph.setTrackGain(0, { monitorGain: 0 }, "ramp"),
 					},
 					{
 						frame: 1536,
-						run: () => audioGraph.setTrackMonitorGain(0, 1, true),
+						run: () => audioGraph.setTrackGain(0, { monitorGain: 1 }, "ramp"),
 					},
 					// Repeated targets must not extend the transition deadline.
 					{
 						frame: 1664,
-						run: () => audioGraph.setTrackVolumeGain(0, 0.6, true),
+						run: () => audioGraph.setTrackGain(0, { volumeGain: 0.6 }, "ramp"),
 					},
 				]),
 				(frame, channel) =>
@@ -388,7 +388,7 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph);
 		checks.push(
 			measure(
@@ -397,8 +397,8 @@ export async function runPreviewGainTransitionChecks() {
 					{
 						frame: START,
 						run: () => {
-							audioGraph.setTrackVolumeGain(0, 0.4, true);
-							audioGraph.setOutputGain(0.5, true);
+							audioGraph.setTrackGain(0, { volumeGain: 0.4 }, "ramp");
+							audioGraph.setOutputGain(0.5, "ramp");
 						},
 					},
 					{ frame: RETARGET, run: () => audioGraph.settleGains() },
@@ -415,7 +415,7 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
 		graphSource(ctx, audioGraph);
 		let replacement: ReturnType<typeof graph> | undefined;
 		checks.push(
@@ -425,8 +425,8 @@ export async function runPreviewGainTransitionChecks() {
 					{
 						frame: START,
 						run: () => {
-							audioGraph.setTrackMonitorGain(0, 0, true);
-							audioGraph.setOutputGain(0, true);
+							audioGraph.setTrackGain(0, { monitorGain: 0 }, "ramp");
+							audioGraph.setOutputGain(0, "ramp");
 						},
 					},
 					{
@@ -434,8 +434,8 @@ export async function runPreviewGainTransitionChecks() {
 						run: () => {
 							audioGraph.destroy();
 							replacement = graph(ctx);
-							replacement.setTrackVolumeGain(0, 0.4);
-							replacement.setTrackMonitorGain(0, 1);
+							replacement.setTrackGain(0, { volumeGain: 0.4 });
+							replacement.setTrackGain(0, { monitorGain: 1 });
 							replacement.setOutputGain(0.5);
 							graphSource(ctx, replacement, RETARGET, LENGTH - RETARGET);
 						},
@@ -463,18 +463,18 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => transition.setTarget(0, ctx.currentTime, true),
+						run: () => transition.setTarget(0, ctx.currentTime, "ramp"),
 					},
 					{
 						frame: RETARGET,
 						run: () => {
-							transition.setTarget(1, ctx.currentTime, true);
-							transition.setTarget(0.8, ctx.currentTime, true);
+							transition.setTarget(1, ctx.currentTime, "ramp");
+							transition.setTarget(0.8, ctx.currentTime, "ramp");
 						},
 					},
 					{
 						frame: 768,
-						run: () => transition.setTarget(0, ctx.currentTime, true),
+						run: () => transition.setTarget(0, ctx.currentTime, "ramp"),
 					},
 				]),
 				(frame) =>
@@ -498,11 +498,11 @@ export async function runPreviewGainTransitionChecks() {
 				await render(ctx, [
 					{
 						frame: START,
-						run: () => transition.setTarget(0.25, ctx.currentTime, true),
+						run: () => transition.setTarget(0.25, ctx.currentTime, "ramp"),
 					},
 					{
 						frame: 2048,
-						run: () => transition.setTarget(0.75, ctx.currentTime, true),
+						run: () => transition.setTarget(0.75, ctx.currentTime, "ramp"),
 					},
 				]),
 				(frame) =>
@@ -516,17 +516,17 @@ export async function runPreviewGainTransitionChecks() {
 	{
 		const ctx = context();
 		const audioGraph = graph(ctx);
-		audioGraph.setTrackMonitorGain(0, 1);
-		audioGraph.setTrackVolumeGain(0, 0.5);
+		audioGraph.setTrackGain(0, { monitorGain: 1 });
+		audioGraph.setTrackGain(0, { volumeGain: 0.5 });
 		graphSource(ctx, audioGraph);
 		checks.push(
 			measure(
 				"global mute reaches exact zero while pre-global meters follow track ramp",
 				await render(ctx, [
-					{ frame: START, run: () => audioGraph.setOutputGain(0, true) },
+					{ frame: START, run: () => audioGraph.setOutputGain(0, "ramp") },
 					{
 						frame: RETARGET,
-						run: () => audioGraph.setTrackVolumeGain(0, 0.8, true),
+						run: () => audioGraph.setTrackGain(0, { volumeGain: 0.8 }, "ramp"),
 					},
 					{
 						frame: 3584,

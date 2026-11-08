@@ -310,6 +310,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	}, [onPreviewPlayheadChange, playheadUs]);
 
 	usePreviewAudioMonitoringLifecycle({
+		activeMediaAssetCleanupScope,
 		audioMix,
 		previewAudioResources,
 		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,

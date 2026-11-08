@@ -44,7 +44,22 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 		window.AudioContext = class extends Native {
 			constructor(...args) {
 				super(...args);
-				window.__audio.push({ context: this, gains: [], events: [] });
+				window.__audio.push({
+					context: this,
+					gains: [],
+					events: [],
+					analyserReads: 0,
+				});
+			}
+			createAnalyser() {
+				const analyser = super.createAnalyser();
+				const record = window.__audio.find((entry) => entry.context === this);
+				const read = analyser.getFloatTimeDomainData.bind(analyser);
+				analyser.getFloatTimeDomainData = (samples) => {
+					record.analyserReads++;
+					return read(samples);
+				};
+				return analyser;
 			}
 			createGain() {
 				const gain = super.createGain();
@@ -101,8 +116,9 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 			.getByRole("region", { name: "Workbench transport region" })
 			.getByRole("button", { name: "Pause", exact: true })
 			.waitFor();
+		// The Pause button can represent pending playback. Wait for a live graph tap.
 		await page.waitForFunction(() =>
-			window.__audio.some((r) => r.context.currentTime > 0.1),
+			window.__audio.some((r) => r.analyserReads > 0),
 		);
 		const controls = page.getByRole("slider", {
 			name: "Preview volume",
@@ -137,7 +153,9 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 			() => Math.abs(window.__audio[0].gains[0].gain.value - 0.7) < 1e-6,
 		);
 		await page.getByRole("tab", { name: "Audio", exact: true }).click();
-		const audioText = await page.getByRole("tabpanel").innerText();
+		const audioText = await page
+			.getByRole("tabpanel", { name: "Audio", exact: true })
+			.innerText();
 		const trackVolumes = page.getByRole("slider", { name: /track volume$/ });
 		assert.equal(await trackVolumes.count(), 2);
 		const strips = page.locator('section[aria-label^="Audio track strip "]');
@@ -204,6 +222,13 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 		await waitTarget(since, 0.43 ** 2, firstNode);
 		// Channel handling rebuilds routes; subsequent volume still targets the track.
 		await first.getByRole("combobox").selectOption("average-to-mono");
+		const readsBeforeResume = await page.evaluate(
+			() => window.__audio[0].analyserReads,
+		);
+		await page.waitForFunction(
+			(reads) => window.__audio[0].analyserReads > reads,
+			readsBeforeResume,
+		);
 		since = await eventCount();
 		await trackVolumes.nth(0).fill("49");
 		await waitTarget(since, 0.49 ** 2, firstNode);
@@ -279,13 +304,16 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 		trackChecks.pausedTrackVolumeIsImmediate = true;
 
 		await page.getByRole("tab", { name: "Export", exact: true }).click();
-		const exportText = await page.getByRole("tabpanel").innerText();
+		const exportText = await page
+			.getByRole("tabpanel", { name: "Export", exact: true })
+			.innerText();
 		await page.getByRole("tab", { name: "Media", exact: true }).click();
 		page.once("dialog", (dialog) => dialog.accept());
 		await page.getByRole("button", { name: "Close file", exact: true }).click();
 		await page.waitForFunction(
 			() => window.__audio[0].context.state === "closed",
 		);
+		await page.getByText("Open a video", { exact: true }).waitFor();
 		await page
 			.locator("input[type=file]")
 			.first()
@@ -348,10 +376,16 @@ const liveApp = process.env.YAFFW_LIVE_APP === "1";
 			).length,
 			0,
 		);
-		for (const event of result.contexts[0].events.filter(
-			(e) => e.method === "linearRampToValueAtTime",
-		))
-			assert.ok(Math.abs(event.args[1] - event.time - 0.008) < 1e-6);
+		const gainAnchors = new Map();
+		for (const event of result.contexts[0].events) {
+			if (event.method === "setValueAtTime")
+				gainAnchors.set(event.node, event.args[1]);
+			if (event.method === "linearRampToValueAtTime") {
+				assert.ok(
+					Math.abs(event.args[1] - gainAnchors.get(event.node) - 0.008) < 1e-6,
+				);
+			}
+		}
 		assert.deepEqual(errors, []);
 		await fs.writeFile(
 			process.env.YAFFW_BROWSER_RESULT_PATH || "/tmp/yaffw-115-browser.json",

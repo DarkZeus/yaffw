@@ -39,8 +39,7 @@ const adapterMockState = vi.hoisted(() => ({
 		setCurrentTimeSeconds: (nextCurrentTimeSeconds: number) => void;
 		setTime: ReturnType<typeof vi.fn>;
 		setTrackChannelMode: ReturnType<typeof vi.fn>;
-		setTrackMonitorGain: ReturnType<typeof vi.fn>;
-		setTrackVolumeGain: ReturnType<typeof vi.fn>;
+		setTrackGain: ReturnType<typeof vi.fn>;
 	}>,
 }));
 
@@ -171,8 +170,7 @@ beforeEach(() => {
 			setOutputGain: vi.fn(),
 			setTime: vi.fn(),
 			setTrackChannelMode: vi.fn(),
-			setTrackMonitorGain: vi.fn(),
-			setTrackVolumeGain: vi.fn(),
+			setTrackGain: vi.fn(),
 		};
 		adapterMockState.previewAudioEngines.push(previewAudioEngine);
 

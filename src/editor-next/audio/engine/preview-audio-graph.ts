@@ -13,13 +13,17 @@ import type {
 	PreviewAudioEngineTrackMeterState,
 	PreviewAudioGainNodeLike,
 	PreviewAudioNodeLike,
+	PreviewTrackGainControls,
 } from "../types/preview-audio-engine.types";
 import type { PreviewAudioResource } from "../types/preview-audio-resources.types";
 import {
 	type ResolvedChannelTransform,
 	resolveChannelTransform,
 } from "./audio-channel-analysis";
-import { createPreviewGainTransition } from "./preview-gain-transition";
+import {
+	type PreviewGainChangeMode,
+	createPreviewGainTransition,
+} from "./preview-gain-transition";
 type PreviewAudioTrackChannelRouting = {
 	dispose: () => void;
 	inputNode: PreviewAudioNodeLike;
@@ -118,17 +122,17 @@ export function createPreviewAudioGraph(
 	}
 	return {
 		destination,
-		setOutputGain(gain: number, smooth = false) {
+		setOutputGain(gain: number, mode: PreviewGainChangeMode = "immediate") {
 			outputTransition.setTarget(
 				clampPreviewVolume(gain),
 				audioContext.currentTime,
-				smooth,
+				mode,
 			);
 		},
 		settleGains() {
-			outputTransition.settle(audioContext.currentTime);
-			for (const track of tracks)
-				track.transition.settle(audioContext.currentTime);
+			const time = audioContext.currentTime;
+			outputTransition.settle(time);
+			for (const track of tracks) track.transition.settle(time);
 		},
 		setTrackChannelMode(index: number, mode: AudioTrackChannelMode) {
 			const track = tracks[index];
@@ -153,27 +157,20 @@ export function createPreviewAudioGraph(
 			});
 			return true;
 		},
-		setTrackMonitorGain(index: number, gain: number, smooth = false) {
+		setTrackGain(
+			index: number,
+			{ monitorGain, volumeGain }: PreviewTrackGainControls,
+			mode: PreviewGainChangeMode = "immediate",
+		) {
 			const track = tracks[index];
-			if (track) {
-				track.monitorGain = clampPreviewVolume(gain);
-				track.transition.setTarget(
-					track.monitorGain * track.volumeGain,
-					audioContext.currentTime,
-					smooth,
-				);
-			}
-		},
-		setTrackVolumeGain(index: number, gain: number, smooth = false) {
-			const track = tracks[index];
-			if (track) {
-				track.volumeGain = clampPreviewVolume(gain);
-				track.transition.setTarget(
-					track.monitorGain * track.volumeGain,
-					audioContext.currentTime,
-					smooth,
-				);
-			}
+			if (!track) return;
+			track.monitorGain = clampPreviewVolume(monitorGain ?? track.monitorGain);
+			track.volumeGain = clampPreviewVolume(volumeGain ?? track.volumeGain);
+			track.transition.setTarget(
+				track.monitorGain * track.volumeGain,
+				audioContext.currentTime,
+				mode,
+			);
 		},
 		readMeterSnapshot(
 			playing: boolean,
@@ -222,9 +219,10 @@ export function createPreviewAudioGraph(
 			};
 		},
 		destroy() {
-			outputTransition.dispose(audioContext.currentTime);
+			const time = audioContext.currentTime;
+			outputTransition.dispose(time);
 			for (const track of tracks) {
-				track.transition.dispose(audioContext.currentTime);
+				track.transition.dispose(time);
 				for (const route of track.routes.values()) route.dispose();
 				track.routes.clear();
 				disposePreviewAudioMeterTapState(track.meterTap);

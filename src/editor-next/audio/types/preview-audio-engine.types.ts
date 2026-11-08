@@ -8,6 +8,11 @@ import type {
 } from "../engine/scheduled-window-engine";
 import type { PreviewAudioResource } from "./preview-audio-resources.types";
 
+export type PreviewTrackGainControls = {
+	monitorGain?: number;
+	volumeGain?: number;
+};
+
 export type PreviewAudioEngine = {
 	destroy: () => void;
 	subscribe: (listener: () => void) => () => void;
@@ -38,8 +43,10 @@ export type PreviewAudioEngine = {
 		trackIndex: number,
 		channelMode: AudioTrackChannelMode,
 	) => void;
-	setTrackMonitorGain: (trackIndex: number, gain: number) => void;
-	setTrackVolumeGain: (trackIndex: number, gain: number) => void;
+	setTrackGain: (
+		trackIndex: number,
+		controls: PreviewTrackGainControls,
+	) => void;
 };
 
 export type PreviewAudioEngineStatus = ScheduledWindowEngineStatus;

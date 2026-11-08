@@ -192,6 +192,51 @@ function createLifecycleContext() {
 	return context;
 }
 describe("bounded production Preview audio engine", () => {
+	it("applies one effective gain target when a mix update changes volume and monitoring together", async () => {
+		const { engine, context, provider } = await setup();
+		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
+		const apply = () =>
+			applyPreviewAudioEngineMix({
+				audioMix,
+				muted: false,
+				previewAudioEngine: engine,
+				resources: provider.trackIds.map(createResource),
+				volume: 1,
+			});
+		apply();
+		await engine.play();
+		context.currentTime = 0.1;
+		audioMix.tracks["audio-1"].volumePercent = 50;
+		audioMix.tracks["audio-1"].include = false;
+		apply();
+		const track = context.createdGains[2].gain;
+		expect(track.linearRampToValueAtTime).toHaveBeenCalledExactlyOnceWith(
+			0,
+			expect.closeTo(0.108, 8),
+		);
+	});
+
+	it("settles master and track ramps once and leaves identical paused targets alone", async () => {
+		const { engine, context } = await setup();
+		await engine.play();
+		const master = context.createdGains[0].gain;
+		const track = context.createdGains[2].gain;
+		context.currentTime = 0.1;
+		engine.setOutputGain(0.5);
+		engine.setTrackGain(0, { monitorGain: 1 });
+		master.cancelScheduledValues.mockClear();
+		track.cancelScheduledValues.mockClear();
+		context.currentTime = 0.104;
+		engine.pause();
+		engine.pause();
+		engine.setOutputGain(0.5);
+		engine.setTrackGain(0, { monitorGain: 1 });
+		expect(master.cancelScheduledValues).toHaveBeenCalledExactlyOnceWith(0.104);
+		expect(track.cancelScheduledValues).toHaveBeenCalledExactlyOnceWith(0.104);
+		expect(master.value).toBe(0.5);
+		expect(track.value).toBe(1);
+	});
+
 	it("retargets the combined track gain without changing decisions or restarting sources", async () => {
 		const { engine, context, provider } = await setup();
 		const audioMix = createDefaultAudioMix(readyAssetWithAudio);
@@ -243,8 +288,8 @@ describe("bounded production Preview audio engine", () => {
 	it("settles all track gains on pause, seek, speed and routing changes and cancels them on replacement", async () => {
 		const { engine, context } = await setup();
 		const track = context.createdGains[2].gain;
-		engine.setTrackMonitorGain(0, 1);
-		engine.setTrackVolumeGain(0, 0.5);
+		engine.setTrackGain(0, { monitorGain: 1 });
+		engine.setTrackGain(0, { volumeGain: 0.5 });
 		expect(track.value).toBe(0.5);
 		await engine.play();
 		for (const reset of [
@@ -254,7 +299,7 @@ describe("bounded production Preview audio engine", () => {
 			async () => engine.setTrackChannelMode(0, "use-left-as-mono"),
 		]) {
 			context.currentTime += 0.01;
-			engine.setTrackMonitorGain(0, 0);
+			engine.setTrackGain(0, { monitorGain: 0 });
 			expect(track.linearRampToValueAtTime.mock.calls.at(-1)?.[0]).toBe(0);
 			await reset();
 			expect(track.value).toBe(0);
@@ -263,20 +308,20 @@ describe("bounded production Preview audio engine", () => {
 			);
 			engine.pause();
 			const count = track.linearRampToValueAtTime.mock.calls.length;
-			engine.setTrackMonitorGain(0, 1);
+			engine.setTrackGain(0, { monitorGain: 1 });
 			expect(track.value).toBe(0.5);
 			await engine.play();
 			expect(track.linearRampToValueAtTime).toHaveBeenCalledTimes(count);
 		}
-		engine.setTrackVolumeGain(0, 0.75);
+		engine.setTrackGain(0, { volumeGain: 0.75 });
 		engine.destroy();
 		expect(track.value).toBe(0);
 		const calls = track.setValueAtTime.mock.calls.length;
-		engine.setTrackVolumeGain(0, 1);
-		engine.setTrackMonitorGain(0, 1);
+		engine.setTrackGain(0, { volumeGain: 1 });
+		engine.setTrackGain(0, { monitorGain: 1 });
 		expect(track.setValueAtTime).toHaveBeenCalledTimes(calls);
 		const replacement = await setup();
-		replacement.engine.setTrackMonitorGain(0, 1);
+		replacement.engine.setTrackGain(0, { monitorGain: 1 });
 		expect(replacement.context.createdGains[2].gain.value).toBe(1);
 		expect(
 			replacement.context.createdGains[2].gain.linearRampToValueAtTime,
@@ -355,7 +400,7 @@ describe("bounded production Preview audio engine", () => {
 			),
 		);
 		const { engine, context } = await setup(provider);
-		engine.setTrackMonitorGain(1, 1);
+		engine.setTrackGain(1, { monitorGain: 1 });
 		expect(engine.getStatus()).toBe("degraded");
 		expect(engine.readMeterSnapshot().combinedState).toMatchObject({
 			partial: true,
