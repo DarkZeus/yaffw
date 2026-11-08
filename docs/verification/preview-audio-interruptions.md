@@ -10,15 +10,18 @@ export decisions.
 The context lifecycle helper owns state observation and cancellable resume
 results. The existing window controller owns latest playback intent, decode
 generations, frozen media time, and recovery preparation. Its playback state
-(`paused`, `playing`, `buffering`, `interrupted`, `recovery-required`, `closed`)
+(`paused`, `playing`, `buffering`, `interrupted`, `resuming`,
+`recovery-required`, `closed`)
 is separate from decoded-track readiness, so interruption never activates an
 independent native clock or disables mix edits.
 
 A suspended/interrupted context stops sources and pulls, invalidates pending
 windows, and freezes the audio clock. At most one automatic resume is attempted
 per interruption; a rejected or pending request exposes **Resume audio**.
-Explicit recovery can supersede a pending browser promise. Running-state
-recovery re-primes at the latest requested media time and speed. Pause, frame
+Explicit recovery can supersede a pending browser promise. Since #126, the
+resume result and running-state event share one availability transition. Seeks
+and speed changes during an interruption update the frozen position and rate
+for one re-prime when the context is running. Pause, frame
 stepping, scrubbing, Close file, replacement, and teardown cancel older intent.
 Closed contexts are terminal and are never resumed or closed twice. Disposal
 removes listeners before closing the owned context.

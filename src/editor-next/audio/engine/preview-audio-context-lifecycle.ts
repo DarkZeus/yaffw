@@ -11,56 +11,76 @@ export type PreviewAudioContextLifecycleSource = {
 	removeEventListener?: (type: "statechange", listener: () => void) => void;
 };
 
+export type PreviewAudioContextAvailability = "running" | "blocked" | "closed";
+
 /** Observes the browser context and makes pending resume attempts cancellable.
  * Cancellation invalidates the result; it cannot cancel the browser's promise.
  */
 export function createPreviewAudioContextLifecycle(
 	context: PreviewAudioContextLifecycleSource,
-	onStateChange: (state: PreviewAudioContextState) => void,
+	onAvailabilityChange: (state: PreviewAudioContextAvailability) => void,
 ) {
 	let disposed = false;
-	let cancelPending: (() => void) | null = null;
-	let lastState = context.state;
-	const stateChanged = () => {
-		if (disposed || !context.state || context.state === lastState) return;
-		lastState = context.state;
-		onStateChange(context.state);
-	};
-	context.addEventListener?.("statechange", stateChanged);
+	let pending: ((running: boolean) => void) | null = null;
+	let observed = readAvailability();
+
+	function readAvailability(): PreviewAudioContextAvailability {
+		switch (context.state) {
+			case "suspended":
+			case "interrupted":
+				return "blocked";
+			case "closed":
+				return "closed";
+			default:
+				return "running";
+		}
+	}
+
+	function observeAvailability() {
+		const availability = readAvailability();
+		if (!disposed && availability !== observed) {
+			observed = availability;
+			if (availability !== "blocked") pending?.(availability === "running");
+			onAvailabilityChange(availability);
+		}
+		return availability;
+	}
+
+	context.addEventListener?.("statechange", observeAvailability);
 	function cancelResume() {
-		cancelPending?.();
-		cancelPending = null;
+		pending?.(false);
 	}
 	return {
-		getState: () => context.state,
-		isRunning: () => context.state === undefined || context.state === "running",
+		isRunning: () => readAvailability() === "running",
 		cancelResume,
 		resume() {
 			cancelResume();
-			if (disposed || context.state === "closed") return Promise.resolve(false);
+			if (disposed || observeAvailability() === "closed")
+				return Promise.resolve(false);
 			if (context.state === "running") return Promise.resolve(true);
 			return new Promise<boolean>((resolve) => {
 				let settled = false;
 				const finish = (running: boolean) => {
 					if (settled) return;
 					settled = true;
-					if (cancelPending === cancel) cancelPending = null;
+					if (pending === finish) pending = null;
 					resolve(running);
 				};
-				const cancel = () => finish(false);
-				cancelPending = cancel;
+				pending = finish;
+				const observeCompletion = (fulfilled: boolean) =>
+					finish(
+						!disposed &&
+							observeAvailability() === "running" &&
+							(fulfilled || context.state === "running"),
+					);
 				try {
 					// Invoke synchronously so an explicit Play retains user activation.
 					Promise.resolve(context.resume?.()).then(
-						() =>
-							finish(
-								!disposed &&
-									(context.state === undefined || context.state === "running"),
-							),
-						() => finish(false),
+						() => observeCompletion(true),
+						() => observeCompletion(false),
 					);
 				} catch {
-					finish(false);
+					observeCompletion(false);
 				}
 			});
 		},
@@ -68,7 +88,7 @@ export function createPreviewAudioContextLifecycle(
 			if (disposed) return;
 			disposed = true;
 			cancelResume();
-			context.removeEventListener?.("statechange", stateChanged);
+			context.removeEventListener?.("statechange", observeAvailability);
 		},
 	};
 }

@@ -90,7 +90,7 @@ export async function createPreviewAudioEngine({
 	signal?.addEventListener("abort", destroy, { once: true });
 	try {
 		scheduler.setPlaybackRate(initialPlaybackRate);
-		await controller.prepare(initialTimeSeconds);
+		await controller.initialize(initialTimeSeconds);
 		if (destroyed)
 			throw new DOMException(
 				"Preview audio preparation aborted.",
@@ -102,9 +102,9 @@ export async function createPreviewAudioEngine({
 	}
 	return {
 		destroy,
-		getCurrentTime: scheduler.getCurrentTime,
+		getCurrentTime: controller.getCurrentTime,
 		getPresentationTime() {
-			const fallback = scheduler.getCurrentTime();
+			const fallback = controller.getCurrentTime();
 			if (!outputTimingEnabled) return fallback;
 			let timestamp:
 				| ReturnType<NonNullable<PreviewAudioContextLike["getOutputTimestamp"]>>

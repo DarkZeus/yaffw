@@ -52,6 +52,20 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 	volume,
 }: PreviewTransportRegionProps) {
 	const [speedPointerFocus, setSpeedPointerFocus] = useState(false);
+	const canRecoverAudio =
+		audioPlaybackState === "interrupted" ||
+		audioPlaybackState === "resuming" ||
+		audioPlaybackState === "recovery-required";
+	const audioStatusText = {
+		paused: null,
+		playing: null,
+		buffering: "Preparing Preview audio…",
+		interrupted: "Preview audio is interrupted.",
+		resuming: "Resuming Preview audio…",
+		"recovery-required": "Preview audio needs a manual resume.",
+		closed:
+			"Preview audio is unavailable. Close and reopen the file to restore audio.",
+	}[audioPlaybackState];
 
 	function updatePlaybackRate(event: ChangeEvent<HTMLSelectElement>) {
 		onPlaybackRateChange(Number.parseFloat(event.currentTarget.value));
@@ -189,20 +203,10 @@ export const PreviewTransportRegion = memo(function PreviewTransportRegion({
 					</Button>
 				</div>
 			</div>
-			{(audioPlaybackState === "interrupted" ||
-				audioPlaybackState === "recovery-required" ||
-				audioPlaybackState === "closed" ||
-				audioPlaybackState === "buffering") && (
+			{audioStatusText && (
 				<output className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span>
-						{audioPlaybackState === "closed"
-							? "Preview audio is unavailable. Close and reopen the file to restore audio."
-							: audioPlaybackState === "buffering"
-								? "Preparing Preview audio…"
-								: "Preview audio is interrupted."}
-					</span>
-					{(audioPlaybackState === "interrupted" ||
-						audioPlaybackState === "recovery-required") && (
+					<span>{audioStatusText}</span>
+					{canRecoverAudio && (
 						<Button
 							size="sm"
 							variant="outline"

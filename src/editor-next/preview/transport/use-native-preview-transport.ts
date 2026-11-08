@@ -315,7 +315,9 @@ export function useNativePreviewTransport({
 			if (
 				recover &&
 				(!playbackRef.current.request ||
-					(audioState !== "interrupted" && audioState !== "recovery-required"))
+					(audioState !== "interrupted" &&
+						audioState !== "resuming" &&
+						audioState !== "recovery-required"))
 			)
 				return;
 			const pausedAudioEngine = pausedAudioEngineRef.current;
@@ -488,10 +490,11 @@ export function useNativePreviewTransport({
 			}
 
 			if (state !== "playing") {
+				const audioHadStarted = followerStart?.request === request;
 				followerStart = null;
 				pauseVideo(video);
 				if (state === "closed") setPlayback(PAUSED_PLAYBACK);
-				else if (phase === "playing")
+				else if (phase === "playing" || audioHadStarted)
 					setPlayback({ phase: "resuming", request });
 				if (
 					state !== "paused" &&
@@ -519,6 +522,7 @@ export function useNativePreviewTransport({
 				!disposed &&
 				videoRef.current === video &&
 				playbackRef.current.request === request &&
+				engine.getPlaybackState() === "playing" &&
 				followerStart === start;
 			void video
 				.play()

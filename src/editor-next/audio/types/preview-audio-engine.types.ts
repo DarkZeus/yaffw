@@ -57,6 +57,7 @@ export type PreviewAudioPlaybackState =
 	| "playing"
 	| "buffering"
 	| "interrupted"
+	| "resuming"
 	| "recovery-required"
 	| "closed";
 

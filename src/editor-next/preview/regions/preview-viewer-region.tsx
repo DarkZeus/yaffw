@@ -27,6 +27,7 @@ export type PreviewViewerRegionProps = {
 	onRequestFullscreen: () => void;
 	onSyncPlayhead: () => void;
 	playbackRate: number;
+	playbackDisabled: boolean;
 	playbackRequested: boolean;
 	playheadUs: MediaTimeUs;
 	previewUrl: string;
@@ -57,6 +58,7 @@ export function PreviewViewerRegion({
 	onPlayheadSeekRequested,
 	onSyncPlayhead,
 	playbackRate,
+	playbackDisabled,
 	playbackRequested,
 	playheadUs,
 	previewUrl,
@@ -137,6 +139,7 @@ export function PreviewViewerRegion({
 					onSyncPlayhead={onSyncPlayhead}
 					previewUrl={previewUrl}
 					fullscreenRef={fullscreenRef}
+					playbackDisabled={playbackDisabled}
 					playbackRequested={playbackRequested}
 					playheadUs={playheadUs}
 					onTogglePlayback={onTogglePlayback}
@@ -162,6 +165,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead,
 	previewUrl,
 	fullscreenRef,
+	playbackDisabled,
 	playbackRequested,
 	playheadUs,
 	onTogglePlayback,
@@ -181,6 +185,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onSyncPlayhead: () => void;
 	previewUrl: string;
 	fullscreenRef: PreviewViewerRegionProps["fullscreenRef"];
+	playbackDisabled: boolean;
 	playbackRequested: boolean;
 	playheadUs: MediaTimeUs;
 	onTogglePlayback: () => void;
@@ -206,6 +211,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 					<PreviewVideoSkin
 						durationUs={asset.durationUs}
 						fullscreenRef={fullscreenRef}
+						playbackDisabled={playbackDisabled}
 						playbackRequested={playbackRequested}
 						onChapterSelected={onChapterSelectionRequested}
 						onSeek={onPlayheadSeekRequested}

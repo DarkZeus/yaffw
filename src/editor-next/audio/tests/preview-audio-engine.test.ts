@@ -105,6 +105,54 @@ describe("Preview presentation timing candidate", () => {
 });
 
 describe("Preview audio context interruptions", () => {
+	it.each(["promise-first", "event-first"])(
+		"re-primes once at the latest position and rate with %s recovery",
+		async (order) => {
+			const context = createLifecycleContext();
+			const { engine, provider } = await setup(undefined, {
+				createAudioContext: () => context,
+			});
+			await engine.play();
+			context.currentTime = 0.4;
+			const pending = deferred<void>();
+			context.resume.mockReturnValue(pending.promise);
+			context.changeState("suspended");
+			context.changeState("interrupted");
+			expect(context.resume).toHaveBeenCalledOnce();
+			expect(engine.getPlaybackState()).toBe("resuming");
+			expect(engine.getCurrentTime()).toBe(0.4);
+			expect(engine.getMetrics().activeTimers).toBe(0);
+
+			const generations = provider.openGeneration.mock.calls.length;
+			await engine.setTime(6);
+			await engine.setPlaybackRate(1.5);
+			expect(engine.getCurrentTime()).toBe(6);
+			expect(engine.getStatus()).toBe("ready");
+			expect(provider.openGeneration).toHaveBeenCalledTimes(generations);
+
+			if (order === "promise-first") {
+				context.state = "running";
+				pending.resolve();
+			} else {
+				context.changeState("running");
+			}
+			await vi.waitFor(() => expect(engine.getPlaybackState()).toBe("playing"));
+			const sources = context.createdSources.length;
+			expect(provider.openGeneration).toHaveBeenCalledTimes(generations + 1);
+			expect(provider.openGeneration).toHaveBeenLastCalledWith(
+				expect.objectContaining({ startSeconds: 6 }),
+			);
+			expect(context.createdSources.at(-1)?.playbackRate.value).toBe(1.5);
+
+			if (order === "promise-first") context.changeState("running");
+			else pending.reject(new Error("Obsolete resume rejection"));
+			await flushMicrotasks();
+			expect(engine.getPlaybackState()).toBe("playing");
+			expect(provider.openGeneration).toHaveBeenCalledTimes(generations + 1);
+			expect(context.createdSources).toHaveLength(sources);
+		},
+	);
+
 	it("keeps duplicate Play idempotent while running", async () => {
 		const context = createLifecycleContext();
 		const { engine } = await setup(undefined, {
@@ -127,7 +175,7 @@ describe("Preview audio context interruptions", () => {
 		const pending = deferred<void>();
 		context.resume.mockImplementation(() => pending.promise);
 		context.changeState("suspended");
-		expect(engine.getPlaybackState()).toBe("recovery-required");
+		expect(engine.getPlaybackState()).toBe("resuming");
 		await engine.setTime(7);
 		await engine.setPlaybackRate(2);
 		context.resume.mockImplementation(async () =>
@@ -149,21 +197,43 @@ describe("Preview audio context interruptions", () => {
 
 	it("publishes a closed context terminal state and never attempts to resume it", async () => {
 		const context = createLifecycleContext();
-		const { engine } = await setup(undefined, {
+		const { engine, provider } = await setup(undefined, {
 			createAudioContext: () => context,
 		});
 		const observed: string[] = [];
 		engine.subscribe(() => observed.push(engine.getPlaybackState()));
 		await engine.play();
 		context.changeState("closed");
+		const generationCount = provider.openGeneration.mock.calls.length;
 		await engine.play();
 		await engine.setTime(4);
+		await engine.setPlaybackRate(2);
 		engine.pause();
 		expect(engine.getPlaybackState()).toBe("closed");
 		expect(engine.getStatus()).toBe("ready");
 		expect(context.resume).not.toHaveBeenCalled();
 		expect(observed).toContain("closed");
 		expect(engine.getMetrics().activeTimers).toBe(0);
+		expect(provider.openGeneration).toHaveBeenCalledTimes(generationCount);
+	});
+
+	it("publishes context closure even while the initial decode is pending", async () => {
+		const first = deferred<MediaWindowTrackState[]>();
+		const provider = createProvider(() => first.promise);
+		const context = createLifecycleContext();
+		const preparation = setup(provider, { createAudioContext: () => context });
+		await vi.waitFor(() => expect(provider.pulls).toHaveLength(1));
+		context.changeState("closed");
+		const { engine } = await preparation;
+		expect(engine.getPlaybackState()).toBe("closed");
+		expect(engine.getStatus()).toBe("preparing");
+
+		first.resolve(states(0, 2, provider.trackIds));
+		await flushMicrotasks();
+		await engine.play();
+		expect(engine.getPlaybackState()).toBe("closed");
+		expect(context.resume).not.toHaveBeenCalled();
+		expect(context.createdSources).toHaveLength(0);
 	});
 });
 
@@ -685,10 +755,12 @@ function states(
 }
 function deferred<T>() {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((r) => {
+	let reject!: (reason?: unknown) => void;
+	const promise = new Promise<T>((r, fail) => {
 		resolve = r;
+		reject = fail;
 	});
-	return { promise, resolve };
+	return { promise, resolve, reject };
 }
 function createAudioContextSpy() {
 	const destination = createAudioNodeSpy();

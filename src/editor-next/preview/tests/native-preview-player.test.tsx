@@ -294,6 +294,111 @@ describe("NativePreviewPlayer", () => {
 		},
 	);
 
+	it("shows recovery phases and retires a pending muted follower when Pause wins", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
+		render(<AudioMasterPlayerProbe />);
+		await waitFor(() =>
+			expect(adapterMockState.previewAudioEngines).toHaveLength(1),
+		);
+		const [engine] = adapterMockState.previewAudioEngines;
+		const video = screen.getByLabelText(
+			"Preview for clip.mp4",
+		) as HTMLVideoElement;
+		fireEvent.click(screen.getByRole("button", { name: "Play" }));
+		await waitFor(() =>
+			expect(
+				screen
+					.getByLabelText("Preview viewer header")
+					.querySelector(".text-workbench-progress"),
+			).toBeTruthy(),
+		);
+
+		act(() => {
+			engine.setCurrentTimeSeconds(0.5);
+			engine.setPlaybackState("interrupted");
+		});
+		expect(video.paused).toBe(true);
+		expect(video.muted).toBe(true);
+		expect(screen.getByLabelText("Preview playhead time").textContent).toBe(
+			"00:00:00.500",
+		);
+		act(() => engine.setPlaybackState("resuming"));
+		expect(screen.getByText("Resuming Preview audio…")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Resume audio" })).toBeTruthy();
+		act(() => engine.setPlaybackState("recovery-required"));
+		expect(
+			screen.getByText("Preview audio needs a manual resume."),
+		).toBeTruthy();
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Seek forward 1 second" }),
+		);
+		expect(engine.setTime).toHaveBeenLastCalledWith(1.5);
+		fireEvent.change(screen.getByLabelText("Playback speed"), {
+			target: { value: "1.5" },
+		});
+		expect(engine.setPlaybackRate).toHaveBeenLastCalledWith(1.5);
+		engine.play.mockImplementationOnce(() => {
+			engine.setPlaybackState("buffering");
+			return Promise.resolve();
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Resume audio" }));
+		expect(screen.getByText("Preparing Preview audio…")).toBeTruthy();
+		expect(play).toHaveBeenCalledOnce();
+
+		const follower = createDeferredPlayback();
+		play.mockReturnValueOnce(follower.promise);
+		act(() => {
+			engine.setCurrentTimeSeconds(1.5);
+			engine.setPlaybackState("playing");
+		});
+		expect(play).toHaveBeenCalledTimes(2);
+		fireEvent.click(screen.getByRole("button", { name: "Pause preview" }));
+		await act(async () => follower.resolve());
+		expect(video.paused).toBe(true);
+		expect(engine.getPlaybackState()).toBe("paused");
+		expect(screen.queryByRole("button", { name: "Resume audio" })).toBeNull();
+	});
+
+	it("keeps a closed context terminal even if track preparation never established readiness", async () => {
+		vi.stubGlobal("AudioContext", class AudioContext {});
+		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>
+			createPreparedPreviewAudioResourcesForRequest(request),
+		);
+		const createEngine =
+			adapterMockState.previewAudioEngineCreate.getMockImplementation();
+		if (!createEngine)
+			throw new Error("Expected a Preview audio engine fixture.");
+		adapterMockState.previewAudioEngineCreate.mockImplementationOnce(
+			async () => {
+				const engine = await createEngine();
+				engine.getStatus.mockReturnValue("preparing");
+				engine.setPlaybackState("closed");
+				return engine;
+			},
+		);
+		render(<AudioMasterPlayerProbe />);
+		await screen.findByText(
+			"Preview audio is unavailable. Close and reopen the file to restore audio.",
+		);
+		const viewer = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Play preview",
+		});
+		const transport = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Play",
+		});
+		expect(viewer.disabled).toBe(true);
+		expect(transport.disabled).toBe(true);
+		fireEvent.keyDown(document, { key: "k", code: "KeyK" });
+		expect(play).not.toHaveBeenCalled();
+		expect(
+			adapterMockState.previewAudioEngines[0]?.play,
+		).not.toHaveBeenCalled();
+	});
+
 	it("routes viewer play, pause, and seek through the audio-master transport", async () => {
 		vi.stubGlobal("AudioContext", class AudioContext {});
 		preparePreviewAudioResourcesMock.mockImplementation(async (request) =>

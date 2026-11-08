@@ -33,6 +33,7 @@ export function PreviewVideoSkin({
 	children,
 	durationUs,
 	fullscreenRef,
+	playbackDisabled,
 	playbackRequested,
 	onChapterSelected,
 	onSeek,
@@ -42,6 +43,7 @@ export function PreviewVideoSkin({
 	children: ReactNode;
 	durationUs: MediaTimeUs;
 	fullscreenRef: RefObject<HTMLDivElement | null>;
+	playbackDisabled: boolean;
 	playbackRequested: boolean;
 	onChapterSelected?: (selection: Selection) => void;
 	onSeek: (timeUs: MediaTimeUs) => void;
@@ -67,6 +69,7 @@ export function PreviewVideoSkin({
 						<button
 							aria-label={playbackRequested ? "Pause preview" : "Play preview"}
 							className="preview-video-button"
+							disabled={playbackDisabled}
 							onClick={onTogglePlayback}
 							type="button"
 						>

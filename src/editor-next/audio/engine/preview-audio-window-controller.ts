@@ -7,7 +7,7 @@ import type {
 } from "./media-window-provider";
 import {
 	type PreviewAudioContextLifecycleSource,
-	type PreviewAudioContextState,
+	type PreviewAudioContextAvailability,
 	createPreviewAudioContextLifecycle,
 } from "./preview-audio-context-lifecycle";
 import {
@@ -26,6 +26,8 @@ type OwnedGeneration = {
 	throughSeconds: number;
 };
 
+type PlaybackIntent = { resumePending: boolean };
+
 /** Owns decode generations and transport intent; the asset hook owns the provider. */
 export function createPreviewAudioWindowController(
 	provider: MediaWindowProvider,
@@ -35,7 +37,8 @@ export function createPreviewAudioWindowController(
 ) {
 	let destroyed = false;
 	let version = 0;
-	let desiredPlaying = false;
+	let playbackIntent: PlaybackIntent | null = null;
+	let interruptedTimeSeconds: number | null = null;
 	let active: OwnedGeneration | null = null;
 	const retries = new Map<string, OwnedGeneration>();
 	const listeners = new Set<() => void>();
@@ -44,13 +47,9 @@ export function createPreviewAudioWindowController(
 	let playbackRate = initialPlaybackRate;
 	let playbackState: PreviewAudioPlaybackState =
 		audioContext.state === "closed" ? "closed" : "paused";
-	let recoveryRequest = 0;
-	let playRequest = 0;
-	let interruptionObserved =
-		audioContext.state === "suspended" || audioContext.state === "interrupted";
 	const contextLifecycle = createPreviewAudioContextLifecycle(
 		audioContext,
-		contextStateChanged,
+		contextAvailabilityChanged,
 	);
 	const metrics = {
 		generationsOpened: 0,
@@ -67,50 +66,85 @@ export function createPreviewAudioWindowController(
 		playbackState = state;
 		notify();
 	}
-	function contextStateChanged(state: PreviewAudioContextState) {
-		if (destroyed) return;
-		if (state === "running") {
-			interruptionObserved = false;
-			if (desiredPlaying) void prepare(engine.getCurrentTime());
+	function getCurrentTime() {
+		return interruptedTimeSeconds ?? engine.getCurrentTime();
+	}
+
+	function contextAvailabilityChanged(
+		availability: PreviewAudioContextAvailability,
+	) {
+		if (destroyed || playbackState === "closed") return;
+		const intent = playbackIntent;
+		if (availability === "closed") {
+			playbackIntent = null;
+			contextLifecycle.cancelResume();
+			engine.pause();
+			invalidate();
+			setPlaybackState("closed");
 			return;
 		}
-		// Some browsers alternate suspended/interrupted while resume is pending.
-		// Treat both reports as one interruption, rather than a retry trigger.
-		if (state !== "closed" && interruptionObserved) return;
-		interruptionObserved = true;
+		if (!intent) return;
+		if (availability === "running") {
+			if (!intent.resumePending)
+				startAutomatically(intent, resumePlayback(intent));
+			return;
+		}
+
 		engine.pause();
+		interruptedTimeSeconds = getCurrentTime();
 		invalidate();
-		contextLifecycle.cancelResume();
-		recoveryRequest++;
-		if (state === "closed") {
-			desiredPlaying = false;
-			setPlaybackState("closed");
-		} else if (desiredPlaying) {
+		if (!intent.resumePending) {
 			setPlaybackState("interrupted");
-			// Exactly one attempt per observed interruption; rejected/pending attempts
-			// expose explicit Play recovery instead of polling the browser.
-			void requestContextResume().then((running) => {
-				if (running && !active && desiredPlaying && !destroyed)
-					void prepare(engine.getCurrentTime());
-			});
-		} else setPlaybackState("paused");
-	}
-	async function requestContextResume() {
-		const request = ++recoveryRequest;
-		if (contextLifecycle.getState() === "closed") {
-			setPlaybackState("closed");
-			return false;
+			if (playbackIntent === intent)
+				startAutomatically(intent, requestContextResume(intent));
 		}
-		if (!contextLifecycle.isRunning()) setPlaybackState("recovery-required");
+	}
+
+	function startAutomatically(intent: PlaybackIntent, start: Promise<void>) {
+		void start.catch(() => {
+			if (playbackIntent === intent) pause();
+		});
+	}
+
+	async function requestContextResume(intent: PlaybackIntent) {
+		intent.resumePending = true;
+		setPlaybackState(contextLifecycle.isRunning() ? "buffering" : "resuming");
+		if (playbackIntent !== intent) return;
 		const running = await contextLifecycle.resume();
-		if (destroyed || request !== recoveryRequest || !desiredPlaying)
-			return false;
-		if (!running) {
+		if (playbackIntent !== intent) return;
+		intent.resumePending = false;
+		if (!running || !contextLifecycle.isRunning()) {
 			setPlaybackState("recovery-required");
-			return false;
+			return;
 		}
-		return true;
+		await resumePlayback(intent);
 	}
+
+	async function resumePlayback(intent: PlaybackIntent) {
+		const interruptionPosition = interruptedTimeSeconds;
+		if (interruptionPosition !== null || !active) {
+			const position = interruptionPosition ?? engine.getCurrentTime();
+			interruptedTimeSeconds = null;
+			void prepare(position);
+		} else {
+			setPlaybackState("buffering");
+		}
+		let pending: Promise<void>;
+		do {
+			pending = readiness;
+			await pending;
+		} while (pending !== readiness && playbackIntent === intent);
+		if (playbackIntent === intent && active) await resume(active);
+	}
+
+	function pause() {
+		playbackIntent = null;
+		contextLifecycle.cancelResume();
+		stopTimer();
+		engine.pause();
+		if (playbackState !== "closed") setPlaybackState("paused");
+	}
+
 	function stopTimer() {
 		if (timer !== null) {
 			clearInterval(timer);
@@ -239,18 +273,34 @@ export function createPreviewAudioWindowController(
 			})),
 		);
 	}
-	async function resume() {
-		if (destroyed || !desiredPlaying) return;
-		if (!contextLifecycle.isRunning()) return;
-		await engine.play();
-		if (!destroyed && desiredPlaying && engine.isPlaying()) {
+	async function resume(owned: OwnedGeneration) {
+		const intent = playbackIntent;
+		if (
+			!intent ||
+			intent.resumePending ||
+			!current(owned) ||
+			!contextLifecycle.isRunning()
+		)
+			return;
+		try {
+			await engine.play();
+		} catch (error) {
+			if (playbackIntent === intent && current(owned)) throw error;
+			return;
+		}
+		if (
+			playbackIntent === intent &&
+			current(owned) &&
+			contextLifecycle.isRunning() &&
+			engine.isPlaying()
+		) {
 			setPlaybackState("playing");
-			if (timer === null)
+			if (timer === null && playbackIntent === intent && current(owned))
 				timer = setInterval(tick, PREVIEW_AUDIO_WINDOW_PULL_INTERVAL_MS);
 		}
 	}
 	function prepare(timeSeconds: number) {
-		if (destroyed) return Promise.resolve();
+		if (destroyed || playbackState === "closed") return Promise.resolve();
 		const startSeconds = Math.max(
 			0,
 			Math.min(
@@ -258,6 +308,11 @@ export function createPreviewAudioWindowController(
 				Number.isFinite(timeSeconds) ? timeSeconds : 0,
 			),
 		);
+		if (interruptedTimeSeconds !== null) {
+			interruptedTimeSeconds = startSeconds;
+			notify();
+			return Promise.resolve();
+		}
 		engine.pause();
 		invalidate();
 		const owned = open(startSeconds);
@@ -267,12 +322,8 @@ export function createPreviewAudioWindowController(
 			if (!current(owned)) return;
 			await prime(owned, startSeconds);
 			const status = engine.getStatus();
-			if (
-				current(owned) &&
-				desiredPlaying &&
-				(status === "ready" || status === "degraded")
-			)
-				await resume();
+			if (current(owned) && (status === "ready" || status === "degraded"))
+				await resume(owned);
 		});
 		const retired = new Promise<void>((resolve) => {
 			owned.abort.signal.addEventListener("abort", () => resolve(), {
@@ -280,13 +331,21 @@ export function createPreviewAudioWindowController(
 			});
 		});
 		readiness = Promise.race([pending, retired]);
-		if (desiredPlaying && contextLifecycle.isRunning())
+		if (
+			playbackIntent &&
+			!playbackIntent.resumePending &&
+			contextLifecycle.isRunning()
+		)
 			setPlaybackState("buffering");
 		notify();
 		return pending;
 	}
 	return {
-		prepare,
+		initialize(timeSeconds: number) {
+			void prepare(timeSeconds);
+			return readiness;
+		},
+		getCurrentTime,
 		getPlaybackState: () => playbackState,
 		isTrackRetrying: (trackId: string) =>
 			retries.get(trackId)?.phase === "priming",
@@ -304,9 +363,7 @@ export function createPreviewAudioWindowController(
 		destroy() {
 			if (destroyed) return;
 			destroyed = true;
-			desiredPlaying = false;
-			playRequest++;
-			recoveryRequest++;
+			playbackIntent = null;
 			contextLifecycle.destroy();
 			stopTimer();
 			engine.pause();
@@ -316,38 +373,16 @@ export function createPreviewAudioWindowController(
 			void engine.destroy();
 			metrics.cleanupCount++;
 		},
-		pause() {
-			desiredPlaying = false;
-			playRequest++;
-			recoveryRequest++;
-			contextLifecycle.cancelResume();
-			stopTimer();
-			engine.pause();
-			if (playbackState !== "closed") setPlaybackState("paused");
-		},
+		pause,
 		async play() {
 			if (destroyed || playbackState === "closed") return;
 			if (engine.isPlaying() && contextLifecycle.isRunning()) return;
-			const request = ++playRequest;
-			desiredPlaying = true;
-			if (contextLifecycle.isRunning()) setPlaybackState("buffering");
-			if (!(await requestContextResume()) || request !== playRequest) return;
-			if (!active) void prepare(engine.getCurrentTime());
-			// A seek can replace the awaited preparation while a play command is pending.
-			let pending: Promise<void>;
-			do {
-				pending = readiness;
-				await pending;
-			} while (
-				pending !== readiness &&
-				!destroyed &&
-				desiredPlaying &&
-				request === playRequest
-			);
-			if (!destroyed && desiredPlaying && request === playRequest)
-				await resume();
+			const intent = { resumePending: false };
+			playbackIntent = intent;
+			await requestContextResume(intent);
 		},
 		setTime(timeSeconds: number) {
+			if (playbackState === "closed") return Promise.resolve();
 			// The transport synchronizes its playhead before Play. A paused window at
 			// that exact position already owns everything necessary for exact resume.
 			if (
@@ -360,6 +395,7 @@ export function createPreviewAudioWindowController(
 			return prepare(timeSeconds);
 		},
 		setPlaybackRate(rate: number) {
+			if (playbackState === "closed") return Promise.resolve();
 			const normalized =
 				Number.isFinite(rate) && rate > 0
 					? Math.max(0.25, Math.min(4, rate))
@@ -368,13 +404,19 @@ export function createPreviewAudioWindowController(
 			playbackRate = normalized;
 			engine.pause();
 			engine.setPlaybackRate(normalized);
-			return prepare(engine.getCurrentTime());
+			return prepare(getCurrentTime());
 		},
 		rebuildRouting() {
-			return prepare(engine.getCurrentTime());
+			return playbackState === "closed"
+				? Promise.resolve()
+				: prepare(getCurrentTime());
 		},
 		async retryTrack(trackId: string) {
-			if (destroyed || engine.getTrackReadiness(trackId)?.kind !== "failure")
+			if (
+				destroyed ||
+				playbackState === "closed" ||
+				engine.getTrackReadiness(trackId)?.kind !== "failure"
+			)
 				return;
 			const previous = retries.get(trackId);
 			if (previous?.phase === "priming") return;

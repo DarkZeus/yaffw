@@ -23,6 +23,11 @@ export type PreviewAudioMonitoringStatus =
 	| "preparing"
 	| "ready";
 
+export type PreviewAudioMonitoringSnapshot = {
+	status: PreviewAudioMonitoringStatus;
+	engine: "unavailable" | "established" | "closed";
+};
+
 export type UsePreviewAudioMonitoringLifecycleOptions = {
 	activeMediaAssetCleanupScope?: ActiveMediaAssetCleanupScope;
 	audioMix: AudioMix;
@@ -32,7 +37,7 @@ export type UsePreviewAudioMonitoringLifecycleOptions = {
 	getPlayheadUs: () => MediaTimeUs;
 	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	muted: boolean;
-	onStatusChange?: (status: PreviewAudioMonitoringStatus) => void;
+	onStatusChange?: (snapshot: PreviewAudioMonitoringSnapshot) => void;
 	soloedAudioTrackId?: string | null;
 	volume: number;
 };
@@ -56,8 +61,18 @@ export function usePreviewAudioMonitoringLifecycle({
 		soloedAudioTrackId,
 		volume,
 	}));
-	const reportStatus = useEffectEvent((status: PreviewAudioMonitoringStatus) =>
-		onStatusChange?.(status),
+	const reportStatus = useEffectEvent(
+		(status: PreviewAudioMonitoringStatus, engine?: PreviewAudioEngine) => {
+			onStatusChange?.({
+				status,
+				engine:
+					engine?.getPlaybackState() === "closed"
+						? "closed"
+						: engine
+							? "established"
+							: "unavailable",
+			});
+		},
 	);
 
 	useEffect(() => {
@@ -113,7 +128,7 @@ export function usePreviewAudioMonitoringLifecycle({
 				lifecycle.registerCleanup(
 					previewAudioEngine.subscribe(() => {
 						if (!lifecycle.isDisposed()) {
-							reportStatus(previewAudioEngine.getStatus());
+							reportStatus(previewAudioEngine.getStatus(), previewAudioEngine);
 						}
 					}),
 				);
@@ -122,7 +137,7 @@ export function usePreviewAudioMonitoringLifecycle({
 					previewAudioEngine,
 					resources: previewAudioResources.resources,
 				});
-				reportStatus(previewAudioEngine.getStatus());
+				reportStatus(previewAudioEngine.getStatus(), previewAudioEngine);
 			})
 			.catch(() => {
 				if (!lifecycle.isDisposed()) {

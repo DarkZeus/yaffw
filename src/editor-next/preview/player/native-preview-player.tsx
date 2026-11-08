@@ -17,6 +17,7 @@ import type {
 import { canUsePreviewAudioEngine } from "../../audio/engine/preview-audio-engine";
 import { usePreviewAudioMonitoring } from "../../audio/engine/preview-audio-monitoring-provider";
 import {
+	type PreviewAudioMonitoringSnapshot,
 	type PreviewAudioMonitoringStatus,
 	usePreviewAudioMonitoringLifecycle,
 } from "../../audio/engine/use-preview-audio-monitoring-lifecycle";
@@ -116,8 +117,23 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 			};
 		},
 	});
-	const [audioMonitoringStatus, setAudioMonitoringStatus] =
-		useState<PreviewAudioMonitoringStatus>("idle");
+	const [audioMonitoring, setAudioMonitoring] =
+		useState<PreviewAudioMonitoringSnapshot>({
+			status: "idle",
+			engine: "unavailable",
+		});
+	const reportAudioMonitoring = useCallback(
+		(snapshot: PreviewAudioMonitoringSnapshot) => {
+			setAudioMonitoring((previous) =>
+				previous.status === snapshot.status &&
+				previous.engine === snapshot.engine
+					? previous
+					: snapshot,
+			);
+		},
+		[],
+	);
+	const audioMonitoringStatus = audioMonitoring.status;
 	const [previewUrl, setPreviewUrl] = useState("");
 	audioMixRef.current = audioMix;
 	audioMonitoringStatusRef.current = audioMonitoringStatus;
@@ -166,12 +182,9 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	);
 	const previewClockMode = resolvePreviewClockMode({
 		asset,
-		audioMonitoringFailed: audioMonitoringStatus === "failed",
-		audioMonitoringReady:
-			audioMonitoringStatus === "ready" || audioMonitoringStatus === "degraded",
-		audioMonitoringEstablished:
-			audioMonitoringStatus === "preparing" &&
-			previewAudioEngineRef.current !== null,
+		audioMonitoringFailed:
+			audioMonitoringStatus === "failed" && audioMonitoring.engine !== "closed",
+		audioMonitoringEstablished: audioMonitoring.engine !== "unavailable",
 		previewAudioResources,
 		audioPreviewTransportSupported,
 	});
@@ -315,7 +328,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		getPlaybackRate: readPreviewAudioMonitoringPlaybackRate,
 		getPlayheadUs: readPreviewAudioMonitoringPlayheadUs,
 		muted,
-		onStatusChange: setAudioMonitoringStatus,
+		onStatusChange: reportAudioMonitoring,
 		previewAudioEngineRef,
 		soloedAudioTrackId,
 		volume,
@@ -364,6 +377,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onPlayheadSeekRequested={seekToUsWithScrubPreview}
 					onSyncPlayhead={syncPlayheadWithNativeVideo}
 					playbackRate={playbackRate}
+					playbackDisabled={audioPlaybackState === "closed"}
 					playbackRequested={playbackRequested}
 					playheadUs={playheadUs}
 					previewUrl={previewUrl}
