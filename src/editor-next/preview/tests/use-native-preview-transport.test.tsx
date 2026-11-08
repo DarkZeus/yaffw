@@ -30,7 +30,7 @@ beforeEach(() => {
 		configurable: true,
 		value: pause,
 	});
-	play.mockClear();
+	play.mockReset().mockResolvedValue(undefined);
 	pause.mockClear();
 });
 
@@ -280,9 +280,68 @@ describe("useNativePreviewTransport", () => {
 		fireEvent.play(video);
 		expect(readState()).toContain("playing:true");
 
+		video.currentTime = 12;
+		stubNativeEnd(video, 12);
 		fireEvent.ended(video);
 		expect(readState()).toContain("playing:false");
 		expect(readState()).toContain("playhead:12000000");
+	});
+
+	it("uses the terminal native sample to enter and wrap a Selection at media end", async () => {
+		render(
+			<NativePreviewTransportProbe
+				previewClockMode="native-video"
+				selection={{ startUs: 11_900_000, endUs: 12_000_000 }}
+			/>,
+		);
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		stubNativeEnd(video, 12);
+		video.currentTime = 11.5;
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		fireEvent.click(screen.getByText("Toggle loop"));
+		fireEvent.timeUpdate(video);
+		expect(video.currentTime).toBe(11.5);
+
+		video.currentTime = 12;
+		fireEvent.pause(video);
+		fireEvent.ended(video);
+
+		expect(video.currentTime).toBe(11.9);
+		expect(readState()).toContain("requested:true");
+		expect(readState()).toContain("playhead:11900000");
+		await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+		fireEvent.ended(video);
+		expect(play).toHaveBeenCalledTimes(2);
+		expect(readState()).toContain("requested:true");
+	});
+
+	it("wraps from the audio clock while the native follower is still starting", async () => {
+		const { frameCallbacks } = stubPreviewAnimationFrames();
+		const followerPlay = createDeferred<void>();
+		play.mockReturnValueOnce(followerPlay.promise);
+		const engine = createPreviewAudioEngineSpy({
+			setTimeUpdatesCurrentTime: true,
+		});
+		render(
+			<NativePreviewTransportProbe
+				previewAudioEngine={engine}
+				selection={{ startUs: 11_900_000, endUs: 12_000_000 }}
+			/>,
+		);
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		video.currentTime = 11.5;
+		fireEvent.click(screen.getByText("Toggle loop"));
+		fireEvent.click(screen.getByText("Toggle playback"));
+		await waitFor(() => expect(play).toHaveBeenCalledOnce());
+		expect(readState()).toContain("playing:false");
+		expect(engine.setPlaybackEnd).toHaveBeenLastCalledWith(12);
+
+		engine.setCurrentTimeSeconds(12);
+		runNextPreviewFrame(frameCallbacks);
+		expect(engine.setTime).toHaveBeenLastCalledWith(11.9);
+		expect(readState()).toContain("requested:true");
+		await act(async () => followerPlay.resolve());
 	});
 
 	it.each([true])(
@@ -578,6 +637,13 @@ function trackVideoCurrentTimeWrites(
 			return [...writes];
 		},
 	};
+}
+
+function stubNativeEnd(video: HTMLVideoElement, durationSeconds: number) {
+	Object.defineProperty(video, "ended", {
+		configurable: true,
+		get: () => video.currentTime >= durationSeconds,
+	});
 }
 
 function createDeferred<T>() {

@@ -30,5 +30,6 @@ describe("createPreviewMediaTransport", () => {
 		expect(transport.volume).toBe(0.25);
 		expect(transport.muted).toBe(true);
 		expect(transport.seeking).toBe(video.seeking);
+		expect(transport.ended).toBe(video.ended);
 	});
 });

@@ -18,6 +18,7 @@ import type {
 } from "../../audio/types/preview-audio-engine.types";
 import type { ScrubPreviewTransport } from "../scrub/use-scrub-preview";
 import type { PreviewClockMode } from "./preview-clock-mode";
+import { createSelectionLoop } from "./selection-loop";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
 const PREVIEW_AV_HARD_RESYNC_FRAME_TOLERANCE = 2;
@@ -26,6 +27,7 @@ const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 50_000;
 
 export type PreviewMediaTransportHandle = {
 	currentTime: number;
+	readonly ended: boolean;
 	readonly seeking?: boolean;
 	muted: boolean;
 	pause: () => Promise<void> | void;
@@ -72,7 +74,6 @@ export function useNativePreviewTransport({
 	const hasScrubTarget = scrubPreview?.hasTarget;
 	const onNativeSeekRequested = scrubPreview?.onNativeSeekRequested;
 	const playheadRef = useRef<MediaTimeUs>(0);
-	const renderingPlayheadRef = useRef<MediaTimeUs>(0);
 	const playbackRateRef = useRef(1);
 	const playbackStartRequestIdRef = useRef(0);
 	const playbackStartPendingRef = useRef(false);
@@ -90,18 +91,13 @@ export function useNativePreviewTransport({
 	const playheadStateRef = useRef<MediaTimeUs>(0);
 	const pendingVideoFollowerSeekSecondsRef = useRef<number | null>(null);
 	const pausedAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
-	const selectionLoopEnteredRef = useRef(false);
+	const [selectionLoop] = useState(() => createSelectionLoop(selection));
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [muted, setMuted] = useState(false);
 	const [playbackRate, setPlaybackRate] = useState(1);
 	const [playheadUs, setPlayheadUsState] = useState<MediaTimeUs>(0);
 	const [selectionLoopEnabled, setSelectionLoopEnabled] = useState(false);
 	const [volume, setVolume] = useState(1);
-	const selectionLoopConfigRef = useRef({
-		selection,
-		enabled: selectionLoopEnabled,
-	});
-	selectionLoopConfigRef.current = { selection, enabled: selectionLoopEnabled };
 
 	const getPlaybackRate = useCallback(() => playbackRateRef.current, []);
 	const getPlayheadUs = useCallback(() => playheadRef.current, []);
@@ -114,7 +110,6 @@ export function useNativePreviewTransport({
 		}
 
 		playheadRef.current = 0;
-		renderingPlayheadRef.current = 0;
 		playheadStateRef.current = 0;
 		playheadStateCommitTimestampRef.current = null;
 		pendingVideoFollowerSeekSecondsRef.current = null;
@@ -123,7 +118,7 @@ export function useNativePreviewTransport({
 		playbackStartPendingRef.current = false;
 		setPlaybackRequested(false);
 		previewScrubActiveRef.current = false;
-		selectionLoopEnteredRef.current = false;
+		selectionLoop.setEnabled(false, 0);
 		setPlayheadUsState(0);
 		setIsPlaying(false);
 		setSelectionLoopEnabled(false);
@@ -131,7 +126,7 @@ export function useNativePreviewTransport({
 			playbackStartRequestIdRef.current += 1;
 			playbackRequestedRef.current = false;
 		};
-	}, [source, setPlaybackRequested]);
+	}, [source, selectionLoop, setPlaybackRequested]);
 
 	const commitPlayheadState = useCallback(
 		(nextPlayheadUs: MediaTimeUs, options: PlayheadCommitOptions) => {
@@ -178,9 +173,17 @@ export function useNativePreviewTransport({
 		[commitPlayheadState, durationUs],
 	);
 
+	const syncAudioLoopEnd = useCallback(() => {
+		if (!audioMasterClockActive) return;
+		const endUs = selectionLoop.getPlaybackEndUs();
+		previewAudioEngineRef.current?.setPlaybackEnd(
+			endUs === null ? null : endUs / 1_000_000,
+		);
+	}, [audioMasterClockActive, previewAudioEngineRef, selectionLoop]);
+
 	const setPreviewTransportTime = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
-			renderingPlayheadRef.current = nextPlayheadUs;
+			selectionLoop.reposition(nextPlayheadUs);
 			const nextTimeSeconds = nextPlayheadUs / 1_000_000;
 			const video = videoRef.current;
 
@@ -195,11 +198,7 @@ export function useNativePreviewTransport({
 			}
 
 			if (audioMasterClockActive) {
-				previewAudioEngineRef.current?.setPlaybackEnd(
-					selectionLoopEnabled && nextPlayheadUs < selection.endUs
-						? selection.endUs / 1_000_000
-						: null,
-				);
+				syncAudioLoopEnd();
 				void previewAudioEngineRef.current?.setTime(nextTimeSeconds);
 			}
 		},
@@ -207,19 +206,21 @@ export function useNativePreviewTransport({
 			audioMasterClockActive,
 			onNativeSeekRequested,
 			previewAudioEngineRef,
-			selection.endUs,
-			selectionLoopEnabled,
+			selectionLoop,
+			syncAudioLoopEnd,
 			videoRef,
 		],
 	);
 
-	const updateSelectionLoopEntryFromPlayhead = useCallback(
-		(nextPlayheadUs: MediaTimeUs) => {
-			selectionLoopEnteredRef.current =
-				selectionLoopEnabled &&
-				isMediaTimeInsideSelection(nextPlayheadUs, selection);
+	const wrapSelectionLoopAt = useCallback(
+		(playbackTimeUs: MediaTimeUs) => {
+			const startUs = selectionLoop.advancePlayback(playbackTimeUs);
+			if (startUs === null) return false;
+			setPreviewTransportTime(startUs);
+			setPlayheadUs(startUs);
+			return true;
 		},
-		[selection, selectionLoopEnabled],
+		[selectionLoop, setPlayheadUs, setPreviewTransportTime],
 	);
 
 	const seekToUs = useCallback(
@@ -232,15 +233,9 @@ export function useNativePreviewTransport({
 
 			previewScrubActiveRef.current = false;
 			setPreviewTransportTime(clampedPlayheadUs);
-			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
 		},
-		[
-			durationUs,
-			setPlayheadUs,
-			setPreviewTransportTime,
-			updateSelectionLoopEntryFromPlayhead,
-		],
+		[durationUs, setPlayheadUs, setPreviewTransportTime],
 	);
 
 	const previewScrubToUs = useCallback(
@@ -267,7 +262,7 @@ export function useNativePreviewTransport({
 			pendingVideoFollowerSeekSecondsRef.current =
 				clampedPlayheadUs / 1_000_000;
 
-			updateSelectionLoopEntryFromPlayhead(clampedPlayheadUs);
+			selectionLoop.reposition(clampedPlayheadUs);
 			setPlayheadUs(clampedPlayheadUs);
 		},
 		[
@@ -276,8 +271,8 @@ export function useNativePreviewTransport({
 			durationUs,
 			isPlaying,
 			previewAudioEngineRef,
+			selectionLoop,
 			setPlayheadUs,
-			updateSelectionLoopEntryFromPlayhead,
 			videoRef,
 		],
 	);
@@ -337,12 +332,8 @@ export function useNativePreviewTransport({
 								? engine.getCurrentTime()
 								: video.currentTime,
 						});
-						renderingPlayheadRef.current = secondsToMicroseconds(start);
-						engine.setPlaybackEnd(
-							selectionLoopEnabled && start < selection.endUs / 1_000_000
-								? selection.endUs / 1_000_000
-								: null,
-						);
+						selectionLoop.reposition(secondsToMicroseconds(start));
+						syncAudioLoopEnd();
 						if (!resumingPausedWindow) void engine.setTime(start);
 					}
 					previewScrubActiveRef.current = false;
@@ -356,7 +347,7 @@ export function useNativePreviewTransport({
 					setVideoFollowerTime(video, targetUs);
 				}
 				previewScrubActiveRef.current = false;
-				renderingPlayheadRef.current = secondsToMicroseconds(video.currentTime);
+				selectionLoop.reposition(secondsToMicroseconds(video.currentTime));
 				const completeHandoff = capturePlaybackHandoff?.();
 				await video.play();
 				if (
@@ -385,9 +376,9 @@ export function useNativePreviewTransport({
 			onNativeSeekRequested,
 			previewAudioEngineRef,
 			previewClockMode,
-			selection.endUs,
-			selectionLoopEnabled,
+			selectionLoop,
 			setPlaybackRequested,
+			syncAudioLoopEnd,
 			videoRef,
 		],
 	);
@@ -490,17 +481,6 @@ export function useNativePreviewTransport({
 					!hasScrubTarget?.()
 				) {
 					const time = secondsToMicroseconds(engine.getCurrentTime());
-					const loop = selectionLoopConfigRef.current;
-					if (
-						loop.enabled &&
-						hasPlaybackEnteredSelection({
-							previousPlayheadUs: renderingPlayheadRef.current,
-							currentPlayheadUs: time,
-							selection: loop.selection,
-						})
-					)
-						selectionLoopEnteredRef.current = true;
-					renderingPlayheadRef.current = time;
 					setVideoFollowerTime(video, time);
 					setPlayheadUs(time);
 				}
@@ -556,28 +536,49 @@ export function useNativePreviewTransport({
 		videoRef,
 	]);
 
-	const toggleSelectionLoop = useCallback(() => {
-		setSelectionLoopEnabled((currentSelectionLoopEnabled) => {
-			const nextSelectionLoopEnabled = !currentSelectionLoopEnabled;
-			selectionLoopEnteredRef.current =
-				nextSelectionLoopEnabled &&
-				isMediaTimeInsideSelection(playheadRef.current, selection);
+	const readLoopPositionUs = useCallback(() => {
+		const playheadUs = playheadRef.current;
+		if (
+			!playbackRequestedRef.current ||
+			previewScrubActiveRef.current ||
+			hasScrubTarget?.()
+		) {
+			return playheadUs;
+		}
 
-			return nextSelectionLoopEnabled;
-		});
-	}, [selection]);
+		const engine = audioMasterClockActive
+			? previewAudioEngineRef.current
+			: null;
+		if (engine) return secondsToMicroseconds(engine.getCurrentTime());
+		const video = videoRef.current;
+		return video ? finiteVideoPlayheadUs(video, playheadUs) : playheadUs;
+	}, [audioMasterClockActive, hasScrubTarget, previewAudioEngineRef, videoRef]);
+
+	const toggleSelectionLoop = useCallback(() => {
+		const enabled = !selectionLoop.enabled;
+		selectionLoop.setEnabled(enabled, readLoopPositionUs());
+		setSelectionLoopEnabled(enabled);
+		syncAudioLoopEnd();
+	}, [readLoopPositionUs, selectionLoop, syncAudioLoopEnd]);
 
 	const syncPlayheadWithNativeVideo = useCallback(
 		(options?: PreviewSyncOptions) => {
-			if (previewScrubActiveRef.current || hasScrubTarget?.()) {
-				return;
-			}
-
 			const video = videoRef.current;
-
-			if (!video) {
+			if (
+				!video ||
+				previewScrubActiveRef.current ||
+				(nativeVideoClockActive && video.ended)
+			)
 				return;
-			}
+
+			const engine = audioMasterClockActive
+				? previewAudioEngineRef.current
+				: null;
+			const renderingPlaybackActive =
+				playbackRequestedRef.current &&
+				(engine ? engine.getPlaybackState() === "playing" : isPlaying);
+			const scrubOwnsPlayhead = hasScrubTarget?.();
+			if (scrubOwnsPlayhead && !(engine && renderingPlaybackActive)) return;
 
 			const previousPlayheadUs = playheadRef.current;
 
@@ -607,15 +608,11 @@ export function useNativePreviewTransport({
 					setVideoFollowerTime(video, nextPlayheadUs);
 				}
 
-				renderingPlayheadRef.current = nextPlayheadUs;
-				updateSelectionLoopEntryFromPlayhead(nextPlayheadUs);
+				selectionLoop.reposition(nextPlayheadUs);
 				setPlayheadUs(nextPlayheadUs);
 				return;
 			}
 
-			const engine = audioMasterClockActive
-				? previewAudioEngineRef.current
-				: null;
 			// Presentation drives both visual consumers. Rendering still owns source
 			// clipping, loop entry/wrap and media end, so output delay cannot stop PCM early.
 			const transportTimeSeconds =
@@ -623,8 +620,25 @@ export function useNativePreviewTransport({
 			const renderingPlayheadUs = secondsToMicroseconds(
 				engine?.getCurrentTime() ?? video.currentTime,
 			);
-			const previousRenderingPlayheadUs = renderingPlayheadRef.current;
-			renderingPlayheadRef.current = renderingPlayheadUs;
+			if (renderingPlaybackActive && wrapSelectionLoopAt(renderingPlayheadUs))
+				return;
+
+			if (
+				renderingPlaybackActive &&
+				audioMasterClockActive &&
+				renderingPlayheadUs >= durationUs
+			) {
+				// Media end supersedes any still-pending follower seek from a loop.
+				pendingVideoFollowerSeekSecondsRef.current = durationUs / 1_000_000;
+				engine?.pause();
+				setPlaybackRequested(false);
+				setVideoFollowerTime(video, durationUs);
+				setPlayheadUs(durationUs);
+				setIsPlaying(false);
+				return;
+			}
+			if (scrubOwnsPlayhead) return;
+
 			const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
 			const hardResyncThresholdSeconds =
 				previewAvHardResyncThresholdSeconds(frameDurationUs);
@@ -659,45 +673,9 @@ export function useNativePreviewTransport({
 			}
 
 			if (!isPlaying) {
-				updateSelectionLoopEntryFromPlayhead(nativePlayheadUs);
+				if (!playbackRequestedRef.current)
+					selectionLoop.reposition(nativePlayheadUs);
 				setPlayheadUs(nativePlayheadUs);
-				return;
-			}
-
-			if (
-				selectionLoopEnabled &&
-				shouldLoopSelectionPlayback({
-					currentPlayheadUs: renderingPlayheadUs,
-					previousPlayheadUs: previousRenderingPlayheadUs,
-					selection,
-					selectionEntered: selectionLoopEnteredRef.current,
-				})
-			) {
-				selectionLoopEnteredRef.current = true;
-				setPreviewTransportTime(selection.startUs);
-				setPlayheadUs(selection.startUs);
-				return;
-			}
-
-			if (
-				selectionLoopEnabled &&
-				hasPlaybackEnteredSelection({
-					currentPlayheadUs: renderingPlayheadUs,
-					previousPlayheadUs: previousRenderingPlayheadUs,
-					selection,
-				})
-			) {
-				selectionLoopEnteredRef.current = true;
-			}
-
-			if (audioMasterClockActive && renderingPlayheadUs >= durationUs) {
-				// Media end supersedes any still-pending follower seek from a loop.
-				pendingVideoFollowerSeekSecondsRef.current = durationUs / 1_000_000;
-				previewAudioEngineRef.current?.pause();
-				setPlaybackRequested(false);
-				setVideoFollowerTime(video, durationUs);
-				setPlayheadUs(durationUs);
-				setIsPlaying(false);
 				return;
 			}
 
@@ -714,42 +692,37 @@ export function useNativePreviewTransport({
 			frameDurationUs,
 			hasScrubTarget,
 			isPlaying,
+			nativeVideoClockActive,
 			previewAudioEngineRef,
-			selection,
-			selectionLoopEnabled,
+			selectionLoop,
 			setPlayheadUs,
-			setPreviewTransportTime,
-			updateSelectionLoopEntryFromPlayhead,
 			videoRef,
+			wrapSelectionLoopAt,
 		],
 	);
 
+	const { startUs: selectionStartUs, endUs: selectionEndUs } = selection;
 	useEffect(() => {
-		const engine = audioMasterClockActive
-			? previewAudioEngineRef.current
-			: null;
-		const loopTimeUs =
-			engine?.getPlaybackState() === "playing"
-				? secondsToMicroseconds(engine.getCurrentTime())
-				: playheadRef.current;
-		selectionLoopEnteredRef.current =
-			selectionLoopEnabled && isMediaTimeInsideSelection(loopTimeUs, selection);
-		if (audioMasterClockActive) {
-			previewAudioEngineRef.current?.setPlaybackEnd(
-				selectionLoopEnabled && loopTimeUs < selection.endUs
-					? selection.endUs / 1_000_000
-					: null,
-			);
-		}
+		selectionLoop.setSelection(
+			{ startUs: selectionStartUs, endUs: selectionEndUs },
+			readLoopPositionUs(),
+		);
+		syncAudioLoopEnd();
 	}, [
-		audioMasterClockActive,
-		previewAudioEngineRef,
-		selection,
-		selectionLoopEnabled,
+		readLoopPositionUs,
+		selectionEndUs,
+		selectionLoop,
+		selectionStartUs,
+		source,
+		syncAudioLoopEnd,
 	]);
 
+	// Audio can reach the loop boundary before its muted follower starts.
+	const playbackSamplingActive =
+		isPlaying || (audioMasterClockActive && audioPlaybackState === "playing");
+
 	useEffect(() => {
-		if (!isPlaying) {
+		if (!playbackSamplingActive) {
 			if (playheadAnimationFrameRef.current !== null) {
 				cancelBrowserFrame(playheadAnimationFrameRef.current);
 				playheadAnimationFrameRef.current = null;
@@ -780,28 +753,22 @@ export function useNativePreviewTransport({
 				playheadAnimationFrameRef.current = null;
 			}
 		};
-	}, [isPlaying, syncPlayheadWithNativeVideo]);
+	}, [playbackSamplingActive, syncPlayheadWithNativeVideo]);
 
 	const handleEnded = useCallback(() => {
-		if (!nativeVideoClockActive) {
+		if (
+			!nativeVideoClockActive ||
+			!videoRef.current?.ended ||
+			previewScrubActiveRef.current ||
+			hasScrubTarget?.()
+		) {
 			return;
 		}
 
-		const video = videoRef.current;
-
-		if (
-			video &&
-			selectionLoopEnabled &&
-			selectionLoopEnteredRef.current &&
-			selection.endUs >= durationUs
-		) {
-			setPreviewTransportTime(selection.startUs);
-			setPlayheadUs(selection.startUs);
-			setIsPlaying(true);
-			void video.play().catch(() => {
-				setPlaybackRequested(false);
-				setIsPlaying(false);
-			});
+		// Native video can emit ended between playback samples. The terminal
+		// position can cross both Selection boundaries in one observation.
+		if (playbackRequestedRef.current && wrapSelectionLoopAt(durationUs)) {
+			void startPlayback();
 			return;
 		}
 
@@ -810,27 +777,30 @@ export function useNativePreviewTransport({
 		setIsPlaying(false);
 		setPlayheadUs(durationUs);
 	}, [
-		setPlaybackRequested,
 		durationUs,
-		previewAudioEngineRef,
+		hasScrubTarget,
 		nativeVideoClockActive,
-		selection.endUs,
-		selection.startUs,
-		selectionLoopEnabled,
+		previewAudioEngineRef,
+		setPlaybackRequested,
 		setPlayheadUs,
-		setPreviewTransportTime,
+		startPlayback,
 		videoRef,
+		wrapSelectionLoopAt,
 	]);
 
 	const handleNativePause = useCallback(() => {
-		if (!nativeVideoClockActive) {
-			return;
-		}
+		// A natural end fires pause before ended, which owns the wrap decision.
+		if (!nativeVideoClockActive || videoRef.current?.ended) return;
 
 		previewAudioEngineRef.current?.pause();
 		setPlaybackRequested(false);
 		setIsPlaying(false);
-	}, [previewAudioEngineRef, nativeVideoClockActive, setPlaybackRequested]);
+	}, [
+		previewAudioEngineRef,
+		nativeVideoClockActive,
+		setPlaybackRequested,
+		videoRef,
+	]);
 
 	const handleNativePlay = useCallback(() => {
 		if (!nativeVideoClockActive) {
@@ -876,51 +846,6 @@ export function useNativePreviewTransport({
 		toggleSelectionLoop,
 		volume,
 	};
-}
-
-function shouldLoopSelectionPlayback({
-	currentPlayheadUs,
-	previousPlayheadUs,
-	selection,
-	selectionEntered,
-}: {
-	currentPlayheadUs: MediaTimeUs;
-	previousPlayheadUs: MediaTimeUs;
-	selection: Selection;
-	selectionEntered: boolean;
-}): boolean {
-	const enteredSelection =
-		selectionEntered ||
-		hasPlaybackEnteredSelection({
-			currentPlayheadUs,
-			previousPlayheadUs,
-			selection,
-		});
-
-	return enteredSelection && currentPlayheadUs >= selection.endUs;
-}
-
-function hasPlaybackEnteredSelection({
-	currentPlayheadUs,
-	previousPlayheadUs,
-	selection,
-}: {
-	currentPlayheadUs: MediaTimeUs;
-	previousPlayheadUs: MediaTimeUs;
-	selection: Selection;
-}): boolean {
-	return (
-		isMediaTimeInsideSelection(currentPlayheadUs, selection) ||
-		(previousPlayheadUs < selection.startUs &&
-			currentPlayheadUs >= selection.startUs)
-	);
-}
-
-function isMediaTimeInsideSelection(
-	playheadUs: MediaTimeUs,
-	selection: Selection,
-): boolean {
-	return playheadUs >= selection.startUs && playheadUs < selection.endUs;
 }
 
 function secondsToMicroseconds(seconds: number): MediaTimeUs {

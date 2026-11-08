@@ -34,6 +34,9 @@ export function createPreviewMediaTransport(
 		get seeking() {
 			return player.seeking;
 		},
+		get ended() {
+			return player.ended;
+		},
 		play() {
 			return player.play();
 		},
