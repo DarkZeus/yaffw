@@ -138,10 +138,7 @@ export function EditorNextRouteComposition({
 			key={session.asset.id}
 			assetId={session.asset.id}
 		>
-			<PreviewMeteringProvider
-				asset={session.asset}
-				audioMix={session.audioMix}
-			>
+			<PreviewMeteringProvider asset={session.asset}>
 				{editorWorkbench}
 			</PreviewMeteringProvider>
 		</PreviewAudioMonitoringProvider>

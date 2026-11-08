@@ -671,7 +671,7 @@ function createPlayerElement(
 
 	return (
 		<PreviewAudioMonitoringProvider assetId={asset.id}>
-			<PreviewMeteringProvider asset={asset} audioMix={audioMix}>
+			<PreviewMeteringProvider asset={asset}>
 				<NativePreviewPlayer
 					asset={asset}
 					audioMix={audioMix}
@@ -705,7 +705,7 @@ function AudioMasterPlayerProbe({
 
 	return (
 		<PreviewAudioMonitoringProvider assetId={asset.id}>
-			<PreviewMeteringProvider asset={asset} audioMix={audioMix}>
+			<PreviewMeteringProvider asset={asset}>
 				<NativePreviewPlayer
 					asset={asset}
 					audioMix={audioMix}

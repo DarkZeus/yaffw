@@ -135,8 +135,11 @@ export async function createPreviewAudioEngine({
 		setTime: (...args) => controller.setTime(...args),
 		setPlaybackRate: (...args) => controller.setPlaybackRate(...args),
 		setPlaybackEnd: scheduler.setPlaybackEnd,
-		readMeterSnapshot: () =>
-			graph.readMeterSnapshot(scheduler.isPlaying(), controller.getFailures()),
+		readMeterSnapshot: (sampleSignal = true) =>
+			graph.readMeterSnapshot(
+				sampleSignal && scheduler.isPlaying(),
+				controller.getFailures(),
+			),
 		setOutputGain(gain) {
 			if (destroyed) return;
 			graph.setOutputGain(gain, scheduler.isPlaying());

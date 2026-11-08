@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	memo,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { createDefaultAudioMix } from "@/editor-core/audio-mix";
 import type {
 	AudioMix,
@@ -86,7 +94,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	const audioMonitoringStatusRef = useRef<PreviewAudioMonitoringStatus>("idle");
 	const getPlaybackRateRef = useRef<() => number>(() => 1);
 	const getPlayheadUsRef = useRef<() => MediaTimeUs>(() => 0);
-	const getPreviewMeteringIsPlayingRef = useRef<() => boolean>(() => false);
+	const previewMeteringIsPlayingRef = useRef(false);
 	const previewMeteringPlaybackStateListenersRef = useRef(
 		new Set<() => void>(),
 	);
@@ -94,10 +102,10 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		() => undefined,
 	);
 	const previewMeteringSourceRef = useRef({
-		getIsPlaying: () => getPreviewMeteringIsPlayingRef.current(),
+		getIsPlaying: () => previewMeteringIsPlayingRef.current,
 		getMeteringStatus: () => audioMonitoringStatusRef.current,
-		readMeterSnapshot: () =>
-			previewAudioEngineRef.current?.readMeterSnapshot() ?? null,
+		readMeterSnapshot: (sampleSignal: boolean) =>
+			previewAudioEngineRef.current?.readMeterSnapshot(sampleSignal) ?? null,
 		retryTrack: (trackId: string) =>
 			retryPreviewMeteringTrackRef.current(trackId),
 		subscribeToPlaybackStateChange: (listener: () => void) => {
@@ -285,15 +293,13 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 	]);
 	getPlaybackRateRef.current = getPlaybackRate;
 	getPlayheadUsRef.current = getPlayheadUs;
-	getPreviewMeteringIsPlayingRef.current = () => isPlaying;
 	usePreviewMeteringSource(previewMeteringSourceRef.current);
-	const previousPreviewMeteringIsPlayingRef = useRef(isPlaying);
-	useEffect(() => {
-		if (previousPreviewMeteringIsPlayingRef.current === isPlaying) {
+	useLayoutEffect(() => {
+		if (previewMeteringIsPlayingRef.current === isPlaying) {
 			return;
 		}
 
-		previousPreviewMeteringIsPlayingRef.current = isPlaying;
+		previewMeteringIsPlayingRef.current = isPlaying;
 		for (const listener of previewMeteringPlaybackStateListenersRef.current) {
 			listener();
 		}

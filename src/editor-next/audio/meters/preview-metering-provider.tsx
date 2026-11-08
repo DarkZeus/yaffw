@@ -8,8 +8,7 @@ import {
 	useRef,
 	useState,
 } from "react";
-import type { AudioMix, ReadyMediaAsset } from "@/editor-core/model";
-import { usePreviewAudioMonitoring } from "../engine/preview-audio-monitoring-provider";
+import type { ReadyMediaAsset } from "@/editor-core/model";
 import type {
 	LivePreviewMeteringClock,
 	LivePreviewMeteringState,
@@ -36,25 +35,19 @@ const PreviewMeteringDisplayContext =
 
 export function PreviewMeteringProvider({
 	asset,
-	audioMix,
 	children,
 }: {
 	asset: ReadyMediaAsset;
-	audioMix: AudioMix;
 	children: ReactNode;
 }) {
-	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const [source, setSource] = useState<PreviewMeteringSource | null>(null);
 	const knownTrackIds = useMemo(
 		() => asset.tracks.audio.map((track) => track.id),
 		[asset.tracks.audio],
 	);
 	const meteringState = useLivePreviewMetering({
-		audioMix,
 		clock: source,
-		enabled: true,
 		knownTrackIds,
-		soloedAudioTrackId,
 	});
 	const sourceRef = useRef(source);
 	const trackStatesRef = useRef(meteringState.trackStates);

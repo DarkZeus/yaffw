@@ -28,7 +28,9 @@ export type PreviewAudioEngine = {
 	getPlaybackState: () => PreviewAudioPlaybackState;
 	pause: () => void;
 	play: () => Promise<void>;
-	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot;
+	readMeterSnapshot: (
+		sampleSignal?: boolean,
+	) => PreviewAudioEngineMeterSnapshot;
 	setOutputGain: (gain: number) => void;
 	setPlaybackRate: (playbackRate: number) => Promise<void>;
 	setTime: (timeSeconds: number) => Promise<void>;

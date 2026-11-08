@@ -66,7 +66,7 @@ describe("AudioPanel live meter render isolation", () => {
 
 		render(
 			<PreviewAudioMonitoringProvider assetId={readyAsset.id}>
-				<PreviewMeteringProvider asset={readyAsset} audioMix={audioMix}>
+				<PreviewMeteringProvider asset={readyAsset}>
 					<PreviewMeteringSourceProbe
 						source={{ ...clock, retryTrack: () => undefined }}
 					/>

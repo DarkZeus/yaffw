@@ -401,6 +401,7 @@ _Avoid_: first-slice requirement, automatic fallback
 - **Preview level meters** should preserve supplied channel identity and render the prepared channel list without assuming mono or stereo; sources may be mono, 2.0, 2.1, 5.1, 7.1, or custom channel layouts.
 - **Preview level meters** are live playback readouts; when preview is paused or stopped, they should decay toward silence rather than snap to the paused playhead's analyzed level.
 - **Preview level meter** decay after pause or stop is presentation behavior; the **Preview audio engine** should report actual playback signal state rather than emitting artificial fading levels.
+- The **Preview level meter** adapter samples signal during playback, then advances display decay and each channel's clip deadline independently. Once the display settles at the floor, it stops requesting animation frames and can still refresh meter readiness.
 - In a **Preview audio engine** graph, per-track **Preview level meter** taps should observe each track after channel handling and **Track volume**, while the combined **Preview level meter** tap should observe the monitored mix after include/exclude, **Track volume**, channel handling, and preview solo.
 - All **Preview level meter** taps in a **Preview audio engine** graph should sit before global **Preview volume** and preview mute.
 - Live **Preview level meter** sampling should use a short peak window around 50 ms so the meter remains responsive without flickering on individual samples.

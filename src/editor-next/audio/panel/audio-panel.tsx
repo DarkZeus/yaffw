@@ -175,6 +175,7 @@ function AudioTrackStrip({
 	);
 	const meterDisplay = createTrackMeterDisplay({
 		controlled: previewMeteringControlled,
+		excluded: !audioIncluded && !soloActive,
 		state: previewMeteringState,
 		track,
 		trackIndex: index,
@@ -492,11 +493,13 @@ function createStaticTrackMeterChannels(
 
 function createTrackMeterDisplay({
 	controlled,
+	excluded,
 	state,
 	track,
 	trackIndex,
 }: {
 	controlled: boolean;
+	excluded: boolean;
 	state?: LivePreviewMeteringTrackState;
 	track: AudioMediaTrack;
 	trackIndex: number;
@@ -540,9 +543,9 @@ function createTrackMeterDisplay({
 
 	return {
 		channels: state.channels,
-		excluded: state.excluded,
+		excluded,
 		state: "ready",
-		statusLabel: state.excluded ? "Excluded" : "Ready",
+		statusLabel: excluded ? "Excluded" : "Ready",
 	};
 }
 

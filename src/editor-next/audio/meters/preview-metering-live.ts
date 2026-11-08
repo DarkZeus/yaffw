@@ -3,7 +3,6 @@ import type { PreviewLevelMeterChannel } from "../types/preview-level-meter.type
 import { previewPeakMeterVisualRange } from "./preview-level-meter.constants";
 
 const PREVIEW_METERING_CLIP_HOLD_MS = 750;
-const COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY = "__combined-preview-output__";
 
 export type LivePreviewMeteringSourceStatus =
 	| "degraded"
@@ -12,296 +11,161 @@ export type LivePreviewMeteringSourceStatus =
 	| "preparing"
 	| "ready";
 
-export type LivePreviewMeteringTrackState =
-	| {
-			status: "preparing";
-			trackId: string;
-	  }
-	| {
-			channels: PreviewLevelMeterChannel[];
-			excluded: boolean;
-			status: "ready";
-			trackId: string;
-	  }
-	| {
-			reason: string;
-			status: "unavailable";
-			trackId: string;
-	  };
+export type LivePreviewMeteringTrackState<Channel = PreviewLevelMeterChannel> =
+	| { status: "preparing"; trackId: string }
+	| { channels: Channel[]; status: "ready"; trackId: string }
+	| { reason: string; status: "unavailable"; trackId: string };
 
-export type LivePreviewMeteringTrackStates = Record<
-	string,
-	LivePreviewMeteringTrackState
->;
+export type LivePreviewMeteringCombinedState<
+	Channel = PreviewLevelMeterChannel,
+> =
+	| { channels: Channel[]; partial: boolean; reason?: string; status: "ready" }
+	| { reason?: string; status: "preparing" }
+	| { reason: string; status: "unavailable" };
 
-export type LivePreviewMeteringCombinedState =
-	| {
-			channels: PreviewLevelMeterChannel[];
-			partial: boolean;
-			reason?: string;
-			status: "ready";
-	  }
-	| {
-			reason?: string;
-			status: "preparing";
-	  }
-	| {
-			reason: string;
-			status: "unavailable";
-	  };
-
-export type LivePreviewMeteringState = {
-	combinedState: LivePreviewMeteringCombinedState;
-	trackStates: LivePreviewMeteringTrackStates;
+export type LivePreviewMeteringState<Channel = PreviewLevelMeterChannel> = {
+	combinedState: LivePreviewMeteringCombinedState<Channel>;
+	trackStates: Record<string, LivePreviewMeteringTrackState<Channel>>;
 };
 
 export type LivePreviewMeteringClock = {
 	getIsPlaying: () => boolean;
 	getMeteringStatus: () => LivePreviewMeteringSourceStatus;
-	readMeterSnapshot: () => PreviewAudioEngineMeterSnapshot | null;
+	readMeterSnapshot: (
+		sampleSignal: boolean,
+	) => PreviewAudioEngineMeterSnapshot | null;
 	subscribeToPlaybackStateChange: (listener: () => void) => () => void;
 };
 
-export type LivePreviewMeteringClipHoldState = Record<
-	string,
-	Record<number, number>
->;
-
-export type CreateLivePreviewMeteringTrackStatesOptions = {
-	excludedTrackIds?: ReadonlySet<string>;
-	isPlaying: boolean;
-	knownTrackIds: string[];
-	meterSnapshot: PreviewAudioEngineMeterSnapshot | null;
-	meteringStatus: LivePreviewMeteringSourceStatus;
-	nowMs: number;
-	previousClipHoldState?: LivePreviewMeteringClipHoldState;
+export type PreviewMeterTargetChannel = {
+	clipUntilMs: number | null;
+	label: string;
+	peakDb: number;
 };
 
-export type LivePreviewMeteringTrackStatesResult = {
-	clipHoldState: LivePreviewMeteringClipHoldState;
-} & LivePreviewMeteringState;
+export type PreviewMeterTarget =
+	LivePreviewMeteringState<PreviewMeterTargetChannel>;
 
-export function createLivePreviewMeteringTrackStates({
-	excludedTrackIds = new Set(),
-	isPlaying,
+export const PREPARING_PREVIEW_METERS = {
+	combinedState: {
+		reason: "Preparing engine meter taps",
+		status: "preparing",
+	},
+	trackStates: {},
+} satisfies LivePreviewMeteringState<never>;
+
+export function createPreviewMeterTarget({
 	knownTrackIds,
 	meterSnapshot,
 	meteringStatus,
 	nowMs,
-	previousClipHoldState = {},
-}: CreateLivePreviewMeteringTrackStatesOptions): LivePreviewMeteringTrackStatesResult {
+	previousTarget,
+	sampleSignal,
+}: {
+	knownTrackIds: string[];
+	meterSnapshot: PreviewAudioEngineMeterSnapshot | null;
+	meteringStatus: LivePreviewMeteringSourceStatus;
+	nowMs: number;
+	previousTarget: PreviewMeterTarget | null;
+	sampleSignal: boolean;
+}): PreviewMeterTarget {
 	if (meteringStatus === "failed") {
-		return createUnavailableLivePreviewMeteringState(knownTrackIds);
-	}
-
-	if (
-		(meteringStatus !== "ready" && meteringStatus !== "degraded") ||
-		!meterSnapshot
-	) {
-		return createPreparingLivePreviewMeteringState(knownTrackIds);
-	}
-
-	const clipHoldState: LivePreviewMeteringClipHoldState = {};
-	const trackStates: LivePreviewMeteringTrackStates = {};
-	const trackIds = createMeteredTrackIds(knownTrackIds, meterSnapshot);
-
-	for (const trackId of trackIds) {
-		const snapshotState = meterSnapshot.trackStates[trackId];
-
-		if (!snapshotState) {
-			trackStates[trackId] = {
-				status: "preparing",
-				trackId,
-			};
-			continue;
-		}
-
-		if (snapshotState.status === "unavailable") {
-			trackStates[trackId] = snapshotState;
-			continue;
-		}
-
-		const meteredChannels = createMeterChannelsFromEnginePeaks({
-			channels: snapshotState.channels,
-			isPlaying,
-			nowMs,
-			previousClipHoldByChannel: previousClipHoldState[trackId],
-		});
-
-		if (Object.keys(meteredChannels.clipHoldByChannel).length > 0) {
-			clipHoldState[trackId] = meteredChannels.clipHoldByChannel;
-		}
-
-		trackStates[trackId] = {
-			channels: meteredChannels.channels,
-			excluded: excludedTrackIds.has(trackId),
-			status: "ready",
-			trackId,
+		const reason = "Preview audio engine meter taps unavailable";
+		return {
+			combinedState: { reason, status: "unavailable" },
+			trackStates: Object.fromEntries(
+				knownTrackIds.map((trackId) => [
+					trackId,
+					{ reason, status: "unavailable", trackId },
+				]),
+			),
 		};
 	}
 
-	const combinedState = createCombinedLivePreviewMeteringState({
-		isPlaying,
-		meterSnapshot,
-		nowMs,
-		previousClipHoldByChannel:
-			previousClipHoldState[COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY],
-	});
-
-	if (Object.keys(combinedState.clipHoldByChannel).length > 0) {
-		clipHoldState[COMBINED_PREVIEW_OUTPUT_CLIP_HOLD_KEY] =
-			combinedState.clipHoldByChannel;
+	if (!meterSnapshot) {
+		return {
+			combinedState: PREPARING_PREVIEW_METERS.combinedState,
+			trackStates: Object.fromEntries(
+				knownTrackIds.map((trackId) => [
+					trackId,
+					{ status: "preparing", trackId },
+				]),
+			),
+		};
 	}
 
+	const trackStates: PreviewMeterTarget["trackStates"] = {};
+	for (const trackId of new Set([
+		...knownTrackIds,
+		...Object.keys(meterSnapshot.trackStates),
+	])) {
+		const state = meterSnapshot.trackStates[trackId];
+		const previous = previousTarget?.trackStates[trackId];
+		if (!state) {
+			trackStates[trackId] = { status: "preparing", trackId };
+		} else if (state.status === "unavailable") {
+			trackStates[trackId] = state;
+		} else {
+			trackStates[trackId] = {
+				...state,
+				channels: createTargetChannels(
+					state.channels,
+					previous?.status === "ready" ? previous.channels : [],
+					sampleSignal,
+					nowMs,
+				),
+			};
+		}
+	}
+
+	const combined = meterSnapshot.combinedState;
+	const previousCombined = previousTarget?.combinedState;
 	return {
-		clipHoldState,
-		combinedState: combinedState.state,
+		combinedState:
+			combined.status === "unavailable"
+				? combined
+				: {
+						...combined,
+						channels: createTargetChannels(
+							combined.channels,
+							previousCombined?.status === "ready"
+								? previousCombined.channels
+								: [],
+							sampleSignal,
+							nowMs,
+						),
+					},
 		trackStates,
 	};
 }
 
-function createPreparingLivePreviewMeteringState(
-	knownTrackIds: string[],
-): LivePreviewMeteringTrackStatesResult {
-	return {
-		clipHoldState: {},
-		combinedState: {
-			reason: "Preparing engine meter taps",
-			status: "preparing",
-		},
-		trackStates: Object.fromEntries(
-			knownTrackIds.map((trackId) => [
-				trackId,
-				{
-					status: "preparing",
-					trackId,
-				} satisfies LivePreviewMeteringTrackState,
-			]),
-		),
-	};
-}
-
-function createUnavailableLivePreviewMeteringState(
-	knownTrackIds: string[],
-): LivePreviewMeteringTrackStatesResult {
-	const reason = "Preview audio engine meter taps unavailable";
-
-	return {
-		clipHoldState: {},
-		combinedState: {
-			reason,
-			status: "unavailable",
-		},
-		trackStates: Object.fromEntries(
-			knownTrackIds.map((trackId) => [
-				trackId,
-				{
-					reason,
-					status: "unavailable",
-					trackId,
-				} satisfies LivePreviewMeteringTrackState,
-			]),
-		),
-	};
-}
-
-function createMeteredTrackIds(
-	knownTrackIds: string[],
-	meterSnapshot: PreviewAudioEngineMeterSnapshot,
-) {
-	return Array.from(
-		new Set([...knownTrackIds, ...Object.keys(meterSnapshot.trackStates)]),
-	);
-}
-
-function createCombinedLivePreviewMeteringState({
-	isPlaying,
-	meterSnapshot,
-	nowMs,
-	previousClipHoldByChannel,
-}: {
-	isPlaying: boolean;
-	meterSnapshot: PreviewAudioEngineMeterSnapshot;
-	nowMs: number;
-	previousClipHoldByChannel?: Record<number, number>;
-}): {
-	clipHoldByChannel: Record<number, number>;
-	state: LivePreviewMeteringCombinedState;
-} {
-	if (meterSnapshot.combinedState.status === "unavailable") {
+function createTargetChannels(
+	channels: { label: string; peak: number }[],
+	previousChannels: PreviewMeterTargetChannel[],
+	sampleSignal: boolean,
+	nowMs: number,
+): PreviewMeterTargetChannel[] {
+	return channels.map(({ label, peak }, index) => {
+		const previous = previousChannels[index];
+		const previousDeadline =
+			previous?.label === label ? previous.clipUntilMs : null;
+		const signalPeak = sampleSignal && Number.isFinite(peak) ? peak : 0;
 		return {
-			clipHoldByChannel: {},
-			state: meterSnapshot.combinedState,
-		};
-	}
-
-	const meteredChannels = createMeterChannelsFromEnginePeaks({
-		channels: meterSnapshot.combinedState.channels,
-		isPlaying,
-		nowMs,
-		previousClipHoldByChannel,
-	});
-
-	return {
-		clipHoldByChannel: meteredChannels.clipHoldByChannel,
-		state: {
-			channels: meteredChannels.channels,
-			partial: meterSnapshot.combinedState.partial,
-			reason: meterSnapshot.combinedState.reason,
-			status: "ready",
-		},
-	};
-}
-
-function createMeterChannelsFromEnginePeaks({
-	channels,
-	isPlaying,
-	nowMs,
-	previousClipHoldByChannel = {},
-}: {
-	channels: { label: string; peak: number }[];
-	isPlaying: boolean;
-	nowMs: number;
-	previousClipHoldByChannel?: Record<number, number>;
-}): {
-	channels: PreviewLevelMeterChannel[];
-	clipHoldByChannel: Record<number, number>;
-} {
-	const clipHoldByChannel: Record<number, number> = {};
-	const meteredChannels = channels.map((channel, channelIndex) => {
-		const peak = isPlaying ? channel.peak : 0;
-		const clipped = peak >= 1;
-		const lastClipMs = clipped
-			? nowMs
-			: previousClipHoldByChannel[channelIndex];
-		const clipHeld =
-			typeof lastClipMs === "number" &&
-			nowMs - lastClipMs <= PREVIEW_METERING_CLIP_HOLD_MS;
-
-		if (clipHeld && typeof lastClipMs === "number") {
-			clipHoldByChannel[channelIndex] = lastClipMs;
-		}
-
-		return {
-			clipHeld,
-			label: channel.label,
-			peakDb: linearPeakToDb(peak),
+			clipUntilMs:
+				signalPeak >= 1
+					? nowMs + PREVIEW_METERING_CLIP_HOLD_MS
+					: previousDeadline !== null && previousDeadline > nowMs
+						? previousDeadline
+						: null,
+			label,
+			peakDb: linearPeakToDb(signalPeak),
 		};
 	});
-
-	return {
-		channels: meteredChannels,
-		clipHoldByChannel,
-	};
 }
 
 function linearPeakToDb(peak: number): number {
-	if (!Number.isFinite(peak) || peak <= 0) {
-		return previewPeakMeterVisualRange.floorDb;
-	}
-
-	return Math.min(
-		previewPeakMeterVisualRange.ceilingDb,
-		Math.max(previewPeakMeterVisualRange.floorDb, 20 * Math.log10(peak)),
-	);
+	const { ceilingDb, floorDb } = previewPeakMeterVisualRange;
+	return peak <= 0
+		? floorDb
+		: Math.min(ceilingDb, Math.max(floorDb, 20 * Math.log10(peak)));
 }
