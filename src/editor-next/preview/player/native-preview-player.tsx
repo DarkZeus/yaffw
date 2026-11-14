@@ -139,7 +139,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		[],
 	);
 	const audioMonitoringStatus = audioMonitoring.status;
-	const { url: previewUrl, mse: msePreview } = usePreviewVideoSource({
+	const { url: previewUrl, waitForFragment } = usePreviewVideoSource({
 		asset,
 		cleanupScope: activeMediaAssetCleanupScope,
 		file: source,
@@ -214,7 +214,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		frameDurationUs: asset.frameTiming.frameDurationUs,
 		previewAudioEngineRef,
 		previewClockMode,
-		msePreview,
+		waitForFragment,
 		scrubPreview,
 		selection,
 		source,

@@ -108,11 +108,12 @@ try {
 		await button("Pause").click();
 	}
 
-	for (const name of [
-		"Seek backward 10 seconds",
-		"Seek backward 10 seconds",
-		"Seek forward 10 seconds",
-	]) {
+	const seekDirections =
+		process.env.YAFFW_SEEK_ONLY === "1"
+			? ["forward", "forward", "backward"]
+			: ["backward", "backward", "forward"];
+	for (const [index, direction] of seekDirections.entries()) {
+		const name = `Seek ${direction} 10 seconds`;
 		await button(name).click();
 		const playhead = await page
 			.getByLabel("Preview playhead time", { exact: true })
@@ -120,6 +121,29 @@ try {
 		const target = playhead
 			.split(":")
 			.reduce((time, part) => time * 60 + Number(part), 0);
+		// Check the native buffer on the first two seeks before asking to play.
+		// The last seek presses Play immediately into a cold buffer.
+		if (index < 2)
+			await page.waitForFunction(
+				(target) => {
+					const video = document.querySelector("video");
+					return (
+						video?.paused &&
+						!video.seeking &&
+						Math.abs(video.currentTime - target) < 0.035 &&
+						Array.from(
+							{ length: video.buffered.length },
+							(_, index) => index,
+						).some(
+							(index) =>
+								video.buffered.start(index) <= target + 0.005 &&
+								video.buffered.end(index) > target + 0.25,
+						)
+					);
+				},
+				target,
+				{ timeout: 5_000 },
+			);
 		await button("Play").click();
 		await page.waitForFunction(
 			(target) => {
@@ -130,7 +154,7 @@ try {
 					!video.seeking &&
 					window.previewCheck.mseUrls.has(video.currentSrc) &&
 					window.previewCheck.frames.lastFrame >= target - 0.1 &&
-					window.previewCheck.frames.lastFrame < target + 1.5
+					window.previewCheck.frames.lastFrame < target + 0.25
 				);
 			},
 			target,

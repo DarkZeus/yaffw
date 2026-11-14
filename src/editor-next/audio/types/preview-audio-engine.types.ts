@@ -32,7 +32,7 @@ export type PreviewAudioEngine = {
 	getStatus: () => PreviewAudioEngineStatus;
 	getPlaybackState: () => PreviewAudioPlaybackState;
 	pause: () => void;
-	play: () => Promise<void>;
+	play: (videoReady?: Promise<void>) => Promise<void>;
 	readMeterSnapshot: (
 		sampleSignal?: boolean,
 	) => PreviewAudioEngineMeterSnapshot;

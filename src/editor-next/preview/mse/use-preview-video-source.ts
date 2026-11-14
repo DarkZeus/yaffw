@@ -3,7 +3,10 @@ import type { ReadyMediaAsset } from "@/editor-core/model";
 import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/active-media-asset-cleanup-scope";
 import { createMsePreview } from "./create-mse-preview";
 
-type PreviewSource = { url: string; mse: boolean };
+type PreviewSource = {
+	url: string;
+	waitForFragment?: ReturnType<typeof createMsePreview>["waitForFragment"];
+};
 
 export function usePreviewVideoSource({
 	asset,
@@ -18,7 +21,6 @@ export function usePreviewVideoSource({
 }) {
 	const [preview, setPreview] = useState<PreviewSource>({
 		url: "",
-		mse: false,
 	});
 	const codec = asset.tracks.video[0]?.codec;
 	const audioCodec = asset.tracks.audio[0]?.codec;
@@ -50,13 +52,15 @@ export function usePreviewVideoSource({
 		const registration = cleanupScope?.registerCleanup(dispose);
 		if (!disposed) {
 			setPreview(
-				mse ? { url: mse.url, mse: true } : { url: nativeUrl, mse: false },
+				mse
+					? { url: mse.url, waitForFragment: mse.waitForFragment }
+					: { url: nativeUrl },
 			);
 			if (mse && video) {
 				const fallback = () => {
 					if (disposed) return;
 					mse?.close();
-					setPreview({ url: nativeUrl, mse: false });
+					setPreview({ url: nativeUrl });
 				};
 				void mse.play(video).catch(fallback);
 			}

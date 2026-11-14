@@ -99,6 +99,14 @@ export function createMsePreview({
 		URL.revokeObjectURL(url);
 	}
 
+	let isFragmentReady: ((time: number) => boolean) | undefined;
+
+	async function waitForFragment(time: number, ownsPlayback: () => boolean) {
+		while (!signal.aborted && ownsPlayback() && !isFragmentReady?.(time)) {
+			await waitForPlayback();
+		}
+	}
+
 	async function play(video: HTMLVideoElement, onReady?: () => void) {
 		const [index] = await Promise.all([
 			request({ type: "open" }),
@@ -124,11 +132,19 @@ export function createMsePreview({
 		const appended = new Map<number, number>();
 		let desiredSeek: number | null = null;
 		let nextIndex = 0;
+		let firstFragmentAfterSeek: number | null = null;
 		let loadedEnd = 0;
 		let ready = false;
 
 		const fragmentEnd = (position: number) =>
 			fragments[position + 1]?.start ?? duration;
+		isFragmentReady = (time) => {
+			if (time >= duration) return true;
+			const position = findFragment(fragments, time);
+			return (
+				desiredSeek === null && position < nextIndex && appended.has(position)
+			);
+		};
 
 		video.addEventListener(
 			"seeking",
@@ -160,16 +176,20 @@ export function createMsePreview({
 			stats.appendedVideoBytes = 0;
 			appended.clear();
 			nextIndex = findFragment(fragments, time);
+			firstFragmentAfterSeek = nextIndex;
 			loadedEnd = fragments[nextIndex].start;
 		}
 
 		async function evict() {
 			let end = 0;
 			let bytesRemoved = 0;
+			// A paused seek at the boundary must be able to buffer the next
+			// fragment without consuming the guard interval through playback.
+			const guard = video.paused ? 0 : 0.045;
 			for (const [position, bytes] of appended) {
 				const boundary = fragmentEnd(position);
 				// Keep the current group, including the decode dependencies of its B-frames.
-				if (position >= nextIndex || boundary + 0.045 > video.currentTime)
+				if (position >= nextIndex || boundary + guard > video.currentTime)
 					break;
 				appended.delete(position);
 				bytesRemoved += bytes;
@@ -192,8 +212,11 @@ export function createMsePreview({
 				initialized.add(buffer);
 			}
 			for (let offset = part.initBytes; offset < part.mediaEnd;) {
-				if (desiredSeek !== null) return;
-				const end = Math.min(part.mediaEnd, offset + APPEND_BYTES);
+				if (signal.aborted || desiredSeek !== null) return;
+				const end =
+					nextIndex === firstFragmentAfterSeek
+						? part.mediaEnd
+						: Math.min(part.mediaEnd, offset + APPEND_BYTES);
 				const added = end - offset;
 				if (
 					buffer === videoBuffer &&
@@ -201,7 +224,7 @@ export function createMsePreview({
 				) {
 					await evict();
 					if (stats.appendedVideoBytes + added > VIDEO_BUFFER_BYTES) {
-						await waitForPlayback(signal);
+						await waitForPlayback();
 						continue;
 					}
 				}
@@ -231,11 +254,11 @@ export function createMsePreview({
 			await evict();
 			if (nextIndex === fragments.length) {
 				if (mediaSource.readyState === "open") mediaSource.endOfStream();
-				await waitForPlayback(signal);
+				await waitForPlayback();
 				continue;
 			}
 			if (loadedEnd > video.currentTime + LOOKAHEAD_SECONDS) {
-				await waitForPlayback(signal);
+				await waitForPlayback();
 				continue;
 			}
 
@@ -255,6 +278,7 @@ export function createMsePreview({
 			await append(videoBuffer, parts.video);
 			if (desiredSeek !== null) continue;
 			loadedEnd = fragmentEnd(nextIndex++);
+			firstFragmentAfterSeek = null;
 			if (!ready) {
 				ready = true;
 				onReady?.();
@@ -262,7 +286,7 @@ export function createMsePreview({
 		}
 	}
 
-	return { url, play, close, stats };
+	return { url, play, close, stats, waitForFragment };
 }
 
 function findFragment(fragments: Fragment[], seconds: number) {
@@ -312,7 +336,6 @@ function waitForMediaEvent(
 	});
 }
 
-async function waitForPlayback(signal: AbortSignal) {
-	await new Promise((resolve) => setTimeout(resolve, 25));
-	signal.throwIfAborted();
+function waitForPlayback() {
+	return new Promise<void>((resolve) => setTimeout(resolve, 25));
 }

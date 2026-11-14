@@ -26,7 +26,7 @@ type OwnedGeneration = {
 	throughSeconds: number;
 };
 
-type PlaybackIntent = { resumePending: boolean };
+type PlaybackIntent = { resumePending: boolean; videoReady?: Promise<void> };
 
 /** Owns decode generations and transport intent; the asset hook owns the provider. */
 export function createPreviewAudioWindowController(
@@ -112,11 +112,21 @@ export function createPreviewAudioWindowController(
 		if (playbackIntent !== intent) return;
 		const running = await contextLifecycle.resume();
 		if (playbackIntent !== intent) return;
-		intent.resumePending = false;
 		if (!running || !contextLifecycle.isRunning()) {
+			intent.resumePending = false;
 			setPlaybackState("recovery-required");
 			return;
 		}
+		if (intent.videoReady) {
+			await intent.videoReady;
+			if (playbackIntent !== intent) return;
+			intent.videoReady = undefined;
+			if (!contextLifecycle.isRunning()) {
+				await requestContextResume(intent);
+				return;
+			}
+		}
+		intent.resumePending = false;
 		await resumePlayback(intent);
 	}
 
@@ -374,10 +384,10 @@ export function createPreviewAudioWindowController(
 			metrics.cleanupCount++;
 		},
 		pause,
-		async play() {
+		async play(videoReady?: Promise<void>) {
 			if (destroyed || playbackState === "closed") return;
 			if (engine.isPlaying() && contextLifecycle.isRunning()) return;
-			const intent = { resumePending: false };
+			const intent = { resumePending: false, videoReady };
 			playbackIntent = intent;
 			await requestContextResume(intent);
 		},

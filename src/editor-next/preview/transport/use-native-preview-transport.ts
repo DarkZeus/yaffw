@@ -42,7 +42,10 @@ export type UseNativePreviewTransportOptions = {
 	frameDurationUs: MediaTimeUs;
 	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	previewClockMode: PreviewClockMode;
-	msePreview?: boolean;
+	waitForFragment?: (
+		timeSeconds: number,
+		ownsPlayback: () => boolean,
+	) => Promise<void>;
 	scrubPreview?: ScrubPreviewTransport;
 	selection: Selection;
 	source: Blob;
@@ -78,7 +81,7 @@ export function useNativePreviewTransport({
 	frameDurationUs,
 	previewAudioEngineRef,
 	previewClockMode,
-	msePreview = false,
+	waitForFragment,
 	scrubPreview,
 	selection,
 	source,
@@ -282,11 +285,25 @@ export function useNativePreviewTransport({
 		(nextPlayheadUs: MediaTimeUs) => {
 			if (audioMasterClockActive && playbackRef.current.phase === "resuming") {
 				seekToUs(nextPlayheadUs);
-			} else {
-				previewScrubToUs(nextPlayheadUs);
+				return;
+			}
+
+			previewScrubToUs(nextPlayheadUs);
+			if (waitForFragment) {
+				// A committed seek should prime the MSE buffer while the scrub frame
+				// is visible, even if the user has not pressed Play yet.
+				const targetUs = playheadRef.current;
+				const video = videoRef.current;
+				if (video) setVideoFollowerTime(video, targetUs);
 			}
 		},
-		[audioMasterClockActive, previewScrubToUs, seekToUs],
+		[
+			audioMasterClockActive,
+			waitForFragment,
+			previewScrubToUs,
+			seekToUs,
+			videoRef,
+		],
 	);
 
 	const seekByUs = useCallback(
@@ -335,6 +352,7 @@ export function useNativePreviewTransport({
 			try {
 				if (audioMasterClockActive && engine) {
 					video.muted = true;
+					let videoReady: Promise<void> | undefined;
 					if (!recover) {
 						const pendingSeekSeconds =
 							pendingVideoFollowerSeekSecondsRef.current;
@@ -350,11 +368,20 @@ export function useNativePreviewTransport({
 						});
 						selectionLoop.reposition(secondsToMicroseconds(start));
 						syncAudioLoopEnd();
-						if (!resumingPausedWindow) void engine.setTime(start);
+						if (!resumingPausedWindow) {
+							void engine.setTime(start);
+							if (waitForFragment && pendingSeekSeconds !== null) {
+								setVideoFollowerTime(video, secondsToMicroseconds(start));
+								videoReady = waitForFragment(
+									start,
+									() => playbackRef.current.request === request,
+								);
+							}
+						}
 					}
 					previewScrubActiveRef.current = false;
 					// Call in the user gesture; the engine owns resume and bounded preparation.
-					await engine.play();
+					await engine.play(videoReady);
 					return;
 				}
 				if (previewScrubActiveRef.current || hasScrubTarget?.()) {
@@ -399,6 +426,7 @@ export function useNativePreviewTransport({
 			setPlayback,
 			syncAudioLoopEnd,
 			videoRef,
+			waitForFragment,
 		],
 	);
 
@@ -687,7 +715,7 @@ export function useNativePreviewTransport({
 
 			if (
 				audioMasterClockActive &&
-				(!msePreview || !video.seeking) &&
+				(!waitForFragment || !video.seeking) &&
 				Number.isFinite(transportTimeSeconds) &&
 				Math.abs(video.currentTime - transportTimeSeconds) >
 					hardResyncThresholdSeconds &&
@@ -721,7 +749,7 @@ export function useNativePreviewTransport({
 			frameDurationUs,
 			hasScrubTarget,
 			isPlaying,
-			msePreview,
+			waitForFragment,
 			nativeVideoClockActive,
 			pausePlayback,
 			previewAudioEngineRef,

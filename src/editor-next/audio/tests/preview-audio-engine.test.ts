@@ -104,6 +104,40 @@ describe("Preview presentation timing candidate", () => {
 	});
 });
 
+describe("Preview audio with a pending video fragment", () => {
+	it("keeps the audio clock at the seek target until the fragment is ready", async () => {
+		const { context, engine } = await setup();
+		const fragment = deferred<void>();
+		await engine.setTime(5);
+		const playing = engine.play(fragment.promise);
+		await flushMicrotasks();
+
+		context.currentTime = 1;
+		expect(engine.getPlaybackState()).toBe("buffering");
+		expect(engine.getCurrentTime()).toBe(5);
+
+		fragment.resolve();
+		await playing;
+		context.currentTime = 1.25;
+		expect(engine.getPlaybackState()).toBe("playing");
+		expect(engine.getCurrentTime()).toBeCloseTo(5.25);
+	});
+
+	it("ignores a finished fragment after Pause cancels playback", async () => {
+		const { engine } = await setup();
+		const fragment = deferred<void>();
+		const playing = engine.play(fragment.promise);
+		await flushMicrotasks();
+
+		engine.pause();
+		fragment.resolve();
+		await playing;
+
+		expect(engine.getPlaybackState()).toBe("paused");
+		expect(engine.getMetrics().activeTimers).toBe(0);
+	});
+});
+
 describe("Preview audio context interruptions", () => {
 	it.each(["promise-first", "event-first"])(
 		"re-primes once at the latest position and rate with %s recovery",
