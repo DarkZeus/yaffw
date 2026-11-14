@@ -28,6 +28,7 @@ import type { ActiveMediaAssetCleanupScope } from "../../media-work/scopes/activ
 import { EditorWorkbenchLayout } from "../../workbench/frame/editor-workbench-layout";
 import type { WorkbenchInspectorPanels } from "../../workbench/frame/workbench-layout-model";
 import { usePreviewKeyboardShortcuts } from "../keyboard/preview-keyboard-shortcuts";
+import { usePreviewVideoSource } from "../mse/use-preview-video-source";
 import { PreviewSelectionWaveformRegion } from "../regions/preview-selection-waveform-region";
 import { PreviewTransportRegion } from "../regions/preview-transport-region";
 import { PreviewViewerRegion } from "../regions/preview-viewer-region";
@@ -82,9 +83,13 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 }: NativePreviewPlayerProps) {
 	const { soloedAudioTrackId } = usePreviewAudioMonitoring();
 	const videoRef = useRef<HTMLVideoElement | null>(null);
+	const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
+		null,
+	);
 	const mediaTransportRef = useRef<PreviewMediaTransportHandle | null>(null);
 	const setVideoRef = useCallback((video: HTMLVideoElement | null) => {
 		videoRef.current = video;
+		setVideoElement(video);
 		mediaTransportRef.current = video
 			? createPreviewMediaTransport(video)
 			: null;
@@ -134,28 +139,14 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		[],
 	);
 	const audioMonitoringStatus = audioMonitoring.status;
-	const [previewUrl, setPreviewUrl] = useState("");
+	const { url: previewUrl, mse: msePreview } = usePreviewVideoSource({
+		asset,
+		cleanupScope: activeMediaAssetCleanupScope,
+		file: source,
+		video: videoElement,
+	});
 	audioMixRef.current = audioMix;
 	audioMonitoringStatusRef.current = audioMonitoringStatus;
-
-	useEffect(() => {
-		const objectUrl = URL.createObjectURL(source);
-		const cleanupRegistration = activeMediaAssetCleanupScope?.registerCleanup(
-			() => {
-				URL.revokeObjectURL(objectUrl);
-			},
-		);
-		setPreviewUrl(objectUrl);
-
-		return () => {
-			if (cleanupRegistration) {
-				cleanupRegistration.dispose();
-				return;
-			}
-
-			URL.revokeObjectURL(objectUrl);
-		};
-	}, [activeMediaAssetCleanupScope, source]);
 
 	const audioPreviewTransportSupported = canUsePreviewAudioEngine(asset);
 	const previewAudioResources = usePreviewAudioResources({
@@ -223,6 +214,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		frameDurationUs: asset.frameTiming.frameDurationUs,
 		previewAudioEngineRef,
 		previewClockMode,
+		msePreview,
 		scrubPreview,
 		selection,
 		source,

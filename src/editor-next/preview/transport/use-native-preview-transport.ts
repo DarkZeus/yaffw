@@ -42,6 +42,7 @@ export type UseNativePreviewTransportOptions = {
 	frameDurationUs: MediaTimeUs;
 	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	previewClockMode: PreviewClockMode;
+	msePreview?: boolean;
 	scrubPreview?: ScrubPreviewTransport;
 	selection: Selection;
 	source: Blob;
@@ -77,6 +78,7 @@ export function useNativePreviewTransport({
 	frameDurationUs,
 	previewAudioEngineRef,
 	previewClockMode,
+	msePreview = false,
 	scrubPreview,
 	selection,
 	source,
@@ -685,6 +687,7 @@ export function useNativePreviewTransport({
 
 			if (
 				audioMasterClockActive &&
+				(!msePreview || !video.seeking) &&
 				Number.isFinite(transportTimeSeconds) &&
 				Math.abs(video.currentTime - transportTimeSeconds) >
 					hardResyncThresholdSeconds &&
@@ -718,6 +721,7 @@ export function useNativePreviewTransport({
 			frameDurationUs,
 			hasScrubTarget,
 			isPlaying,
+			msePreview,
 			nativeVideoClockActive,
 			pausePlayback,
 			previewAudioEngineRef,

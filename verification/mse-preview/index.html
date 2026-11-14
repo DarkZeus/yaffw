@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>MSE preview prototype</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				font-family: system-ui, sans-serif;
+				background: oklch(0.17 0 none);
+				color: oklch(0.95 0 none);
+			}
+			main {
+				max-width: 1120px;
+				margin-inline: auto;
+				padding: 24px;
+			}
+			h1 {
+				font-size: 1.4rem;
+			}
+			video {
+				display: block;
+				width: 100%;
+				aspect-ratio: 16 / 9;
+				margin-block: 20px;
+				background: oklch(0.1 0 none);
+			}
+			#status {
+				color: oklch(0.78 0 none);
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>MSE preview prototype</h1>
+			<label>Open MP4 <input type="file" accept="video/mp4,.mp4" /></label>
+			<video controls playsinline></video>
+			<p id="status" role="status">Choose an H.264 MP4.</p>
+		</main>
+		<script type="module" src="./preview.js"></script>
+	</body>
+</html>
