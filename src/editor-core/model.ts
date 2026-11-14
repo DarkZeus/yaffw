@@ -61,9 +61,13 @@ export type FrameTiming =
 			source: "estimated";
 	  };
 
-export type VideoMediaTrack = {
-	/** Bits per second declared by container metadata; not measured. */
+export type MediaTrackBitrate = {
+	/** Bits per second. An average can come from metadata or packet sizes. */
 	bitrate?: number;
+	bitrateKind?: "average" | "peak";
+};
+
+export type VideoMediaTrack = MediaTrackBitrate & {
 	codec?: string;
 	height?: number;
 	id: string;
@@ -72,9 +76,7 @@ export type VideoMediaTrack = {
 	width?: number;
 };
 
-export type AudioMediaTrack = {
-	/** Bits per second declared by container metadata; not measured. */
-	bitrate?: number;
+export type AudioMediaTrack = MediaTrackBitrate & {
 	channels?: number;
 	codec?: string;
 	id: string;

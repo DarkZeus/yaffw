@@ -7,6 +7,9 @@ import { createLocalMediaAssetDraft } from "@/editor-core/local-file-import";
 import { inspectBrowserLocalMediaAssetDraft } from "../adapters/browser-local-asset-analyzer";
 
 const mediabunnyMock = vi.hoisted(() => ({
+	mp4: {},
+	quickTime: {},
+	getFormat: vi.fn(),
 	canRead: vi.fn(),
 	computeDuration: vi.fn(),
 	dispose: vi.fn(),
@@ -17,6 +20,8 @@ const mediabunnyMock = vi.hoisted(() => ({
 
 vi.mock("mediabunny", () => ({
 	ALL_FORMATS: [],
+	MP4: mediabunnyMock.mp4,
+	QTFF: mediabunnyMock.quickTime,
 	BlobSource: class BlobSource {},
 	Input: class Input {
 		canRead = mediabunnyMock.canRead;
@@ -24,6 +29,7 @@ vi.mock("mediabunny", () => ({
 		dispose = mediabunnyMock.dispose;
 		getAudioTracks = mediabunnyMock.getAudioTracks;
 		getDurationFromMetadata = mediabunnyMock.getDurationFromMetadata;
+		getFormat = mediabunnyMock.getFormat;
 		getVideoTracks = mediabunnyMock.getVideoTracks;
 	},
 }));
@@ -33,6 +39,58 @@ afterEach(() => {
 });
 
 describe("inspectBrowserLocalMediaAssetDraft", () => {
+	it("uses the whole MP4 packet table when the average bitrate is missing", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		mediabunnyMock.getFormat.mockResolvedValueOnce(mediabunnyMock.mp4);
+		track.computePacketStats.mockResolvedValueOnce({
+			averageBitrate: 533_866_771,
+		});
+		track.getBitrate.mockResolvedValueOnce(700_000_000);
+
+		const result = await analyzeLocalMediaAssetDraft(draft, {
+			inspect: inspectBrowserLocalMediaAssetDraft,
+		});
+
+		expect(result).toMatchObject({
+			status: "ready",
+			asset: {
+				tracks: { video: [{ bitrate: 533_866_771, bitrateKind: "average" }] },
+			},
+		});
+		expect(track.computePacketStats).toHaveBeenCalledWith(Infinity, {
+			metadataOnly: true,
+		});
+		expect(track.getBitrate).not.toHaveBeenCalled();
+	});
+
+	it("keeps a declared average without scanning packets", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		mediabunnyMock.getFormat.mockResolvedValueOnce(mediabunnyMock.mp4);
+		track.getAverageBitrate.mockResolvedValueOnce(4_000_000);
+
+		const inspection = await inspectBrowserLocalMediaAssetDraft(draft, {});
+
+		expect(inspection.videoTracks[0]).toMatchObject({
+			bitrate: 4_000_000,
+			bitrateKind: "average",
+		});
+		expect(track.computePacketStats).not.toHaveBeenCalled();
+	});
+
+	it("reports a declared peak for formats without a packet table scan", async () => {
+		const { draft, track } = prepareFrameTimingInspection(frameMetrics());
+		mediabunnyMock.getFormat.mockResolvedValueOnce({});
+		track.getBitrate.mockResolvedValueOnce(8_000_000);
+
+		const inspection = await inspectBrowserLocalMediaAssetDraft(draft, {});
+
+		expect(inspection.videoTracks[0]).toMatchObject({
+			bitrate: 8_000_000,
+			bitrateKind: "peak",
+		});
+		expect(track.computePacketStats).not.toHaveBeenCalled();
+	});
+
 	it("retains VFR statistics and a useful non-30 estimated rate", async () => {
 		const metrics = frameMetrics({
 			averageFrameRate: 22,
@@ -121,6 +179,7 @@ function createVideoTrack({
 }) {
 	return {
 		computeFrameRateMetrics: vi.fn(async () => frameMetrics()),
+		computePacketStats: vi.fn<() => Promise<{ averageBitrate: number }>>(),
 		getAverageBitrate: vi.fn(async () => averageBitrate),
 		getBitrate: vi.fn(async () => peakBitrate),
 		getCodec: vi.fn(async () => codec),

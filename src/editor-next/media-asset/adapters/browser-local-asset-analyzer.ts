@@ -3,7 +3,11 @@ import type {
 	LocalMediaAssetInspection,
 	LocalMediaAssetInspector,
 } from "@/editor-core/local-file-analysis";
-import type { FrameTiming, FrameTimingAnalysis } from "@/editor-core/model";
+import type {
+	FrameTiming,
+	FrameTimingAnalysis,
+	MediaTrackBitrate,
+} from "@/editor-core/model";
 import { resolveMediabunnyInputTrackCodec } from "../../media-work/adapters/mediabunny-input-track-metadata";
 import { createMediaSourceFailureBoundary } from "../../media-work/scopes/media-source-failure-boundary";
 
@@ -14,7 +18,8 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 		}
 		throwIfAborted(request.signal);
 
-		const { ALL_FORMATS, BlobSource, Input } = await import("mediabunny");
+		const { ALL_FORMATS, BlobSource, Input, MP4, QTFF } =
+			await import("mediabunny");
 		const sourceFailure = createMediaSourceFailureBoundary();
 
 		const input = new Input({
@@ -26,7 +31,9 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 		const unregisterAbort = disposeInputOnAbort(input, request.signal);
 
 		try {
-			return await sourceFailure.run(inspectInput(input, request.signal));
+			return await sourceFailure.run(
+				inspectInput(input, [MP4, QTFF], request.signal),
+			);
 		} finally {
 			unregisterAbort();
 			input.dispose();
@@ -35,6 +42,7 @@ export const inspectBrowserLocalMediaAssetDraft: LocalMediaAssetInspector =
 
 async function inspectInput(
 	input: Input,
+	packetTableFormats: Awaited<ReturnType<Input["getFormat"]>>[],
 	signal: AbortSignal | undefined,
 ): Promise<LocalMediaAssetInspection> {
 	throwIfAborted(signal);
@@ -42,23 +50,24 @@ async function inspectInput(
 		throw new Error("Mediabunny cannot read this local media asset.");
 	}
 	throwIfAborted(signal);
-	const [metadataDurationSeconds, videoTracks, audioTracks] = await Promise.all(
-		[
+	const [metadataDurationSeconds, videoTracks, audioTracks, format] =
+		await Promise.all([
 			input.getDurationFromMetadata().catch(() => null),
 			input.getVideoTracks(),
 			input.getAudioTracks(),
-		],
-	);
+			input.getFormat(),
+		]);
 	throwIfAborted(signal);
 	const durationSeconds = isUsableDuration(metadataDurationSeconds)
 		? metadataDurationSeconds
 		: await input.computeDuration();
 	throwIfAborted(signal);
+	const canScanPacketTable = packetTableFormats.includes(format);
 	const [videoTrackInspections, audioTrackInspections] = await Promise.all([
 		Promise.all(
 			videoTracks.map(async (track, index) => {
 				const [bitrate, codec, height, name, width] = await Promise.all([
-					resolveTrackBitrate(track),
+					resolveTrackBitrate(track, canScanPacketTable, signal),
 					resolveMediabunnyInputTrackCodec(track),
 					track.getDisplayHeight(),
 					track.getName(),
@@ -66,7 +75,7 @@ async function inspectInput(
 				]);
 
 				return {
-					bitrate,
+					...bitrate,
 					codec,
 					height,
 					id: String(track.id),
@@ -79,7 +88,7 @@ async function inspectInput(
 			audioTracks.map(async (track, index) => {
 				const [bitrate, channels, codec, language, name, sampleRate] =
 					await Promise.all([
-						resolveTrackBitrate(track),
+						resolveTrackBitrate(track, canScanPacketTable, signal),
 						track.getNumberOfChannels(),
 						resolveMediabunnyInputTrackCodec(track),
 						track.getLanguageCode(),
@@ -88,7 +97,7 @@ async function inspectInput(
 					]);
 
 				return {
-					bitrate,
+					...bitrate,
 					channels,
 					codec,
 					id: String(track.id),
@@ -183,14 +192,36 @@ function isUsableFrameRate(value: number): boolean {
 }
 
 async function resolveTrackBitrate(
-	track: Pick<InputTrack, "getAverageBitrate" | "getBitrate">,
-): Promise<number | undefined> {
-	const bitrate =
-		(await track.getAverageBitrate()) ?? (await track.getBitrate());
+	track: Pick<
+		InputTrack,
+		"computePacketStats" | "getAverageBitrate" | "getBitrate"
+	>,
+	canScanPacketTable: boolean,
+	signal: AbortSignal | undefined,
+): Promise<MediaTrackBitrate> {
+	const average = await track.getAverageBitrate();
+	if (isUsableBitrate(average))
+		return { bitrate: average, bitrateKind: "average" };
 
-	return bitrate !== null && Number.isFinite(bitrate) && bitrate > 0
-		? bitrate
-		: undefined;
+	throwIfAborted(signal);
+	// ISO BMFF records packet sizes and timestamps in its sample tables.
+	// Other formats may have to scan the payload to discover those fields.
+	if (canScanPacketTable) {
+		const stats = await track
+			.computePacketStats(Infinity, { metadataOnly: true })
+			.catch(() => null);
+		throwIfAborted(signal);
+		if (isUsableBitrate(stats?.averageBitrate)) {
+			return { bitrate: stats.averageBitrate, bitrateKind: "average" };
+		}
+	}
+
+	const peak = await track.getBitrate();
+	return isUsableBitrate(peak) ? { bitrate: peak, bitrateKind: "peak" } : {};
+}
+
+function isUsableBitrate(value: number | null | undefined): value is number {
+	return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function secondsToMicroseconds(seconds: number): number {

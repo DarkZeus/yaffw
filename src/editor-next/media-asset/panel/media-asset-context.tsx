@@ -3,6 +3,7 @@ import { type ReactElement, type ReactNode, cloneElement } from "react";
 import type {
 	AudioMediaTrack,
 	FrameTiming,
+	MediaTrackBitrate,
 	ReadyMediaAsset,
 	Selection,
 	VideoMediaTrack,
@@ -182,7 +183,7 @@ function videoAnalysisFactsForAsset(
 		},
 		{ label: "Frame timing", value: frameTiming },
 		{ label: "Codec", value: formatCodec(primaryVideoTrack?.codec) },
-		{ label: "Bitrate", value: formatBitrate(primaryVideoTrack?.bitrate) },
+		bitrateFact(primaryVideoTrack),
 	];
 }
 
@@ -212,7 +213,7 @@ function audioAnalysisFactsForAsset(
 			value: formatSampleRate(primaryAudioTrack.sampleRate),
 		},
 		{ label: "Codec", value: formatCodec(primaryAudioTrack.codec) },
-		{ label: "Bitrate", value: formatBitrate(primaryAudioTrack.bitrate) },
+		bitrateFact(primaryAudioTrack),
 		{ label: "Language", value: formatLanguage(primaryAudioTrack.language) },
 	];
 }
@@ -523,14 +524,27 @@ function formatSampleRate(sampleRate?: number): string {
 		: `${sampleRate} Hz`;
 }
 
+function bitrateFact(track?: MediaTrackBitrate): MediaAssetContextFact {
+	const kind = track?.bitrateKind;
+	return {
+		label:
+			kind === "average"
+				? "Average bitrate"
+				: kind === "peak"
+					? "Peak bitrate"
+					: "Bitrate",
+		value: formatBitrate(track?.bitrate),
+	};
+}
+
 function formatBitrate(bitrate?: number): string {
-	if (!bitrate || bitrate <= 0) {
+	if (!bitrate || !Number.isFinite(bitrate) || bitrate <= 0) {
 		return "Unknown";
 	}
 
 	return bitrate >= 1_000_000
-		? `${formatNumber(bitrate / 1_000_000)} Mbps`
-		: `${formatNumber(bitrate / 1_000)} kbps`;
+		? `${formatNumber(bitrate / 1_000_000)} Mb/s`
+		: `${formatNumber(bitrate / 1_000)} kb/s`;
 }
 
 function formatCodec(codec?: string, fallback = "Unknown"): string {

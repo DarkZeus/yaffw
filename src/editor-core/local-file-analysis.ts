@@ -4,14 +4,14 @@ import type {
 	AudioMediaTrack,
 	FrameTiming,
 	MediaAssetDraft,
+	MediaTrackBitrate,
 	ReadyMediaAsset,
 	Selection,
 	UnsupportedMediaFailure,
 	VideoMediaTrack,
 } from "./model";
 
-export type VideoTrackInspection = {
-	bitrate?: number;
+export type VideoTrackInspection = MediaTrackBitrate & {
 	codec?: string;
 	height?: number;
 	id: string;
@@ -19,8 +19,7 @@ export type VideoTrackInspection = {
 	width?: number;
 };
 
-export type AudioTrackInspection = {
-	bitrate?: number;
+export type AudioTrackInspection = MediaTrackBitrate & {
 	channels?: number;
 	codec?: string;
 	id: string;
@@ -146,6 +145,7 @@ function validateInspection(
 function toVideoTrack(track: VideoTrackInspection): VideoMediaTrack {
 	return {
 		bitrate: track.bitrate,
+		bitrateKind: track.bitrateKind,
 		codec: track.codec,
 		height: track.height,
 		id: track.id,
@@ -158,6 +158,7 @@ function toVideoTrack(track: VideoTrackInspection): VideoMediaTrack {
 function toAudioTrack(track: AudioTrackInspection): AudioMediaTrack {
 	return {
 		bitrate: track.bitrate,
+		bitrateKind: track.bitrateKind,
 		channels: track.channels,
 		codec: track.codec,
 		id: track.id,
