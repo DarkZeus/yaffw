@@ -11,7 +11,7 @@ sending it. The browser decodes H.264 and AAC for playback.
 The prototype uses separate video and audio SourceBuffers. It appends video in
 8 MiB slices and removes past groups of pictures as playback advances. For a seek
 outside the current buffer, it starts again from the nearest preceding
-keyframe. The 144 MiB budget counts appended video fragment bytes before
+keyframe. The 148 MiB budget counts appended video fragment bytes before
 eviction. The worker's current fragment, browser-internal allocations, decoded
 frames, and audio are outside this count.
 
@@ -97,3 +97,21 @@ events. Three forward and backward seek checks presented within one frame of
 the target. The 6.5 Mb/s replacement also played through MSE. Direct file
 playback passed with MSE support disabled. A concurrent run with the unit suite
 reached the end but reported playback interruptions.
+
+## Continuous playback under high bitrate
+
+The original editor trace ran out of buffered video at 65.21 seconds while the
+next fragment was still being prepared. The audio clock then sought beyond the
+buffer, dropping the pending fragment and triggering more seeks. The trace
+recorded 18 waiting events and a frame callback gap of 1.88 seconds.
+
+The editor now remuxes one fragment ahead of the fragment being appended. Small
+audio/video clock differences use a video rate adjustment of up to 2.5%, and
+catch-up seeks require buffered video ahead of the destination. If playback
+runs out of video, audio pauses until the video can play again.
+
+In Chrome for Testing 151, the editor reached the final frame with zero
+waiting events, 3 dropped frames out of 5,609, and a maximum frame callback
+gap of 67 ms. The editor check also passed forward and backward seeks and
+direct-file fallback. Delaying one fragment request by 4.3 seconds separately
+caused a single wait and playback resumed without a catch-up seek.

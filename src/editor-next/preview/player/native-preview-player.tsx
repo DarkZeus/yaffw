@@ -139,7 +139,11 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		[],
 	);
 	const audioMonitoringStatus = audioMonitoring.status;
-	const { url: previewUrl, waitForFragment } = usePreviewVideoSource({
+	const {
+		url: previewUrl,
+		waitForFragment,
+		canResyncTo,
+	} = usePreviewVideoSource({
 		asset,
 		cleanupScope: activeMediaAssetCleanupScope,
 		file: source,
@@ -192,6 +196,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		handleNativePause,
 		handleNativePlay,
 		handleNativePlaying,
+		handleNativeWaiting,
 		isPlaying,
 		playbackRequested,
 		audioPlaybackState,
@@ -215,6 +220,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 		previewAudioEngineRef,
 		previewClockMode,
 		waitForFragment,
+		canResyncTo,
 		scrubPreview,
 		selection,
 		source,
@@ -363,6 +369,7 @@ export const NativePreviewPlayer = memo(function NativePreviewPlayer({
 					onNativePause={handleNativePause}
 					onNativePlay={handleNativePlay}
 					onNativePlaying={handleNativePlaying}
+					onNativeWaiting={handleNativeWaiting}
 					onNativeSeeked={handleNativeSeeked}
 					onRequestFullscreen={requestFullscreen}
 					onTogglePlayback={togglePlaybackWithScrubPreview}

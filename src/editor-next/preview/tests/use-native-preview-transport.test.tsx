@@ -183,6 +183,42 @@ describe("useNativePreviewTransport", () => {
 		expect(currentTimeWrites.values()).toEqual([]);
 	});
 
+	it("lets a starved MSE follower continue in decode order and brings audio back when it plays", async () => {
+		const previewAudioEngine = createPreviewAudioEngineSpy({
+			currentTimeSeconds: 0,
+			setTimeUpdatesCurrentTime: true,
+		});
+		const canResyncTo = vi.fn(() => false);
+		render(
+			<NativePreviewTransportProbe
+				canResyncTo={canResyncTo}
+				previewAudioEngine={previewAudioEngine}
+			/>,
+		);
+		const video = screen.getByLabelText("Preview video") as HTMLVideoElement;
+		fireEvent.click(screen.getByRole("button", { name: "Toggle playback" }));
+		await waitFor(() => expect(readState()).toContain("playing:true"));
+		video.currentTime = 2;
+		previewAudioEngine.setCurrentTimeSeconds(3);
+		fireEvent.timeUpdate(video);
+		expect(video.currentTime).toBe(2);
+
+		fireEvent.waiting(video);
+		expect(previewAudioEngine.getPlaybackState()).toBe("paused");
+		expect(readState()).toContain("playhead:2000000");
+		expect(video.paused).toBe(false);
+		expect(readState()).toContain("requested:true");
+
+		video.currentTime = 2.1;
+		fireEvent.playing(video);
+		await waitFor(() =>
+			expect(previewAudioEngine.getPlaybackState()).toBe("playing"),
+		);
+		expect(previewAudioEngine.getCurrentTime()).toBe(2.1);
+		expect(video.currentTime).toBe(2.1);
+		expect(play).toHaveBeenCalledOnce();
+	});
+
 	it("keeps paused audio-master frame steps on the requested visual follower frame", () => {
 		const previewAudioEngine = createPreviewAudioEngineSpy({
 			currentTimeSeconds: 0,
@@ -398,6 +434,7 @@ describe("useNativePreviewTransport", () => {
 });
 
 function NativePreviewTransportProbe({
+	canResyncTo,
 	durationUs = 12_000_000,
 	frameDurationUs = 33_333,
 	previewAudioEngine = createPreviewAudioEngineSpy(),
@@ -407,6 +444,7 @@ function NativePreviewTransportProbe({
 	selection = defaultSelection,
 	source = previewSource,
 }: {
+	canResyncTo?: (time: number) => boolean;
 	durationUs?: number;
 	frameDurationUs?: number;
 	previewAudioEngine?: ReturnType<typeof createPreviewAudioEngineSpy>;
@@ -423,6 +461,7 @@ function NativePreviewTransportProbe({
 		previewAudioEngine as unknown as PreviewAudioEngine,
 	);
 	const transport = useNativePreviewTransport({
+		canResyncTo,
 		durationUs,
 		frameDurationUs,
 		previewAudioEngineRef,
@@ -441,6 +480,7 @@ function NativePreviewTransportProbe({
 				onPause={transport.handleNativePause}
 				onPlay={transport.handleNativePlay}
 				onPlaying={transport.handleNativePlaying}
+				onWaiting={transport.handleNativeWaiting}
 				onSeeked={() => transport.syncPlayheadWithNativeVideo()}
 				onTimeUpdate={() => transport.syncPlayheadWithNativeVideo()}
 				ref={videoRef}

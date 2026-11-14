@@ -21,6 +21,9 @@ import type { PreviewClockMode } from "./preview-clock-mode";
 import { createSelectionLoop } from "./selection-loop";
 
 const PREVIEW_AV_HARD_RESYNC_MIN_THRESHOLD_SECONDS = 0.25;
+const MSE_AV_HARD_RESYNC_SECONDS = 1;
+const MSE_AV_DRIFT_DEADBAND_SECONDS = 0.1;
+const MSE_AV_MAX_RATE_CORRECTION = 0.025;
 const PREVIEW_AV_HARD_RESYNC_FRAME_TOLERANCE = 2;
 const PREVIEW_PLAYHEAD_UI_COMMIT_INTERVAL_MS = 50;
 const PREVIEW_PLAYHEAD_UI_COMMIT_JUMP_US = 50_000;
@@ -42,6 +45,7 @@ export type UseNativePreviewTransportOptions = {
 	frameDurationUs: MediaTimeUs;
 	previewAudioEngineRef: RefObject<PreviewAudioEngine | null>;
 	previewClockMode: PreviewClockMode;
+	canResyncTo?: (timeSeconds: number) => boolean;
 	waitForFragment?: (
 		timeSeconds: number,
 		ownsPlayback: () => boolean,
@@ -77,6 +81,7 @@ type PreviewPlayback =
 const PAUSED_PLAYBACK: PreviewPlayback = { phase: "paused", request: null };
 
 export function useNativePreviewTransport({
+	canResyncTo,
 	durationUs,
 	frameDurationUs,
 	previewAudioEngineRef,
@@ -109,6 +114,7 @@ export function useNativePreviewTransport({
 	const playheadStateRef = useRef<MediaTimeUs>(0);
 	const pendingVideoFollowerSeekSecondsRef = useRef<number | null>(null);
 	const pausedAudioEngineRef = useRef<PreviewAudioEngine | null>(null);
+	const videoBufferingRef = useRef<PlaybackRequest | null>(null);
 	const [selectionLoop] = useState(() => createSelectionLoop(selection));
 	const [muted, setMuted] = useState(false);
 	const [playbackRate, setPlaybackRate] = useState(1);
@@ -139,6 +145,7 @@ export function useNativePreviewTransport({
 		const video = videoRef.current;
 		return () => {
 			playbackRef.current = PAUSED_PLAYBACK;
+			videoBufferingRef.current = null;
 			pauseVideo(video);
 		};
 	}, [source, selectionLoop, setPlayback, videoRef]);
@@ -254,10 +261,13 @@ export function useNativePreviewTransport({
 	);
 
 	const pausePlayback = useCallback(() => {
+		videoBufferingRef.current = null;
 		setPlayback(PAUSED_PLAYBACK);
-		pauseVideo(videoRef.current);
+		const video = videoRef.current;
+		pauseVideo(video);
+		if (canResyncTo && video) video.playbackRate = playbackRateRef.current;
 		previewAudioEngineRef.current?.pause();
-	}, [previewAudioEngineRef, setPlayback, videoRef]);
+	}, [canResyncTo, previewAudioEngineRef, setPlayback, videoRef]);
 
 	const previewScrubToUs = useCallback(
 		(nextPlayheadUs: MediaTimeUs) => {
@@ -519,6 +529,11 @@ export function useNativePreviewTransport({
 				return;
 			}
 
+			if (videoBufferingRef.current === request) {
+				if (state === "paused" || state === "buffering") return;
+				videoBufferingRef.current = null;
+			}
+
 			if (state !== "playing") {
 				const audioHadStarted = followerStart?.request === request;
 				followerStart = null;
@@ -694,11 +709,33 @@ export function useNativePreviewTransport({
 				setPlayheadUs(durationUs);
 				return;
 			}
-			if (scrubOwnsPlayhead) return;
+			if (scrubOwnsPlayhead || videoBufferingRef.current) return;
 
 			const nativePlayheadUs = secondsToMicroseconds(transportTimeSeconds);
 			const hardResyncThresholdSeconds =
 				previewAvHardResyncThresholdSeconds(frameDurationUs);
+			const drift = transportTimeSeconds - video.currentTime;
+			if (
+				canResyncTo &&
+				engine &&
+				renderingPlaybackActive &&
+				!video.seeking &&
+				Number.isFinite(drift)
+			) {
+				// Small rate corrections let video catch up without flushing decoded
+				// frames and decoding the same high-bitrate GOP again.
+				const adjustment =
+					Math.abs(drift) <= MSE_AV_DRIFT_DEADBAND_SECONDS
+						? 0
+						: clamp(
+								drift * 0.3,
+								-MSE_AV_MAX_RATE_CORRECTION,
+								MSE_AV_MAX_RATE_CORRECTION,
+							);
+				const rate = playbackRateRef.current * (1 + adjustment);
+				if (Math.abs(video.playbackRate - rate) > 0.005)
+					video.playbackRate = rate;
+			}
 			const pendingVideoFollowerSeekSeconds =
 				pendingVideoFollowerSeekSecondsRef.current;
 
@@ -715,10 +752,12 @@ export function useNativePreviewTransport({
 
 			if (
 				audioMasterClockActive &&
-				(!waitForFragment || !video.seeking) &&
 				Number.isFinite(transportTimeSeconds) &&
-				Math.abs(video.currentTime - transportTimeSeconds) >
-					hardResyncThresholdSeconds &&
+				(!canResyncTo || canResyncTo(transportTimeSeconds)) &&
+				Math.abs(drift) >
+					(canResyncTo
+						? MSE_AV_HARD_RESYNC_SECONDS
+						: hardResyncThresholdSeconds) &&
 				!shouldDeferVideoFollowerResyncForPendingSeek({
 					hardResyncThresholdSeconds,
 					pendingSeekSeconds: pendingVideoFollowerSeekSecondsRef.current,
@@ -745,11 +784,11 @@ export function useNativePreviewTransport({
 		[
 			audioPlaybackState,
 			audioMasterClockActive,
+			canResyncTo,
 			durationUs,
 			frameDurationUs,
 			hasScrubTarget,
 			isPlaying,
-			waitForFragment,
 			nativeVideoClockActive,
 			pausePlayback,
 			previewAudioEngineRef,
@@ -874,9 +913,62 @@ export function useNativePreviewTransport({
 			setPlayback({ phase: "starting", request: { origin: "native" } });
 	}, [nativeVideoClockActive, previewAudioEngineRef, setPlayback, videoRef]);
 
+	// A starved follower must be able to resume sequential playback once data
+	// arrives. Hold the audio clock rather than seeking away from its buffer.
+	const handleNativeWaiting = useCallback(() => {
+		const video = videoRef.current;
+		const engine = previewAudioEngineRef.current;
+		const { phase, request } = playbackRef.current;
+		if (
+			!canResyncTo ||
+			!audioMasterClockActive ||
+			phase !== "playing" ||
+			!request ||
+			videoBufferingRef.current ||
+			!video ||
+			video.paused ||
+			video.seeking ||
+			engine?.getPlaybackState() !== "playing"
+		)
+			return;
+
+		videoBufferingRef.current = request;
+		const time = video.currentTime;
+		engine.pause();
+		setPlayheadUs(secondsToMicroseconds(time));
+	}, [
+		audioMasterClockActive,
+		canResyncTo,
+		previewAudioEngineRef,
+		setPlayheadUs,
+		videoRef,
+	]);
+
 	const handleNativePlaying = useCallback(() => {
 		const video = videoRef.current;
 		const { phase, request } = playbackRef.current;
+		if (
+			request &&
+			videoBufferingRef.current === request &&
+			!video?.paused &&
+			!video?.seeking
+		) {
+			const engine = previewAudioEngineRef.current;
+			if (engine?.getPlaybackState() === "paused" && video) {
+				const ownsPlayback = () => playbackRef.current.request === request;
+				const time = video.currentTime;
+				void engine.setTime(time);
+				void engine
+					.play()
+					.catch(() => {
+						if (ownsPlayback()) pausePlayback();
+					})
+					.finally(() => {
+						if (videoBufferingRef.current === request)
+							videoBufferingRef.current = null;
+					});
+			}
+		}
 		if (
 			nativeVideoClockActive &&
 			video &&
@@ -887,7 +979,13 @@ export function useNativePreviewTransport({
 		) {
 			setPlayback({ phase: "playing", request });
 		}
-	}, [nativeVideoClockActive, setPlayback, videoRef]);
+	}, [
+		nativeVideoClockActive,
+		pausePlayback,
+		previewAudioEngineRef,
+		setPlayback,
+		videoRef,
+	]);
 
 	return {
 		getPlaybackRate,
@@ -896,6 +994,7 @@ export function useNativePreviewTransport({
 		handleNativePause,
 		handleNativePlay,
 		handleNativePlaying,
+		handleNativeWaiting,
 		isPlaying,
 		playbackRequested,
 		audioPlaybackState,

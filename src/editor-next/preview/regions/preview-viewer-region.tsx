@@ -23,6 +23,7 @@ export type PreviewViewerRegionProps = {
 	onNativePause: () => void;
 	onNativePlay: () => void;
 	onNativePlaying: () => void;
+	onNativeWaiting: () => void;
 	onNativeSeeked: ReactEventHandler<HTMLVideoElement>;
 	onRequestFullscreen: () => void;
 	onSyncPlayhead: () => void;
@@ -52,6 +53,7 @@ export function PreviewViewerRegion({
 	onNativePause,
 	onNativePlay,
 	onNativePlaying,
+	onNativeWaiting,
 	onNativeSeeked,
 	onRequestFullscreen,
 	onTogglePlayback,
@@ -135,6 +137,7 @@ export function PreviewViewerRegion({
 					onNativePause={onNativePause}
 					onNativePlay={onNativePlay}
 					onNativePlaying={onNativePlaying}
+					onNativeWaiting={onNativeWaiting}
 					onNativeSeeked={onNativeSeeked}
 					onSyncPlayhead={onSyncPlayhead}
 					previewUrl={previewUrl}
@@ -161,6 +164,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativePause,
 	onNativePlay,
 	onNativePlaying,
+	onNativeWaiting,
 	onNativeSeeked,
 	onSyncPlayhead,
 	previewUrl,
@@ -181,6 +185,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 	onNativePause: () => void;
 	onNativePlay: () => void;
 	onNativePlaying: () => void;
+	onNativeWaiting: () => void;
 	onNativeSeeked: PreviewViewerRegionProps["onNativeSeeked"];
 	onSyncPlayhead: () => void;
 	previewUrl: string;
@@ -227,6 +232,7 @@ const PreviewMediaSurface = memo(function PreviewMediaSurface({
 							onPause={onNativePause}
 							onPlay={onNativePlay}
 							onPlaying={onNativePlaying}
+							onWaiting={onNativeWaiting}
 							onSeeked={onNativeSeeked}
 							onTimeUpdate={onSyncPlayhead}
 							playsInline

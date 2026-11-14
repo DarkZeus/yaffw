@@ -136,7 +136,7 @@ async function mux({ sink, kind, config }, start, end, first) {
 
 	const nextKey =
 		videoTrack && Number.isFinite(end)
-			? await sink.getKeyPacket(end, { verifyKeyPackets: true })
+			? await sink.getKeyPacket(end, { metadataOnly: true })
 			: undefined;
 	await output.start();
 	let payloadBytes = 0;

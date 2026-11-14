@@ -1,9 +1,12 @@
 import MseFragmentWorker from "./mse-fragment.worker.js?worker";
 
 const MIB = 1024 * 1024;
-const VIDEO_BUFFER_BYTES = 144 * MIB;
+// Keep the accounted video payload below Chromium's default SourceBuffer quota.
+const VIDEO_BUFFER_BYTES = 148 * MIB;
 const APPEND_BYTES = 8 * MIB;
-const LOOKAHEAD_SECONDS = 1.75;
+const MIN_APPEND_BYTES = MIB;
+const LOOKAHEAD_SECONDS = 3.5;
+const RESYNC_BUFFER_SECONDS = 0.25;
 
 type Fragment = { start: number; bytes: number };
 type MediaIndex = {
@@ -100,6 +103,16 @@ export function createMsePreview({
 	}
 
 	let isFragmentReady: ((time: number) => boolean) | undefined;
+	let player: HTMLVideoElement | undefined;
+
+	function canResyncTo(time: number) {
+		return (
+			player !== undefined &&
+			!player.seeking &&
+			player.readyState >= player.HAVE_FUTURE_DATA &&
+			contains(player.buffered, time, RESYNC_BUFFER_SECONDS)
+		);
+	}
 
 	async function waitForFragment(time: number, ownsPlayback: () => boolean) {
 		while (!signal.aborted && ownsPlayback() && !isFragmentReady?.(time)) {
@@ -108,6 +121,7 @@ export function createMsePreview({
 	}
 
 	async function play(video: HTMLVideoElement, onReady?: () => void) {
+		player = video;
 		const [index] = await Promise.all([
 			request({ type: "open" }),
 			mediaSource.readyState === "closed"
@@ -185,7 +199,8 @@ export function createMsePreview({
 			let bytesRemoved = 0;
 			// A paused seek at the boundary must be able to buffer the next
 			// fragment without consuming the guard interval through playback.
-			const guard = video.paused ? 0 : 0.045;
+			const guard =
+				video.paused || video.readyState < video.HAVE_FUTURE_DATA ? 0 : 0.045;
 			for (const [position, bytes] of appended) {
 				const boundary = fragmentEnd(position);
 				// Keep the current group, including the decode dependencies of its B-frames.
@@ -213,27 +228,27 @@ export function createMsePreview({
 			}
 			for (let offset = part.initBytes; offset < part.mediaEnd;) {
 				if (signal.aborted || desiredSeek !== null) return;
-				const end =
+				const isVideo = buffer === videoBuffer;
+				let size =
 					nextIndex === firstFragmentAfterSeek
-						? part.mediaEnd
-						: Math.min(part.mediaEnd, offset + APPEND_BYTES);
-				const added = end - offset;
-				if (
-					buffer === videoBuffer &&
-					stats.appendedVideoBytes + added > VIDEO_BUFFER_BYTES
-				) {
+						? part.mediaEnd - offset
+						: Math.min(APPEND_BYTES, part.mediaEnd - offset);
+				if (isVideo && stats.appendedVideoBytes + size > VIDEO_BUFFER_BYTES) {
 					await evict();
-					if (stats.appendedVideoBytes + added > VIDEO_BUFFER_BYTES) {
+					const freeBytes = VIDEO_BUFFER_BYTES - stats.appendedVideoBytes;
+					if (freeBytes < Math.min(size, MIN_APPEND_BYTES)) {
 						await waitForPlayback();
 						continue;
 					}
+					size = Math.min(size, freeBytes);
 				}
+				const end = offset + size;
 				await waitForMediaEvent(buffer, "updateend", signal, () =>
 					buffer.appendBuffer(bytes.subarray(offset, end)),
 				);
 				if (buffer === videoBuffer) {
-					stats.appendedVideoBytes += added;
-					appended.set(nextIndex, (appended.get(nextIndex) ?? 0) + added);
+					stats.appendedVideoBytes += size;
+					appended.set(nextIndex, (appended.get(nextIndex) ?? 0) + size);
 					stats.maxAppendedVideoBytes = Math.max(
 						stats.maxAppendedVideoBytes,
 						stats.appendedVideoBytes,
@@ -242,6 +257,19 @@ export function createMsePreview({
 				offset = end;
 			}
 		}
+
+		// Keep one remux in flight while the previous fragment waits for room
+		// in the SourceBuffer. Always finish that request before posting another.
+		function prepareFragment(index: number) {
+			return {
+				index,
+				result: request({ type: "fragment", index }).then(
+					(result) => ({ result }),
+					(error: unknown) => ({ error }),
+				),
+			};
+		}
+		let prepared: ReturnType<typeof prepareFragment> | undefined;
 
 		while (!signal.aborted) {
 			if (video.error) throw new Error(video.error.message);
@@ -262,8 +290,22 @@ export function createMsePreview({
 				continue;
 			}
 
-			const parts = await request({ type: "fragment", index: nextIndex });
+			prepared ??= prepareFragment(nextIndex);
+			const index = prepared.index;
+			const outcome = await prepared.result;
+			prepared = undefined;
+			if (signal.aborted) break;
+			if (desiredSeek !== null || nextIndex !== index) continue;
+			if ("error" in outcome) throw outcome.error;
+			const parts = outcome.result;
 			if (!("video" in parts)) throw new Error("Expected a media fragment.");
+			const following = nextIndex + 1;
+			if (
+				following < fragments.length &&
+				fragmentEnd(nextIndex) <= video.currentTime + LOOKAHEAD_SECONDS
+			) {
+				prepared = prepareFragment(following);
+			}
 			stats.fragmentsBuilt++;
 			stats.maxFragmentBytes = Math.max(
 				stats.maxFragmentBytes,
@@ -286,7 +328,7 @@ export function createMsePreview({
 		}
 	}
 
-	return { url, play, close, stats, waitForFragment };
+	return { url, play, close, stats, waitForFragment, canResyncTo };
 }
 
 function findFragment(fragments: Fragment[], seconds: number) {
@@ -295,9 +337,10 @@ function findFragment(fragments: Fragment[], seconds: number) {
 	return index;
 }
 
-function contains(ranges: TimeRanges, time: number) {
+function contains(ranges: TimeRanges, time: number, lead = 0) {
 	for (let index = 0; index < ranges.length; index++) {
-		if (ranges.start(index) <= time && time < ranges.end(index)) return true;
+		if (ranges.start(index) <= time && time + lead < ranges.end(index))
+			return true;
 	}
 	return false;
 }

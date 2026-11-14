@@ -6,6 +6,7 @@ import { createMsePreview } from "./create-mse-preview";
 type PreviewSource = {
 	url: string;
 	waitForFragment?: ReturnType<typeof createMsePreview>["waitForFragment"];
+	canResyncTo?: ReturnType<typeof createMsePreview>["canResyncTo"];
 };
 
 export function usePreviewVideoSource({
@@ -53,7 +54,11 @@ export function usePreviewVideoSource({
 		if (!disposed) {
 			setPreview(
 				mse
-					? { url: mse.url, waitForFragment: mse.waitForFragment }
+					? {
+							url: mse.url,
+							waitForFragment: mse.waitForFragment,
+							canResyncTo: mse.canResyncTo,
+						}
 					: { url: nativeUrl },
 			);
 			if (mse && video) {
