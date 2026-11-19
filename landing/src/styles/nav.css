@@ -1,0 +1,89 @@
+/* ───────── Nav ───────── */
+
+.nav {
+	position: fixed;
+	inset: 12px 0 auto;
+	z-index: 50;
+	padding-inline: var(--gutter);
+	pointer-events: none;
+}
+.nav__inner {
+	pointer-events: auto;
+	max-width: 1080px;
+	margin: 0 auto;
+	height: 52px;
+	display: flex;
+	align-items: center;
+	gap: 24px;
+	padding: 0 10px 0 16px;
+	border-radius: 14px;
+	border: 1px solid transparent;
+	transition:
+		background-color 150ms var(--ease-out),
+		border-color 150ms var(--ease-out),
+		box-shadow 150ms var(--ease-out),
+		backdrop-filter 150ms var(--ease-out);
+}
+.nav[data-scrolled="true"] .nav__inner {
+	background: color-mix(in oklch, var(--workbench-viewer) 72%, transparent);
+	border-color: var(--border);
+	box-shadow:
+		var(--hairline-top),
+		0 8px 24px oklch(0 0 none / 0.06);
+	backdrop-filter: blur(16px) saturate(1.4);
+	-webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 600;
+	font-size: 15px;
+	letter-spacing: -0.02em;
+}
+.brand img {
+	border-radius: 6px;
+}
+.nav__links {
+	display: flex;
+	gap: 4px;
+	margin-inline: auto;
+}
+.nav__links a {
+	padding: 6px 12px;
+	border-radius: 8px;
+	font-size: 13.5px;
+	color: var(--muted-foreground);
+	transition:
+		color 150ms var(--ease-out),
+		background-color 150ms var(--ease-out);
+}
+.nav__links a[aria-current="page"],
+.nav__links a:hover {
+	color: var(--foreground);
+	background: var(--workbench-hover);
+}
+.nav__actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.icon-link {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 8px;
+	color: var(--muted-foreground);
+	transition:
+		color 150ms var(--ease-out),
+		background-color 150ms var(--ease-out);
+}
+.icon-link:hover {
+	color: var(--foreground);
+	background: var(--workbench-hover);
+}
+.icon-link svg {
+	width: 18px;
+	height: 18px;
+}

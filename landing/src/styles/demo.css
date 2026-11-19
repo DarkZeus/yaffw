@@ -1,0 +1,428 @@
+/* ───────── Selection demo ───────── */
+
+/* ── Editor slice: viewer + output + transport + timeline ── */
+.demo {
+	border-radius: 16px;
+	border: 1px solid transparent;
+	background:
+		linear-gradient(var(--workbench), var(--workbench)) padding-box,
+		var(--edge) border-box;
+	overflow: hidden;
+	box-shadow: var(--shadow-float);
+}
+.demo__top {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 320px;
+	border-bottom: 1px solid var(--border);
+}
+.demo__viewer {
+	position: relative;
+	height: clamp(200px, 26vw, 300px);
+	background: var(--workbench-viewer);
+}
+/* Parallax shot: the camera scales, nearer layers pan further (driven by the playhead in JS). */
+.scene {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	contain: strict;
+}
+.scene__cam,
+.scene__cam i {
+	position: absolute;
+	inset: 0;
+}
+.scene__cam .scene__ridge {
+	left: -20%;
+	right: -20%;
+}
+.scene__cam .scene__ground {
+	left: -30%;
+	right: -30%;
+}
+.demo__osd {
+	position: absolute;
+	inset: 12px 12px auto;
+	display: flex;
+	justify-content: space-between;
+	font-size: 12px;
+	color: var(--workbench-foreground);
+	text-shadow: 0 1px 2px oklch(0 0 none / 0.6);
+}
+.demo__out {
+	display: flex;
+	flex-direction: column;
+	padding: 20px;
+	border-left: 1px solid var(--border);
+	background: var(--workbench-inspector);
+}
+.demo__out h3 {
+	font-size: 16px;
+	font-weight: 600;
+}
+.demo__out dl {
+	margin: 16px 0 0;
+	font-size: 13px;
+}
+.demo__out dl div {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+}
+.demo__out dt {
+	color: var(--muted-foreground);
+}
+.demo__out dd {
+	margin: 0;
+}
+.demo__export {
+	margin-top: auto;
+	width: 100%;
+}
+.demo .transport {
+	border-top: 0;
+	border-bottom: 1px solid var(--border);
+}
+.demo .timecode {
+	margin-left: auto;
+}
+.demo__tl {
+	display: grid;
+	grid-template-columns: 128px minmax(0, 1fr);
+	padding: 16px 20px 20px;
+}
+.demo__tl .timeline {
+	border-radius: 0 8px 8px 0;
+}
+.demo__labels {
+	display: grid;
+	grid-template-rows: 36px 76px 80px;
+	border: 1px solid var(--border);
+	border-right: 0;
+	border-radius: 8px 0 0 8px;
+	background: var(--workbench-timeline);
+	font-size: 13px;
+}
+.demo__labels div {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	padding: 0 12px;
+	border-top: 1px solid var(--border);
+}
+.demo__labels div:first-child {
+	border-top: 0;
+}
+.demo__labels small {
+	font-size: 11px;
+	color: var(--muted-foreground);
+}
+
+[data-playing="true"] .t-btn--play .i-play {
+	display: none;
+}
+[data-playing="true"] .t-btn--play .i-pause {
+	display: block;
+}
+.timeline--noruler .shade,
+.timeline--noruler .selection,
+.timeline--noruler .handle {
+	top: 0;
+}
+.timeline--noruler .playhead i {
+	top: -1px;
+}
+.demo,
+.try__player {
+	user-select: none;
+	-webkit-user-select: none;
+}
+.demo .timeline,
+.try__player .timeline {
+	border-radius: 8px;
+}
+.demo[data-active="true"],
+.try__player[data-active="true"] {
+	border-color: color-mix(in oklch, var(--accent) 30%, var(--border));
+}
+
+.timeline {
+	position: relative;
+	display: grid;
+	grid-template-rows: 36px 76px 80px;
+	border: 1px solid var(--border);
+	border-radius: 0 8px 8px 0;
+	background: var(--workbench-timeline);
+	cursor: pointer;
+	touch-action: none;
+	overflow: hidden;
+}
+.ruler {
+	position: relative;
+	background: var(--workbench-viewer);
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	color: var(--muted-foreground);
+	font-variant-numeric: tabular-nums;
+}
+.ruler span {
+	position: absolute;
+	bottom: 4px;
+	translate: 4px 0;
+	white-space: nowrap;
+}
+.ruler i {
+	position: absolute;
+	bottom: 0;
+	width: 1px;
+	height: 6px;
+	background: var(--workbench-waveform-guide);
+}
+.ruler i.major {
+	height: 14px;
+	background: var(--muted-foreground);
+}
+
+.lane {
+	position: relative;
+	border-top: 1px solid var(--border);
+}
+.lane--video {
+	display: flex;
+	padding: 4px 0;
+	gap: 2px;
+}
+.frame {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+	border-radius: 2px;
+	overflow: hidden;
+	background: var(--bg);
+}
+.frame::after {
+	content: attr(data-tc);
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 2px 6px;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	color: var(--workbench-foreground);
+	background: linear-gradient(to top, oklch(0 0 none / 0.7), transparent);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.lane--audio {
+	padding: 6px 0;
+}
+.wave {
+	width: 100%;
+	height: 100%;
+	color: var(--workbench-waveform);
+}
+
+.shade {
+	position: absolute;
+	top: 36px;
+	bottom: 0;
+	background: oklch(0 0 none / 0.5);
+	pointer-events: none;
+}
+.shade--l {
+	left: 0;
+	width: calc(var(--s) * 100%);
+}
+.shade--r {
+	right: 0;
+	width: calc((1 - var(--e)) * 100%);
+}
+.selection {
+	position: absolute;
+	top: 36px;
+	bottom: 0;
+	left: calc(var(--s) * 100%);
+	width: calc((var(--e) - var(--s)) * 100%);
+	border-top: 2px solid var(--accent);
+	border-bottom: 2px solid var(--accent);
+	background: color-mix(in oklch, var(--accent) 12%, transparent);
+	pointer-events: none;
+}
+.selection::before {
+	/* video lane gets the app's gold frame treatment */
+	content: "";
+	position: absolute;
+	inset: 0 0 auto;
+	height: 76px;
+	border-bottom: 2px solid color-mix(in oklch, var(--accent) 60%, transparent);
+}
+
+.handle {
+	position: absolute;
+	top: 36px;
+	bottom: 0;
+	width: 24px;
+	translate: -50% 0;
+	cursor: ew-resize;
+	z-index: 3;
+	touch-action: none;
+	border-radius: 0;
+}
+/* Keep the grip fully visible at the media bounds, like the app does. */
+.handle--start {
+	left: clamp(6px, calc(var(--s) * 100%), calc(100% - 6px));
+}
+.handle--end {
+	left: clamp(6px, calc(var(--e) * 100%), calc(100% - 6px));
+}
+.handle::before {
+	content: "";
+	position: absolute;
+	inset-block: 0;
+	left: 50%;
+	width: 2px;
+	translate: -1px 0;
+	background: var(--accent);
+}
+.handle::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	translate: -50% -50%;
+	width: 10px;
+	height: 32px;
+	border-radius: 4px;
+	background:
+		linear-gradient(
+				to right,
+				transparent 3px,
+				var(--workbench-selected-foreground) 3px 4px,
+				transparent 4px 6px,
+				var(--workbench-selected-foreground) 6px 7px,
+				transparent 7px
+			)
+			center / 10px 12px no-repeat,
+		var(--accent);
+	box-shadow: 0 1px 4px oklch(0 0 none / 0.35);
+	transition: scale 150ms var(--ease-out);
+}
+.handle[data-dragging="true"]::after {
+	scale: 1.15 1;
+}
+@media (hover: hover) and (pointer: fine) {
+	.handle:hover::after {
+		scale: 1.15 1;
+	}
+}
+.handle:focus-visible {
+	outline: none;
+}
+.handle:focus-visible::after {
+	box-shadow:
+		0 0 0 2px var(--workbench),
+		0 0 0 4px var(--ring);
+}
+
+.playhead-track {
+	position: absolute;
+	inset: 0;
+	translate: calc(var(--ph, 0) * 100%) 0;
+	pointer-events: none;
+	z-index: 4;
+}
+.playhead {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: 2px;
+	translate: -1px 0;
+	background: var(--workbench-playhead);
+}
+.playhead i {
+	position: absolute;
+	top: 18px;
+	left: 50%;
+	translate: -50% 0;
+	width: 12px;
+	height: 12px;
+	background: var(--workbench-playhead);
+	clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.transport {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 12px 20px;
+	border-top: 1px solid var(--border);
+	background: var(--workbench-transport);
+}
+.transport__group {
+	display: flex;
+	gap: 4px;
+}
+.t-btn {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	color: var(--workbench-foreground);
+	transition:
+		background-color 150ms var(--ease-out),
+		color 150ms var(--ease-out),
+		transform 150ms var(--ease-out);
+}
+.t-btn:hover {
+	background: var(--workbench-hover);
+}
+.t-btn:active {
+	transform: scale(0.97);
+}
+.t-btn svg {
+	width: 16px;
+	height: 16px;
+}
+.t-btn--play {
+	background: var(--primary);
+	color: var(--primary-foreground);
+	margin-right: 8px;
+}
+.t-btn--play:hover {
+	background: color-mix(in oklch, var(--primary) 88%, var(--black));
+}
+.t-btn--play .i-pause {
+	display: none;
+}
+
+.t-btn[aria-pressed="true"] {
+	color: var(--accent);
+	background: var(--accent-soft);
+}
+.timecode {
+	font-size: 14px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	background: var(--workbench-viewer);
+	border: 1px solid var(--border);
+}
+
+.card kbd {
+	display: inline-grid;
+	place-items: center;
+	min-width: 22px;
+	height: 22px;
+	padding: 0 6px;
+	border-radius: 5px;
+	font-size: 11px;
+	color: var(--foreground);
+	background: var(--workbench-lane);
+	border: 1px solid var(--border);
+	box-shadow: inset 0 -1px 0 oklch(0 0 none / 0.4);
+}

@@ -1,0 +1,50 @@
+/* ───────── Footer ───────── */
+
+.footer {
+	border-top: 1px solid var(--border);
+	padding-block: 48px 32px;
+	font-size: 14px;
+}
+.footer__inner {
+	display: flex;
+	justify-content: space-between;
+	gap: 48px;
+	flex-wrap: wrap;
+}
+.footer__brand p {
+	margin-top: 12px;
+	max-width: 30ch;
+	color: var(--muted-foreground);
+}
+.footer__cols {
+	display: flex;
+	gap: clamp(32px, 6vw, 64px);
+	flex-wrap: wrap;
+}
+.footer__cols div {
+	display: grid;
+	align-content: start;
+	gap: 10px;
+}
+.footer__cols h4 {
+	margin-bottom: 4px;
+	font-size: 13px;
+	font-weight: 500;
+}
+.footer__cols a {
+	color: var(--muted-foreground);
+	transition: color 150ms var(--ease-out);
+}
+.footer__cols a:hover {
+	color: var(--foreground);
+}
+.footer__base {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-top: 48px;
+	padding-top: 24px;
+	border-top: 1px solid var(--border);
+	font-size: 12px;
+}

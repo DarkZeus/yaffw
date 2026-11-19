@@ -1,0 +1,158 @@
+/* ───────── Responsive ───────── */
+
+@media (max-width: 960px) {
+	.limits-grid {
+		grid-template-columns: 1fr;
+		gap: 48px;
+	}
+	.nav__links {
+		display: none;
+	}
+	.nav__actions {
+		margin-left: auto;
+	}
+	.bento {
+		grid-template-columns: 1fr 1fr;
+	}
+	.card--wide {
+		grid-column: span 2;
+	}
+	.card--preview {
+		grid-column: span 2;
+	}
+	.hero {
+		grid-template-columns: 1fr;
+		padding-right: var(--gutter);
+		min-height: 0;
+	}
+	.hero__shot {
+		width: 100%;
+		border-radius: 14px;
+	}
+	.demo__top,
+	.steps,
+	.try,
+	.source,
+	.local__facts {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.demo__out {
+		border-left: 0;
+		border-top: 1px solid var(--border);
+	}
+	.demo__tl {
+		grid-template-columns: 1fr;
+		padding: 12px;
+	}
+	.demo__labels {
+		display: none;
+	}
+	.bound__row {
+		grid-template-columns: 1fr;
+		justify-items: stretch;
+	}
+	.bound__wire {
+		width: 2px;
+		height: 32px;
+		justify-self: center;
+		background: repeating-linear-gradient(
+			to bottom,
+			var(--input) 0 6px,
+			transparent 6px 10px
+		);
+	}
+	.bound__wire i {
+		--p0: 0 -12px;
+		--p1: 0 32px;
+		inset: 0 auto auto 0;
+		width: 2px;
+		height: 12px;
+	}
+}
+
+@media (max-width: 720px) {
+	.ruler span:nth-of-type(2n) {
+		display: none;
+	}
+	.try__hint {
+		display: none;
+	}
+	.timeline {
+		border-radius: 8px;
+	}
+
+	.transport {
+		padding: 10px 12px;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.t-btn {
+		width: 34px;
+		height: 34px;
+	}
+	.timecode {
+		font-size: 13px;
+	}
+	.bento {
+		grid-template-columns: 1fr;
+	}
+	.card--wide,
+	.card--preview {
+		grid-column: auto;
+	}
+	.card {
+		min-height: 0;
+		padding: 20px;
+	}
+	.card--audio {
+		flex-direction: column;
+	}
+	.card--audio .card__copy {
+		flex: none;
+		align-self: auto;
+	}
+	.mixer {
+		margin: 0;
+		gap: 6px;
+		padding: 6px;
+	}
+	.strip {
+		width: auto;
+		min-width: 0;
+		flex: 1 1 0;
+		padding: 8px;
+	}
+	.meter-scale {
+		display: none;
+	}
+	.frame::after {
+		display: none;
+	}
+
+	.strip__body {
+		min-height: 130px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		animation-delay: 0ms !important;
+	}
+	[data-reveal] {
+		opacity: 1;
+		translate: none;
+		transition: none;
+	}
+	/* Export mini-UI rests on its finished state: full bar, "Download" only. */
+	.steps__lbl--a,
+	.steps__ink {
+		opacity: 0;
+	}
+}

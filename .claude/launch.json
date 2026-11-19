@@ -1,0 +1,11 @@
+{
+	"version": "0.0.1",
+	"configurations": [
+		{
+			"name": "landing",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": ["--filter", "yaffw-landing", "dev"],
+			"port": 4173
+		}
+	]
+}

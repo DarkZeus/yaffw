@@ -1,0 +1,166 @@
+/* ───────── Changelog (and the 404 page, which shares its frame) ───────── */
+
+.changelog {
+	max-width: calc(960px + var(--gutter) * 2);
+	min-height: 70vh;
+	padding-block: 160px 128px;
+}
+.changelog__head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	flex-wrap: wrap;
+	padding-bottom: 32px;
+}
+.changelog__title {
+	font-size: clamp(40px, 5.6vw, 72px);
+	line-height: 1;
+	font-weight: 600;
+	letter-spacing: -0.04em;
+}
+.changelog__empty {
+	display: grid;
+	gap: 8px;
+	padding-top: 32px;
+	border-top: 1px solid var(--border);
+	font-size: 17px;
+}
+.changelog__empty .btn {
+	margin-top: 16px;
+}
+
+/* One release per row: date and tag on the left (sticky while you read), notes on the right. */
+.releases {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.release {
+	display: grid;
+	grid-template-columns: 200px minmax(0, 1fr);
+	gap: 48px;
+	padding-block: 40px;
+	border-top: 1px solid var(--border);
+	scroll-margin-top: 96px;
+}
+.release__meta {
+	position: sticky;
+	top: 96px;
+	align-self: start;
+	display: grid;
+	justify-items: start;
+	gap: 8px;
+	font-size: 14px;
+	color: var(--muted-foreground);
+}
+.release__tag {
+	padding: 2px 8px;
+	border-radius: 6px;
+	background: var(--workbench-lane);
+	font-size: 12.5px;
+	color: var(--foreground);
+	transition: background-color 150ms var(--ease-out);
+}
+.release__tag:hover {
+	background: var(--workbench-ruler);
+}
+.release__pre {
+	font-size: 12px;
+	color: var(--accent);
+}
+.release__name {
+	font-size: clamp(22px, 2.4vw, 28px);
+	line-height: 1.2;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	text-wrap: balance;
+}
+
+/* GitHub-rendered release notes */
+.prose {
+	margin-top: 16px;
+	max-width: 68ch;
+	font-size: 15.5px;
+	line-height: 1.65;
+	color: oklch(1 0 none / 0.78);
+}
+.prose > * + * {
+	margin-top: 14px;
+}
+.prose :is(h1, h2, h3, h4) {
+	margin-top: 28px;
+	font-size: 16px;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--foreground);
+}
+.prose :is(ul, ol) {
+	padding-left: 20px;
+}
+.prose li + li {
+	margin-top: 6px;
+}
+.prose li::marker {
+	color: var(--faint);
+}
+.prose a {
+	color: var(--foreground);
+	text-decoration: underline;
+	text-decoration-color: oklch(1 0 none / 0.3);
+	text-underline-offset: 3px;
+	transition: text-decoration-color 150ms var(--ease-out);
+}
+.prose a:hover {
+	text-decoration-color: currentColor;
+}
+.prose code {
+	padding: 1px 6px;
+	border-radius: 5px;
+	background: var(--workbench-lane);
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+}
+.prose pre {
+	padding: 16px;
+	border-radius: 10px;
+	background: var(--workbench);
+	border: 1px solid var(--border);
+	overflow-x: auto;
+}
+.prose pre code {
+	padding: 0;
+	background: none;
+}
+.prose img {
+	height: auto;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+}
+.prose hr {
+	border: 0;
+	border-top: 1px solid var(--border);
+}
+.prose blockquote {
+	margin: 0;
+	padding-left: 16px;
+	border-left: 1px solid var(--input);
+	color: var(--muted-foreground);
+}
+
+@media (max-width: 720px) {
+	.changelog {
+		padding-block: 120px 96px;
+	}
+	.release {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 16px;
+	}
+	.release__meta {
+		position: static;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 12px;
+	}
+}

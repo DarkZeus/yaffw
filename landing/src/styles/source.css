@@ -1,0 +1,148 @@
+/* ───────── Source ───────── */
+
+.copy-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 10px;
+	border-radius: 7px;
+	border: 1px solid var(--border);
+	font-size: 12px;
+	color: var(--muted-foreground);
+	transition:
+		color 150ms var(--ease-out),
+		background-color 150ms var(--ease-out);
+}
+.copy-btn:hover {
+	color: var(--foreground);
+	background: var(--workbench-hover);
+}
+.copy-btn[data-copied="true"] {
+	color: var(--chart-2);
+}
+.copy-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+/* ── Repo card: the repository as an object ── */
+.source {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 560px);
+	gap: 64px;
+	align-items: center;
+}
+.source .section__title {
+	margin: 0 0 32px;
+}
+.repo {
+	position: relative;
+	padding: 20px;
+	border-radius: 16px;
+	border: 1px solid transparent;
+	background:
+		linear-gradient(var(--workbench), var(--workbench)) padding-box,
+		var(--edge) border-box;
+	box-shadow: var(--shadow-float);
+}
+.repo__head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-size: 16px;
+}
+.repo__head img {
+	border-radius: 5px;
+}
+.repo__head b {
+	font-weight: 600;
+}
+.repo__desc {
+	margin-top: 8px;
+	font-size: 14px;
+	color: var(--muted-foreground);
+}
+.repo__stack {
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 16px 0 0;
+	padding: 0;
+}
+.repo__stack li {
+	padding: 2px 8px;
+	border-radius: 6px;
+	background: var(--workbench-lane);
+	font-size: 12px;
+	color: var(--muted-foreground);
+}
+.repo__tabs {
+	display: flex;
+	gap: 4px;
+	margin-top: 20px;
+	border-bottom: 1px solid var(--border);
+}
+.repo__tabs button {
+	padding: 8px 12px;
+	margin-bottom: -1px;
+	border-bottom: 2px solid transparent;
+	font-size: 13px;
+	color: var(--muted-foreground);
+	transition:
+		color 150ms var(--ease-out),
+		border-color 150ms var(--ease-out);
+}
+.repo__tabs [aria-selected="true"] {
+	color: var(--foreground);
+	border-color: var(--accent);
+}
+.repo__term,
+.repo__dev {
+	min-height: 152px;
+	margin: 16px 0 0;
+	font-size: 13px;
+	line-height: 1.8;
+	overflow-x: auto;
+}
+.repo__dev div {
+	display: grid;
+	grid-template-columns: 136px 1fr;
+	gap: 12px;
+}
+.repo__dev dd {
+	margin: 0;
+	font-family: var(--font-sans);
+	color: var(--muted-foreground);
+}
+.repo__copy {
+	position: absolute;
+	right: 20px;
+	top: 20px;
+}
+.repo__copy[hidden] {
+	display: none;
+}
+
+.t-p {
+	color: var(--accent);
+	user-select: none;
+}
+.t-o {
+	color: var(--muted-foreground);
+}
+.t-a {
+	color: var(--chart-2);
+}
+
+.source .section__title .muted {
+	display: block;
+	margin-top: 16px;
+	max-width: 44ch;
+	font-size: 17px;
+	line-height: 1.55;
+	font-weight: 400;
+	letter-spacing: -0.01em;
+	color: var(--muted-foreground);
+}

@@ -1,0 +1,34 @@
+/* ───────── Limits ───────── */
+
+.limits {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	border-top: 1px solid var(--border);
+}
+.limits li {
+	display: grid;
+	gap: 4px;
+	padding: 20px 0;
+	border-bottom: 1px solid var(--border);
+	font-size: 15px;
+}
+.limits b {
+	font-weight: 550;
+}
+.limits span {
+	color: var(--muted-foreground);
+}
+.limits-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 64px;
+	align-items: start;
+}
+.limits__heading {
+	margin-bottom: 24px;
+	font-size: clamp(28px, 4vw, 48px);
+	line-height: 1.08;
+	font-weight: 600;
+	letter-spacing: -0.035em;
+}

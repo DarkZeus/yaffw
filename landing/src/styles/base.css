@@ -1,0 +1,162 @@
+/* ──────────────────────────────────────────────────────────────
+   YAFFW landing: tokens and base elements.
+   All authored colors are oklch(); achromatic hues use `none`.
+   ────────────────────────────────────────────────────────────── */
+
+:root {
+	color-scheme: dark;
+
+	/* Workbench palette (--workbench-*) comes from ../../src/workbench-tokens.css via <html class="workbench">. */
+	--chart-2: oklch(0.696 0.17 162.48);
+	--chart-3: oklch(0.769 0.188 70.08);
+	--black: oklch(0 0 none);
+	--white: oklch(1 0 none);
+
+	/* Semantic aliases, mapped the same way the app maps them */
+	--background: var(--workbench-viewer);
+	--foreground: var(--workbench-foreground);
+	--card: var(--workbench-inspector);
+	--primary: oklch(0.970151 0 none);
+	--primary-foreground: oklch(0.173042 0 none);
+	--muted-foreground: var(--workbench-rail-foreground);
+	--border: var(--workbench-border);
+	--input: var(--workbench-border-strong);
+	--ring: var(--workbench-focus);
+	--accent: var(--workbench-selected);
+
+	/* Landing-only derived values */
+	--faint: oklch(1 0 none / 0.38);
+	--hairline-top: inset 0 1px 0 oklch(1 0 none / 0.07);
+	--accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
+	/* Lit rim: brighter where light falls (top), quiet down the sides. Use as a border-box background layer. */
+	--edge: linear-gradient(
+		to bottom,
+		oklch(1 0 none / 0.16),
+		oklch(1 0 none / 0.06) 36%,
+		oklch(1 0 none / 0.07)
+	);
+	/* Product mocks float above the page; cards stay flat. */
+	--shadow-float:
+		0 1px 1px oklch(0 0 none / 0.3), 0 16px 32px -12px oklch(0 0 none / 0.55),
+		0 56px 112px -32px oklch(0 0 none / 0.75);
+
+	--radius: 0.625rem;
+	--container: 1160px;
+	--gutter: clamp(16px, 4vw, 32px);
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+	--font-sans:
+		"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	--font-mono:
+		"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		monospace;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+/* Pointer light on bento cards (0 = off). Registered so it can fade. */
+@property --spot {
+	syntax: "<number>";
+	inherits: true;
+	initial-value: 0;
+}
+
+html {
+	scroll-behavior: smooth;
+	scroll-padding-top: 96px;
+	-webkit-text-size-adjust: 100%;
+	scrollbar-color: oklch(1 0 none / 0.16) transparent;
+}
+
+body {
+	margin: 0;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: var(--font-sans);
+	font-size: 16px;
+	line-height: 1.55;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	caret-color: var(--accent);
+	overflow-x: clip;
+}
+
+img,
+svg {
+	display: block;
+	max-width: 100%;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+button {
+	font: inherit;
+	color: inherit;
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+}
+
+::selection {
+	background: color-mix(in oklch, var(--accent) 35%, transparent);
+	color: var(--white);
+}
+
+:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 3px;
+	border-radius: 6px;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+	margin: 0;
+}
+
+kbd {
+	font-family: var(--font-mono);
+}
+
+.mono {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}
+
+.dim {
+	color: var(--muted-foreground);
+}
+
+.container {
+	width: 100%;
+	max-width: calc(var(--container) + var(--gutter) * 2);
+	margin-inline: auto;
+	padding-inline: var(--gutter);
+}
+
+.skip-link {
+	position: absolute;
+	left: 16px;
+	top: -48px;
+	z-index: 100;
+	padding: 8px 12px;
+	border-radius: 8px;
+	background: var(--primary);
+	color: var(--primary-foreground);
+	font-size: 14px;
+}
+.skip-link:focus {
+	top: 16px;
+}

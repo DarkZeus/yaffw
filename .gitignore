@@ -458,3 +458,6 @@ Icon?
 
 # Generated design exploration artifacts
 .impeccable/
+
+# Astro generated types
+.astro/
