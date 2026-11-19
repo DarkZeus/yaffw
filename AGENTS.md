@@ -1,6 +1,6 @@
 ## Git workflow
 
-Work directly on `master`. Create a branch only when the user explicitly requests one.
+Work directly on `master`. Do not create new branches.
 
 ## Agent skills
 
