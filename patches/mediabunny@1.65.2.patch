@@ -1,0 +1,183 @@
+diff --git a/dist/modules/src/conversion.js b/dist/modules/src/conversion.js
+index 87ff3745b62d10b299e35ad28db7df1b54982720..42b8ecab9d6f58d2e23966197c7ad73f2090cda7 100644
+--- a/dist/modules/src/conversion.js
++++ b/dist/modules/src/conversion.js
+@@ -225,6 +225,29 @@ const validateAudioOptions = (audioOptions) => {
+ const FALLBACK_NUMBER_OF_CHANNELS = 2;
+ const FALLBACK_SAMPLE_RATE = 48000;
+ const PACKET_STATS_PACKET_COUNT = 256;
++
++async function estimateEncoderFrameRate(track, start, end) {
++    const sink = new EncodedPacketSink(track);
++    const options = { metadataOnly: true };
++    const firstPacket = await sink.getPacket(start, options);
++    const timestamps = new Set();
++    let packetCount = 0;
++    for await (const packet of sink.packets(firstPacket ?? undefined, undefined, options)) {
++        if (packetCount++ >= PACKET_STATS_PACKET_COUNT) {
++            break;
++        }
++        if (packet.timestamp >= start && packet.timestamp < end) {
++            timestamps.add(packet.timestamp);
++        }
++    }
++
++    if (timestamps.size >= 2) {
++        const span = Math.max(...timestamps) - Math.min(...timestamps);
++        return Number(((timestamps.size - 1) / span).toPrecision(8));
++    }
++
++    return undefined;
++}
+ /**
+  * Represents a media file conversion process, used to convert one media file into another. In addition to conversion,
+  * this class can be used to resize and rotate video, resample audio, drop tracks, or trim to a specific time range.
+@@ -1118,7 +1141,12 @@ export class Conversion {
+             // eslint-disable-next-line @typescript-eslint/no-deprecated
+             const quality = resolveQuality(trackOptions.quality, trackOptions.bitrate)
+                 ?? new Quality('high');
+-            const encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, {
++            // Give rate control the expected cadence without retiming the output.
++            let expectedFrameRate = quality._bitrate !== undefined && quality._quantizer === undefined
++                && trackOptions.frameRate === undefined && trackOptions.process === undefined
++                ? await estimateEncoderFrameRate(track, this._startTimestamp, this._endTimestamp)
++                : undefined;
++            const codecOptions = {
+                 width: trackOptions.process && trackOptions.processedWidth
+                     ? trackOptions.processedWidth
+                     : width,
+@@ -1126,7 +1154,15 @@ export class Conversion {
+                     ? trackOptions.processedHeight
+                     : height,
+                 quality,
++            };
++            let encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, {
++                ...codecOptions,
++                frameRate: expectedFrameRate,
+             });
++            if (!encodableCodec && expectedFrameRate !== undefined) {
++                expectedFrameRate = undefined;
++                encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, codecOptions);
++            }
+             if (!encodableCodec) {
+                 this.discardedTracks.push({
+                     track,
+@@ -1138,6 +1174,7 @@ export class Conversion {
+             const encodingConfig = {
+                 codec: encodableCodec,
+                 quality,
++                expectedFrameRate,
+                 keyFrameInterval: trackOptions.keyFrameInterval,
+                 sizeChangeBehavior: trackOptions.fit ?? 'passThrough',
+                 alpha,
+diff --git a/dist/modules/src/media-source.js b/dist/modules/src/media-source.js
+index 57cfe8fcc38d48731114ef1f5c6a5817c0842c7c..c039ba488a96c55d4d6568eac2da880002b92466 100644
+--- a/dist/modules/src/media-source.js
++++ b/dist/modules/src/media-source.js
+@@ -597,7 +597,7 @@ class VideoEncoderWrapper {
+                 height: videoSample.codedHeight,
+                 squarePixelWidth: videoSample.squarePixelWidth,
+                 squarePixelHeight: videoSample.squarePixelHeight,
+-                framerate: this.source._connectedTrack?.metadata.frameRate,
++                framerate: this.encodingConfig.expectedFrameRate ?? this.source._connectedTrack?.metadata.frameRate,
+             });
+             // Try the candidate configs in order of preference until we find one that is supported
+             let selected = null;
+diff --git a/src/conversion.ts b/src/conversion.ts
+index dbecc6ca55abb610e86fcbe5147aea6d6b4eb27a..8786365f681fc3be8b82a6cca545e32d27166bf8 100644
+--- a/src/conversion.ts
++++ b/src/conversion.ts
+@@ -633,6 +633,29 @@ const FALLBACK_NUMBER_OF_CHANNELS = 2;
+ const FALLBACK_SAMPLE_RATE = 48000;
+ const PACKET_STATS_PACKET_COUNT = 256;
+ 
++async function estimateEncoderFrameRate(track: InputVideoTrack, start: number, end: number) {
++	const sink = new EncodedPacketSink(track);
++	const options = { metadataOnly: true };
++	const firstPacket = await sink.getPacket(start, options);
++	const timestamps = new Set<number>();
++	let packetCount = 0;
++	for await (const packet of sink.packets(firstPacket ?? undefined, undefined, options)) {
++		if (packetCount++ >= PACKET_STATS_PACKET_COUNT) {
++			break;
++		}
++		if (packet.timestamp >= start && packet.timestamp < end) {
++			timestamps.add(packet.timestamp);
++		}
++	}
++
++	if (timestamps.size >= 2) {
++		const span = Math.max(...timestamps) - Math.min(...timestamps);
++		return Number(((timestamps.size - 1) / span).toPrecision(8));
++	}
++
++	return undefined;
++}
++
+ /**
+  * An input track that was discarded (excluded) from a {@link Conversion} alongside the discard reason.
+  * @group Conversion
+@@ -1804,7 +1827,12 @@ export class Conversion {
+ 			const quality = resolveQuality(trackOptions.quality, trackOptions.bitrate)
+ 				?? new Quality('high');
+ 
+-			const encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, {
++			// Give rate control the expected cadence without retiming the output.
++			let expectedFrameRate = quality._bitrate !== undefined && quality._quantizer === undefined
++				&& trackOptions.frameRate === undefined && trackOptions.process === undefined
++				? await estimateEncoderFrameRate(track, this._startTimestamp, this._endTimestamp)
++				: undefined;
++			const codecOptions = {
+ 				width: trackOptions.process && trackOptions.processedWidth
+ 					? trackOptions.processedWidth
+ 					: width,
+@@ -1812,7 +1840,15 @@ export class Conversion {
+ 					? trackOptions.processedHeight
+ 					: height,
+ 				quality,
++			};
++			let encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, {
++				...codecOptions,
++				frameRate: expectedFrameRate,
+ 			});
++			if (!encodableCodec && expectedFrameRate !== undefined) {
++				expectedFrameRate = undefined;
++				encodableCodec = await getFirstEncodableVideoCodec(videoCodecs, codecOptions);
++			}
+ 			if (!encodableCodec) {
+ 				this.discardedTracks.push({
+ 					track,
+@@ -1825,6 +1861,7 @@ export class Conversion {
+ 			const encodingConfig: VideoEncodingConfig = {
+ 				codec: encodableCodec,
+ 				quality,
++				expectedFrameRate,
+ 				keyFrameInterval: trackOptions.keyFrameInterval,
+ 				sizeChangeBehavior: trackOptions.fit ?? 'passThrough',
+ 				alpha,
+diff --git a/src/encode.ts b/src/encode.ts
+index 5cc5708e91448e611eaa8b65b51e8510ba3a2355..3611073e21970dd61c4cb5322bef059c5d833a66 100644
+--- a/src/encode.ts
++++ b/src/encode.ts
+@@ -35,6 +35,8 @@ export const canEncodeAudioMemo = new Map<string, Promise<boolean>>();
+  * @public
+  */
+ export type VideoEncodingConfig = {
++	/** @internal Expected frame rate for encoder rate control only. */
++	expectedFrameRate?: number;
+ 	/** The video codec that should be used for encoding the video samples (frames). */
+ 	codec: VideoCodec;
+ 	/** The desired quality of the encoded video. */
+diff --git a/src/media-source.ts b/src/media-source.ts
+index 7130c9e2194fe2661b44435a6030d84f7acf7e5a..696394a1e4eca9eb92b1f428d0e617760e95addc 100644
+--- a/src/media-source.ts
++++ b/src/media-source.ts
+@@ -694,7 +694,7 @@ class VideoEncoderWrapper {
+ 				height: videoSample.codedHeight,
+ 				squarePixelWidth: videoSample.squarePixelWidth,
+ 				squarePixelHeight: videoSample.squarePixelHeight,
+-				framerate: this.source._connectedTrack?.metadata.frameRate,
++				framerate: this.encodingConfig.expectedFrameRate ?? this.source._connectedTrack?.metadata.frameRate,
+ 			});
+ 
+ 			// Try the candidate configs in order of preference until we find one that is supported

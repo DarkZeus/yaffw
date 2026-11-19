@@ -17,3 +17,6 @@ onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - canvas
   - esbuild
+
+patchedDependencies:
+  mediabunny@1.65.2: patches/mediabunny@1.65.2.patch

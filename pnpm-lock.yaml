@@ -10,6 +10,11 @@ overrides:
   postcss: 8.5.23
   rollup: 4.62.2
 
+patchedDependencies:
+  mediabunny@1.65.2:
+    hash: 1cdfb64aa776328ff69ea1b0611130582ca758605a5ad5d7c3f64d93851f86e0
+    path: patches/mediabunny@1.65.2.patch
+
 importers:
 
   .:
@@ -43,7 +48,7 @@ importers:
         version: 0.476.0(react@19.2.8)
       mediabunny:
         specifier: 1.65.2
-        version: 1.65.2
+        version: 1.65.2(patch_hash=1cdfb64aa776328ff69ea1b0611130582ca758605a5ad5d7c3f64d93851f86e0)
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -5386,7 +5391,7 @@ snapshots:
 
   mdn-data@2.27.1: {}
 
-  mediabunny@1.65.2:
+  mediabunny@1.65.2(patch_hash=1cdfb64aa776328ff69ea1b0611130582ca758605a5ad5d7c3f64d93851f86e0):
     dependencies:
       '@types/dom-mediacapture-transform': 0.1.11
       '@types/dom-webcodecs': 0.1.13
