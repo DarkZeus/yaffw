@@ -34,6 +34,19 @@ const path = Astro.url.pathname;
 			href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap"
 			rel="stylesheet"
 		/>
+		<script is:inline>
+			// A header/footer link on another page asked for a section (see scripts/nav.js).
+			// Scroll before the page is revealed so the view transition shows the section, not the top.
+			addEventListener(
+				"pagereveal",
+				() => {
+					const id = sessionStorage.getItem("yaffw:scroll-to");
+					const el = id && document.getElementById(id);
+					if (el) el.scrollIntoView({ block: "start", behavior: "instant" });
+				},
+				{ once: true },
+			);
+		</script>
 	</head>
 	<body>
 		<a class="skip-link" href="#main">Skip to content</a>
@@ -101,7 +114,7 @@ const path = Astro.url.pathname;
 				</div>
 			</div>
 			<div class="container footer__base">
-				<span class="mono dim">© 2026 YAFFW</span>
+				<span class="mono dim">© 2026 YAFFW · Made by <a class="footer__credit" href="https://fuad.work/">fuad</a></span>
 			</div>
 		</footer>
 

@@ -48,3 +48,13 @@
 	border-top: 1px solid var(--border);
 	font-size: 12px;
 }
+.footer__credit {
+	color: var(--foreground);
+	text-decoration: underline;
+	text-decoration-color: oklch(1 0 none / 0.3);
+	text-underline-offset: 3px;
+	transition: text-decoration-color 150ms var(--ease-out);
+}
+.footer__credit:hover {
+	text-decoration-color: currentColor;
+}

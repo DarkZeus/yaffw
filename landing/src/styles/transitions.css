@@ -1,0 +1,44 @@
+/* ───────── Page transitions ─────────
+   Native cross-document view transitions between the landing's pages (home,
+   changelog, 404). Browsers without support just navigate normally. */
+
+@view-transition {
+	navigation: auto;
+}
+
+/* The header is the same on every page: keep it still while the content changes. */
+.nav {
+	view-transition-name: site-nav;
+}
+::view-transition-group(site-nav) {
+	animation-duration: 0s;
+}
+::view-transition-old(site-nav),
+::view-transition-new(site-nav) {
+	animation-duration: 150ms;
+}
+
+/* Content: the old page fades out quickly, the new one fades in and settles up. */
+::view-transition-old(root) {
+	animation: page-out 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+::view-transition-new(root) {
+	animation: page-in 320ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+@keyframes page-out {
+	to {
+		opacity: 0;
+	}
+}
+@keyframes page-in {
+	from {
+		opacity: 0;
+		translate: 0 12px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	@view-transition {
+		navigation: none;
+	}
+}
