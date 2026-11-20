@@ -28,7 +28,7 @@ Deployment serves `landing/dist` through the `yaffw-landing` Cloudflare Worker c
 - Meaningful secondary text shares the muted foreground token; size, spacing, and weight carry the remaining hierarchy. The header has a stronger dark glass ground for contrast over the product image. The local-processing diagram quiets its web-side border after the code arrives while keeping its explanation fully readable. Dark viewer-token backing plates keep the demo playback readouts legible over bright scenery.
 - Geist and Geist Mono are requested as web fonts, with system sans-serif and monospace fallbacks. Large headings, smaller muted explanations, and monospaced media-time readouts establish the hierarchy.
 
-The real workbench screenshot lives in `src/assets/` and is processed by Astro. One screenshot component generates responsive AVIF/WebP/JPEG widths with explicit slot sizes, eager/high-priority hero loading, and a lazy decorative CTA backdrop. The same transforms share URLs; original dimensions and palette are preserved.
+The real workbench screenshot lives in `src/assets/` and is processed by Astro. One screenshot component generates responsive AVIF/WebP/JPEG widths with explicit slot sizes, eager/high-priority hero loading, and a lazy decorative CTA backdrop. The same transforms share URLs; original dimensions and palette are preserved. Social sharing has a separate deliberate 1200×630 bottom-cover JPEG crop that keeps the timeline/audio waveform and export controls in view.
 
 ## Demonstration fidelity and enhancement
 
@@ -61,9 +61,13 @@ The earlier November 2026 research pass recorded these observations. This is des
 | Resend    | Near-black gradients, hairline borders, a glossy hero object                                       | Use subtle edge lighting and depth around product objects                                                      |
 | Vercel    | Strict grid and restrained color                                                                   | Reserve chromatic accents for meaningful product cues                                                          |
 
+## Page identity
+
+Production identity comes from the confirmed public `config/deployment.json` setting, with an optional explicit `LANDING_SITE_ORIGIN` build override; no request host, preview domain or editor destination supplies it. Home and changelog declare stable canonical paths and page-specific metadata. Explicitly unconfigured previews and the 404 template omit canonical/social identity and emit noindex; production builds require a valid origin. Sharing metadata points to the absolute production URL of the generated crop, with dimensions/type and descriptive alt. See the landing README for the confirmed origin and preview behavior.
+
 ## Validation
 
-`pnpm verify` preserves the editor gates and invokes landing validation, a single production build, and focused built-browser smoke checks. Astro templates have official Prettier formatting, Astro ESLint/a11y rules, and supported `astro check` typing with landing-local TypeScript 6; editor types remain on TypeScript 7. Generated HTML strings and ordinary JavaScript are not claimed as template lint/type-check coverage. Navigation/focus, command tabs, and progressive demo initialization are protected by the built browser checks; the preview uses an assigned loopback port and is cleaned up. See the landing README for commands and limits.
+`pnpm verify` preserves the editor gates and invokes landing validation, a single production build, and focused built-browser smoke checks. Astro templates have official Prettier formatting, Astro ESLint/a11y rules, and supported `astro check` typing with landing-local TypeScript 6; editor types remain on TypeScript 7. Generated HTML strings and ordinary JavaScript are not claimed as template lint/type-check coverage. Navigation/focus, command tabs, progressive demo initialization and built metadata are protected by the built browser checks; the preview uses an assigned loopback port and is cleaned up. See the landing README for commands and limits.
 
 ## Future work and documentation ownership
 

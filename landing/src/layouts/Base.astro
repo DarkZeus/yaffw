@@ -1,6 +1,6 @@
 ---
 import "../styles/index.css";
-import workbench from "../assets/workbench.jpg";
+import PageMetadata from "../components/PageMetadata.astro";
 import { EDITOR_URL, REPO_URL } from "../links.js";
 
 interface Props {
@@ -8,9 +8,18 @@ interface Props {
 	description: string;
 	/** Social preview text, when it should differ from the meta description. */
 	ogDescription?: string;
+	/** Only content pages declare a stable canonical path. */
+	canonicalPath?: "/" | "/changelog/";
 }
 
-const { title, description, ogDescription = description } = Astro.props;
+const {
+	title,
+	description,
+	ogDescription = description,
+	canonicalPath,
+} = Astro.props;
+const canonical =
+	Astro.site && canonicalPath ? new URL(canonicalPath, Astro.site) : undefined;
 const path = Astro.url.pathname;
 const sections = [
 	["demo", "Selection"],
@@ -26,8 +35,7 @@ const sections = [
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>{title}</title>
-		<meta name="description" content={description} />
+		<PageMetadata {title} {description} {ogDescription} {canonical} />
 		<meta name="theme-color" content="oklch(0.144788 0 none)" />
 		<meta name="color-scheme" content="dark" />
 		<link rel="icon" href="/assets/favicon.ico" />
@@ -36,9 +44,6 @@ const sections = [
 			sizes="180x180"
 			href="/assets/apple-touch-icon.png"
 		/>
-		<meta property="og:title" content={title} />
-		<meta property="og:description" content={ogDescription} />
-		<meta property="og:image" content={workbench.src} />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link

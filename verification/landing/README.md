@@ -22,6 +22,7 @@ node verification/landing/navigation-check.mjs
 node verification/landing/contrast-check.mjs
 node verification/landing/demo-check.mjs
 node verification/landing/disclosure-check.mjs
+node verification/landing/images-check.mjs
 ```
 
 The checks use `verification/browser.cjs`. Use the Chromium installed by the
@@ -145,7 +146,7 @@ The optional keyboard summary precedes limitations and Source. Opening it adds
 the reference and practice controls without repeating the primary workflow by
 default.
 
-The navigation, tabs and progressive checks now run through `pnpm --filter
+The navigation, tabs, progressive and metadata checks now run through `pnpm --filter
 yaffw-landing test:smoke` after a production build and are included in root
 `pnpm verify` and CI. Its Astro preview uses an OS-assigned loopback port and is
 stopped on success or failure. The other checks remain explicit diagnostics.
@@ -235,3 +236,33 @@ all page JavaScript disabled (reproduced in both matching headless distributions
 The no-JavaScript case checks actual URL, focus and header clearance;
 it does not count those browser animation diagnostics as application-script
 errors. No application exception filter or product CSS workaround is installed.
+
+The metadata check verifies home/changelog canonical and social identity against
+the confirmed deployment setting or explicit `LANDING_SITE_ORIGIN` override,
+including query/fragment-independent home identity,
+page-specific titles/descriptions, absolute sharing image URLs, JPEG MIME type,
+actual 1200×630 decoded crop dimensions and descriptive alt text. It resolves the
+image path against the local built server to validate pre-deployment assets,
+rather than claiming an unpushed image is already hosted at the production URL.
+The 404 file and an arbitrary missing path must omit canonical/OG/Twitter identity
+and remain noindex. With an explicit empty origin override, the home/changelog previews must
+also omit identity and be noindex. Theme metadata remains OKLCH.
+
+```sh
+pnpm --filter yaffw-landing test:metadata
+```
+
+Keep the origin environment identical to the build being checked. The metadata
+check is part of the existing smoke preview and adds no extra build. The sharing
+crop is saved to `tmp/landing-metadata/social-preview.jpg` for visual inspection
+when production identity is configured. #161's production-mode fixture uses a
+reserved test hostname and a temporary build directory; the real production
+origin is owned by `landing/config/deployment.json`, as confirmed by the user,
+and is never inferred from that fixture.
+The image check now verifies sharing-asset availability only for configured
+content builds and verifies omission for non-indexable unconfigured previews.
+
+The metadata-only command reuses Astro's temporary preview and its 404 fallback.
+The generic Python file server above does not serve the site's 404 template for
+arbitrary missing paths. For an already running Astro preview/Worker, pass its
+origin via `YAFFW_LANDING_ORIGIN` to `node verification/landing/metadata-check.mjs`.

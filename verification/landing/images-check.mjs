@@ -138,13 +138,28 @@ try {
 			await page
 				.locator(".cta")
 				.screenshot({ path: resolve(output, `${width}-${density}x-cta.png`) });
-			const metadata = await page
-				.locator('meta[property="og:image"]')
-				.getAttribute("content");
-			assert.equal(
-				(await context.request.head(new URL(metadata, origin).href)).status(),
-				200,
-			);
+			const canonical = page.locator('head link[rel="canonical"]');
+			const metadata = page.locator('meta[property="og:image"]');
+			if (await canonical.count()) {
+				const url = new URL(await metadata.getAttribute("content"));
+				assert.equal(
+					url.origin,
+					new URL(await canonical.getAttribute("href")).origin,
+				);
+				assert.equal(
+					(
+						await context.request.head(new URL(url.pathname, origin).href)
+					).status(),
+					200,
+				);
+			} else {
+				assert.equal(
+					await metadata.count(),
+					0,
+					"Unconfigured previews omit production sharing identity",
+				);
+			}
+
 			results.push({
 				width,
 				density,

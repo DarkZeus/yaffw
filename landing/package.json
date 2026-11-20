@@ -12,7 +12,9 @@
 		"lint": "eslint \"src/**/*.astro\" --max-warnings 0",
 		"check": "pnpm format:check && pnpm lint && pnpm typecheck",
 		"test:smoke": "node scripts/smoke.mjs",
-		"verify": "pnpm check && pnpm build && pnpm test:smoke"
+		"verify": "pnpm check && pnpm build && pnpm test:smoke",
+		"build:production": "node scripts/require-site-origin.mjs && astro build",
+		"test:metadata": "node scripts/smoke.mjs metadata"
 	},
 	"dependencies": {
 		"astro": "7.4.11"

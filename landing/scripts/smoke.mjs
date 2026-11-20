@@ -2,6 +2,14 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { preview } from "astro";
 
+const availableChecks = ["navigation", "tabs", "progressive", "metadata"];
+const requestedChecks = process.argv.slice(2);
+const checks = requestedChecks.length ? requestedChecks : availableChecks;
+for (const check of checks) {
+	if (!availableChecks.includes(check))
+		throw new Error(`Unknown smoke check: ${check}`);
+}
+
 const root = new URL("../", import.meta.url);
 const repository = new URL("../../", import.meta.url);
 // Preview only the existing production build. Port 0 is assigned by the OS;
@@ -13,7 +21,7 @@ const server = await preview({
 });
 
 try {
-	for (const check of ["navigation", "tabs", "progressive"]) {
+	for (const check of checks) {
 		await new Promise((resolve, reject) => {
 			const child = spawn(
 				process.execPath,
