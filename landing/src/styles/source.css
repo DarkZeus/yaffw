@@ -125,9 +125,14 @@
 	display: none;
 }
 
-.t-p {
-	color: var(--accent);
-	user-select: none;
+.repo__term code {
+	font: inherit;
+	user-select: text;
+}
+.repo__feedback {
+	margin-top: 12px;
+	font-size: 13px;
+	color: var(--muted-foreground);
 }
 .t-o {
 	color: var(--muted-foreground);

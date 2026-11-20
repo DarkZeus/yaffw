@@ -15,6 +15,7 @@ In another terminal:
 
 ```sh
 node verification/landing/progressive-check.mjs
+node verification/landing/copy-check.mjs
 ```
 
 The check uses `verification/browser.cjs`. Provide Playwright through
@@ -30,6 +31,12 @@ Selection/waveform and scene, native editor/source links, default runnable
 commands, unavailable controls before handlers attach, and functioning controls
 after initialization. It also samples an already visible heading during delayed
 initialization to detect content flashing out.
+
+The clipboard check covers successful copying by pointer and Space, denied
+clipboard access by Enter, an unavailable Clipboard API, and denied access in a
+touch/mobile browser context. It verifies the exact runnable commands, accessible
+feedback, and focused text selection for manual copying without a platform-specific
+keyboard instruction.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.

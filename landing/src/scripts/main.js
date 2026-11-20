@@ -263,23 +263,37 @@ if (repo) {
 	const tabs = $$("[data-tab]", repo);
 	const panes = $$("[data-pane]", repo);
 	const copy = $("[data-copy]", repo);
+	const command = $("[data-command]", repo);
+	const feedback = $("[data-copy-status]", repo);
+	let copyFeedbackTimer;
 	tabs.forEach((t, i) =>
 		t.addEventListener("click", () => {
 			tabs.forEach((x, j) => x.setAttribute("aria-selected", String(j === i)));
 			panes.forEach((p, j) => (p.hidden = j !== i));
 			copy.hidden = i !== 0;
+			feedback.textContent = "";
 		}),
 	);
 	copy.addEventListener("click", async () => {
 		const label = $("[data-label]", copy);
+		clearTimeout(copyFeedbackTimer);
+		copy.removeAttribute("data-copied");
 		try {
-			await navigator.clipboard.writeText(copy.dataset.copy);
+			await navigator.clipboard.writeText(command.textContent.trim());
 			swapText(label, "Copied");
 			copy.setAttribute("data-copied", "true");
+			feedback.textContent = "Commands copied.";
 		} catch {
-			swapText(label, "Press ⌘C");
+			command.closest("pre").focus({ preventScroll: true });
+			const selection = window.getSelection();
+			const range = document.createRange();
+			range.selectNodeContents(command);
+			selection?.removeAllRanges();
+			selection?.addRange(range);
+			swapText(label, "Copy manually");
+			feedback.textContent = `${selection ? "Commands selected." : "Select the commands."} Use Copy in your browser or device’s text-selection menu.`;
 		}
-		setTimeout(() => {
+		copyFeedbackTimer = setTimeout(() => {
 			swapText(label, "Copy");
 			copy.removeAttribute("data-copied");
 		}, 1600);
