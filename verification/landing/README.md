@@ -174,11 +174,14 @@ asset; its seconds-based state is not the editor's media-time domain model.
 
 The mobile-navigation check covers home, changelog and 404 at 320px, 390px,
 768px and 1440px, with JavaScript enabled and disabled. It verifies directly
-available Changelog/brand/editor destinations, active-page indication, native
-Sections disclosure/expanded state, touch target dimensions on compact layouts,
-pairwise control overlap, and horizontal overflow. Every no-JavaScript case also
-runs at 200% root text size. It activates section links and checks target focus
-and visibility without manually closing the unenhanced menu. Enhanced cases cover
+available brand/editor destinations, Changelog inside the mobile menu, active-page
+indication, native Menu disclosure/expanded state, touch target dimensions on
+compact layouts, pairwise control overlap, and horizontal overflow. At default text size, the
+compact header must stay within 60px in one row, with the visible wordmark left
+and adjacent editor/menu controls right in both visual and keyboard order; this
+prevents the oversized two-row header regression. This check also runs in the default smoke suite. Every
+no-JavaScript case also runs at 200% root text size. It activates section links
+and checks target focus and visibility without manually closing the unenhanced menu. Enhanced cases cover
 keyboard entry/Escape, outside focus/pointer dismissal without focus stealing,
 modified-link new-tab behavior, and keyboard continuation after section navigation.
 

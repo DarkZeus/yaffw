@@ -2,7 +2,13 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { preview } from "astro";
 
-const availableChecks = ["navigation", "tabs", "progressive", "metadata"];
+const availableChecks = [
+	"navigation",
+	"mobile-navigation",
+	"tabs",
+	"progressive",
+	"metadata",
+];
 const requestedChecks = process.argv.slice(2);
 const checks = requestedChecks.length ? requestedChecks : availableChecks;
 for (const check of checks) {

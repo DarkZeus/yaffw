@@ -17,10 +17,10 @@ async function expanded(page, expected) {
 		const { nodes } = await accessibility.send("Accessibility.getFullAXTree");
 		const control = nodes.find(
 			(node) =>
-				node.name?.value === "Sections" &&
+				node.name?.value === "Menu" &&
 				node.properties?.some((property) => property.name === "expanded"),
 		);
-		assert.ok(control, "Sections must expose native accessible expanded state");
+		assert.ok(control, "Menu must expose native accessible expanded state");
 		assert.equal(
 			control.properties.find((property) => property.name === "expanded").value
 				.value,
@@ -75,14 +75,14 @@ async function layout(page, compact) {
 
 async function common(page, path, compact) {
 	const header = page.locator(".nav");
-	const changelog = header.getByRole("link", {
-		name: "Changelog",
-		exact: true,
-	});
+	const changelog = compact
+		? header.locator('.nav__menu-links a[href="/changelog/"]')
+		: header.getByRole("link", { name: "Changelog", exact: true });
 	assert.equal(await changelog.count(), 1);
-	assert.ok(
+	assert.equal(
 		await changelog.isVisible(),
-		"Changelog must remain directly discoverable",
+		!compact,
+		"Changelog belongs inside the closed mobile menu and stays visible on desktop",
 	);
 	assert.equal(await changelog.getAttribute("href"), "/changelog/");
 	assert.equal(
@@ -92,6 +92,10 @@ async function common(page, path, compact) {
 	const brand = header.getByRole("link", { name: "YAFFW home", exact: true });
 	assert.ok(await brand.isVisible());
 	assert.equal(await brand.getAttribute("href"), "/");
+	assert.ok(
+		await brand.locator("span").isVisible(),
+		"Keep the YAFFW wordmark visible",
+	);
 	const editor = header.getByRole("link", { name: "Open editor", exact: true });
 	assert.ok(await editor.isVisible());
 	assert.equal(
@@ -104,8 +108,10 @@ async function common(page, path, compact) {
 			await header.locator("[data-section-menu] > summary").isVisible(),
 		);
 		assert.equal(
-			await header.locator("[data-section-menu] > summary").textContent(),
-			"Sections",
+			await header
+				.locator("[data-section-menu] > summary")
+				.getAttribute("aria-label"),
+			"Menu",
 		);
 		await expanded(page, false);
 	} else
@@ -153,7 +159,7 @@ async function sectionLink(page, compact, javaScriptEnabled) {
 				.evaluateAll((elements) =>
 					elements.map((element) => element.getAttribute("href")),
 				),
-			sections,
+			[...sections, "/changelog/"],
 		);
 		await layout(page, true);
 		await page.locator('.nav__menu-links a[href="/#features"]').click();
@@ -201,7 +207,19 @@ async function sectionLink(page, compact, javaScriptEnabled) {
 async function enhancedDismissal(page, context) {
 	const menu = page.locator("[data-section-menu]");
 	const summary = menu.locator("summary");
-	await summary.focus();
+	await page.locator(".nav .brand").focus();
+	await page.keyboard.press("Tab");
+	assert.ok(
+		await page
+			.locator(".nav__actions .btn")
+			.evaluate((element) => element === document.activeElement),
+		"The editor action must follow the brand in keyboard order",
+	);
+	await page.keyboard.press("Tab");
+	assert.ok(
+		await summary.evaluate((element) => element === document.activeElement),
+		"The far-right menu must follow the editor action in keyboard order",
+	);
 	await page.keyboard.press("Enter");
 	await expanded(page, true);
 	await page.keyboard.press("Tab");
@@ -274,6 +292,33 @@ try {
 				const page = await context.newPage();
 				await page.goto(new URL(path, origin).href);
 				const normalSize = await common(page, path, compact);
+				if (compact) {
+					const headerBox = await page.locator(".nav__inner").boundingBox();
+					assert.ok(
+						headerBox.height <= 60,
+						"Default compact header must remain a single row (at most 60px)",
+					);
+					const brandBox = await page.locator(".nav .brand").boundingBox();
+					const editorBox = await page
+						.locator(".nav__actions .btn")
+						.boundingBox();
+					const menuBox = await page
+						.locator("[data-section-menu] > summary")
+						.boundingBox();
+					assert.ok(
+						brandBox.x + brandBox.width < editorBox.x,
+						"Brand and right-side actions must form separate groups",
+					);
+					const actionGap = menuBox.x - editorBox.x - editorBox.width;
+					assert.ok(
+						actionGap >= 4 && actionGap <= 12,
+						"Editor and far-right menu must remain adjacent",
+					);
+					assert.ok(
+						Math.abs(editorBox.y - menuBox.y) < 1,
+						"Editor and menu must share one row",
+					);
+				}
 				if (javaScriptEnabled) {
 					const name =
 						path === "/"
@@ -317,6 +362,19 @@ try {
 					await sectionLink(page, compact, false);
 					console.log(
 						`PASS ${width}px ${path} noJS 200%: enlarged text, nonoverlap, native sections`,
+					);
+				}
+				if (compact) {
+					const menu = page.locator("[data-section-menu]");
+					if (!(await menu.evaluate((element) => element.open)))
+						await menu.locator("summary").click();
+					await page.locator('.nav__menu-links a[href="/changelog/"]').click();
+					await page.waitForURL("**/changelog/");
+					assert.equal(
+						await page
+							.locator('.nav__menu-links a[href="/changelog/"]')
+							.getAttribute("aria-current"),
+						"page",
 					);
 				}
 				await page.close();

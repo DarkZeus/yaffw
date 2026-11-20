@@ -68,14 +68,7 @@ const sections = [
 							<a href={`/#${id}`}>{label}</a>
 						))}
 					</div>
-					<details class="nav__menu" data-section-menu>
-						<summary>Sections</summary>
-						<div class="nav__menu-links">
-							{sections.map(([id, label]) => (
-								<a href={`/#${id}`}>{label}</a>
-							))}
-						</div>
-					</details>
+
 					<a
 						href="/changelog/"
 						aria-current={path.startsWith("/changelog") ? "page" : undefined}
@@ -96,6 +89,37 @@ const sections = [
 						Open editor
 					</a>
 				</div>
+				<nav class="nav__compact" aria-label="Primary">
+					<details class="nav__menu" data-section-menu>
+						<summary aria-label="Menu">
+							<svg
+								viewBox="0 0 24 24"
+								width="20"
+								height="20"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								aria-hidden="true"
+							>
+								<path d="M4 6h16M4 12h16M4 18h16"></path>
+							</svg>
+						</summary>
+						<div class="nav__menu-links">
+							{sections.map(([id, label]) => (
+								<a href={`/#${id}`}>{label}</a>
+							))}
+							<a
+								href="/changelog/"
+								aria-current={
+									path.startsWith("/changelog") ? "page" : undefined
+								}
+							>
+								Changelog
+							</a>
+						</div>
+					</details>
+				</nav>
 			</div>
 		</header>
 
