@@ -1,5 +1,5 @@
 // Home page behaviour. Progressive enhancement only; the page reads fine without JS.
-import { createTimeline, timelineHTML, createSceneView } from "./timeline.js";
+import { createTimeline, createSceneView } from "./timeline.js";
 
 const reduceMotion = window.matchMedia(
 	"(prefers-reduced-motion: reduce)",
@@ -28,18 +28,6 @@ const swapText = (el, text) => {
 	});
 };
 
-/* ───────── Scroll reveals ───────── */
-const revealObserver = new IntersectionObserver(
-	(entries) =>
-		entries.forEach((e) => {
-			if (!e.isIntersecting) return;
-			e.target.classList.add("is-in");
-			revealObserver.unobserve(e.target);
-		}),
-	{ threshold: 0.2, rootMargin: "0px 0px -8% 0px" },
-);
-$$("[data-reveal]").forEach((el) => revealObserver.observe(el));
-
 // Hero ↵ hint: Enter at the top of the page opens the editor.
 document.addEventListener("keydown", (ev) => {
 	if (
@@ -56,9 +44,8 @@ document.addEventListener("keydown", (ev) => {
 
 /* ───────── Timelines (selection demo + shortcut playground) ───────── */
 // Keyboard shortcuts drive whichever timeline fills most of the viewport.
-const mountTimeline = (root, markup, { onChange, onActive } = {}) => {
+const mountTimeline = (root, { onChange, onActive } = {}) => {
 	if (!root) return null;
-	$("[data-timeline-mount]", root).outerHTML = timelineHTML(markup);
 	let active = false;
 	const tl = createTimeline(root, { onChange, isActive: () => active });
 	onVisible(
@@ -71,6 +58,8 @@ const mountTimeline = (root, markup, { onChange, onActive } = {}) => {
 		},
 		[0, 0.55, 0.8],
 	);
+	$$("button", root).forEach((button) => (button.disabled = false));
+	root.dataset.ready = "";
 	return tl;
 };
 
@@ -79,13 +68,9 @@ const viewer = $("[data-viewer]");
 const showScene = viewer
 	? createSceneView(viewer, { still: reduceMotion })
 	: () => {};
-mountTimeline(
-	$("[data-demo]"),
-	{},
-	{
-		onChange: (s) => showScene(s.ph),
-	},
-);
+mountTimeline($("[data-demo]"), {
+	onChange: (s) => showScene(s.ph),
+});
 
 // Preview card: same footage as the demo, frozen at the timecode it displays (00:00:07.003).
 const miniViewer = $(".mini-viewer");
@@ -96,16 +81,12 @@ const playground = $("[data-try]");
 if (playground) {
 	const rows = $$("#shortcuts [data-row]");
 	const hint = $("[data-hint]", playground);
-	mountTimeline(
-		playground,
-		{ ruler: false, video: false },
-		{
-			onActive: (on) =>
-				(hint.textContent = on
-					? "Shortcuts are live"
-					: "Scroll here, then try the keys"),
-		},
-	);
+	mountTimeline(playground, {
+		onActive: (on) =>
+			(hint.textContent = on
+				? "Shortcuts are live"
+				: "Scroll here, then try the keys"),
+	});
 	const rowFor = (ev) => {
 		if (ev.key === " " || /^k$/i.test(ev.key)) return 0;
 		if (ev.key.startsWith("Arrow")) return ev.shiftKey ? 3 : 1;
@@ -302,5 +283,29 @@ if (repo) {
 			swapText(label, "Copy");
 			copy.removeAttribute("data-copied");
 		}, 1600);
+	});
+	$(".repo__tabs", repo).hidden = false;
+	copy.hidden = false;
+}
+
+/* Only enhance content below the viewport after the rest of initialization
+   succeeds. Never hide existing content, including a deep-linked section. */
+if (!reduceMotion) {
+	const revealObserver = new IntersectionObserver((entries) => {
+		entries.forEach((entry) => {
+			if (!entry.isIntersecting) return;
+			entry.target.animate(
+				[
+					{ opacity: 0, translate: "0 8px" },
+					{ opacity: 1, translate: "0 0" },
+				],
+				{ duration: 400, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+			);
+			revealObserver.unobserve(entry.target);
+		});
+	});
+	$$("[data-reveal]").forEach((el) => {
+		if (el.getBoundingClientRect().top >= window.innerHeight)
+			revealObserver.observe(el);
 	});
 }

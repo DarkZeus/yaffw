@@ -1,6 +1,22 @@
 /* ───────── Selection demo ───────── */
 
 /* ── Editor slice: viewer + output + transport + timeline ── */
+
+.enhancement-note {
+	padding: 12px 16px;
+	font-size: 13px;
+	color: var(--muted-foreground);
+}
+[data-ready] .enhancement-note,
+[data-demo]:not([data-ready]) button,
+[data-try]:not([data-ready]) button {
+	display: none;
+}
+[data-demo]:not([data-ready]) .timeline,
+[data-try]:not([data-ready]) .timeline {
+	cursor: default;
+	touch-action: auto;
+}
 .demo {
 	border-radius: 16px;
 	border: 1px solid transparent;
@@ -136,6 +152,9 @@
 }
 .demo,
 .try__player {
+	--s: 0.18;
+	--e: 0.72;
+	--ph: 0.18;
 	user-select: none;
 	-webkit-user-select: none;
 }

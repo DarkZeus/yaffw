@@ -380,8 +380,8 @@ export function timelineHTML({
 		<div class="shade shade--l" aria-hidden="true"></div>
 		<div class="shade shade--r" aria-hidden="true"></div>
 		<div class="selection" aria-hidden="true"></div>
-		<button class="handle handle--start" type="button" role="slider" aria-label="Selection start" data-handle="start"></button>
-		<button class="handle handle--end" type="button" role="slider" aria-label="Selection end" data-handle="end"></button>
+		<button class="handle handle--start" type="button" disabled role="slider" aria-label="Selection start" data-handle="start"></button>
+		<button class="handle handle--end" type="button" disabled role="slider" aria-label="Selection end" data-handle="end"></button>
 		<div class="playhead-track" aria-hidden="true"><div class="playhead"><i></i></div></div>
 	</div>`;
 }
