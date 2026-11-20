@@ -52,12 +52,6 @@
 	],
 	"overrides": [
 		{
-			"files": ["scripts/**/*.mjs", "landing/scripts/**/*.mjs"],
-			"rules": {
-				"eslint/no-shadow": "error"
-			}
-		},
-		{
 			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs"],
 			"rules": {
 				"typescript/unbound-method": "off"

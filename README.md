@@ -75,7 +75,7 @@ Linting includes React Hooks, accessibility, and type-aware checks for promises 
 
 Install the matching browser once before verification: `pnpm exec playwright install chromium` (on Linux, use `--with-deps` to install its system dependencies). The landing check uses Astro’s supported TypeScript 6 toolchain separately from the editor’s TypeScript 7; its Astro lint tools set the declared Node minimum. See [landing validation](landing/README.md#validation) for coverage and limitations.
 
-CI validates Ubuntu’s preinstalled browser libraries/fonts, installs the pinned headless Chromium, and runs the complete `pnpm verify` contract on pushes and pull requests. Independent commands share one setup; failures and timings are retained. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
+CI installs Chromium and runs `pnpm verify` on pushes and pull requests. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 
@@ -87,5 +87,3 @@ Thank you to the developers and contributors behind the libraries that make YAFF
 - [shadcn/ui](https://ui.shadcn.com/) by [shadcn](https://shadcn.com/), for the UI components.
 - [Tailwind CSS](https://tailwindcss.com/) by [Adam Wathan](https://adamwathan.me/) and the [Tailwind CSS team and contributors](https://github.com/tailwindlabs/tailwindcss/graphs/contributors), for the styling toolkit.
 - [wavesurfer.js](https://wavesurfer.xyz/) by [Ivan K. (katspaugh)](https://github.com/katspaugh), for interactive audio waveforms.
-
-`pnpm install` installs Husky hooks. Pre-commit formats/lints staged files with Oxfmt/Oxlint and the landing’s Astro tools, preserving partial staging. Pre-push requires a clean worktree and verifies the exact current master revision in full. Hooks supplement CI; they do not enforce a server-side integration barrier. See the [CI audit and remaining account actions](docs/verification/ci-latency/README.md).

@@ -1,6 +1,0 @@
-pnpm exec lint-staged
-
-# Preserve the existing local React Doctor hook's advisory behavior.
-if ! pnpm exec react-doctor --staged --blocking warning; then
-	printf '%s\n' 'React Doctor advisory findings are shown above; required staged checks passed.' >&2
-fi

@@ -6,9 +6,7 @@ import { launchBrowser } from "../browser.cjs";
 
 const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
 const production = configuredProductionOrigin(process.env.LANDING_SITE_ORIGIN);
-const output = resolve(
-	process.env.YAFFW_VERIFICATION_OUTPUT || "tmp/landing-metadata",
-);
+const output = resolve("tmp/landing-metadata");
 const browser = await launchBrowser();
 const pages = [
 	["/", "/", "YAFFW: edit local video in your browser"],

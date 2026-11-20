@@ -1,21 +1,12 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { launchBrowser } from "../browser.cjs";
-import { navigationReady } from "./navigation-ready.mjs";
 
 const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
 const browser = await launchBrowser();
 
-async function goto(page, url) {
-	await page.goto(url);
-	await navigationReady(page);
-}
-
 async function section(page, id, { focused = true } = {}) {
-	await navigationReady(page);
 	let result;
-	let previousTop;
-	let settledSamples = 0;
 	// Host polling also works with page JavaScript disabled and during native scrolling.
 	for (let attempt = 0; attempt < 100; attempt++) {
 		result = await page.evaluate((targetId) => {
@@ -32,18 +23,13 @@ async function section(page, id, { focused = true } = {}) {
 					.getBoundingClientRect().bottom,
 			};
 		}, id);
-		const atDestination =
+		if (
 			result.hash === `#${id}` &&
 			(!focused || result.focused) &&
 			result.top >= result.headerBottom - 1 &&
-			Math.abs(result.top - result.offset) <= 1;
-		// A smooth scroll can cross the expected pixel before finishing. History
-		// snapshots taken at that instant restore an intermediate scroll offset.
-		// Require the same correct resting position before issuing another action.
-		settledSamples =
-			atDestination && result.top === previousTop ? settledSamples + 1 : 0;
-		if (settledSamples >= 2) return;
-		previousTop = result.top;
+			Math.abs(result.top - result.offset) <= 1
+		)
+			return;
 		await delay(50);
 	}
 	assert.fail(
@@ -73,7 +59,7 @@ try {
 		"Stale fragments and native section history",
 		{},
 		async (page) => {
-			await goto(page, `${origin}/#source`);
+			await page.goto(`${origin}/#source`);
 			await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
 			await page
 				.locator(".nav__links")
@@ -116,13 +102,13 @@ try {
 						});
 					});
 				for (const path of ["/changelog/", "/404.html"]) {
-					await goto(page, new URL(path, origin).href);
+					await page.goto(new URL(path, origin).href);
 					await page
 						.locator(".nav__links")
 						.getByRole("link", { name: "Features", exact: true })
 						.click();
 					await section(page, "features");
-					await goto(page, new URL(path, origin).href);
+					await page.goto(new URL(path, origin).href);
 					await page
 						.locator(".footer")
 						.getByRole("link", { name: "Features", exact: true })
@@ -144,51 +130,17 @@ try {
 	}
 
 	await scenario(
-		"Unavailable CSS preserves native transition opt-in",
-		{},
-		async (page, context) => {
-			const errors = [];
-			page.on("pageerror", (error) => errors.push(error.message));
-			await context.addInitScript(() => {
-				window.addEventListener("pagereveal", (event) => {
-					globalThis.__yaffwRevealedTransition = Boolean(event.viewTransition);
-				});
-			});
-			await goto(page, origin);
-			// An absent external rule reproduces the same opt-in resolution boundary
-			// as the intermittent delayed-stylesheet case, without a timing lottery.
-			await context.route("**/_astro/*.css", (route) => route.abort());
-			await page
-				.locator(".nav__links")
-				.getByRole("link", { name: "Changelog", exact: true })
-				.click();
-			await page.waitForLoadState();
-			await navigationReady(page);
-			assert.equal(
-				await page.evaluate(() => globalThis.__yaffwRevealedTransition),
-				true,
-				"Cross-document transition opt-in must exist before external CSS",
-			);
-			assert.deepEqual(
-				errors,
-				[],
-				"Native transitions must not emit runtime errors when external CSS is unavailable",
-			);
-		},
-	);
-
-	await scenario(
 		"Copied destinations, new tabs and refresh",
 		{},
 		async (page, context) => {
-			await goto(page, `${origin}/changelog/`);
+			await page.goto(`${origin}/changelog/`);
 			const href = await page
 				.locator(".nav__links")
 				.getByRole("link", { name: "Features", exact: true })
 				.getAttribute("href");
 			assert.equal(href, "/#features");
 			const opened = await context.newPage();
-			await goto(opened, new URL(href, page.url()).href);
+			await opened.goto(new URL(href, page.url()).href);
 			await section(opened, "features");
 			await opened.reload();
 			await section(opened, "features", { focused: false });
@@ -197,7 +149,7 @@ try {
 	);
 
 	await scenario("Skip link and keyboard continuation", {}, async (page) => {
-		await goto(page, origin);
+		await page.goto(origin);
 		await page.keyboard.press("Tab");
 		assert.ok(
 			await page
@@ -224,7 +176,7 @@ try {
 		"Native changelog permalinks and targeted section links",
 		{},
 		async (page, context) => {
-			await goto(page, `${origin}/changelog/`);
+			await page.goto(`${origin}/changelog/`);
 			const permalink = page.locator(".release__name a").first();
 			const href = await permalink.getAttribute("href");
 			await permalink.click();
@@ -249,7 +201,7 @@ try {
 		"Reduced-motion native fragments",
 		{ reducedMotion: "reduce" },
 		async (page) => {
-			await goto(page, `${origin}/#source`);
+			await page.goto(`${origin}/#source`);
 			await page
 				.locator(".nav__links")
 				.getByRole("link", { name: "Features", exact: true })

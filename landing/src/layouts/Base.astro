@@ -38,17 +38,6 @@ const sections = [
 		<PageMetadata {title} {description} {ogDescription} {canonical} />
 		<meta name="theme-color" content="oklch(0.144788 0 none)" />
 		<meta name="color-scheme" content="dark" />
-		<!-- Resolve native transition opt-in before any external CSS can arrive. -->
-		<style is:inline>
-			@view-transition {
-				navigation: auto;
-			}
-			@media (prefers-reduced-motion: reduce) {
-				@view-transition {
-					navigation: none;
-				}
-			}
-		</style>
 		<link rel="icon" href="/assets/favicon.ico" />
 		<link
 			rel="apple-touch-icon"

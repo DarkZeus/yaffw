@@ -2,6 +2,10 @@
    Native cross-document view transitions between the landing's pages (home,
    changelog, 404). Browsers without support just navigate normally. */
 
+@view-transition {
+	navigation: auto;
+}
+
 /* The header is the same on every page: keep it still while the content changes. */
 .nav {
 	view-transition-name: site-nav;
@@ -30,5 +34,11 @@
 	from {
 		opacity: 0;
 		translate: 0 12px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	@view-transition {
+		navigation: none;
 	}
 }
