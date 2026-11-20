@@ -3,25 +3,116 @@ name: Verify
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      dependency-cache:
+        type: choice
+        options: [store, modules, cold]
+        default: store
+      checkout:
+        type: choice
+        options: [shallow, blobless]
+        default: shallow
+      runner-image:
+        type: choice
+        options: [host, playwright]
+        default: host
+      cache-salt:
+        type: string
+        default: v1
 
 permissions:
   contents: read
 
 concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Master runs must all finish; even pending integrations need unique groups.
+  group: verify-${{ github.workflow }}-${{ github.ref == 'refs/heads/master' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    container: ${{ inputs.runner-image == 'playwright' && 'mcr.microsoft.com/playwright:v1.65.0-noble' || '' }}
     timeout-minutes: 15
+    env:
+      DEPENDENCY_CACHE_MODE: ${{ inputs.dependency-cache || 'store' }}
+      CACHE_SALT: ${{ inputs.cache-salt || 'v1' }}
+      CI_RUNNER_IMAGE: ${{ inputs.runner-image || 'host' }}
+      YAFFW_TEST_SEED: ${{ github.run_id }}
     steps:
+      - name: Record setup start
+        run: echo "CI_SETUP_STARTED=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          filter: ${{ inputs.checkout == 'blobless' && 'blob:none' || '' }}
+          fetch-depth: 1
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm verify
+      - name: Calculate exact cache identities
+        id: keys
+        run: node scripts/ci-cache-keys.mjs
+      - name: Restore dependencies
+        if: env.DEPENDENCY_CACHE_MODE != 'cold'
+        id: dependencies
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ steps.keys.outputs.path }}
+          key: ${{ steps.keys.outputs.dependencies }}
+      - name: Frozen install (also validates restored pnpm links)
+        run: pnpm install --frozen-lockfile
+      - name: Verify native canvas ABI
+        run: pnpm exec node -e 'require("canvas").createCanvas(1, 1)'
+      - name: Restore exact Chromium
+        if: env.DEPENDENCY_CACHE_MODE != 'cold' && inputs.runner-image != 'playwright'
+        id: browser
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.keys.outputs.browser }}
+      - name: Install Chromium and system dependencies
+        if: inputs.runner-image != 'playwright'
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Validate preinstalled matching Chromium
+        if: inputs.runner-image == 'playwright'
+        run: pnpm exec playwright install --only-shell chromium
+      - name: Restore Astro image transforms
+        if: env.DEPENDENCY_CACHE_MODE != 'cold'
+        id: images
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: landing/node_modules/.astro/assets
+          key: ${{ steps.keys.outputs.images }}
+      - name: Record runner and setup evidence
+        run: |
+          node -e 'const os = require("node:os"); console.log(JSON.stringify({cpu:os.availableParallelism(),memoryBytes:os.totalmem(),node:process.version,abi:process.versions.modules,setupSeconds:Date.now()/1000-Number(process.env.CI_SETUP_STARTED),dependencyCache:"${{ steps.dependencies.outputs.cache-hit }}",browserCache:"${{ steps.browser.outputs.cache-hit }}",imageCache:"${{ steps.images.outputs.cache-hit }}"}))'
+      - name: Complete verification
+        id: contract
+        run: pnpm verify
+      - name: Upload complete evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: verification-evidence-${{ github.run_id }}
+          path: tmp/verify-*/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Save dependencies from verified master only
+        if: success() && github.ref == 'refs/heads/master' && env.DEPENDENCY_CACHE_MODE != 'cold' && steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ${{ steps.keys.outputs.path }}
+          key: ${{ steps.keys.outputs.dependencies }}
+      - name: Save Chromium from verified master only
+        if: success() && github.ref == 'refs/heads/master' && env.DEPENDENCY_CACHE_MODE != 'cold' && inputs.runner-image != 'playwright' && steps.browser.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.keys.outputs.browser }}
+      - name: Save image transforms from verified master only
+        if: success() && github.ref == 'refs/heads/master' && env.DEPENDENCY_CACHE_MODE != 'cold' && steps.images.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: landing/node_modules/.astro/assets
+          key: ${{ steps.keys.outputs.images }}

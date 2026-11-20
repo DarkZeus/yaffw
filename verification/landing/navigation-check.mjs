@@ -7,6 +7,8 @@ const browser = await launchBrowser();
 
 async function section(page, id, { focused = true } = {}) {
 	let result;
+	let previousTop;
+	let settledSamples = 0;
 	// Host polling also works with page JavaScript disabled and during native scrolling.
 	for (let attempt = 0; attempt < 100; attempt++) {
 		result = await page.evaluate((targetId) => {
@@ -23,13 +25,18 @@ async function section(page, id, { focused = true } = {}) {
 					.getBoundingClientRect().bottom,
 			};
 		}, id);
-		if (
+		const atDestination =
 			result.hash === `#${id}` &&
 			(!focused || result.focused) &&
 			result.top >= result.headerBottom - 1 &&
-			Math.abs(result.top - result.offset) <= 1
-		)
-			return;
+			Math.abs(result.top - result.offset) <= 1;
+		// A smooth scroll can cross the expected pixel before finishing. History
+		// snapshots taken at that instant restore an intermediate scroll offset.
+		// Require the same correct resting position before issuing another action.
+		settledSamples =
+			atDestination && result.top === previousTop ? settledSamples + 1 : 0;
+		if (settledSamples >= 2) return;
+		previousTop = result.top;
 		await delay(50);
 	}
 	assert.fail(
