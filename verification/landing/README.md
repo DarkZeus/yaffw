@@ -165,3 +165,24 @@ Crossed boundary commands preserved Playhead and a minimum source frame (40ms fo
 this 25-FPS fixture), and a frame step paused playback. The landing keeps the
 same interaction rules while deliberately simulating a fixed nominal-30-FPS
 asset; its seconds-based state is not the editor's media-time domain model.
+
+The mobile-navigation check covers home, changelog and 404 at 320px, 390px,
+768px and 1440px, with JavaScript enabled and disabled. It verifies directly
+available Changelog/brand/editor destinations, active-page indication, native
+Sections disclosure/expanded state, touch target dimensions on compact layouts,
+pairwise control overlap, and horizontal overflow. Every no-JavaScript case also
+runs at 200% root text size. It activates section links and checks target focus
+and visibility without manually closing the unenhanced menu. Enhanced cases cover
+keyboard entry/Escape, outside focus/pointer dismissal without focus stealing,
+modified-link new-tab behavior, and keyboard continuation after section navigation.
+
+```sh
+node verification/landing/mobile-navigation-check.mjs
+```
+
+Representative header/menu screenshots are written to
+`tmp/landing-mobile-navigation/`. These checks use paired Chromium, reduced motion
+and blocked external fonts for repeatability. The text-enlargement case changes
+root font size; it does not claim to reproduce every browser/OS zoom setting.
+The geometry checks concern authored navigation controls, not unrelated raster
+screenshot contents or a full accessibility certification.

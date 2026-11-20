@@ -44,6 +44,7 @@ async function measure(page, label, { header = false } = {}) {
 				parent.closest('script, style, svg, [aria-hidden="true"], [hidden]') ||
 				(!onlyHeader && parent.closest(".nav")) ||
 				!parent.getClientRects().length ||
+				!parent.checkVisibility() ||
 				getComputedStyle(parent).visibility !== "visible"
 			)
 				continue;
@@ -202,6 +203,12 @@ try {
 			`${viewport.width}px header worst-white backdrop`,
 			{ header: true },
 		);
+		if (viewport.width <= 960) {
+			await headerPage.locator("[data-section-menu] > summary").click();
+			await measure(headerPage, `${viewport.width}px open section menu`, {
+				header: true,
+			});
+		}
 		await context.close();
 	}
 	const failures = results.filter((result) => result.ratio < result.threshold);

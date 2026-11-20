@@ -1,15 +1,13 @@
 /* ───────── Responsive ───────── */
 
 @media (max-width: 960px) {
+	.hero,
+	.changelog {
+		padding-top: 64px;
+	}
 	.limits-grid {
 		grid-template-columns: 1fr;
 		gap: 48px;
-	}
-	.nav__links {
-		display: none;
-	}
-	.nav__actions {
-		margin-left: auto;
 	}
 	.bento {
 		grid-template-columns: 1fr 1fr;

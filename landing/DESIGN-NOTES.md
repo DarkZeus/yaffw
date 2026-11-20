@@ -43,6 +43,7 @@ Motion follows the implementation's actual limits:
 - After initialization succeeds, newly entering content below the viewport may fade/rise into view. Content already visible, including a deep-linked heading, is not hidden at initialization.
 - The scene camera follows the simulated Playhead; it is not a scroll effect. JavaScript illustration loops and meter updates pause offscreen.
 - Reduced motion stops JavaScript illustration loops, freezes scene-camera motion, collapses CSS keyframe durations, and disables native cross-document view transitions. Explicit demo transport still works; short control transitions and command-label fades remain.
+- Below 960px, Changelog stays visible and the section links move into a native Sections disclosure. The compact header keeps home/editor actions, uses 44px targets and rem-based type, and reserves a conservative CSS fragment offset for enlarged text. It stays in document flow without scripts; the enhanced header is sticky with a dismissible dropdown. Without JavaScript the disclosure and anchors work natively; enhancement adds Escape/outside dismissal without replacing navigation.
 - Section links keep native fragments, sharing, refresh, and browser history; section targets are focusable without JavaScript and CSS scroll padding keeps them below the fixed header. No session-storage handoff is used.
 - Supported browsers use native cross-document page transitions. The header remains spatially stable while page content fades and settles vertically. Other browsers navigate normally.
 

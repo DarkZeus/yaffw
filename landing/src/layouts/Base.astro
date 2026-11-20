@@ -11,6 +11,13 @@ interface Props {
 
 const { title, description, ogDescription = description } = Astro.props;
 const path = Astro.url.pathname;
+const sections = [
+	["demo", "Selection"],
+	["local", "Local-first"],
+	["features", "Features"],
+	["shortcuts", "Shortcuts"],
+	["source", "Source"],
+];
 ---
 
 <!doctype html>
@@ -44,11 +51,15 @@ const path = Astro.url.pathname;
 					<span>YAFFW</span>
 				</a>
 				<nav class="nav__links" aria-label="Primary">
-					<a href="/#demo">Selection</a>
-					<a href="/#local">Local-first</a>
-					<a href="/#features">Features</a>
-					<a href="/#shortcuts">Shortcuts</a>
-					<a href="/#source">Source</a>
+					<div class="nav__sections">
+						{sections.map(([id, label]) => <a href={`/#${id}`}>{label}</a>)}
+					</div>
+					<details class="nav__menu" data-section-menu>
+						<summary>Sections</summary>
+						<div class="nav__menu-links">
+							{sections.map(([id, label]) => <a href={`/#${id}`}>{label}</a>)}
+						</div>
+					</details>
 					<a href="/changelog/" aria-current={path.startsWith("/changelog") ? "page" : undefined}>Changelog</a>
 				</nav>
 				<div class="nav__actions">
