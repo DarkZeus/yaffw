@@ -1,0 +1,42 @@
+[
+  {
+    "editor": "success",
+    "landing": "success",
+    "exitCode": 0
+  },
+  {
+    "editor": "failure",
+    "landing": "success",
+    "exitCode": 1
+  },
+  {
+    "editor": "cancelled",
+    "landing": "success",
+    "exitCode": 1
+  },
+  {
+    "editor": "skipped",
+    "landing": "success",
+    "exitCode": 1
+  },
+  {
+    "editor": "success",
+    "landing": "failure",
+    "exitCode": 1
+  },
+  {
+    "editor": "success",
+    "landing": "cancelled",
+    "exitCode": 1
+  },
+  {
+    "editor": "success",
+    "landing": "skipped",
+    "exitCode": 1
+  },
+  {
+    "editor": "",
+    "landing": "success",
+    "exitCode": 1
+  }
+]

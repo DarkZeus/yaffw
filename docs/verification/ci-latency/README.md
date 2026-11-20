@@ -2,6 +2,10 @@
 
 Audit started 2026-11-20. Work remains on `master`; no branches or account settings are changed. Reproduce the GitHub sample with `python3 scripts/audit-ci.py tmp/ci-audit`. The GitHub connector has job/log readers but no workflow-run listing, branch-protection, ruleset or billing endpoint, so bulk collection uses authenticated `gh`.
 
+## Latest measured result
+
+See [RESULTS.md](RESULTS.md) for the fixed before/after window, complete run outcomes, phase budgets, benchmark decisions, cost evidence and unmet guarantees. Current hosted Verify is green; the separate latency audit is red for setup overruns. The target and external enforcement guarantees are not claimed complete. Sections below retain the chronological investigation; earlier configurations and counts are historical.
+
 ## Historical evidence
 
 Requested the last 150 Verify runs with 100-row pagination. GitHub exposes **8 total**, 2026-11-07T21:54:01Z–2026-11-20T15:34:13Z (run creation). All eight are successful `push` runs, attempt 1, on distinct SHAs. PR success/failure/cancellation, push failure/cancellation, duplicate-revision and eligible-PR cache-hit sample sizes are all **0**. This is an inventory, not a statistically reliable p95 estimate. Full SHAs, jobs, step timestamps, runner names, timing API responses and phase observations are in [baseline-runs.json](baseline-runs.json); logs are reproducible and linked through each run.
@@ -46,7 +50,7 @@ Action step times come from the jobs API. Internal serial phases use **timestamp
 
 Runner: `ubuntu-latest` resolved to ubuntu-26.04, x64; latest image `20261116.202.1`, Node 24.22.3, pnpm 10.33.0. Logs show four Oxc threads; GitHub documents 4 vCPU/16 GB RAM for standard public Linux runners. Historical actual CPU/RAM measurements are unavailable. Current local measurements use Apple M4 (10 logical CPUs, 24 GiB RAM, measured with node:os), Node 24.21.0; they are not hosted-runner estimates. A first exploratory baseline accidentally used the host's unsupported Node 25 through Volta; it is excluded from comparisons. Subsequent measurements use an explicit Node 24/pnpm PATH.
 
-Four of eight runs restored the exact pnpm store cache (50%); two full-contract runs have one hit (50%). PR hit rate and >95% eligible-PR target are unmeasured (no PR runs). Cache inventory: three master store entries, 480,126,539 bytes total. No browser/image cache existed. Cache restoration and saving are included in wall time. GitHub timing API reports **0 billable milliseconds**, 8 jobs; actual job wall time sums to **659s (10.98 minutes)**, versus 688s run-created→report time. An illustrative per-job minute rounding yields 17 runner-minutes, not an invoice. This public repository uses standard hosted runners, which [GitHub prices at $0](https://docs.github.com/en/actions/concepts/billing-and-usage). Monthly Actions compute cost before = $0 under that assumption; Cloudflare/paid-runner costs are not inferred from this endpoint.
+Four of eight runs restored the exact pnpm store cache (50%); two full-contract runs have one hit (50%). PR hit rate and >95% eligible-PR target are unmeasured (no PR runs). Cache inventory: three master store entries, 480,126,539 bytes total. No browser/image cache existed. Cache restoration and saving are included in wall time. GitHub timing API reports **0 billable milliseconds**, 8 jobs; actual job wall time sums to **659s (10.98 minutes)**, versus 688s run-created→report time. An illustrative per-job minute rounding yields 13 runner-minutes, not an invoice. This public repository uses standard hosted runners, which [GitHub prices at $0](https://docs.github.com/en/actions/concepts/billing-and-usage). Monthly Actions compute cost before = $0 under that assumption; Cloudflare/paid-runner costs are not inferred from this endpoint.
 
 ## Correctness and deployment boundary
 

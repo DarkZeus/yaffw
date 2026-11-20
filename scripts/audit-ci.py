@@ -43,6 +43,9 @@ def collect_run(run):
             row["created_to_required_result_s"] = seconds(row["created_at"], check["completed_at"])
     row["logs"] = []
     for job in row["jobs"]:
+        if job["conclusion"] == "skipped":
+            row["logs"].append({"job_id": job["id"], "text": "Job explicitly skipped; no execution log exists."})
+            continue
         # Preserve logs, including phase boundaries not exposed by the step API.
         try:
             log = api(f"actions/jobs/{job['id']}/logs").decode()
@@ -62,7 +65,13 @@ def summarize(row):
             if step["started_at"] and step["completed_at"]:
                 phases[step["name"]] = seconds(step["started_at"], step["completed_at"])
     row["steps_s"] = phases
-    log = "\n".join(item["text"] for item in row.pop("logs"))
+    job_logs = row.pop("logs")
+    row["job_observations"] = []
+    for item in job_logs:
+        setup_matches = re.findall(r"^\S+Z (\{[^\n]+\"setupSeconds\"[^\n]+\})", item["text"], re.M)
+        result_matches = re.findall(r"VERIFY_RESULT (\{[^\n]+\})", item["text"])
+        row["job_observations"].append({"job_id": item["job_id"], "setup": json.loads(setup_matches[-1]) if setup_matches else None, "verification": json.loads(result_matches[-1]) if result_matches else None})
+    log = "\n".join(item["text"] for item in job_logs)
     row["pnpm_cache_hit"] = "Cache restored from key: node-cache-" in log
     row["pnpm_exact_cache_hit"] = "Cache hit occurred on the primary key node-cache-" in log
     row["runner_image"] = re.findall(r"Image: (ubuntu-\S+)", log)
