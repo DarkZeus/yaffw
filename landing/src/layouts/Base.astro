@@ -31,7 +31,11 @@ const sections = [
 		<meta name="theme-color" content="oklch(0.144788 0 none)" />
 		<meta name="color-scheme" content="dark" />
 		<link rel="icon" href="/assets/favicon.ico" />
-		<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
+		<link
+			rel="apple-touch-icon"
+			sizes="180x180"
+			href="/assets/apple-touch-icon.png"
+		/>
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={ogDescription} />
 		<meta property="og:image" content={workbench.src} />
@@ -43,7 +47,9 @@ const sections = [
 		/>
 	</head>
 	<body>
-		<a class="skip-link" href="#main">Skip to content</a>
+		<a class="skip-link" href="#main">
+			Skip to content
+		</a>
 
 		<header class="nav" data-nav>
 			<div class="nav__inner">
@@ -53,15 +59,24 @@ const sections = [
 				</a>
 				<nav class="nav__links" aria-label="Primary">
 					<div class="nav__sections">
-						{sections.map(([id, label]) => <a href={`/#${id}`}>{label}</a>)}
+						{sections.map(([id, label]) => (
+							<a href={`/#${id}`}>{label}</a>
+						))}
 					</div>
 					<details class="nav__menu" data-section-menu>
 						<summary>Sections</summary>
 						<div class="nav__menu-links">
-							{sections.map(([id, label]) => <a href={`/#${id}`}>{label}</a>)}
+							{sections.map(([id, label]) => (
+								<a href={`/#${id}`}>{label}</a>
+							))}
 						</div>
 					</details>
-					<a href="/changelog/" aria-current={path.startsWith("/changelog") ? "page" : undefined}>Changelog</a>
+					<a
+						href="/changelog/"
+						aria-current={path.startsWith("/changelog") ? "page" : undefined}
+					>
+						Changelog
+					</a>
 				</nav>
 				<div class="nav__actions">
 					<a class="icon-link" href={REPO_URL} aria-label="YAFFW on GitHub">
@@ -72,7 +87,9 @@ const sections = [
 							></path>
 						</svg>
 					</a>
-					<a class="btn btn--primary btn--sm" href={EDITOR_URL}>Open editor</a>
+					<a class="btn btn--primary btn--sm" href={EDITOR_URL}>
+						Open editor
+					</a>
 				</div>
 			</div>
 		</header>
@@ -84,7 +101,10 @@ const sections = [
 		<footer class="footer">
 			<div class="container footer__inner">
 				<div class="footer__brand">
-					<a class="brand" href="/"><img src="/assets/icon-192.png" alt="" width="20" height="20" /><span>YAFFW</span></a>
+					<a class="brand" href="/">
+						<img src="/assets/icon-192.png" alt="" width="20" height="20" />
+						<span>YAFFW</span>
+					</a>
 					<p>A personal, opinionated video editor for the browser.</p>
 				</div>
 				<div class="footer__cols">
@@ -105,7 +125,12 @@ const sections = [
 				</div>
 			</div>
 			<div class="container footer__base">
-				<span class="mono dim">© 2026 YAFFW · Made by <a class="footer__credit" href="https://fuad.work/">fuad</a></span>
+				<span class="mono dim">
+					© 2026 YAFFW · Made by{" "}
+					<a class="footer__credit" href="https://fuad.work/">
+						fuad
+					</a>
+				</span>
 			</div>
 		</footer>
 

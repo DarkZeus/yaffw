@@ -145,8 +145,13 @@ The optional keyboard summary precedes limitations and Source. Opening it adds
 the reference and practice controls without repeating the primary workflow by
 default.
 
-These checks are currently explicit verification commands. Repository-wide Astro
-validation and CI integration are tracked separately in issue #149.
+The navigation, tabs and progressive checks now run through `pnpm --filter
+yaffw-landing test:smoke` after a production build and are included in root
+`pnpm verify` and CI. Its Astro preview uses an OS-assigned loopback port and is
+stopped on success or failure. The other checks remain explicit diagnostics.
+Install the pinned browser with `pnpm exec playwright install chromium`; see
+[landing validation](../../landing/README.md#validation) for tooling coverage and
+limits.
 
 Issue #154 was also compared with the actual built editor on a separate static
 server at port 4175; the user-owned development server at port 3000 was unavailable
@@ -215,3 +220,18 @@ Payload means encoded image body bytes, excluding HTTP headers. This is a local
 resource-selection/visual check, not a real-device load-time or Core Web Vitals
 benchmark. JPEG remains the fallback and WebP an alternative for browsers that
 cannot display AVIF; the browser checks run in Chromium.
+
+Issue #149 validates the gates themselves with a temporary Astro probe: both a
+frontmatter assignment mismatch and a component-prop mismatch fail type checking;
+a missing image alt fails Astro a11y lint; an unformatted template fails the
+formatter. The probe is removed after checking. Corrupting a built Features link
+also fails the smoke suite's actual URL/focus contract, and the failed run closes
+its assigned preview port.
+
+Navigation runtime-error assertions apply to JavaScript-capable contexts,
+including unavailable storage. Chromium 158 emits stackless native CSS view-
+transition abort diagnostics during some cross-document navigations even with
+all page JavaScript disabled (reproduced in both matching headless distributions).
+The no-JavaScript case checks actual URL, focus and header clearance;
+it does not count those browser animation diagnostics as application-script
+errors. No application exception filter or product CSS workaround is installed.

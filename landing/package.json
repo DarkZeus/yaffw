@@ -5,9 +5,26 @@
 	"scripts": {
 		"dev": "astro dev --port 4173",
 		"build": "astro build",
-		"preview": "astro preview --port 4173"
+		"preview": "astro preview --port 4173",
+		"typecheck": "astro check --minimumFailingSeverity warning",
+		"format": "prettier --write \"src/**/*.astro\"",
+		"format:check": "prettier --check \"src/**/*.astro\"",
+		"lint": "eslint \"src/**/*.astro\" --max-warnings 0",
+		"check": "pnpm format:check && pnpm lint && pnpm typecheck",
+		"test:smoke": "node scripts/smoke.mjs",
+		"verify": "pnpm check && pnpm build && pnpm test:smoke"
 	},
 	"dependencies": {
 		"astro": "7.4.11"
+	},
+	"devDependencies": {
+		"@astrojs/check": "0.9.12",
+		"@typescript-eslint/parser": "8.72.2",
+		"eslint": "10.6.0",
+		"eslint-plugin-astro": "3.2.1",
+		"eslint-plugin-jsx-a11y-x": "0.2.0",
+		"prettier": "3.5.3",
+		"prettier-plugin-astro": "1.1.2",
+		"typescript": "6.0.3"
 	}
 }

@@ -48,7 +48,7 @@ Shortcuts pause while you're editing an input, using a dialog, or exporting.
 
 ## Run locally
 
-You'll need Node.js 24.15 or newer in the 24.x line, or Node.js 26+, and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
+You'll need Node.js 24.16 or newer in the 24.x line, or Node.js 26.3+, and **pnpm 10.33.0**, the version pinned in `package.json`. There are no API keys, environment variables, backend services, or FFmpeg installation to configure.
 
 ```sh
 git clone https://github.com/DarkZeus/yaffw.git
@@ -61,19 +61,21 @@ Open [localhost:3000](http://localhost:3000).
 
 Useful development commands:
 
-| Command          | Purpose                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| `pnpm verify`    | Run formatting, linting, tests, production build, and type checking |
-| `pnpm check`     | Check formatting with Oxfmt and type-aware lint rules with Oxlint   |
-| `pnpm format`    | Format maintained files and sort imports and Tailwind classes       |
-| `pnpm typecheck` | Check types with TypeScript 7                                       |
-| `pnpm test`      | Run the test suite                                                  |
-| `pnpm run build` | Build to `dist` and check TypeScript                                |
-| `pnpm run serve` | Preview the production build locally                                |
+| Command          | Purpose                                                                   |
+| ---------------- | ------------------------------------------------------------------------- |
+| `pnpm verify`    | Run editor gates plus landing validation, build, and browser smoke checks |
+| `pnpm check`     | Check formatting with Oxfmt and type-aware lint rules with Oxlint         |
+| `pnpm format`    | Format maintained files and sort imports and Tailwind classes             |
+| `pnpm typecheck` | Check types with TypeScript 7                                             |
+| `pnpm test`      | Run the test suite                                                        |
+| `pnpm run build` | Build to `dist` and check TypeScript                                      |
+| `pnpm run serve` | Preview the production build locally                                      |
 
 Linting includes React Hooks, accessibility, and type-aware checks for promises and method binding. React Compiler eligibility rules are excluded because the app does not use React Compiler. Method-binding checks exempt test files so assertions can inspect spies without calling them.
 
-CI runs `pnpm verify` on pushes and pull requests. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
+Install the matching browser once before verification: `pnpm exec playwright install chromium` (on Linux, use `--with-deps` to install its system dependencies). The landing check uses Astro’s supported TypeScript 6 toolchain separately from the editor’s TypeScript 7; its Astro lint tools set the declared Node minimum. See [landing validation](landing/README.md#validation) for coverage and limitations.
+
+CI installs Chromium and runs `pnpm verify` on pushes and pull requests. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 

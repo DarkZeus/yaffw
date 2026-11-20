@@ -61,6 +61,10 @@ The earlier November 2026 research pass recorded these observations. This is des
 | Resend    | Near-black gradients, hairline borders, a glossy hero object                                       | Use subtle edge lighting and depth around product objects                                                      |
 | Vercel    | Strict grid and restrained color                                                                   | Reserve chromatic accents for meaningful product cues                                                          |
 
+## Validation
+
+`pnpm verify` preserves the editor gates and invokes landing validation, a single production build, and focused built-browser smoke checks. Astro templates have official Prettier formatting, Astro ESLint/a11y rules, and supported `astro check` typing with landing-local TypeScript 6; editor types remain on TypeScript 7. Generated HTML strings and ordinary JavaScript are not claimed as template lint/type-check coverage. Navigation/focus, command tabs, and progressive demo initialization are protected by the built browser checks; the preview uses an assigned loopback port and is cleaned up. See the landing README for commands and limits.
+
 ## Future work and documentation ownership
 
 Reference ideas are not commitments. Proposed blur, perspective, or other hero effects remain unimplemented unless a later issue explicitly chooses and delivers them. Demo fidelity repairs and changes to the page's narrative must describe the resulting behavior rather than preserving claims about the earlier prototype.
