@@ -16,8 +16,8 @@
 	--background: var(--workbench-viewer);
 	--foreground: var(--workbench-foreground);
 	--card: var(--workbench-inspector);
-	--primary: oklch(0.970151 0 none);
-	--primary-foreground: oklch(0.173042 0 none);
+	--primary: var(--workbench-foreground);
+	--primary-foreground: var(--workbench);
 	--muted-foreground: var(--workbench-rail-foreground);
 	--border: var(--workbench-border);
 	--input: var(--workbench-border-strong);
