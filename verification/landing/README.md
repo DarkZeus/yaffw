@@ -17,6 +17,7 @@ In another terminal:
 node verification/landing/progressive-check.mjs
 node verification/landing/copy-check.mjs
 node verification/landing/tabs-check.mjs
+node verification/landing/links-check.mjs
 ```
 
 The check uses `verification/browser.cjs`. Provide Playwright through
@@ -45,6 +46,12 @@ Only the selected tab is in the Tab order, followed by its named, focusable pane
 The tab check verifies this keyboard behavior, pointer and Enter/Space activation,
 Copy visibility, stable ARIA relationships and the browser accessibility tree,
 plus useful commands when JavaScript is disabled.
+
+The destination check inspects editor, repository, README and issue links on the
+built home, changelog and 404 pages with JavaScript disabled. It also exercises
+the hero Enter shortcut, modified Enter, and a native modified editor-link click
+that opens a new tab. Requests to the editor destination are intercepted and
+fulfilled locally, so the check does not load the production editor.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.

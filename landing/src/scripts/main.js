@@ -1,3 +1,4 @@
+import { EDITOR_URL } from "../links.js";
 // Home page behaviour. Progressive enhancement only; the page reads fine without JS.
 import { createTimeline, createSceneView } from "./timeline.js";
 
@@ -7,7 +8,6 @@ const reduceMotion = window.matchMedia(
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const EDITOR_URL = "https://yaffw.serhii-resnyanskyi.workers.dev/";
 
 /** Run `fn(visible, entry)` whenever `el` enters/leaves the viewport. */
 const onVisible = (el, fn, threshold = 0.15) => {

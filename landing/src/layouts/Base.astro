@@ -1,5 +1,6 @@
 ---
 import "../styles/index.css";
+import { EDITOR_URL, REPO_URL } from "../links.js";
 
 interface Props {
 	title: string;
@@ -9,8 +10,6 @@ interface Props {
 }
 
 const { title, description, ogDescription = description } = Astro.props;
-const EDITOR_URL = "https://yaffw.serhii-resnyanskyi.workers.dev/";
-const REPO_URL = "https://github.com/DarkZeus/yaffw";
 const path = Astro.url.pathname;
 ---
 

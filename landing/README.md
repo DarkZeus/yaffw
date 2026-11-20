@@ -39,6 +39,7 @@ Entries are sorted by `date`. The file name becomes the entry's link (`/changelo
 - `src/pages/index.astro`: home page
 - `src/pages/changelog.astro`: the hand-written entries in `src/content/changelog/`, newest first
 - `src/layouts/Base.astro`: head, nav, footer
+- `src/links.js`: editor and repository destinations shared by pages, layout, and client shortcuts
 - `src/styles/`: one file per section, imported in cascade order by `index.css`. The shared `--workbench-*` palette is owned by `src/workbench-tokens.css` at the repository root and imported by both editor and landing; `<html class="workbench">` applies it.
 - `src/scripts/main.js`: home page behaviour (demo and shortcut timelines, meters, illustrations, repo card)
 - `src/scripts/timeline.js`: selection timeline engine shared by the demo and the shortcut playground
