@@ -4,6 +4,8 @@
 
 The landing introduces YAFFW's personal, local-first video editing workflow and links to the separate editor. It also publishes a hand-written changelog. The product edits one local video at a time; the landing is a static marketing site with illustrative browser interactions, rather than another media editor.
 
+The main demonstration follows the hero directly. A single Built with acknowledgment area near Source separates browser APIs, libraries/frameworks, editor tooling, and the landing site. The footer keeps product/repository navigation and author credit rather than repeating upstream lists.
+
 The maintained site is the `yaffw-landing` Astro package in this pnpm workspace. From the repository root, use the supported Node version and pinned pnpm version described in [README.md](../README.md):
 
 ```sh

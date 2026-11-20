@@ -25,32 +25,3 @@
 
 /* Content is visible by default. scripts/main.js may animate newly entering
    content after initialization; a missing script never hides the page. */
-
-/* ───────── Built on ───────── */
-
-.built-on {
-	text-align: center;
-}
-.built-on__label {
-	font-size: 14px;
-	color: var(--muted-foreground);
-}
-.built-on ul {
-	list-style: none;
-	margin: 20px 0 0;
-	padding: 0;
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	gap: 12px clamp(24px, 4vw, 48px);
-}
-.built-on a {
-	font-size: clamp(15px, 1.6vw, 19px);
-	font-weight: 500;
-	letter-spacing: -0.02em;
-	color: oklch(1 0 none / 0.5);
-	transition: color 150ms var(--ease-out);
-}
-.built-on a:hover {
-	color: var(--foreground);
-}
