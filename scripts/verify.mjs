@@ -149,11 +149,23 @@ const plan = [
 		}
 	},
 ];
-const owners = ["landing", "editor", "editor", "editor", "editor", "landing"];
-await runLanes(
-	plan.filter((_run, index) => scope === "all" || owners[index] === scope),
-	3,
-);
+const [
+	landingWork,
+	tests,
+	rootChecks,
+	editorTypes,
+	editorBuild,
+	landingChecks,
+] = plan;
+const selected =
+	scope === "editor"
+		? [rootChecks, editorTypes, editorBuild, tests]
+		: scope === "landing"
+			? [landingWork, landingChecks]
+			: plan;
+// On the slower hosted CPUs, even overlapping the short native checks pushed
+// formatting/lint over budget. Run those brief editor checks before Vitest.
+await runLanes(selected, scope === "editor" ? 1 : 3);
 
 // Compare actual execution to discovery, not a maintained list that can silently
 // omit newly added files. Reject skipped/todo tests as well as missing files.

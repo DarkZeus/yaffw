@@ -1,0 +1,33 @@
+name: CI latency audit
+
+on:
+  workflow_run:
+    workflows: [Verify]
+    types: [completed]
+
+# Metadata only, after reporting has actually completed. No code/artifacts from
+# a PR are executed, no verification is retried, and no production is deployed.
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+jobs:
+  latency:
+    name: Latency of Verify ${{ github.event.workflow_run.id }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Enforce measured end-to-end, queue and setup budgets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: python3 scripts/check-ci-budgets.py "$SOURCE_RUN_ID"
+      - name: Retain the full latency evidence on failure
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ci-latency-budget-${{ github.event.workflow_run.id }}
+          path: tmp/ci-latency-budget.json
+          if-no-files-found: error
+          retention-days: 14

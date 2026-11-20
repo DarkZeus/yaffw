@@ -33,6 +33,14 @@ def collect_run(run):
     row["created_to_report_s"] = seconds(row["created_at"], row["updated_at"])
     row["timing"] = timing
     row["jobs"] = jobs["jobs"]
+    required_job = next((job for job in jobs["jobs"] if job["name"] == "verify"), None)
+    if required_job and required_job.get("check_run_url"):
+        check_id = required_job["check_run_url"].rsplit("/", 1)[-1]
+        check = json.loads(api(f"check-runs/{check_id}"))
+        row["required_check"] = {key: check.get(key) for key in ("id", "name", "conclusion", "completed_at", "details_url")}
+        if check.get("completed_at"):
+            row["commit_to_required_result_s"] = seconds(row["commit_timestamp"], check["completed_at"])
+            row["created_to_required_result_s"] = seconds(row["created_at"], check["completed_at"])
     row["logs"] = []
     for job in row["jobs"]:
         # Preserve logs, including phase boundaries not exposed by the step API.
