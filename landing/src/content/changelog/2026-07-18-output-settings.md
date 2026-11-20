@@ -9,4 +9,4 @@ Choose what the export looks like before you start it:
 - Resolution: keep the source size or scale down, with the aspect ratio preserved.
 - Quality for video and audio, by name or as a custom bitrate.
 
-Save settings as an export preset in your browser and load it next time. "Last used settings" always holds the settings of your last export.
+Save settings as an export preset in your browser and load it next time. "Last used settings" holds the settings you last successfully applied, even if you did not export. Load it into the draft, then choose Apply to use it for the current file.
