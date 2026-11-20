@@ -38,6 +38,7 @@ Motion follows the implementation's actual limits:
 - After initialization succeeds, newly entering content below the viewport may fade/rise into view. Content already visible, including a deep-linked heading, is not hidden at initialization.
 - The scene camera follows the simulated Playhead; it is not a scroll effect. JavaScript illustration loops and meter updates pause offscreen. The three-step cards also have decorative CSS keyframe loops.
 - Reduced motion stops JavaScript illustration loops, freezes scene-camera motion, collapses CSS keyframe durations, and disables native cross-document view transitions. Explicit demo transport still works; short control transitions and command-label fades remain.
+- Section links keep native fragments, sharing, refresh, and browser history; section targets are focusable without JavaScript and CSS scroll padding keeps them below the fixed header. No session-storage handoff is used.
 - Supported browsers use native cross-document page transitions. The header remains spatially stable while page content fades and settles vertically. Other browsers navigate normally.
 
 ## Historical reference research

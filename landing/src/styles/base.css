@@ -120,8 +120,8 @@ button {
 	outline-offset: 3px;
 	border-radius: 6px;
 }
-/* Sections focused by a header/footer link (scripts/nav.js) take focus for keyboard
-   continuity only; the browser would otherwise ring the whole section after a page load. */
+/* Native section destinations take focus for keyboard continuity. Keep the ring
+   on interactive controls rather than outlining an entire section. */
 [data-scroll-target]:focus {
 	outline: none;
 }

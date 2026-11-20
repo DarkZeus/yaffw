@@ -18,9 +18,12 @@ node verification/landing/progressive-check.mjs
 node verification/landing/copy-check.mjs
 node verification/landing/tabs-check.mjs
 node verification/landing/links-check.mjs
+node verification/landing/navigation-check.mjs
 ```
 
-The check uses `verification/browser.cjs`. Provide Playwright through
+The checks use `verification/browser.cjs`. Use the Chromium installed by the
+same Playwright version for repeatable verification; custom executables are
+available for diagnostic runs. Provide Playwright through
 `YAFFW_PLAYWRIGHT_PATH` if it is installed outside the repository, and set
 `YAFFW_BROWSER_EXECUTABLE` when using an existing Chromium executable. Override
 `YAFFW_LANDING_ORIGIN` to test another server containing the built landing output;
@@ -52,6 +55,14 @@ built home, changelog and 404 pages with JavaScript disabled. It also exercises
 the hero Enter shortcut, modified Enter, and a native modified editor-link click
 that opens a new tab. Requests to the editor destination are intercepted and
 fulfilled locally, so the check does not load the production editor.
+
+The section-navigation check covers stale fragments, Back/Forward history,
+header/footer links from changelog and 404, disabled JavaScript, inaccessible
+session storage, copied destinations opened in a new tab, refresh, skip-link
+keyboard continuation, changelog permalinks, targeted links, and reduced motion.
+It verifies native URL/focus behavior and waits for the configured header offset
+before taking the next navigation step. External modified links are exercised by
+the destination check above.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.
