@@ -16,6 +16,7 @@ In another terminal:
 ```sh
 node verification/landing/progressive-check.mjs
 node verification/landing/copy-check.mjs
+node verification/landing/tabs-check.mjs
 ```
 
 The check uses `verification/browser.cjs`. Provide Playwright through
@@ -37,6 +38,13 @@ clipboard access by Enter, an unavailable Clipboard API, and denied access in a
 touch/mobile browser context. It verifies the exact runnable commands, accessible
 feedback, and focused text selection for manual copying without a platform-specific
 keyboard instruction.
+
+Command tabs use automatic activation: Left/Right changes focus and selection
+together and wraps between Run and Develop; Home/End selects the first/last tab.
+Only the selected tab is in the Tab order, followed by its named, focusable panel.
+The tab check verifies this keyboard behavior, pointer and Enter/Space activation,
+Copy visibility, stable ARIA relationships and the browser accessibility tree,
+plus useful commands when JavaScript is disabled.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.

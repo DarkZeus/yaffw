@@ -266,14 +266,35 @@ if (repo) {
 	const command = $("[data-command]", repo);
 	const feedback = $("[data-copy-status]", repo);
 	let copyFeedbackTimer;
-	tabs.forEach((t, i) =>
-		t.addEventListener("click", () => {
-			tabs.forEach((x, j) => x.setAttribute("aria-selected", String(j === i)));
-			panes.forEach((p, j) => (p.hidden = j !== i));
-			copy.hidden = i !== 0;
-			feedback.textContent = "";
-		}),
-	);
+	// Automatic activation: arrow navigation both focuses and selects the tab.
+	const activateTab = (index) => {
+		tabs.forEach((tab, i) => {
+			tab.setAttribute("aria-selected", String(i === index));
+			tab.tabIndex = i === index ? 0 : -1;
+		});
+		panes.forEach((pane, i) => (pane.hidden = i !== index));
+		copy.hidden = index !== 0;
+		feedback.textContent = "";
+	};
+	tabs.forEach((tab, index) => {
+		tab.addEventListener("click", () => {
+			activateTab(index);
+			tab.focus();
+		});
+		tab.addEventListener("keydown", (event) => {
+			let next;
+			if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+			else if (event.key === "ArrowLeft")
+				next = (index + tabs.length - 1) % tabs.length;
+			else if (event.key === "Home") next = 0;
+			else if (event.key === "End") next = tabs.length - 1;
+			else return;
+			event.preventDefault();
+			event.stopPropagation();
+			activateTab(next);
+			tabs[next].focus();
+		});
+	});
 	copy.addEventListener("click", async () => {
 		const label = $("[data-label]", copy);
 		clearTimeout(copyFeedbackTimer);
