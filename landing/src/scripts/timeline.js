@@ -354,19 +354,6 @@ export function createTimeline(
 	return api;
 }
 
-export const ICONS = {
-	play: '<svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg>',
-	back10:
-		'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4L4 8l4 4M12 4L8 8l4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
-	fwd10:
-		'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l4 4-4 4M8 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
-	prev: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3.5v9M12 4L7 8l5 4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
-	next: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3.5v9M4 4l5 4-5 4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
-	loop: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
-	reset:
-		'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.5M3 2.5V5h2.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
-};
-
 /** Standard timeline markup: ruler + video lane + audio lane + selection + handles + playhead. */
 export function timelineHTML({
 	ruler = true,
