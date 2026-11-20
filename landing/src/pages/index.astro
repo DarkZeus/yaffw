@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import WorkbenchScreenshot from "../components/WorkbenchScreenshot.astro";
 import { EDITOR_URL, REPO_URL } from "../links.js";
 import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 ---
@@ -26,7 +27,7 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 			<p class="hero__meta reveal" style="--d: 4">Works in Chrome and Edge</p>
 		</div>
 		<div class="hero__shot reveal" style="--d: 3">
-			<img src="/assets/workbench.jpg" width="2940" height="1838" alt="The YAFFW workbench: video preview, output settings with a Start export button, a transport bar, audio level meters, and a selection timeline with thumbnails and a waveform." />
+			<WorkbenchScreenshot />
 		</div>
 	</section>
 
@@ -335,7 +336,7 @@ pnpm dev`}</code>
 
 	<!-- ───────────────────────────── CTA ───────────────────────────── -->
 	<section class="cta">
-		<img class="cta__bg" src="/assets/workbench.jpg" alt="" width="2940" height="1838" loading="lazy" />
+		<WorkbenchScreenshot background />
 		<div class="container cta__inner">
 			<img class="cta__icon" src="/assets/icon-512.png" alt="" width="112" height="112" />
 			<h2>Try YAFFW</h2>

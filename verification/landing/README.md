@@ -186,3 +186,32 @@ and blocked external fonts for repeatability. The text-enlargement case changes
 root font size; it does not claim to reproduce every browser/OS zoom setting.
 The geometry checks concern authored navigation controls, not unrelated raster
 screenshot contents or a full accessibility certification.
+
+The image check exercises the built page at 390px (1× and 2×), 768px and 1440px.
+It checks AVIF/WebP/JPEG candidate markup, actual selected image responses and
+payload bytes, intrinsic/rendered aspect ratio, descriptive/decorative alt text,
+hero eager/high priority, lazy CTA behavior, matching-URL transfer reuse, CTA
+cover geometry, and the moved metadata asset's availability. A delayed-image case
+checks that the unloaded hero reserves the same dimensions as the decoded image. Reports and hero/CTA
+screenshots are written to `tmp/landing-images/`.
+
+```sh
+node verification/landing/images-check.mjs
+```
+
+Issue #160 measurements, paired Chromium 145 with blocked web fonts and 1000px
+viewport height. The original 2940×1838 JPEG was 644,425 bytes at every viewport.
+
+| Viewport | Density | Selected AVIF width | Image payload | Reduction |
+| -------- | ------: | ------------------: | ------------: | --------: |
+| 390px    |      1× |               480px |  16,493 bytes |     97.4% |
+| 390px    |      2× |               800px |  36,633 bytes |     94.3% |
+| 768px    |      1× |               800px |  36,633 bytes |     94.3% |
+| 1440px   |      1× |              1200px |  67,078 bytes |     89.6% |
+
+The phone/tablet CTA reuses the hero candidate without a second image request;
+the wider desktop backdrop selects its own larger candidate on scrolling.
+Payload means encoded image body bytes, excluding HTTP headers. This is a local
+resource-selection/visual check, not a real-device load-time or Core Web Vitals
+benchmark. JPEG remains the fallback and WebP an alternative for browsers that
+cannot display AVIF; the browser checks run in Chromium.

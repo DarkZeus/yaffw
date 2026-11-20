@@ -1,5 +1,6 @@
 ---
 import "../styles/index.css";
+import workbench from "../assets/workbench.jpg";
 import { EDITOR_URL, REPO_URL } from "../links.js";
 
 interface Props {
@@ -33,7 +34,7 @@ const sections = [
 		<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png" />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={ogDescription} />
-		<meta property="og:image" content="/assets/workbench.jpg" />
+		<meta property="og:image" content={workbench.src} />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link

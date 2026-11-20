@@ -1,0 +1,27 @@
+---
+import { Picture } from "astro:assets";
+import workbench from "../assets/workbench.jpg";
+
+interface Props {
+	/** The lower-page, decorative backdrop can load lazily. */
+	background?: boolean;
+}
+
+const { background = false } = Astro.props;
+// Keep both uses on the same transforms so matching candidates share a URL.
+const widths = [480, 800, 1200, 1800, 2400, 2940];
+const heroSizes = "(max-width: 400px) calc(100vw - 32px), (max-width: 800px) 92vw, (max-width: 960px) calc(100vw - 64px), 900px";
+---
+
+<Picture
+	src={workbench}
+	widths={widths}
+	formats={["avif", "webp"]}
+	fallbackFormat="jpg"
+	quality={80}
+	sizes={background ? "100vw" : heroSizes}
+	priority={!background}
+	loading={background ? "lazy" : "eager"}
+	class={background ? "cta__bg" : undefined}
+	alt={background ? "" : "The YAFFW workbench: video preview, output settings with a Start export button, a transport bar, audio level meters, and a selection timeline with thumbnails and a waveform."}
+/>

@@ -28,6 +28,8 @@ Deployment serves `landing/dist` through the `yaffw-landing` Cloudflare Worker c
 - Meaningful secondary text shares the muted foreground token; size, spacing, and weight carry the remaining hierarchy. The header has a stronger dark glass ground for contrast over the product image. The local-processing diagram quiets its web-side border after the code arrives while keeping its explanation fully readable. Dark viewer-token backing plates keep the demo playback readouts legible over bright scenery.
 - Geist and Geist Mono are requested as web fonts, with system sans-serif and monospace fallbacks. Large headings, smaller muted explanations, and monospaced media-time readouts establish the hierarchy.
 
+The real workbench screenshot lives in `src/assets/` and is processed by Astro. One screenshot component generates responsive AVIF/WebP/JPEG widths with explicit slot sizes, eager/high-priority hero loading, and a lazy decorative CTA backdrop. The same transforms share URLs; original dimensions and palette are preserved.
+
 ## Demonstration fidelity and enhancement
 
 The screenshot shows the real editor. The selection demo and keyboard playground simulate a fixed-duration, nominal-30-FPS asset with generated scenery, thumbnail backgrounds, and a deterministic waveform. They do not load, decode, mix, export, or download a visitor's media. The export action opens the real editor. Feature-card meters, format cycling, layout changes, and export progress are illustrative.
