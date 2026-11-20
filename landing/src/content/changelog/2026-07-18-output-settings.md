@@ -5,7 +5,7 @@ date: 2026-07-18
 
 Choose what the export looks like before you start it:
 
-- Container and codecs. Only combinations your browser can produce are offered.
+- Choose containers and compatible codecs. Export support depends on your browser.
 - Resolution: keep the source size or scale down, with the aspect ratio preserved.
 - Quality for video and audio, by name or as a custom bitrate.
 
