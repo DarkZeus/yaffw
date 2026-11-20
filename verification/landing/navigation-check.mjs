@@ -144,6 +144,40 @@ try {
 	}
 
 	await scenario(
+		"Unavailable CSS preserves native transition opt-in",
+		{},
+		async (page, context) => {
+			const errors = [];
+			page.on("pageerror", (error) => errors.push(error.message));
+			await context.addInitScript(() => {
+				window.addEventListener("pagereveal", (event) => {
+					globalThis.__yaffwRevealedTransition = Boolean(event.viewTransition);
+				});
+			});
+			await goto(page, origin);
+			// An absent external rule reproduces the same opt-in resolution boundary
+			// as the intermittent delayed-stylesheet case, without a timing lottery.
+			await context.route("**/_astro/*.css", (route) => route.abort());
+			await page
+				.locator(".nav__links")
+				.getByRole("link", { name: "Changelog", exact: true })
+				.click();
+			await page.waitForLoadState();
+			await navigationReady(page);
+			assert.equal(
+				await page.evaluate(() => globalThis.__yaffwRevealedTransition),
+				true,
+				"Cross-document transition opt-in must exist before external CSS",
+			);
+			assert.deepEqual(
+				errors,
+				[],
+				"Native transitions must not emit runtime errors when external CSS is unavailable",
+			);
+		},
+	);
+
+	await scenario(
 		"Copied destinations, new tabs and refresh",
 		{},
 		async (page, context) => {

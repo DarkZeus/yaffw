@@ -1,0 +1,26 @@
+{
+  "browser": "Chromium 158.0.8127.18",
+  "minimalDelayedCssFixture": {
+    "navigationsPerMode": 8,
+    "externalCssOnly": [
+      "Transition was aborted because of invalid state. ViewTransition opt-in disabled"
+    ],
+    "inlineOnly": [],
+    "inlineOptInPlusExternalCss": []
+  },
+  "canonicalRegression": {
+    "scenario": "Unavailable CSS preserves native transition opt-in",
+    "before": {
+      "exitCode": 1,
+      "actual": false,
+      "expected": true
+    },
+    "after": {
+      "exitCode": 0,
+      "allFiveSmokeScriptsPassed": true,
+      "navigationSeconds": 21.888,
+      "mobileNavigationSeconds": 15.011
+    }
+  },
+  "limits": "Single local before/after build plus controlled fixture; hosted confirmation follows. Original hosted failures remain recorded; no retry, timeout widening or message filtering."
+}
