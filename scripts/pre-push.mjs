@@ -26,6 +26,13 @@ if (updates.length) {
 		);
 	const result = spawnSync("pnpm", ["verify"], { stdio: "inherit" });
 	if (result.error) throw result.error;
+	if (
+		git(["rev-parse", "HEAD"]) !== head ||
+		git(["status", "--porcelain", "--untracked-files=all"])
+	)
+		throw new Error(
+			"The revision or worktree changed during verification; refusing to push different bytes",
+		);
 	console.log(
 		`PRE_PUSH_RESULT ${JSON.stringify({ revision: head, seconds: (performance.now() - started) / 1000, code: result.status, signal: result.signal })}`,
 	);

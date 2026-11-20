@@ -13,7 +13,7 @@ try {
 	const page = await browser.newPage();
 	await page.setContent("<p>YAFFW → 123</p>");
 	console.log(
-		`BROWSER_RUNTIME ${JSON.stringify({ version: browser.version(), executable: chromium.executablePath() })}`,
+		`BROWSER_RUNTIME ${JSON.stringify({ version: browser.version(), distribution: "headless-shell" })}`,
 	);
 } finally {
 	await browser.close();

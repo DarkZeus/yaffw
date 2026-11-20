@@ -5,6 +5,8 @@ export function releaseDigest(bytes) {
 }
 
 export function validateRelease(manifest, bytes, expected) {
+	if (manifest.scope !== expected.scope)
+		throw new Error("Wrong production artifact scope");
 	if (
 		manifest.revision !== expected.revision ||
 		manifest.runId !== expected.runId

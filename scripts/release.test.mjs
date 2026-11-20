@@ -4,11 +4,15 @@ import { releaseDigest, validateRelease } from "./release.mjs";
 it("requires the verified revision and workflow run for the exact artifact", () => {
 	const bytes = Buffer.from("verified production assets");
 	const manifest = {
+		scope: "editor",
 		revision: "verified-sha",
 		runId: "123",
 		sha256: releaseDigest(bytes),
 	};
 	expect(() => validateRelease(manifest, bytes, manifest)).not.toThrow();
+	expect(() =>
+		validateRelease({ ...manifest, scope: "landing" }, bytes, manifest),
+	).toThrow(/scope/);
 	expect(() =>
 		validateRelease({ ...manifest, revision: "other-sha" }, bytes, manifest),
 	).toThrow(/revision/);

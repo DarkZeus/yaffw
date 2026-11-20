@@ -1,0 +1,85 @@
+name: CI toolchain and caches
+description: Install the complete frozen workspace and validate owned runtime prerequisites
+inputs:
+  lane:
+    required: true
+    description: editor or landing
+  runner-image:
+    default: host
+    description: host or the exact matching Playwright image
+outputs:
+  dependency-key:
+    description: Cache identity or observed restore status
+    value: ${{ steps.keys.outputs.dependencies }}
+  dependency-path:
+    description: Cache identity or observed restore status
+    value: ${{ steps.keys.outputs.path }}
+  browser-key:
+    description: Cache identity or observed restore status
+    value: ${{ steps.keys.outputs.browser }}
+  image-key:
+    description: Cache identity or observed restore status
+    value: ${{ steps.keys.outputs.images }}
+  dependencies-hit:
+    description: Cache identity or observed restore status
+    value: ${{ steps.dependencies.outputs.cache-hit }}
+  browser-hit:
+    description: Cache identity or observed restore status
+    value: ${{ steps.browser.outputs.cache-hit }}
+  images-hit:
+    description: Cache identity or observed restore status
+    value: ${{ steps.images.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: 24
+    - name: Calculate exact cache identities
+      id: keys
+      shell: bash
+      run: node scripts/ci-cache-keys.mjs
+    - name: Restore dependencies
+      if: env.DEPENDENCY_CACHE_MODE != 'cold'
+      id: dependencies
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.keys.outputs.path }}
+        key: ${{ steps.keys.outputs.dependencies }}
+    - name: Frozen install (also validates restored pnpm links)
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Verify native canvas ABI
+      shell: bash
+      run: pnpm exec node -e 'require("canvas").createCanvas(1, 1)'
+    - name: Restore exact Chromium
+      if: inputs.lane == 'landing' && env.DEPENDENCY_CACHE_MODE != 'cold' && inputs.runner-image != 'playwright'
+      id: browser
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ steps.keys.outputs.browser }}
+    - name: Install exact headless Chromium
+      if: inputs.lane == 'landing' && inputs.runner-image != 'playwright'
+      shell: bash
+      run: pnpm exec playwright install --only-shell chromium
+    - name: Validate preinstalled matching Chromium
+      if: inputs.lane == 'landing' && inputs.runner-image == 'playwright'
+      shell: bash
+      run: pnpm exec playwright install --only-shell chromium
+    - name: Prove preinstalled browser libraries and fonts
+      if: inputs.lane == 'landing'
+      shell: bash
+      run: node scripts/browser-runtime.mjs
+    - name: Restore Astro image transforms
+      if: inputs.lane == 'landing' && env.DEPENDENCY_CACHE_MODE != 'cold'
+      id: images
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: landing/node_modules/.astro/assets
+        key: ${{ steps.keys.outputs.images }}
+    - name: Record runner and setup evidence
+      shell: bash
+      run: |
+        node -e 'const os = require("node:os"); console.log(JSON.stringify({cpu:os.availableParallelism(),memoryBytes:os.totalmem(),node:process.version,abi:process.versions.modules,setupSeconds:Date.now()/1000-Number(process.env.CI_SETUP_STARTED),dependencyCache:"${{ steps.dependencies.outputs.cache-hit }}",browserCache:"${{ steps.browser.outputs.cache-hit }}",imageCache:"${{ steps.images.outputs.cache-hit }}"}))'

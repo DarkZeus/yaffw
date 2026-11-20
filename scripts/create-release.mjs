@@ -26,30 +26,36 @@ if (
 	dirty ||
 	evidence.revision !== revision ||
 	evidence.workingTreeDirty ||
+	!["editor", "landing"].includes(evidence.scope) ||
 	!evidence.correctnessPassed ||
 	!evidence.budgetsPassed
 )
 	throw new Error(
-		"Only a complete, clean, successful verification can publish artifacts",
+		"Only a clean successful verification lane can publish candidate artifacts",
 	);
 const origin = configuredProductionOrigin(process.env.LANDING_SITE_ORIGIN);
 if (!origin) throw new Error("A production landing origin is required");
-const directory = resolve(`tmp/production-${process.env.GITHUB_RUN_ID}`);
+const directory = resolve(
+	`tmp/production-${evidence.scope}-${process.env.GITHUB_RUN_ID}`,
+);
 mkdirSync(directory, { recursive: true });
 const archive = resolve(directory, "production.tar.gz");
-execFileSync("tar", [
-	"-czf",
-	archive,
-	"dist",
-	"landing/dist",
-	"wrangler.jsonc",
-	"landing/wrangler.jsonc",
-]);
+const paths =
+	evidence.scope === "editor"
+		? ["dist", "wrangler.jsonc"]
+		: ["landing/dist", "landing/wrangler.jsonc"];
+execFileSync("tar", ["-czf", archive, ...paths]);
 const sha256 = releaseDigest(readFileSync(archive));
 writeFileSync(
 	resolve(directory, "release.json"),
 	JSON.stringify(
-		{ revision, runId: process.env.GITHUB_RUN_ID, sha256, origin },
+		{
+			scope: evidence.scope,
+			revision,
+			runId: process.env.GITHUB_RUN_ID,
+			sha256,
+			origin,
+		},
 		null,
 		2,
 	),

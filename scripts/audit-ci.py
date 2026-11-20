@@ -85,13 +85,22 @@ def summarize(row):
             row["phases_s"][f"{owner}/{script}"] = seconds(start, end)
     instrumented = re.findall(r"VERIFY_RESULT (\{[^\n]+\})", log)
     if instrumented:
-        row["verification"] = json.loads(instrumented[-1])
+        row["verifications"] = [json.loads(item) for item in instrumented]
+        scopes = {item.get("scope", "all") for item in row["verifications"]}
+        complete = scopes == {"all"} or scopes == {"editor", "landing"}
+        row["verification"] = {
+            "complete": complete,
+            "correctnessPassed": complete and all(item["correctnessPassed"] for item in row["verifications"]),
+            "budgetsPassed": complete and all(item["budgetsPassed"] for item in row["verifications"]),
+            "results": [result for item in row["verifications"] for result in item["results"]],
+        }
         row["phases_s"] = {
             result["name"]: result.get("seconds")
             for result in row["verification"]["results"]
         }
     setup = re.findall(r"^\S+Z (\{[^\n]+\"setupSeconds\"[^\n]+\})", log, re.M)
     if setup:
+        row["setups"] = [json.loads(item) for item in setup]
         row["setup_evidence"] = json.loads(setup[-1])
     row["jobs"] = [{key: job[key] for key in (
         "id", "name", "conclusion", "started_at", "completed_at", "runner_name", "labels", "steps",
