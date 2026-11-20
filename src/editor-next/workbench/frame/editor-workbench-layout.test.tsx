@@ -473,6 +473,15 @@ describe("customizable workbench layout", () => {
 					clientX: 310,
 					clientY: 310,
 				});
+				// A real pointer release dispatches click in the same task. Complete
+				// that gesture so Workspace's document-level suppression cannot eat
+				// the next test's first unrelated click.
+				const transport = panelContent("transport");
+				expect(fireEvent.click(transport)).toBe(false);
+				const unrelatedClick = vi.fn();
+				transport.addEventListener("click", unrelatedClick, { once: true });
+				fireEvent.click(transport);
+				expect(unrelatedClick).toHaveBeenCalledTimes(1);
 				expect(readWorkbenchLayout()).toEqual(before);
 				expect(
 					panelContent("transport")

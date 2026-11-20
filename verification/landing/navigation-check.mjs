@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { launchBrowser } from "../browser.cjs";
+import { navigationReady } from "./navigation-ready.mjs";
 
 const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
 const browser = await launchBrowser();
 
+async function goto(page, url) {
+	await page.goto(url);
+	await navigationReady(page);
+}
+
 async function section(page, id, { focused = true } = {}) {
+	await navigationReady(page);
 	let result;
 	let previousTop;
 	let settledSamples = 0;
@@ -66,7 +73,7 @@ try {
 		"Stale fragments and native section history",
 		{},
 		async (page) => {
-			await page.goto(`${origin}/#source`);
+			await goto(page, `${origin}/#source`);
 			await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
 			await page
 				.locator(".nav__links")
@@ -109,13 +116,13 @@ try {
 						});
 					});
 				for (const path of ["/changelog/", "/404.html"]) {
-					await page.goto(new URL(path, origin).href);
+					await goto(page, new URL(path, origin).href);
 					await page
 						.locator(".nav__links")
 						.getByRole("link", { name: "Features", exact: true })
 						.click();
 					await section(page, "features");
-					await page.goto(new URL(path, origin).href);
+					await goto(page, new URL(path, origin).href);
 					await page
 						.locator(".footer")
 						.getByRole("link", { name: "Features", exact: true })
@@ -140,14 +147,14 @@ try {
 		"Copied destinations, new tabs and refresh",
 		{},
 		async (page, context) => {
-			await page.goto(`${origin}/changelog/`);
+			await goto(page, `${origin}/changelog/`);
 			const href = await page
 				.locator(".nav__links")
 				.getByRole("link", { name: "Features", exact: true })
 				.getAttribute("href");
 			assert.equal(href, "/#features");
 			const opened = await context.newPage();
-			await opened.goto(new URL(href, page.url()).href);
+			await goto(opened, new URL(href, page.url()).href);
 			await section(opened, "features");
 			await opened.reload();
 			await section(opened, "features", { focused: false });
@@ -156,7 +163,7 @@ try {
 	);
 
 	await scenario("Skip link and keyboard continuation", {}, async (page) => {
-		await page.goto(origin);
+		await goto(page, origin);
 		await page.keyboard.press("Tab");
 		assert.ok(
 			await page
@@ -183,7 +190,7 @@ try {
 		"Native changelog permalinks and targeted section links",
 		{},
 		async (page, context) => {
-			await page.goto(`${origin}/changelog/`);
+			await goto(page, `${origin}/changelog/`);
 			const permalink = page.locator(".release__name a").first();
 			const href = await permalink.getAttribute("href");
 			await permalink.click();
@@ -208,7 +215,7 @@ try {
 		"Reduced-motion native fragments",
 		{ reducedMotion: "reduce" },
 		async (page) => {
-			await page.goto(`${origin}/#source`);
+			await goto(page, `${origin}/#source`);
 			await page
 				.locator(".nav__links")
 				.getByRole("link", { name: "Features", exact: true })
