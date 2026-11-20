@@ -17,10 +17,26 @@ cd landing && npx wrangler deploy
 
 With Cloudflare Workers Builds, connect the repo a second time with root directory `landing`, build command `pnpm --filter yaffw-landing build`, and build watch paths `landing/**` and `src/workbench-tokens.css`.
 
+## Changelog
+
+Write one Markdown file per notable feature or change in `src/content/changelog/`, then deploy. Copy `_template.md`:
+
+```md
+---
+title: Export presets
+date: 2026-11-20
+version: 1.2.0 # optional
+---
+
+What changed, for someone who uses the editor.
+```
+
+Entries are sorted by `date`. The file name becomes the entry's link (`/changelog/#file-name`). Files starting with `_` are skipped, so prefix a draft with `_` until it's ready.
+
 ## Layout
 
 - `src/pages/index.astro`: home page
-- `src/pages/changelog.astro`: GitHub releases of DarkZeus/yaffw, fetched at build time (`src/releases.ts`). Publish a release, then rebuild. `GITHUB_TOKEN` is optional and lifts the API rate limit; a production build fails if the request fails, so a broken fetch never ships an empty changelog.
+- `src/pages/changelog.astro`: the hand-written entries in `src/content/changelog/`, newest first
 - `src/layouts/Base.astro`: head, nav, footer
 - `src/styles/`: one file per section, imported in cascade order by `index.css`. The `--workbench-*` palette comes from the editor's `src/workbench-tokens.css`; `<html class="workbench">` applies it.
 - `src/scripts/main.js`: home page behaviour (demo and shortcut timelines, meters, illustrations, repo card)

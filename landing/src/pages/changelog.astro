@@ -1,39 +1,49 @@
 ---
+import { getCollection, render } from "astro:content";
 import Base from "../layouts/Base.astro";
-import { loadReleases } from "../releases";
 
-const RELEASES_URL = "https://github.com/DarkZeus/yaffw/releases";
-const releases = await loadReleases();
-const date = new Intl.DateTimeFormat("en", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+const entries = (await getCollection("changelog")).sort(
+	(a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+const date = new Intl.DateTimeFormat("en", {
+	year: "numeric",
+	month: "long",
+	day: "numeric",
+	timeZone: "UTC",
+});
+const rendered = await Promise.all(
+	entries.map(async (entry) => ({ entry, Content: (await render(entry)).Content })),
+);
 ---
 
-<Base title="Changelog · YAFFW" description="Every published YAFFW release, newest first.">
+<Base title="Changelog · YAFFW" description="Notable changes to the YAFFW editor, newest first.">
 	<section class="changelog container">
 		<header class="changelog__head">
 			<h1 class="changelog__title">Changelog</h1>
-			<a class="btn btn--ghost btn--sm" href={RELEASES_URL}>Releases on GitHub</a>
 		</header>
 
 		{
-			releases.length === 0 ? (
+			rendered.length === 0 ? (
 				<div class="changelog__empty">
-					<p>No releases yet.</p>
-					<p class="dim">Each release published on GitHub appears here.</p>
+					<p>No entries yet.</p>
 				</div>
 			) : (
 				<ol class="releases">
-					{releases.map((r) => (
-						<li class="release" id={r.tag_name}>
+					{rendered.map(({ entry, Content }) => (
+						<li class="release" id={entry.id}>
 							<div class="release__meta">
-								<time datetime={r.published_at}>{date.format(new Date(r.published_at))}</time>
-								<a class="release__tag mono" href={r.html_url}>
-									{r.tag_name}
-								</a>
-								{r.prerelease && <span class="release__pre">Pre-release</span>}
+								<time datetime={entry.data.date.toISOString().slice(0, 10)}>
+									{date.format(entry.data.date)}
+								</time>
+								{entry.data.version && <span class="release__tag mono">{entry.data.version}</span>}
 							</div>
 							<div class="release__body">
-								<h2 class="release__name">{r.name || r.tag_name}</h2>
-								{r.body_html && <div class="prose" set:html={r.body_html} />}
+								<h2 class="release__name">
+									<a href={`#${entry.id}`}>{entry.data.title}</a>
+								</h2>
+								<div class="prose">
+									<Content />
+								</div>
 							</div>
 						</li>
 					))}

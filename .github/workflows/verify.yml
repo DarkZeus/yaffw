@@ -26,6 +26,3 @@ jobs:
       - run: pnpm verify
       - name: Build landing page
         run: pnpm --filter yaffw-landing build
-        env:
-          # Changelog reads GitHub releases at build time; the token avoids the anonymous rate limit.
-          GITHUB_TOKEN: ${{ github.token }}
