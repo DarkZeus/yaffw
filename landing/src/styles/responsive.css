@@ -30,7 +30,6 @@
 		border-radius: 14px;
 	}
 	.demo__top,
-	.steps,
 	.try,
 	.source,
 	.local__facts {
@@ -149,10 +148,5 @@
 		opacity: 1;
 		translate: none;
 		transition: none;
-	}
-	/* Export mini-UI rests on its finished state: full bar, "Download" only. */
-	.steps__lbl--a,
-	.steps__ink {
-		opacity: 0;
 	}
 }

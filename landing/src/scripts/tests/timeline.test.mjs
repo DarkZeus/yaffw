@@ -196,4 +196,32 @@ describe("landing transport matches the editor workflow", () => {
 		expect(document.activeElement).toBe(root);
 		pointer("pointerup", surface, 11);
 	});
+	it("lets its owner discard an unfinished gesture before hiding the surface", () => {
+		select(10, 20);
+		timeline.seek(5);
+		pointer("pointerdown", root.querySelector('[data-handle="start"]'), 10);
+		pointer("pointermove", surface, 14);
+		timeline.cancelGesture();
+		pointer("pointerup", surface, 14);
+		expect(timeline.state).toMatchObject({ s: 10, e: 20, ph: 5 });
+		expect(root.querySelector('[data-out="start"]').textContent).toBe(
+			"00:00:10.000",
+		);
+	});
+	it("yields Space to native disclosure activation", () => {
+		const details = document.createElement("details");
+		details.open = true;
+		details.innerHTML = '<summary tabindex="0">Try keyboard controls</summary>';
+		document.body.prepend(details);
+		const summary = details.querySelector("summary");
+		summary.focus();
+		const event = new KeyboardEvent("keydown", {
+			key: " ",
+			bubbles: true,
+			cancelable: true,
+		});
+		summary.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		expect(timeline.state.playing).toBe(false);
+	});
 });

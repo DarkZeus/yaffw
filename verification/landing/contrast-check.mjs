@@ -153,12 +153,13 @@ try {
 					.waitFor({ timeout: 5000 });
 				await page.locator(".bound").scrollIntoViewIfNeeded();
 				await delay(1500); // The diagram's persistent post-delivery state follows its delayed transition.
+				await page.locator("[data-keyboard-disclosure] > summary").click();
 				await page.locator("[data-try]").scrollIntoViewIfNeeded();
 				for (const [name, selector] of [
 					["hero", ".hero"],
 					["local", ".bound"],
 					["shortcuts", ".try"],
-					["workflow", "#how"],
+					["workflow", "#demo"],
 					["demo", "[data-demo]"],
 				]) {
 					await page.locator(selector).screenshot({

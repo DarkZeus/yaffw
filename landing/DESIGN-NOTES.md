@@ -4,7 +4,7 @@
 
 The landing introduces YAFFW's personal, local-first video editing workflow and links to the separate editor. It also publishes a hand-written changelog. The product edits one local video at a time; the landing is a static marketing site with illustrative browser interactions, rather than another media editor.
 
-The main demonstration follows the hero directly. A single Built with acknowledgment area near Source separates browser APIs, libraries/frameworks, editor tooling, and the landing site. The footer keeps product/repository navigation and author credit rather than repeating upstream lists.
+The main demonstration follows the hero directly and owns the compact open-file, Selection/audio, and export-review/download explanation. The former separate three-step showcase is removed. Keyboard help and its playground are optional inside a native Try keyboard controls disclosure; closing it stops playback and shortcut handling. A single Built with acknowledgment area near Source separates browser APIs, libraries/frameworks, editor tooling, and the landing site. The footer keeps product/repository navigation and author credit rather than repeating upstream lists.
 
 The maintained site is the `yaffw-landing` Astro package in this pnpm workspace. From the repository root, use the supported Node version and pinned pnpm version described in [README.md](../README.md):
 
@@ -41,7 +41,7 @@ Static HTML includes the headings, factual copy, default runnable commands, time
 Motion follows the implementation's actual limits:
 
 - After initialization succeeds, newly entering content below the viewport may fade/rise into view. Content already visible, including a deep-linked heading, is not hidden at initialization.
-- The scene camera follows the simulated Playhead; it is not a scroll effect. JavaScript illustration loops and meter updates pause offscreen. The three-step cards also have decorative CSS keyframe loops.
+- The scene camera follows the simulated Playhead; it is not a scroll effect. JavaScript illustration loops and meter updates pause offscreen.
 - Reduced motion stops JavaScript illustration loops, freezes scene-camera motion, collapses CSS keyframe durations, and disables native cross-document view transitions. Explicit demo transport still works; short control transitions and command-label fades remain.
 - Section links keep native fragments, sharing, refresh, and browser history; section targets are focusable without JavaScript and CSS scroll padding keeps them below the fixed header. No session-storage handoff is used.
 - Supported browsers use native cross-document page transitions. The header remains spatially stable while page content fades and settles vertically. Other browsers navigate normally.

@@ -229,9 +229,22 @@ export function createTimeline(root, { onChange, isActive = () => true } = {}) {
 		repositionLoop();
 		render(reason);
 	};
+	const finishGesture = (reason) => {
+		if (!drag) return;
+		const pointerId = drag.pointerId;
+		drag = null;
+		draft = null;
+		delete root.dataset.dragging;
+		$$("[data-dragging]").forEach((handle) => delete handle.dataset.dragging);
+		if (timeline.hasPointerCapture?.(pointerId))
+			timeline.releasePointerCapture(pointerId);
+		repositionLoop();
+		render(reason);
+	};
 	const api = {
 		state,
 		render,
+		cancelGesture: () => finishGesture("cancel"),
 		subscribe: (fn) => (listeners.add(fn), () => listeners.delete(fn)),
 		setStart: (time) => updateSelection(withStart(state, time), "start"),
 		setEnd: (time) => updateSelection(withEnd(state, time), "end"),
@@ -300,15 +313,7 @@ export function createTimeline(root, { onChange, isActive = () => true } = {}) {
 		const finish = (commit, event) => {
 			if (!drag || (event && !ownsPointer(event))) return;
 			if (commit) Object.assign(state, readDraft(event.clientX));
-			const pointerId = drag.pointerId;
-			drag = null;
-			draft = null;
-			delete root.dataset.dragging;
-			$$("[data-dragging]").forEach((handle) => delete handle.dataset.dragging);
-			if (timeline.hasPointerCapture?.(pointerId))
-				timeline.releasePointerCapture(pointerId);
-			repositionLoop();
-			render(commit ? "commit" : "cancel");
+			finishGesture(commit ? "commit" : "cancel");
 		};
 		on(timeline, "pointerdown", (event) => {
 			if (drag || event.button !== 0 || event.isPrimary === false) return;
@@ -392,10 +397,12 @@ export function createTimeline(root, { onChange, isActive = () => true } = {}) {
 			isTyping(event)
 		)
 			return;
-		const onButton = /^(BUTTON|A)$/.test(document.activeElement?.tagName);
+		const onNativeControl = /^(BUTTON|A|SUMMARY)$/.test(
+			document.activeElement?.tagName,
+		);
 		const key = event.key;
 		if (key === " ") {
-			if (onButton) return;
+			if (onNativeControl) return;
 			setPlaying(!state.playing);
 		} else if (/^k$/i.test(key)) setPlaying(!state.playing);
 		else if (/^j$/i.test(key)) api.seek(state.ph - 10);

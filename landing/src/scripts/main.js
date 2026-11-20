@@ -47,17 +47,29 @@ document.addEventListener("keydown", (ev) => {
 const mountTimeline = (root, { onChange, onActive } = {}) => {
 	if (!root) return null;
 	let active = false;
-	const tl = createTimeline(root, { onChange, isActive: () => active });
+	const disclosure = root.closest("details");
+	const isActive = () => active && (!disclosure || disclosure.open);
+	const tl = createTimeline(root, { onChange, isActive });
+	const publishActive = () => {
+		root.setAttribute("data-active", String(isActive()));
+		onActive?.(isActive());
+	};
 	onVisible(
 		root,
 		(_, entry) => {
 			active = entry.intersectionRatio >= 0.55;
-			root.setAttribute("data-active", String(active));
-			onActive?.(active);
+			publishActive();
 			if (!entry.isIntersecting && tl.state.playing) tl.setPlaying(false);
 		},
 		[0, 0.55, 0.8],
 	);
+	disclosure?.addEventListener("toggle", () => {
+		publishActive();
+		if (!disclosure.open) {
+			tl.cancelGesture();
+			tl.setPlaying(false);
+		}
+	});
 	$$("button", root).forEach((button) => (button.disabled = false));
 	root.dataset.ready = "";
 	return tl;

@@ -37,6 +37,13 @@ async function staticContent(page) {
 		if (opacity === 1) break;
 		await delay(50);
 	}
+	// Native disclosure keeps the optional help available even without scripts.
+	if (
+		!(await page
+			.locator("[data-keyboard-disclosure]")
+			.evaluate((element) => element.open))
+	)
+		await page.locator("[data-keyboard-disclosure] > summary").click();
 	await readable(page, "h1, h2, h3, [data-reveal]");
 	await readable(page, '[data-pane="0"]');
 	assert.match(
@@ -98,7 +105,9 @@ async function controlsUnavailable(page) {
 
 async function enhanced(page) {
 	await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
-	await page.locator("[data-try][data-ready]").waitFor({ timeout: 5000 });
+	await page
+		.locator("[data-try][data-ready]")
+		.waitFor({ state: "attached", timeout: 5000 });
 	assert.ok(await page.locator('[data-tab="1"]').isVisible());
 	assert.ok(await page.locator("[data-copy]").isVisible());
 	const demo = page.locator("[data-demo]");
@@ -207,6 +216,7 @@ try {
 		async (page) => {
 			await page.goto(origin);
 			await enhanced(page);
+			await page.locator("[data-keyboard-disclosure] > summary").click();
 			await readable(page, "h1, h2, h3, [data-reveal]");
 		},
 	);

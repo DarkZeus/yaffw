@@ -14,8 +14,7 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 		<div class="hero__copy">
 			<h1 class="hero__title reveal" style="--d: 1">Cut video without uploading it</h1>
 			<p class="hero__lead reveal" style="--d: 2">
-				YAFFW is a video editor that runs in a browser tab. Open a local file, keep the part
-				you want, adjust the audio, and export. Media processing stays on your device.
+				A focused workbench for one local video at a time. Inspect, mix and export on your device.
 			</p>
 			<div class="hero__ctas reveal" style="--d: 3">
 				<a class="btn btn--primary btn--lg" href={EDITOR_URL}>
@@ -36,6 +35,11 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 		<div class="container">
 			<header class="section__head">
 				<h2 class="section__title" data-reveal>Keep the part you want</h2>
+				<ol class="workflow">
+					<li><b>Open a video</b><p>Drop a file into the editor or use the picker. Media shows its details and tracks.</p></li>
+					<li><b>Choose what to keep</b><p>Drag the Selection, preview the range, and choose which audio tracks contribute to the export.</p></li>
+					<li><b>Review and download</b><p>Choose format and quality, Apply settings, review the plan, then export and download the result.</p></li>
+				</ol>
 			</header>
 			<div class="demo" data-demo tabindex="-1">
 				<div class="demo__top">
@@ -73,6 +77,7 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 					<Fragment set:html={timelineHTML()} />
 				</div>
 			</div>
+			<p class="footnote">The selection starts as the whole file, so you can also use YAFFW to change a file's format or audio without cutting it.</p>
 		</div>
 	</section>
 
@@ -226,68 +231,35 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 		</div>
 	</section>
 
-	<!-- ───────────────────────────── Steps ───────────────────────────── -->
-	<section class="section" id="how" tabindex="-1" data-scroll-target>
-		<div class="container">
-			<header class="section__head">
-				<h2 class="section__title" data-reveal>Three steps</h2>
-			</header>
-			<ol class="steps">
-				<li>
-					<div class="steps__ui steps__drop" aria-hidden="true">
-						<span class="steps__file"><b class="mono">trip-2026.mov</b><small class="mono">3840×2160 · 1:33</small></span>
-					</div>
-					<h3><span class="mono">1</span>Open a video</h3>
-					<p>Drop a file into the editor or use the picker. The Media panel shows its details and tracks.</p>
-				</li>
-				<li>
-					<div class="steps__ui steps__sel" aria-hidden="true">
-						<div class="steps__bar"><i class="steps__range"></i><i class="steps__ph"></i></div>
-						<span class="mono">00:16.835 – 01:07.338</span>
-					</div>
-					<h3><span class="mono">2</span>Choose what to keep</h3>
-					<p>Drag the selection, preview the range, and choose which audio tracks go into the export.</p>
-				</li>
-				<li>
-					<div class="steps__ui steps__exp" aria-hidden="true">
-						<div class="steps__btn"><span class="steps__fill"></span><span class="steps__lbl steps__lbl--a">Exporting…</span><span class="steps__ink"><span>Exporting…</span></span><span class="steps__lbl steps__lbl--b">Download</span></div>
-						<span class="mono">MP4 · H.264 · AAC</span>
-					</div>
-					<h3><span class="mono">3</span>Export and download</h3>
-					<p>Pick format and quality, review the plan, export, then download the result.</p>
-				</li>
-			</ol>
-			<p class="footnote">
-				The selection starts as the whole file, so you can also use YAFFW to change a file's format or audio without cutting it.
-			</p>
-		</div>
-	</section>
-
 	<!-- ───────────────────────────── Shortcuts ───────────────────────────── -->
 	<section class="section" id="shortcuts" tabindex="-1" data-scroll-target>
-		<div class="container try">
-			<div>
-				<h2 class="section__title" data-reveal>Keyboard shortcuts</h2>
-				<ul class="try__list">
-					<li data-row="0"><span class="keycaps"><kbd class="cap cap--wide">Space</kbd><i>or</i><kbd class="cap">K</kbd></span><span>Play / pause</span></li>
-					<li data-row="1"><span class="keycaps"><kbd class="cap">←</kbd><kbd class="cap">→</kbd></span><span>Seek one second</span></li>
-					<li data-row="2"><span class="keycaps"><kbd class="cap">J</kbd><kbd class="cap">L</kbd></span><span>Seek ten seconds</span></li>
-					<li data-row="3"><span class="keycaps"><kbd class="cap cap--wide">⇧ Shift</kbd><i>+</i><kbd class="cap">←</kbd><kbd class="cap">→</kbd></span><span>Step one frame</span></li>
-					<li data-row="4"><span class="keycaps"><kbd class="cap">[</kbd><kbd class="cap">]</kbd></span><span>Set selection start / end at the playhead</span></li>
-				</ul>
-				<p class="try-note">Shortcuts pause while you're editing an input, using a dialog, or exporting.</p>
-			</div>
-			<div class="try__player" data-try tabindex="-1">
-				<p class="enhancement-note">Static demo. Interactive controls require JavaScript.</p>
-				<div class="try__time mono"><output data-out="timecode">00:00:00.000</output></div>
-				<Fragment set:html={timelineHTML({ ruler: false, video: false })} />
-				<div class="try__foot">
-					<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
-					<button class="t-btn" type="button" disabled data-loop aria-pressed="false" aria-label="Loop selection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
-					<span class="mono try__range">Selection <output data-out="start" data-short>00:00.000</output> – <output data-out="end" data-short>01:33.525</output></span>
-					<span class="try__hint" data-hint></span>
+		<div class="container">
+			<details class="keyboard-disclosure" data-keyboard-disclosure>
+				<summary><h2>Try keyboard controls</h2></summary>
+				<div class="try">
+					<div>
+						<ul class="try__list">
+							<li data-row="0"><span class="keycaps"><kbd class="cap cap--wide">Space</kbd><i>or</i><kbd class="cap">K</kbd></span><span>Play / pause</span></li>
+							<li data-row="1"><span class="keycaps"><kbd class="cap">←</kbd><kbd class="cap">→</kbd></span><span>Seek one second</span></li>
+							<li data-row="2"><span class="keycaps"><kbd class="cap">J</kbd><kbd class="cap">L</kbd></span><span>Seek ten seconds</span></li>
+							<li data-row="3"><span class="keycaps"><kbd class="cap cap--wide">⇧ Shift</kbd><i>+</i><kbd class="cap">←</kbd><kbd class="cap">→</kbd></span><span>Step one frame</span></li>
+							<li data-row="4"><span class="keycaps"><kbd class="cap">[</kbd><kbd class="cap">]</kbd></span><span>Set selection start / end at the playhead</span></li>
+						</ul>
+						<p class="try-note">Shortcuts pause while you're editing an input, using a dialog, or exporting.</p>
+					</div>
+					<div class="try__player" data-try tabindex="-1">
+						<p class="enhancement-note">Static demo. Interactive controls require JavaScript.</p>
+						<div class="try__time mono"><output data-out="timecode">00:00:00.000</output></div>
+						<Fragment set:html={timelineHTML({ ruler: false, video: false })} />
+						<div class="try__foot">
+							<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
+							<button class="t-btn" type="button" disabled data-loop aria-pressed="false" aria-label="Loop selection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+							<span class="mono try__range">Selection <output data-out="start" data-short>00:00.000</output> – <output data-out="end" data-short>01:33.525</output></span>
+							<span class="try__hint" data-hint></span>
+						</div>
+					</div>
 				</div>
-			</div>
+			</details>
 		</div>
 	</section>
 

@@ -21,6 +21,7 @@ node verification/landing/links-check.mjs
 node verification/landing/navigation-check.mjs
 node verification/landing/contrast-check.mjs
 node verification/landing/demo-check.mjs
+node verification/landing/disclosure-check.mjs
 ```
 
 The checks use `verification/browser.cjs`. Use the Chromium installed by the
@@ -110,6 +111,39 @@ steps and valid boundary shortcuts that preserve Playhead. Playwright’s clock
 advances the simulated 30 FPS timeline deterministically without long playback
 waits. This checks the landing simulation; real media decoding/export remains the
 editor’s responsibility.
+
+The disclosure check covers the optional keyboard exploration at desktop and
+phone widths: native pointer/Enter/Space activation, accessible expanded state,
+closed-content Tab exclusion and shortcut inactivity, open demo keyboard use, and
+closing during playback without an immediate hidden shortcut interception. It
+also verifies that closing discards an unfinished edge gesture and restores its
+committed Selection and Playhead on reopening. The check
+also opens the native disclosure with JavaScript disabled and verifies useful
+static help, preserved workflow/limitations/Source/credits/CTA, and the existing
+Shortcuts section destination. Screenshots and page-height readings are written
+to `tmp/landing-disclosure/`. Progressive, demo and contrast checks explicitly
+open the optional disclosure whenever they inspect its contents; meaningful help
+text remains part of the contrast audit.
+
+The disclosure's expanded state is inspected in Chromium's actual accessibility
+tree. Playwright 1.58's inferred role snapshot exposes the heading inside a native
+summary but omits its `DisclosureTriangle` control; the native tree correctly
+reports its name and expanded state without synthetic ARIA attributes.
+
+Issue #157 closed-default reading comparison, using paired Chromium 145,
+reduced motion, blocked web fonts, and a 1000px viewport height for both widths:
+
+| Width  | Before height | After height |      Reduction | Visible main words |
+| ------ | ------------: | -----------: | -------------: | -----------------: |
+| 1440px |        7587px |       6844px |   743px / 9.8% |          676 → 587 |
+| 390px  |       10293px |       8719px | 1574px / 15.3% |          656 → 573 |
+
+This is a local reading-length comparison, not a performance benchmark. The
+separate Three steps showcase is integrated into the main demo's workflow:
+open a file, choose Selection/audio, then review, export and explicitly download.
+The optional keyboard summary precedes limitations and Source. Opening it adds
+the reference and practice controls without repeating the primary workflow by
+default.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.

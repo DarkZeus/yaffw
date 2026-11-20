@@ -458,3 +458,31 @@
 	border: 1px solid var(--border);
 	box-shadow: inset 0 -1px 0 oklch(0 0 none / 0.4);
 }
+
+.workflow {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 32px;
+	margin: 28px 0 0;
+	padding-left: 20px;
+	font-size: 14px;
+}
+.workflow b {
+	font-weight: 600;
+}
+.workflow p {
+	margin-top: 8px;
+	color: var(--muted-foreground);
+}
+.footnote {
+	max-width: 70ch;
+	margin-top: 24px;
+	font-size: 14px;
+	color: var(--muted-foreground);
+}
+@media (max-width: 600px) {
+	.workflow {
+		grid-template-columns: 1fr;
+		gap: 16px;
+	}
+}
