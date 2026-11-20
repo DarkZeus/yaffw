@@ -39,6 +39,7 @@ jobs:
       CACHE_SALT: ${{ inputs.cache-salt || 'v1' }}
       CI_RUNNER_IMAGE: ${{ inputs.runner-image || 'host' }}
       YAFFW_TEST_SEED: ${{ github.run_id }}
+      HUSKY: 0
     steps:
       - name: Record setup start
         run: echo "CI_SETUP_STARTED=$(date +%s)" >> "$GITHUB_ENV"
@@ -71,12 +72,14 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ steps.keys.outputs.browser }}
-      - name: Install Chromium and system dependencies
+      - name: Install exact headless Chromium
         if: inputs.runner-image != 'playwright'
-        run: pnpm exec playwright install --with-deps --only-shell chromium
+        run: pnpm exec playwright install --only-shell chromium
       - name: Validate preinstalled matching Chromium
         if: inputs.runner-image == 'playwright'
         run: pnpm exec playwright install --only-shell chromium
+      - name: Prove preinstalled browser libraries and fonts
+        run: node scripts/browser-runtime.mjs
       - name: Restore Astro image transforms
         if: env.DEPENDENCY_CACHE_MODE != 'cold'
         id: images

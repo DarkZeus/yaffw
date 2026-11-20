@@ -83,6 +83,16 @@ def summarize(row):
             end = next((line.split()[0] for line in log.splitlines() if "Post job cleanup." in line and line.split()[0] > start), None)
         if end:
             row["phases_s"][f"{owner}/{script}"] = seconds(start, end)
+    instrumented = re.findall(r"VERIFY_RESULT (\{[^\n]+\})", log)
+    if instrumented:
+        row["verification"] = json.loads(instrumented[-1])
+        row["phases_s"] = {
+            result["name"]: result.get("seconds")
+            for result in row["verification"]["results"]
+        }
+    setup = re.findall(r"^\S+Z (\{[^\n]+\"setupSeconds\"[^\n]+\})", log, re.M)
+    if setup:
+        row["setup_evidence"] = json.loads(setup[-1])
     row["jobs"] = [{key: job[key] for key in (
         "id", "name", "conclusion", "started_at", "completed_at", "runner_name", "labels", "steps",
     )} for job in jobs]

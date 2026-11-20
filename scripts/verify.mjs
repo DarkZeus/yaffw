@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism, totalmem } from "node:os";
 import { relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { runCommand, runLanes } from "./verify-runner.mjs";
+import { forwardInterrupts, runCommand, runLanes } from "./verify-runner.mjs";
 
 const [major, minor] = process.versions.node.split(".").map(Number);
 if (
@@ -11,13 +11,24 @@ if (
 )
 	throw new Error("Verification requires package.json's supported Node engine");
 const started = performance.now();
+forwardInterrupts();
+const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+	encoding: "utf8",
+}).trim();
+const workingTreeDirty = Boolean(
+	execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+		encoding: "utf8",
+	}).trim(),
+);
 await mkdir("tmp", { recursive: true });
 const directory = await mkdtemp(resolve("tmp/verify-"));
 const seed = Number(process.env.YAFFW_TEST_SEED ?? 20261120);
 if (!Number.isSafeInteger(seed)) throw new Error("Invalid YAFFW_TEST_SEED");
-const workers = Math.min(4, availableParallelism());
+const workers = Math.min(4, Math.max(1, availableParallelism() - 1));
 const results = [];
 const testsDone = Promise.withResolvers();
+const rootDone = Promise.withResolvers();
+const landingBuilt = Promise.withResolvers();
 async function phase(name, args, budget) {
 	const result = await runCommand(name, args, directory, budget);
 	results.push(result);
@@ -44,7 +55,13 @@ console.log(
 await runLanes(
 	[
 		async () => {
-			if (await phase("landing-build", landing("build:production"), 50)) {
+			let built;
+			try {
+				built = await phase("landing-build", landing("build:production"), 50);
+			} finally {
+				landingBuilt.resolve();
+			}
+			if (built) {
 				await phase("landing-smoke", landing("test:smoke"), 35);
 			} else {
 				results.push({
@@ -55,6 +72,9 @@ await runLanes(
 			}
 		},
 		async () => {
+			// Cold AVIF transforms competed with all test workers and inflated
+			// both commands. Warm cached builds release this barrier in seconds.
+			await Promise.all([rootDone.promise, landingBuilt.promise]);
 			try {
 				await phase(
 					"tests",
@@ -76,8 +96,12 @@ await runLanes(
 			}
 		},
 		async () => {
-			await phase("root-format", ["format:check"], 2);
-			await phase("root-lint", ["lint"], 4);
+			try {
+				await phase("root-format", ["format:check"], 2);
+				await phase("root-lint", ["lint"], 4);
+			} finally {
+				rootDone.resolve();
+			}
 		},
 		async () => {
 			await phase("editor-typecheck", ["typecheck"], 5);
@@ -124,6 +148,8 @@ const correctnessPassed =
 const budgetsPassed =
 	results.every((result) => result.withinBudget) && seconds < 120;
 const summary = {
+	revision,
+	workingTreeDirty,
 	correctnessPassed,
 	budgetsPassed,
 	inventoryPassed,
