@@ -287,12 +287,13 @@
 	height: calc(var(--h) * 1% - 8px);
 	display: flex;
 	align-items: flex-start;
-	padding: 2px 6px;
+	padding: 4px 6px;
 	border-radius: 5px;
 	background: var(--workbench-lane);
 	border: 1px solid var(--border);
 	font-family: var(--font-mono);
 	font-size: 10.5px;
+	line-height: 12px;
 	color: var(--muted-foreground);
 	white-space: nowrap;
 	overflow: hidden;
@@ -303,6 +304,11 @@
 		height 400ms var(--ease-in-out),
 		border-color 150ms var(--ease-out),
 		color 150ms var(--ease-out);
+}
+/* Transport is a ~16px strip in every layout: center its label instead of top-aligning it. */
+.pane--c {
+	align-items: center;
+	padding-block: 0;
 }
 .pane.is-moving {
 	border-color: color-mix(in oklch, var(--accent) 55%, transparent);
