@@ -74,7 +74,7 @@
 .hero__meta {
 	margin-top: 20px;
 	font-size: 13px;
-	color: var(--faint);
+	color: var(--muted-foreground);
 }
 .hero__shot {
 	position: relative;

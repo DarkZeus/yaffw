@@ -19,6 +19,7 @@ node verification/landing/copy-check.mjs
 node verification/landing/tabs-check.mjs
 node verification/landing/links-check.mjs
 node verification/landing/navigation-check.mjs
+node verification/landing/contrast-check.mjs
 ```
 
 The checks use `verification/browser.cjs`. Use the Chromium installed by the
@@ -63,6 +64,42 @@ keyboard continuation, changelog permalinks, targeted links, and reduced motion.
 It verifies native URL/focus behavior and waits for the configured header offset
 before taking the next navigation step. External modified links are exercised by
 the destination check above.
+
+The contrast check uses the existing Canvas and Culori dependencies to measure
+browser-rendered foreground/background pixels at 1440px and 390px on home,
+changelog, and 404. It wraps rendered text temporarily, samples each visible text
+run's horizontal centerline every four CSS pixels, and compares its background
+with a solid foreground patch through the same ancestor opacity. It preserves
+gradients/translucency and clips samples to overflow containers. It excludes
+`aria-hidden` illustrations, raster screenshot contents, and decorative borders;
+antialiasing and text shadows are not credited. A white plane behind the scrolled
+glass header provides a conservative maximum-brightness backdrop check.
+
+The thresholds follow [WCAG 2.2 Contrast (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html):
+4.5:1 for normal text, 3:1 at 24px or at 18.667px with weight 700+. This is focused
+contrast regression coverage, not an accessibility certification or exhaustive
+sampling of every animation frame. Browser raster quantization can produce small
+differences from analytical color compositing. The current raster artwork is
+unchanged; the measurements concern authored page text.
+
+Issue #150 representative results (paired Chromium 145):
+
+| Text / surface                                               |        Before |   After |
+| ------------------------------------------------------------ | ------------: | ------: |
+| Hero metadata, shortcut note, workflow footnote              |        3.51:1 |  6.44:1 |
+| Shortcut-player hint on the workbench surface                |   about 3.5:1 |  6.43:1 |
+| Local diagram's code-delivery explanation after dimming      |        2.98:1 |  6.43:1 |
+| Scrolled header links over a white backdrop                  |        3.86:1 |  5.37:1 |
+| Demo viewer timecode over the initial scene, desktop / phone | 3.81 / 3.19:1 | 18.16:1 |
+| Technology-band links (unchanged)                            |        5.35:1 |  5.35:1 |
+| Changelog dates and footer secondary text                    |        6.44:1 |  6.44:1 |
+
+The former faint and diagram/header values are analytically composited before
+ratios; the former viewer-timecode ratios and after values are raster samples.
+Former faint text now uses `--muted-foreground`; the viewer timecode uses a solid
+`--workbench-viewer` backing. The final run measured 503 text samples with zero
+failures. Results and the single desktop/phone visual-review batch are written to
+`tmp/landing-contrast/report.json` and `tmp/landing-contrast/{1440,390}-{hero,local,shortcuts,workflow,demo,changelog}.png`.
 
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.

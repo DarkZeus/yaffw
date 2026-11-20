@@ -103,7 +103,7 @@
 	margin-top: 6px;
 }
 .prose li::marker {
-	color: var(--faint);
+	color: var(--muted-foreground);
 }
 .prose a {
 	color: var(--foreground);

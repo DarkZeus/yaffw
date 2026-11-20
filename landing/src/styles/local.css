@@ -105,10 +105,10 @@
 	}
 }
 .bound__web {
-	transition: opacity 400ms var(--ease-out) 900ms;
+	transition: border-color 400ms var(--ease-out) 900ms;
 }
 .bound[data-live] .bound__web {
-	opacity: 0.6;
+	border-color: var(--border);
 }
 .bound__row {
 	display: grid;

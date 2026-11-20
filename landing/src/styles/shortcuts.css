@@ -9,7 +9,7 @@
 .keycaps i {
 	font-style: normal;
 	font-size: 12px;
-	color: var(--faint);
+	color: var(--muted-foreground);
 }
 .cap {
 	display: inline-grid;
@@ -54,7 +54,7 @@
 .try-note {
 	margin-top: 24px;
 	font-size: 14px;
-	color: var(--faint);
+	color: var(--muted-foreground);
 }
 
 /* ── Try it: the keys drive a live mini timeline ── */
@@ -130,5 +130,5 @@
 }
 .try__hint {
 	margin-left: auto;
-	color: var(--faint);
+	color: var(--muted-foreground);
 }

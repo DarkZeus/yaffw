@@ -33,7 +33,7 @@
 }
 .built-on__label {
 	font-size: 14px;
-	color: var(--faint);
+	color: var(--muted-foreground);
 }
 .built-on ul {
 	list-style: none;

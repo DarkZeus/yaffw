@@ -25,7 +25,7 @@
 		backdrop-filter 150ms var(--ease-out);
 }
 .nav[data-scrolled="true"] .nav__inner {
-	background: color-mix(in oklch, var(--workbench-viewer) 72%, transparent);
+	background: color-mix(in oklch, var(--workbench-viewer) 85%, transparent);
 	border-color: var(--border);
 	box-shadow:
 		var(--hairline-top),
