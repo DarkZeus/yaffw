@@ -1,5 +1,2777 @@
 [
   {
+    "id": 44787271673,
+    "head_sha": "363030fc331176047e99e179c2ac63b24e3c3be3",
+    "event": "push",
+    "conclusion": "success",
+    "created_at": "2026-11-20T17:51:27Z",
+    "updated_at": "2026-11-20T17:52:29Z",
+    "run_started_at": "2026-11-20T17:51:27Z",
+    "html_url": "https://github.com/DarkZeus/yaffw/actions/runs/44787271673",
+    "run_attempt": 1,
+    "commit_timestamp": "2026-11-20T17:50:39Z",
+    "commit_to_report_s": 110.0,
+    "created_to_report_s": 62.0,
+    "timing": {
+      "billable": {
+        "UBUNTU": {
+          "total_ms": 0,
+          "jobs": 4,
+          "job_runs": [
+            {
+              "job_id": 136465318675,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136465319243,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136465821686,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136465864294,
+              "duration_ms": 0
+            }
+          ]
+        }
+      },
+      "run_duration_ms": 62000
+    },
+    "jobs": [
+      {
+        "id": 136465318675,
+        "name": "Editor verification",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:51:29Z",
+        "completed_at": "2026-11-20T17:52:20Z",
+        "runner_name": "GitHub Actions 1000000217",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:30Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:30Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:32Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:51:32Z",
+            "completed_at": "2026-11-20T17:51:42Z"
+          },
+          {
+            "name": "Complete editor contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-20T17:51:42Z",
+            "completed_at": "2026-11-20T17:52:16Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:52:16Z",
+            "completed_at": "2026-11-20T17:52:17Z"
+          },
+          {
+            "name": "Package immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-11-20T17:52:17Z",
+            "completed_at": "2026-11-20T17:52:18Z"
+          },
+          {
+            "name": "Retain immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-11-20T17:52:18Z",
+            "completed_at": "2026-11-20T17:52:19Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-11-20T17:52:19Z",
+            "completed_at": "2026-11-20T17:52:19Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-11-20T17:52:19Z",
+            "completed_at": "2026-11-20T17:52:19Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-11-20T17:52:19Z",
+            "completed_at": "2026-11-20T17:52:19Z"
+          }
+        ]
+      },
+      {
+        "id": 136465319243,
+        "name": "Landing verification",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:51:29Z",
+        "completed_at": "2026-11-20T17:52:24Z",
+        "runner_name": "GitHub Actions 1000000218",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:30Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:30Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:51:30Z",
+            "completed_at": "2026-11-20T17:51:32Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:51:32Z",
+            "completed_at": "2026-11-20T17:51:44Z"
+          },
+          {
+            "name": "Complete landing contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-20T17:51:44Z",
+            "completed_at": "2026-11-20T17:52:15Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:52:15Z",
+            "completed_at": "2026-11-20T17:52:17Z"
+          },
+          {
+            "name": "Package immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-11-20T17:52:17Z",
+            "completed_at": "2026-11-20T17:52:17Z"
+          },
+          {
+            "name": "Retain immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-11-20T17:52:17Z",
+            "completed_at": "2026-11-20T17:52:18Z"
+          },
+          {
+            "name": "Require the editor peer before seeding shared caches",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9,
+            "started_at": "2026-11-20T17:52:18Z",
+            "completed_at": "2026-11-20T17:52:21Z"
+          },
+          {
+            "name": "Save dependencies from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 10,
+            "started_at": "2026-11-20T17:52:21Z",
+            "completed_at": "2026-11-20T17:52:21Z"
+          },
+          {
+            "name": "Save Chromium from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 11,
+            "started_at": "2026-11-20T17:52:21Z",
+            "completed_at": "2026-11-20T17:52:21Z"
+          },
+          {
+            "name": "Save image transforms from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 12,
+            "started_at": "2026-11-20T17:52:21Z",
+            "completed_at": "2026-11-20T17:52:21Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23,
+            "started_at": "2026-11-20T17:52:21Z",
+            "completed_at": "2026-11-20T17:52:22Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24,
+            "started_at": "2026-11-20T17:52:22Z",
+            "completed_at": "2026-11-20T17:52:22Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 25,
+            "started_at": "2026-11-20T17:52:22Z",
+            "completed_at": "2026-11-20T17:52:22Z"
+          }
+        ]
+      },
+      {
+        "id": 136465821686,
+        "name": "verify",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:52:26Z",
+        "completed_at": "2026-11-20T17:52:28Z",
+        "runner_name": "GitHub Actions 1000000219",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:52:26Z",
+            "completed_at": "2026-11-20T17:52:27Z"
+          },
+          {
+            "name": "Require both complete contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:52:27Z",
+            "completed_at": "2026-11-20T17:52:27Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:52:27Z",
+            "completed_at": "2026-11-20T17:52:27Z"
+          }
+        ]
+      },
+      {
+        "id": 136465864294,
+        "name": "deploy",
+        "conclusion": "skipped",
+        "started_at": "2026-11-20T17:52:29Z",
+        "completed_at": "2026-11-20T17:52:29Z",
+        "runner_name": null,
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": []
+      }
+    ],
+    "required_check": {
+      "id": 136465821686,
+      "name": "verify",
+      "conclusion": "success",
+      "completed_at": "2026-11-20T17:52:28Z",
+      "details_url": "https://github.com/DarkZeus/yaffw/actions/runs/44787271673/job/136465821686"
+    },
+    "commit_to_required_result_s": 109.0,
+    "created_to_required_result_s": 61.0,
+    "queue_s": 2.0,
+    "finalization_s": 0.0,
+    "steps_s": {
+      "Set up job": 1.0,
+      "Record setup start": 0.0,
+      "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 2.0,
+      "Run ./.github/actions/ci-setup": 12.0,
+      "Complete editor contract": 34.0,
+      "Upload complete evidence even on failure": 2.0,
+      "Package immutable editor candidate outputs": 1.0,
+      "Retain immutable editor candidate outputs": 1.0,
+      "Post Run ./.github/actions/ci-setup": 1.0,
+      "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 0.0,
+      "Complete job": 0.0,
+      "Complete landing contract": 31.0,
+      "Package immutable landing candidate outputs": 0.0,
+      "Retain immutable landing candidate outputs": 1.0,
+      "Require the editor peer before seeding shared caches": 3.0,
+      "Save dependencies from verified master only": 0.0,
+      "Save Chromium from verified master only": 0.0,
+      "Save image transforms from verified master only": 0.0,
+      "Require both complete contracts": 0.0
+    },
+    "job_observations": [
+      {
+        "job_id": 136465318675,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16759439360,
+          "node": "v24.22.2",
+          "abi": "137",
+          "setupSeconds": 12.388999938964844,
+          "dependencyCache": "true",
+          "browserCache": "",
+          "imageCache": ""
+        },
+        "verification": {
+          "scope": "editor",
+          "revision": "363030fc331176047e99e179c2ac63b24e3c3be3",
+          "workingTreeDirty": false,
+          "correctnessPassed": true,
+          "budgetsPassed": true,
+          "inventoryPassed": true,
+          "seconds": 34.403526166000006,
+          "seed": 44787271673,
+          "results": [
+            {
+              "name": "root-format",
+              "args": [
+                "format:check"
+              ],
+              "seconds": 1.3070096949999999,
+              "budgetSeconds": 2,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "root-lint",
+              "args": [
+                "lint"
+              ],
+              "seconds": 2.517781227,
+              "budgetSeconds": 4,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-typecheck",
+              "args": [
+                "typecheck"
+              ],
+              "seconds": 2.0868277969999998,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-build",
+              "args": [
+                "exec",
+                "vite",
+                "build"
+              ],
+              "seconds": 2.3002905899999995,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "tests",
+              "args": [
+                "exec",
+                "vitest",
+                "run",
+                "--maxWorkers=4",
+                "--sequence.shuffle",
+                "--sequence.seed=44787271673",
+                "--reporter=default",
+                "--reporter=json",
+                "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-jgrBUg/vitest.json"
+              ],
+              "seconds": 24.858396676000005,
+              "budgetSeconds": 30,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136465319243,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16759431168,
+          "node": "v24.22.3",
+          "abi": "137",
+          "setupSeconds": 14.619999885559082,
+          "dependencyCache": "true",
+          "browserCache": "true",
+          "imageCache": "true"
+        },
+        "verification": {
+          "scope": "landing",
+          "revision": "363030fc331176047e99e179c2ac63b24e3c3be3",
+          "workingTreeDirty": false,
+          "correctnessPassed": true,
+          "budgetsPassed": true,
+          "inventoryPassed": null,
+          "seconds": 31.074927988,
+          "seed": 44787271673,
+          "results": [
+            {
+              "name": "landing-format",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "format:check"
+              ],
+              "seconds": 0.49374649800000003,
+              "budgetSeconds": 3,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-lint",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "lint"
+              ],
+              "seconds": 1.0247787929999999,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-typecheck",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "typecheck"
+              ],
+              "seconds": 3.3340561280000003,
+              "budgetSeconds": 10,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-build",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "build:production"
+              ],
+              "seconds": 1.4389179789999997,
+              "budgetSeconds": 50,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-smoke",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "test:smoke"
+              ],
+              "seconds": 24.735982555,
+              "budgetSeconds": 35,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136465821686,
+        "setup": null,
+        "verification": null
+      },
+      {
+        "job_id": 136465864294,
+        "setup": null,
+        "verification": null
+      }
+    ],
+    "pnpm_cache_hit": false,
+    "pnpm_exact_cache_hit": false,
+    "runner_image": [
+      "ubuntu-26.04",
+      "ubuntu-26.04",
+      "ubuntu-26.04"
+    ],
+    "phases_s": {
+      "root-format": 1.3070096949999999,
+      "root-lint": 2.517781227,
+      "editor-typecheck": 2.0868277969999998,
+      "editor-build": 2.3002905899999995,
+      "tests": 24.858396676000005,
+      "landing-format": 0.49374649800000003,
+      "landing-lint": 1.0247787929999999,
+      "landing-typecheck": 3.3340561280000003,
+      "landing-build": 1.4389179789999997,
+      "landing-smoke": 24.735982555
+    },
+    "verifications": [
+      {
+        "scope": "editor",
+        "revision": "363030fc331176047e99e179c2ac63b24e3c3be3",
+        "workingTreeDirty": false,
+        "correctnessPassed": true,
+        "budgetsPassed": true,
+        "inventoryPassed": true,
+        "seconds": 34.403526166000006,
+        "seed": 44787271673,
+        "results": [
+          {
+            "name": "root-format",
+            "args": [
+              "format:check"
+            ],
+            "seconds": 1.3070096949999999,
+            "budgetSeconds": 2,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "root-lint",
+            "args": [
+              "lint"
+            ],
+            "seconds": 2.517781227,
+            "budgetSeconds": 4,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-typecheck",
+            "args": [
+              "typecheck"
+            ],
+            "seconds": 2.0868277969999998,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-build",
+            "args": [
+              "exec",
+              "vite",
+              "build"
+            ],
+            "seconds": 2.3002905899999995,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "tests",
+            "args": [
+              "exec",
+              "vitest",
+              "run",
+              "--maxWorkers=4",
+              "--sequence.shuffle",
+              "--sequence.seed=44787271673",
+              "--reporter=default",
+              "--reporter=json",
+              "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-jgrBUg/vitest.json"
+            ],
+            "seconds": 24.858396676000005,
+            "budgetSeconds": 30,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          }
+        ]
+      },
+      {
+        "scope": "landing",
+        "revision": "363030fc331176047e99e179c2ac63b24e3c3be3",
+        "workingTreeDirty": false,
+        "correctnessPassed": true,
+        "budgetsPassed": true,
+        "inventoryPassed": null,
+        "seconds": 31.074927988,
+        "seed": 44787271673,
+        "results": [
+          {
+            "name": "landing-format",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "format:check"
+            ],
+            "seconds": 0.49374649800000003,
+            "budgetSeconds": 3,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-lint",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "lint"
+            ],
+            "seconds": 1.0247787929999999,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-typecheck",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "typecheck"
+            ],
+            "seconds": 3.3340561280000003,
+            "budgetSeconds": 10,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-build",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "build:production"
+            ],
+            "seconds": 1.4389179789999997,
+            "budgetSeconds": 50,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-smoke",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "test:smoke"
+            ],
+            "seconds": 24.735982555,
+            "budgetSeconds": 35,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "complete": true,
+      "correctnessPassed": true,
+      "budgetsPassed": true,
+      "results": [
+        {
+          "name": "root-format",
+          "args": [
+            "format:check"
+          ],
+          "seconds": 1.3070096949999999,
+          "budgetSeconds": 2,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "root-lint",
+          "args": [
+            "lint"
+          ],
+          "seconds": 2.517781227,
+          "budgetSeconds": 4,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-typecheck",
+          "args": [
+            "typecheck"
+          ],
+          "seconds": 2.0868277969999998,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-build",
+          "args": [
+            "exec",
+            "vite",
+            "build"
+          ],
+          "seconds": 2.3002905899999995,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "tests",
+          "args": [
+            "exec",
+            "vitest",
+            "run",
+            "--maxWorkers=4",
+            "--sequence.shuffle",
+            "--sequence.seed=44787271673",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-jgrBUg/vitest.json"
+          ],
+          "seconds": 24.858396676000005,
+          "budgetSeconds": 30,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-format",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "format:check"
+          ],
+          "seconds": 0.49374649800000003,
+          "budgetSeconds": 3,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-lint",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "lint"
+          ],
+          "seconds": 1.0247787929999999,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-typecheck",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "typecheck"
+          ],
+          "seconds": 3.3340561280000003,
+          "budgetSeconds": 10,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-build",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "build:production"
+          ],
+          "seconds": 1.4389179789999997,
+          "budgetSeconds": 50,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-smoke",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "test:smoke"
+          ],
+          "seconds": 24.735982555,
+          "budgetSeconds": 35,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        }
+      ]
+    },
+    "setups": [
+      {
+        "cpu": 4,
+        "memoryBytes": 16759439360,
+        "node": "v24.22.2",
+        "abi": "137",
+        "setupSeconds": 12.388999938964844,
+        "dependencyCache": "true",
+        "browserCache": "",
+        "imageCache": ""
+      },
+      {
+        "cpu": 4,
+        "memoryBytes": 16759431168,
+        "node": "v24.22.3",
+        "abi": "137",
+        "setupSeconds": 14.619999885559082,
+        "dependencyCache": "true",
+        "browserCache": "true",
+        "imageCache": "true"
+      }
+    ],
+    "setup_evidence": {
+      "cpu": 4,
+      "memoryBytes": 16759431168,
+      "node": "v24.22.3",
+      "abi": "137",
+      "setupSeconds": 14.619999885559082,
+      "dependencyCache": "true",
+      "browserCache": "true",
+      "imageCache": "true"
+    }
+  },
+  {
+    "id": 44786082460,
+    "head_sha": "40053880cb4de8a981a5e0eb237c2b8f9be3ee01",
+    "event": "push",
+    "conclusion": "failure",
+    "created_at": "2026-11-20T17:43:54Z",
+    "updated_at": "2026-11-20T17:45:04Z",
+    "run_started_at": "2026-11-20T17:43:54Z",
+    "html_url": "https://github.com/DarkZeus/yaffw/actions/runs/44786082460",
+    "run_attempt": 1,
+    "commit_timestamp": "2026-11-20T17:43:02Z",
+    "commit_to_report_s": 122.0,
+    "created_to_report_s": 70.0,
+    "timing": {
+      "billable": {
+        "UBUNTU": {
+          "total_ms": 0,
+          "jobs": 4,
+          "job_runs": [
+            {
+              "job_id": 136461189678,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136461190035,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136461762340,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136461817018,
+              "duration_ms": 0
+            }
+          ]
+        }
+      },
+      "run_duration_ms": 70000
+    },
+    "jobs": [
+      {
+        "id": 136461189678,
+        "name": "Landing verification",
+        "conclusion": "failure",
+        "started_at": "2026-11-20T17:43:56Z",
+        "completed_at": "2026-11-20T17:44:58Z",
+        "runner_name": "GitHub Actions 1000000213",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:43:57Z",
+            "completed_at": "2026-11-20T17:43:58Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:43:58Z",
+            "completed_at": "2026-11-20T17:43:58Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:43:58Z",
+            "completed_at": "2026-11-20T17:43:59Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:43:59Z",
+            "completed_at": "2026-11-20T17:44:15Z"
+          },
+          {
+            "name": "Complete landing contract",
+            "status": "completed",
+            "conclusion": "failure",
+            "number": 5,
+            "started_at": "2026-11-20T17:44:15Z",
+            "completed_at": "2026-11-20T17:44:55Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:44:55Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Package immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 7,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Retain immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 8,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Require the editor peer before seeding shared caches",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 9,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Save dependencies from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 10,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Save Chromium from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 11,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Save image transforms from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 12,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 25,
+            "started_at": "2026-11-20T17:44:56Z",
+            "completed_at": "2026-11-20T17:44:56Z"
+          }
+        ]
+      },
+      {
+        "id": 136461190035,
+        "name": "Editor verification",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:43:57Z",
+        "completed_at": "2026-11-20T17:44:36Z",
+        "runner_name": "GitHub Actions 1000000214",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:43:57Z",
+            "completed_at": "2026-11-20T17:43:58Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:43:58Z",
+            "completed_at": "2026-11-20T17:43:58Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:43:58Z",
+            "completed_at": "2026-11-20T17:43:59Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:43:59Z",
+            "completed_at": "2026-11-20T17:44:09Z"
+          },
+          {
+            "name": "Complete editor contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-20T17:44:09Z",
+            "completed_at": "2026-11-20T17:44:30Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:44:30Z",
+            "completed_at": "2026-11-20T17:44:31Z"
+          },
+          {
+            "name": "Package immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-11-20T17:44:31Z",
+            "completed_at": "2026-11-20T17:44:32Z"
+          },
+          {
+            "name": "Retain immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8,
+            "started_at": "2026-11-20T17:44:32Z",
+            "completed_at": "2026-11-20T17:44:33Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-11-20T17:44:33Z",
+            "completed_at": "2026-11-20T17:44:33Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-11-20T17:44:33Z",
+            "completed_at": "2026-11-20T17:44:33Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-11-20T17:44:33Z",
+            "completed_at": "2026-11-20T17:44:34Z"
+          }
+        ]
+      },
+      {
+        "id": 136461762340,
+        "name": "verify",
+        "conclusion": "failure",
+        "started_at": "2026-11-20T17:45:00Z",
+        "completed_at": "2026-11-20T17:45:03Z",
+        "runner_name": "GitHub Actions 1000000215",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:45:01Z",
+            "completed_at": "2026-11-20T17:45:01Z"
+          },
+          {
+            "name": "Require both complete contracts",
+            "status": "completed",
+            "conclusion": "failure",
+            "number": 2,
+            "started_at": "2026-11-20T17:45:01Z",
+            "completed_at": "2026-11-20T17:45:01Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:45:01Z",
+            "completed_at": "2026-11-20T17:45:01Z"
+          }
+        ]
+      },
+      {
+        "id": 136461817018,
+        "name": "deploy",
+        "conclusion": "skipped",
+        "started_at": "2026-11-20T17:45:04Z",
+        "completed_at": "2026-11-20T17:45:04Z",
+        "runner_name": null,
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": []
+      }
+    ],
+    "required_check": {
+      "id": 136461762340,
+      "name": "verify",
+      "conclusion": "failure",
+      "completed_at": "2026-11-20T17:45:03Z",
+      "details_url": "https://github.com/DarkZeus/yaffw/actions/runs/44786082460/job/136461762340"
+    },
+    "commit_to_required_result_s": 121.0,
+    "created_to_required_result_s": 69.0,
+    "queue_s": 2.0,
+    "finalization_s": 0.0,
+    "steps_s": {
+      "Set up job": 0.0,
+      "Record setup start": 0.0,
+      "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 1.0,
+      "Run ./.github/actions/ci-setup": 10.0,
+      "Complete landing contract": 40.0,
+      "Upload complete evidence even on failure": 1.0,
+      "Package immutable landing candidate outputs": 0.0,
+      "Retain immutable landing candidate outputs": 0.0,
+      "Require the editor peer before seeding shared caches": 0.0,
+      "Save dependencies from verified master only": 0.0,
+      "Save Chromium from verified master only": 0.0,
+      "Save image transforms from verified master only": 0.0,
+      "Post Run ./.github/actions/ci-setup": 0.0,
+      "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 0.0,
+      "Complete job": 0.0,
+      "Complete editor contract": 21.0,
+      "Package immutable editor candidate outputs": 1.0,
+      "Retain immutable editor candidate outputs": 1.0,
+      "Require both complete contracts": 0.0
+    },
+    "job_observations": [
+      {
+        "job_id": 136461189678,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16758390784,
+          "node": "v24.22.3",
+          "abi": "137",
+          "setupSeconds": 17.937000036239624,
+          "dependencyCache": "true",
+          "browserCache": "true",
+          "imageCache": "true"
+        },
+        "verification": {
+          "scope": "landing",
+          "revision": "40053880cb4de8a981a5e0eb237c2b8f9be3ee01",
+          "workingTreeDirty": false,
+          "correctnessPassed": false,
+          "budgetsPassed": true,
+          "inventoryPassed": null,
+          "seconds": 39.274938012,
+          "seed": 44786082460,
+          "results": [
+            {
+              "name": "landing-format",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "format:check"
+              ],
+              "seconds": 0.689632661,
+              "budgetSeconds": 3,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-lint",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "lint"
+              ],
+              "seconds": 1.390562704,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-typecheck",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "typecheck"
+              ],
+              "seconds": 5.286982949,
+              "budgetSeconds": 10,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-build",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "build:production"
+              ],
+              "seconds": 2.032493149000001,
+              "budgetSeconds": 50,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-smoke",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "test:smoke"
+              ],
+              "seconds": 29.806418845,
+              "budgetSeconds": 35,
+              "code": 1,
+              "signal": null,
+              "passed": false,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136461190035,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16759431168,
+          "node": "v24.22.3",
+          "abi": "137",
+          "setupSeconds": 11.17300009727478,
+          "dependencyCache": "true",
+          "browserCache": "",
+          "imageCache": ""
+        },
+        "verification": {
+          "scope": "editor",
+          "revision": "40053880cb4de8a981a5e0eb237c2b8f9be3ee01",
+          "workingTreeDirty": false,
+          "correctnessPassed": true,
+          "budgetsPassed": true,
+          "inventoryPassed": true,
+          "seconds": 21.555922389,
+          "seed": 44786082460,
+          "results": [
+            {
+              "name": "root-format",
+              "args": [
+                "format:check"
+              ],
+              "seconds": 0.841036546,
+              "budgetSeconds": 2,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "root-lint",
+              "args": [
+                "lint"
+              ],
+              "seconds": 1.637328739,
+              "budgetSeconds": 4,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-typecheck",
+              "args": [
+                "typecheck"
+              ],
+              "seconds": 1.1761942380000001,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-build",
+              "args": [
+                "exec",
+                "vite",
+                "build"
+              ],
+              "seconds": 1.681002327,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "tests",
+              "args": [
+                "exec",
+                "vitest",
+                "run",
+                "--maxWorkers=4",
+                "--sequence.shuffle",
+                "--sequence.seed=44786082460",
+                "--reporter=default",
+                "--reporter=json",
+                "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-MY1t8J/vitest.json"
+              ],
+              "seconds": 15.383779392,
+              "budgetSeconds": 30,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136461762340,
+        "setup": null,
+        "verification": null
+      },
+      {
+        "job_id": 136461817018,
+        "setup": null,
+        "verification": null
+      }
+    ],
+    "pnpm_cache_hit": false,
+    "pnpm_exact_cache_hit": false,
+    "runner_image": [
+      "ubuntu-26.04",
+      "ubuntu-26.04",
+      "ubuntu-26.04"
+    ],
+    "phases_s": {
+      "landing-format": 0.689632661,
+      "landing-lint": 1.390562704,
+      "landing-typecheck": 5.286982949,
+      "landing-build": 2.032493149000001,
+      "landing-smoke": 29.806418845,
+      "root-format": 0.841036546,
+      "root-lint": 1.637328739,
+      "editor-typecheck": 1.1761942380000001,
+      "editor-build": 1.681002327,
+      "tests": 15.383779392
+    },
+    "verifications": [
+      {
+        "scope": "landing",
+        "revision": "40053880cb4de8a981a5e0eb237c2b8f9be3ee01",
+        "workingTreeDirty": false,
+        "correctnessPassed": false,
+        "budgetsPassed": true,
+        "inventoryPassed": null,
+        "seconds": 39.274938012,
+        "seed": 44786082460,
+        "results": [
+          {
+            "name": "landing-format",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "format:check"
+            ],
+            "seconds": 0.689632661,
+            "budgetSeconds": 3,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-lint",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "lint"
+            ],
+            "seconds": 1.390562704,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-typecheck",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "typecheck"
+            ],
+            "seconds": 5.286982949,
+            "budgetSeconds": 10,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-build",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "build:production"
+            ],
+            "seconds": 2.032493149000001,
+            "budgetSeconds": 50,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-smoke",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "test:smoke"
+            ],
+            "seconds": 29.806418845,
+            "budgetSeconds": 35,
+            "code": 1,
+            "signal": null,
+            "passed": false,
+            "withinBudget": true
+          }
+        ]
+      },
+      {
+        "scope": "editor",
+        "revision": "40053880cb4de8a981a5e0eb237c2b8f9be3ee01",
+        "workingTreeDirty": false,
+        "correctnessPassed": true,
+        "budgetsPassed": true,
+        "inventoryPassed": true,
+        "seconds": 21.555922389,
+        "seed": 44786082460,
+        "results": [
+          {
+            "name": "root-format",
+            "args": [
+              "format:check"
+            ],
+            "seconds": 0.841036546,
+            "budgetSeconds": 2,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "root-lint",
+            "args": [
+              "lint"
+            ],
+            "seconds": 1.637328739,
+            "budgetSeconds": 4,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-typecheck",
+            "args": [
+              "typecheck"
+            ],
+            "seconds": 1.1761942380000001,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-build",
+            "args": [
+              "exec",
+              "vite",
+              "build"
+            ],
+            "seconds": 1.681002327,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "tests",
+            "args": [
+              "exec",
+              "vitest",
+              "run",
+              "--maxWorkers=4",
+              "--sequence.shuffle",
+              "--sequence.seed=44786082460",
+              "--reporter=default",
+              "--reporter=json",
+              "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-MY1t8J/vitest.json"
+            ],
+            "seconds": 15.383779392,
+            "budgetSeconds": 30,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "complete": true,
+      "correctnessPassed": false,
+      "budgetsPassed": true,
+      "results": [
+        {
+          "name": "landing-format",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "format:check"
+          ],
+          "seconds": 0.689632661,
+          "budgetSeconds": 3,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-lint",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "lint"
+          ],
+          "seconds": 1.390562704,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-typecheck",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "typecheck"
+          ],
+          "seconds": 5.286982949,
+          "budgetSeconds": 10,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-build",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "build:production"
+          ],
+          "seconds": 2.032493149000001,
+          "budgetSeconds": 50,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-smoke",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "test:smoke"
+          ],
+          "seconds": 29.806418845,
+          "budgetSeconds": 35,
+          "code": 1,
+          "signal": null,
+          "passed": false,
+          "withinBudget": true
+        },
+        {
+          "name": "root-format",
+          "args": [
+            "format:check"
+          ],
+          "seconds": 0.841036546,
+          "budgetSeconds": 2,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "root-lint",
+          "args": [
+            "lint"
+          ],
+          "seconds": 1.637328739,
+          "budgetSeconds": 4,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-typecheck",
+          "args": [
+            "typecheck"
+          ],
+          "seconds": 1.1761942380000001,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-build",
+          "args": [
+            "exec",
+            "vite",
+            "build"
+          ],
+          "seconds": 1.681002327,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "tests",
+          "args": [
+            "exec",
+            "vitest",
+            "run",
+            "--maxWorkers=4",
+            "--sequence.shuffle",
+            "--sequence.seed=44786082460",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-MY1t8J/vitest.json"
+          ],
+          "seconds": 15.383779392,
+          "budgetSeconds": 30,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        }
+      ]
+    },
+    "setups": [
+      {
+        "cpu": 4,
+        "memoryBytes": 16758390784,
+        "node": "v24.22.3",
+        "abi": "137",
+        "setupSeconds": 17.937000036239624,
+        "dependencyCache": "true",
+        "browserCache": "true",
+        "imageCache": "true"
+      },
+      {
+        "cpu": 4,
+        "memoryBytes": 16759431168,
+        "node": "v24.22.3",
+        "abi": "137",
+        "setupSeconds": 11.17300009727478,
+        "dependencyCache": "true",
+        "browserCache": "",
+        "imageCache": ""
+      }
+    ],
+    "setup_evidence": {
+      "cpu": 4,
+      "memoryBytes": 16759431168,
+      "node": "v24.22.3",
+      "abi": "137",
+      "setupSeconds": 11.17300009727478,
+      "dependencyCache": "true",
+      "browserCache": "",
+      "imageCache": ""
+    }
+  },
+  {
+    "id": 44785809793,
+    "head_sha": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
+    "event": "workflow_dispatch",
+    "conclusion": "success",
+    "created_at": "2026-11-20T17:42:10Z",
+    "updated_at": "2026-11-20T17:43:21Z",
+    "run_started_at": "2026-11-20T17:42:10Z",
+    "html_url": "https://github.com/DarkZeus/yaffw/actions/runs/44785809793",
+    "run_attempt": 1,
+    "commit_timestamp": "2026-11-20T17:14:45Z",
+    "commit_to_report_s": 1716.0,
+    "created_to_report_s": 71.0,
+    "timing": {
+      "billable": {
+        "UBUNTU": {
+          "total_ms": 0,
+          "jobs": 4,
+          "job_runs": [
+            {
+              "job_id": 136460248403,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136460248811,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136460836193,
+              "duration_ms": 0
+            },
+            {
+              "job_id": 136460875239,
+              "duration_ms": 0
+            }
+          ]
+        }
+      },
+      "run_duration_ms": 71000
+    },
+    "jobs": [
+      {
+        "id": 136460248403,
+        "name": "Landing verification",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:42:14Z",
+        "completed_at": "2026-11-20T17:43:16Z",
+        "runner_name": "GitHub Actions 1000000209",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:42:14Z",
+            "completed_at": "2026-11-20T17:42:15Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:42:15Z",
+            "completed_at": "2026-11-20T17:42:15Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:42:15Z",
+            "completed_at": "2026-11-20T17:42:16Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:42:16Z",
+            "completed_at": "2026-11-20T17:42:30Z"
+          },
+          {
+            "name": "Complete landing contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-20T17:42:30Z",
+            "completed_at": "2026-11-20T17:43:13Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:43:13Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Package immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 7,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Retain immutable landing candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 8,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Require the editor peer before seeding shared caches",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Save dependencies from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 10,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Save Chromium from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 11,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Save image transforms from verified master only",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 12,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:14Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24,
+            "started_at": "2026-11-20T17:43:14Z",
+            "completed_at": "2026-11-20T17:43:15Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 25,
+            "started_at": "2026-11-20T17:43:15Z",
+            "completed_at": "2026-11-20T17:43:15Z"
+          }
+        ]
+      },
+      {
+        "id": 136460248811,
+        "name": "Editor verification",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:42:14Z",
+        "completed_at": "2026-11-20T17:43:00Z",
+        "runner_name": "GitHub Actions 1000000210",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:42:15Z",
+            "completed_at": "2026-11-20T17:42:16Z"
+          },
+          {
+            "name": "Record setup start",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:42:16Z",
+            "completed_at": "2026-11-20T17:42:16Z"
+          },
+          {
+            "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:42:16Z",
+            "completed_at": "2026-11-20T17:42:17Z"
+          },
+          {
+            "name": "Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-20T17:42:17Z",
+            "completed_at": "2026-11-20T17:42:26Z"
+          },
+          {
+            "name": "Complete editor contract",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-20T17:42:26Z",
+            "completed_at": "2026-11-20T17:42:57Z"
+          },
+          {
+            "name": "Upload complete evidence even on failure",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-20T17:42:57Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          },
+          {
+            "name": "Package immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 7,
+            "started_at": "2026-11-20T17:42:58Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          },
+          {
+            "name": "Retain immutable editor candidate outputs",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 8,
+            "started_at": "2026-11-20T17:42:58Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          },
+          {
+            "name": "Post Run ./.github/actions/ci-setup",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15,
+            "started_at": "2026-11-20T17:42:58Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          },
+          {
+            "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16,
+            "started_at": "2026-11-20T17:42:58Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17,
+            "started_at": "2026-11-20T17:42:58Z",
+            "completed_at": "2026-11-20T17:42:58Z"
+          }
+        ]
+      },
+      {
+        "id": 136460836193,
+        "name": "verify",
+        "conclusion": "success",
+        "started_at": "2026-11-20T17:43:18Z",
+        "completed_at": "2026-11-20T17:43:20Z",
+        "runner_name": "GitHub Actions 1000000211",
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-20T17:43:18Z",
+            "completed_at": "2026-11-20T17:43:18Z"
+          },
+          {
+            "name": "Require both complete contracts",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-20T17:43:18Z",
+            "completed_at": "2026-11-20T17:43:19Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-20T17:43:19Z",
+            "completed_at": "2026-11-20T17:43:19Z"
+          }
+        ]
+      },
+      {
+        "id": 136460875239,
+        "name": "deploy",
+        "conclusion": "skipped",
+        "started_at": "2026-11-20T17:43:20Z",
+        "completed_at": "2026-11-20T17:43:20Z",
+        "runner_name": null,
+        "labels": [
+          "ubuntu-latest"
+        ],
+        "steps": []
+      }
+    ],
+    "required_check": {
+      "id": 136460836193,
+      "name": "verify",
+      "conclusion": "success",
+      "completed_at": "2026-11-20T17:43:20Z",
+      "details_url": "https://github.com/DarkZeus/yaffw/actions/runs/44785809793/job/136460836193"
+    },
+    "commit_to_required_result_s": 1715.0,
+    "created_to_required_result_s": 70.0,
+    "queue_s": 4.0,
+    "finalization_s": 1.0,
+    "steps_s": {
+      "Set up job": 0.0,
+      "Record setup start": 0.0,
+      "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 1.0,
+      "Run ./.github/actions/ci-setup": 9.0,
+      "Complete landing contract": 43.0,
+      "Upload complete evidence even on failure": 1.0,
+      "Package immutable landing candidate outputs": 0.0,
+      "Retain immutable landing candidate outputs": 0.0,
+      "Require the editor peer before seeding shared caches": 0.0,
+      "Save dependencies from verified master only": 0.0,
+      "Save Chromium from verified master only": 0.0,
+      "Save image transforms from verified master only": 0.0,
+      "Post Run ./.github/actions/ci-setup": 0.0,
+      "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803": 0.0,
+      "Complete job": 0.0,
+      "Complete editor contract": 31.0,
+      "Package immutable editor candidate outputs": 0.0,
+      "Retain immutable editor candidate outputs": 0.0,
+      "Require both complete contracts": 1.0
+    },
+    "job_observations": [
+      {
+        "job_id": 136460248403,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16759431168,
+          "node": "v24.22.3",
+          "abi": "137",
+          "setupSeconds": 15.801000118255615,
+          "dependencyCache": "true",
+          "browserCache": "true",
+          "imageCache": "true"
+        },
+        "verification": {
+          "scope": "landing",
+          "revision": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
+          "workingTreeDirty": false,
+          "correctnessPassed": true,
+          "budgetsPassed": true,
+          "inventoryPassed": null,
+          "seconds": 42.442654563999994,
+          "seed": 44785809793,
+          "results": [
+            {
+              "name": "landing-format",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "format:check"
+              ],
+              "seconds": 0.7672593809999999,
+              "budgetSeconds": 3,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-lint",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "lint"
+              ],
+              "seconds": 1.6502215059999998,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-typecheck",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "typecheck"
+              ],
+              "seconds": 5.669487499999999,
+              "budgetSeconds": 10,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-build",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "build:production"
+              ],
+              "seconds": 2.3676765109999995,
+              "budgetSeconds": 50,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "landing-smoke",
+              "args": [
+                "--filter",
+                "yaffw-landing",
+                "test:smoke"
+              ],
+              "seconds": 31.912278598,
+              "budgetSeconds": 35,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136460248811,
+        "setup": {
+          "cpu": 4,
+          "memoryBytes": 16758394880,
+          "node": "v24.22.3",
+          "abi": "137",
+          "setupSeconds": 10.75,
+          "dependencyCache": "true",
+          "browserCache": "",
+          "imageCache": ""
+        },
+        "verification": {
+          "scope": "editor",
+          "revision": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
+          "workingTreeDirty": false,
+          "correctnessPassed": true,
+          "budgetsPassed": true,
+          "inventoryPassed": true,
+          "seconds": 30.217410099000002,
+          "seed": 44785809793,
+          "results": [
+            {
+              "name": "root-format",
+              "args": [
+                "format:check"
+              ],
+              "seconds": 1.157295856,
+              "budgetSeconds": 2,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "root-lint",
+              "args": [
+                "lint"
+              ],
+              "seconds": 2.1777580620000005,
+              "budgetSeconds": 4,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-typecheck",
+              "args": [
+                "typecheck"
+              ],
+              "seconds": 1.6147063209999997,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "editor-build",
+              "args": [
+                "exec",
+                "vite",
+                "build"
+              ],
+              "seconds": 2.26250515,
+              "budgetSeconds": 5,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            },
+            {
+              "name": "tests",
+              "args": [
+                "exec",
+                "vitest",
+                "run",
+                "--maxWorkers=4",
+                "--sequence.shuffle",
+                "--sequence.seed=44785809793",
+                "--reporter=default",
+                "--reporter=json",
+                "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-bfqy6i/vitest.json"
+              ],
+              "seconds": 21.880792641,
+              "budgetSeconds": 30,
+              "code": 0,
+              "signal": null,
+              "passed": true,
+              "withinBudget": true
+            }
+          ]
+        }
+      },
+      {
+        "job_id": 136460836193,
+        "setup": null,
+        "verification": null
+      },
+      {
+        "job_id": 136460875239,
+        "setup": null,
+        "verification": null
+      }
+    ],
+    "pnpm_cache_hit": false,
+    "pnpm_exact_cache_hit": false,
+    "runner_image": [
+      "ubuntu-26.04",
+      "ubuntu-26.04",
+      "ubuntu-26.04"
+    ],
+    "phases_s": {
+      "landing-format": 0.7672593809999999,
+      "landing-lint": 1.6502215059999998,
+      "landing-typecheck": 5.669487499999999,
+      "landing-build": 2.3676765109999995,
+      "landing-smoke": 31.912278598,
+      "root-format": 1.157295856,
+      "root-lint": 2.1777580620000005,
+      "editor-typecheck": 1.6147063209999997,
+      "editor-build": 2.26250515,
+      "tests": 21.880792641
+    },
+    "verifications": [
+      {
+        "scope": "landing",
+        "revision": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
+        "workingTreeDirty": false,
+        "correctnessPassed": true,
+        "budgetsPassed": true,
+        "inventoryPassed": null,
+        "seconds": 42.442654563999994,
+        "seed": 44785809793,
+        "results": [
+          {
+            "name": "landing-format",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "format:check"
+            ],
+            "seconds": 0.7672593809999999,
+            "budgetSeconds": 3,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-lint",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "lint"
+            ],
+            "seconds": 1.6502215059999998,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-typecheck",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "typecheck"
+            ],
+            "seconds": 5.669487499999999,
+            "budgetSeconds": 10,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-build",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "build:production"
+            ],
+            "seconds": 2.3676765109999995,
+            "budgetSeconds": 50,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "landing-smoke",
+            "args": [
+              "--filter",
+              "yaffw-landing",
+              "test:smoke"
+            ],
+            "seconds": 31.912278598,
+            "budgetSeconds": 35,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          }
+        ]
+      },
+      {
+        "scope": "editor",
+        "revision": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
+        "workingTreeDirty": false,
+        "correctnessPassed": true,
+        "budgetsPassed": true,
+        "inventoryPassed": true,
+        "seconds": 30.217410099000002,
+        "seed": 44785809793,
+        "results": [
+          {
+            "name": "root-format",
+            "args": [
+              "format:check"
+            ],
+            "seconds": 1.157295856,
+            "budgetSeconds": 2,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "root-lint",
+            "args": [
+              "lint"
+            ],
+            "seconds": 2.1777580620000005,
+            "budgetSeconds": 4,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-typecheck",
+            "args": [
+              "typecheck"
+            ],
+            "seconds": 1.6147063209999997,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "editor-build",
+            "args": [
+              "exec",
+              "vite",
+              "build"
+            ],
+            "seconds": 2.26250515,
+            "budgetSeconds": 5,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          },
+          {
+            "name": "tests",
+            "args": [
+              "exec",
+              "vitest",
+              "run",
+              "--maxWorkers=4",
+              "--sequence.shuffle",
+              "--sequence.seed=44785809793",
+              "--reporter=default",
+              "--reporter=json",
+              "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-bfqy6i/vitest.json"
+            ],
+            "seconds": 21.880792641,
+            "budgetSeconds": 30,
+            "code": 0,
+            "signal": null,
+            "passed": true,
+            "withinBudget": true
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "complete": true,
+      "correctnessPassed": true,
+      "budgetsPassed": true,
+      "results": [
+        {
+          "name": "landing-format",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "format:check"
+          ],
+          "seconds": 0.7672593809999999,
+          "budgetSeconds": 3,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-lint",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "lint"
+          ],
+          "seconds": 1.6502215059999998,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-typecheck",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "typecheck"
+          ],
+          "seconds": 5.669487499999999,
+          "budgetSeconds": 10,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-build",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "build:production"
+          ],
+          "seconds": 2.3676765109999995,
+          "budgetSeconds": 50,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "landing-smoke",
+          "args": [
+            "--filter",
+            "yaffw-landing",
+            "test:smoke"
+          ],
+          "seconds": 31.912278598,
+          "budgetSeconds": 35,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "root-format",
+          "args": [
+            "format:check"
+          ],
+          "seconds": 1.157295856,
+          "budgetSeconds": 2,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "root-lint",
+          "args": [
+            "lint"
+          ],
+          "seconds": 2.1777580620000005,
+          "budgetSeconds": 4,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-typecheck",
+          "args": [
+            "typecheck"
+          ],
+          "seconds": 1.6147063209999997,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "editor-build",
+          "args": [
+            "exec",
+            "vite",
+            "build"
+          ],
+          "seconds": 2.26250515,
+          "budgetSeconds": 5,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        },
+        {
+          "name": "tests",
+          "args": [
+            "exec",
+            "vitest",
+            "run",
+            "--maxWorkers=4",
+            "--sequence.shuffle",
+            "--sequence.seed=44785809793",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile.json=/home/runner/work/yaffw/yaffw/tmp/verify-bfqy6i/vitest.json"
+          ],
+          "seconds": 21.880792641,
+          "budgetSeconds": 30,
+          "code": 0,
+          "signal": null,
+          "passed": true,
+          "withinBudget": true
+        }
+      ]
+    },
+    "setups": [
+      {
+        "cpu": 4,
+        "memoryBytes": 16759431168,
+        "node": "v24.22.3",
+        "abi": "137",
+        "setupSeconds": 15.801000118255615,
+        "dependencyCache": "true",
+        "browserCache": "true",
+        "imageCache": "true"
+      },
+      {
+        "cpu": 4,
+        "memoryBytes": 16758394880,
+        "node": "v24.22.3",
+        "abi": "137",
+        "setupSeconds": 10.75,
+        "dependencyCache": "true",
+        "browserCache": "",
+        "imageCache": ""
+      }
+    ],
+    "setup_evidence": {
+      "cpu": 4,
+      "memoryBytes": 16758394880,
+      "node": "v24.22.3",
+      "abi": "137",
+      "setupSeconds": 10.75,
+      "dependencyCache": "true",
+      "browserCache": "",
+      "imageCache": ""
+    }
+  },
+  {
     "id": 44785065118,
     "head_sha": "a0045cbfcf638980dbd05e93fedfc81ae1cabf2c",
     "event": "workflow_dispatch",

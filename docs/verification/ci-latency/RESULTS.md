@@ -1,50 +1,130 @@
-# Measurement checkpoint: 2026-11-20
+# Final measured CI results — 2026-11-20
 
-This is a fixed evidence window, not a claim that the requested two-week observation is complete. [measured-runs.json](measured-runs.json) retains every available Verify run, full SHA, URL, event, conclusion, check timestamp, attempt, resource/cache observations and phase timings. All samples are attempt 1. The original eight-run audit remains in [README.md](README.md).
+Fixed measurement window: 2026-11-07T21:54:01Z–2026-11-20T17:51:27Z (run creation). Requested 150 historical runs; only **8 existed initially**. This final snapshot contains **27** original plus audit-generated Verify runs, all attempt 1. [Raw evidence](measured-runs.json) retains full SHAs, links, events, outcomes, step/check timestamps, resources, cache observations and measured phases. No artificial 150-run sample was created. Report-publication commits after this window are validated separately and do not rewrite this frozen comparison.
 
-## Before / current
+## Outcome and limitations
 
-Comparable baseline = the two original full-contract push runs; current = the one push on the final scheduling configuration (`a0045cb`). Tiny-sample empirical percentiles are shown for reproducibility, **not** a reliable tail estimate. Manual dispatch commit age is excluded from commit-feedback statistics. API timestamps resolve to one second.
+Latest corrected source [`363030f`](https://github.com/DarkZeus/yaffw/actions/runs/44787271673) passed the full hosted contract: **55 files / 355 tests**, all five browser scripts including the added CSS-delivery regression, and final `verify`. Commit→actual required-check result = **109s**; created→result = **61s**. Full real pre-push = **34.65s**. The [separate latency audit](https://github.com/DarkZeus/yaffw/actions/runs/44787439230) correctly failed because landing setup was **15s**, against a strict **<15s** target. Editor setup/execution = 13/34s; landing = 15/31s; both queues and aggregate queue = 2s; final check reporting = 0s at API resolution.
 
-| Metric, seconds (p50 / p95) | Before, n=2 | Current push, n=1 |
-| --- | ---: | ---: |
-| Commit → actual full Verify check reported | 218.00/252.20 | 106.00 / 106.00 |
-| Run created → actual check reported | 204.50/236.45 | 63.00 / 63.00 |
-| Workflow finalization after required check | 1.00 / 1.00 | 1.00 / 1.00 |
+**Unmet:** commit p50 <60s; observed cold/warm p95 <120s; setup p95 <15s; longest-lane p95 <35s; consistent root format/lint <1s; eligible-PR cache >95% (PR n=0); two-week failure-value observation (<1 day completed). Tail estimates are not established from tiny samples. Master is still unprotected; Cloudflare can still deploy independently. The prepared production gate is disabled and is not a demonstrated production guarantee. [Exact remaining account/policy actions and costs](README.md#remaining-account-and-policy-actions) are consolidated in one list. No account settings, secrets, spending or branch policy were changed.
 
-The earlier report used workflow `updated_at`; the actual required-check completion is one second earlier on these three runs. No check is enforced by branch protection today. Current commit-to-creation delay is 43s, including the real 34.75s full pre-push hook. Omitting that delay would misstate commit feedback.
+## Comparable before / after
 
-| Current phase | Seconds | Explicit phase budget |
-| --- | ---: | ---: |
-| root-format | 0.930 | 2 |
-| root-lint | 1.813 | 4 |
-| editor-typecheck | 1.329 | 5 |
-| editor-build | 2.025 | 5 |
-| tests | 17.972 | 30 |
-| landing-format | 0.510 | 3 |
-| landing-lint | 1.100 | 5 |
-| landing-typecheck | 3.902 | 10 |
-| landing-build | 1.581 | 50 |
-| landing-smoke | 27.434 | 35 |
+Before = both original full-contract push runs (earlier six omit browser/Astro gates). After = **every push since the two-job architecture**, including cold caches and one failed navigation run, not only green/warm samples. The cache keys and short-check scheduling evolved during this five-run after window; latest-source n=1 is shown separately. Current coverage is stronger (eight added infrastructure cases and an added browser regression), with all original checks retained. Linear interpolated empirical percentiles; one-second API resolution. Commit time is client-supplied GitHub head-commit metadata. Manual-dispatch commit age is excluded.
 
-Current editor/landing queue = 2/2s; full setup including job provisioning and checkout = 18/17s; execution = 25/34s (step timestamps; instrumented command totals 25.136/34.580s); aggregate queue = 2s; required-check reporting after job completion = 0s at API resolution. Total runner wall time = 107s across the two lanes and aggregate, versus 63s elapsed run-to-result. Actual API billable compute = 0ms. The [latency audit](https://github.com/DarkZeus/yaffw/actions/runs/44781713200) correctly failed the two setup budgets while [Verify](https://github.com/DarkZeus/yaffw/actions/runs/44781530345) passed all correctness and phase budgets.
+| Seconds, p50 / p95 | Before n=2 | After n=5, 4 green / 1 red | Latest corrected source n=1 |
+| --- | ---: | ---: | ---: |
+| Commit → required check reported | 218.00 / 252.20 | 121.00 / 170.80 | 109.00 |
+| Run creation → required check reported | 204.50 / 236.45 | 69.00 / 122.80 | 61.00 |
+| Worst lane queue | 3.00 / 3.00 | 2.00 / 2.80 | 2.00 |
+| Worst full setup, provisioning + checkout included | 64.00 / 85.60 | 19.00 / 21.00 | 15.00 |
+| Longest execution lane | 131.00 / 139.10 | 40.00 / 75.40 | 34.00 |
+| Total runner wall time, not elapsed latency | 201.50 / 233.45 | 108.00 / 151.20 | 108.00 |
 
-**Unmet:** one-minute commit p50 (observed 106s), established two-minute p95, setup p95 <15s, longest-lane p95 <35s across cold/warm conditions, root lint <1s, eligible-PR cache >95% (PR n=0), two-week test-value observation, pre-integration enforcement and demonstrated exclusive production gating. Warm landing execution meets 35s in this push; the current manual modules-miss run takes 42.62s and cold transforms previously take 64.84–77.87s. Performance failures are visible; no correctness is dropped to meet a target.
+The actual check completion replaces the earlier workflow `updated_at` proxy; final workflow completion is one second later on the latest run and both comparable old runs. No GitHub check is enforced by protection today: “required result” means completion of the complete Verify contract. The latest commit-to-run-created delay is 48s, including the real 34.65s pre-push; hiding it would misstate commit feedback. Quantiles of individual phases do not add to end-to-end quantiles.
 
-## All available run outcomes
+| Comparable push run | Full SHA | Outcome | Commit→check (s) | Created→check (s) |
+| --- | --- | --- | ---: | ---: |
+| [44752170299](https://github.com/DarkZeus/yaffw/actions/runs/44752170299) | `707ef556e45d89e7f1ebf5d99cae1c3a0e8d64b4` | success | 256 | 240 |
+| [44764587232](https://github.com/DarkZeus/yaffw/actions/runs/44764587232) | `5e2dd0082aa919a15a03717e2a94250425da25fb` | success | 180 | 169 |
+| [44775996256](https://github.com/DarkZeus/yaffw/actions/runs/44775996256) | `92b8391145f32de1a5a412f49a0e679eb5e2c49b` | success | 158 | 110 |
+| [44776985510](https://github.com/DarkZeus/yaffw/actions/runs/44776985510) | `61867c3019fc3aa46d7c2ac8817fd5cf54ba2b59` | success | 174 | 126 |
+| [44781530345](https://github.com/DarkZeus/yaffw/actions/runs/44781530345) | `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c` | success | 106 | 63 |
+| [44786082460](https://github.com/DarkZeus/yaffw/actions/runs/44786082460) | `40053880cb4de8a981a5e0eb237c2b8f9be3ee01` | failure | 121 | 69 |
+| [44787271673](https://github.com/DarkZeus/yaffw/actions/runs/44787271673) | `363030fc331176047e99e179c2ac63b24e3c3be3` | success | 109 | 61 |
 
-Snapshot: 24 Verify runs, 2026-11-07T21:54:01Z–2026-11-20T17:37:27Z (creation timestamps).
+## Execution phases and budgets
+
+Before values use timestamped serial script-start intervals including process handoff, not CPU time. After values use explicit command timers for the three push runs with serial short editor checks (n=3, one navigation failure included); the last adds the new browser regression. These are execution measurements, not proof of a stable tail. Historical setup components and unavailable timing boundaries are separately documented in the main audit.
+
+| Phase | Before p50 / p95 (s), n=2 | After p50 / p95 (s), n=3 | Latest (s) | Enforced phase budget (s) |
+| --- | ---: | ---: | ---: | ---: |
+| root-format | 1.24 / 1.31 | 0.93 / 1.27 | 1.307 | 2 |
+| root-lint | 2.31 / 2.45 | 1.81 / 2.45 | 2.518 | 4 |
+| editor-typecheck | 1.90 / 2.21 | 1.33 / 2.01 | 2.087 | 5 |
+| editor-build | 2.18 / 2.27 | 2.03 / 2.27 | 2.300 | 5 |
+| tests | 21.49 / 22.75 | 17.97 / 24.17 | 24.858 | 30 |
+| landing-format | 0.68 / 0.72 | 0.51 / 0.67 | 0.494 | 3 |
+| landing-lint | 1.55 / 1.65 | 1.10 / 1.36 | 1.025 | 5 |
+| landing-typecheck | 5.22 / 5.56 | 3.90 / 5.15 | 3.334 | 10 |
+| landing-build | 39.42 / 42.18 | 1.58 / 1.99 | 1.439 | 50 |
+| landing-smoke | 53.76 / 57.01 | 27.43 / 29.57 | 24.736 | 35 |
+
+Phase overruns fail Verify after all independent evidence completes; local verification reports budgets and enforces correctness. The separate read-only latency audit visibly enforces queue/setup/lane/end-to-end targets without truncating checks or replacing correctness. Setup comparisons include provisioning and later blob fetch; matching official-container initialization alone cost 27s and was not omitted. The original two full runs spent Chromium/system setup 42.00/54.60s p50/p95; the latest no-apt setup launches the same pinned headless shell and validates actual libraries/fonts.
+
+### Setup component observations
+
+All five after push runs; per-job samples include cold misses. Composite action duration records include lookup/download/extraction, not only the install command. They omit job provisioning/outer handoff, which remain included in the full-setup table above. Before Node/store and browser/system dependencies were combined; their separate old durations remain unknown. [Raw component observations](setup-components.json).
+
+| After component | n | p50 (s) | p95 (s) |
+| --- | ---: | ---: | ---: |
+| Checkout (including working-tree blobs) | 10 | 1.500 | 2.000 |
+| pnpm setup | 10 | 1.056 | 1.464 |
+| Node setup (store restore separate) | 10 | 0.511 | 2.912 |
+| Dependency restore lookup/download/extract | 10 | 3.296 | 4.295 |
+| Frozen install | 10 | 3.688 | 8.512 |
+| Native canvas ABI allocation | 10 | 0.265 | 0.345 |
+| Chromium restore lookup/download/extract | 5 | 1.362 | 1.956 |
+| Exact headless-shell install/validation | 5 | 0.835 | 4.493 |
+| Browser launch and fonts proof | 5 | 0.631 | 0.788 |
+| Image-transform restore | 5 | 0.452 | 0.880 |
+
+## Cache and execution experiments
+
+| Experiment | Actual observations | Decision |
+| --- | --- | --- |
+| Official matching Playwright image | Same `cbf4d13` host/container both failed; container all correctness passed but root-lint budget failed. Container initialization 27s + setup 11.62s. | Keep hosted image with preinstalled dependencies, exact shell and actual font/browser validation. No paid runner. |
+| Shallow vs blobless | Same `61867c3` warm-store batch: shallow setup editor/landing 13.86/28.49s, blobless 12.52/34.50s including checkout blobs. Both performance gates failed under overlap. | Keep depth-1 shallow; this does not establish an isolated checkout winner. No selection needs history. |
+| Store vs installed modules | Same `61867c3`: store hit 2/2, setup 13.86/28.49s; modules miss 2/2, 13.35/32.81s. On `a0045cb`, store hit 2/2: 16.10/16.25s; actual warm modules [44785809793](https://github.com/DarkZeus/yaffw/actions/runs/44785809793) hit 2/2: 10.75/15.80s; frozen install still ran (landing 1.7s), native canvas passed and full contract passed. Different hosted CPU/image variants prevent attributing all timing differences to cache mode. | Store remains default: no reliable end-to-end modules win, and exact-image modules misses are common. Portable store keys bind Node ABI/platform/lock/settings/patch; modules additionally bind exact image/Node patch. |
+| Landing artifact transfer | Same `61867c3`, [44777582348](https://github.com/DarkZeus/yaffw/actions/runs/44777582348): production built once; consumer setup 18.298s, transfer/hash/extract 0.628s, smoke ~28.1s, whole experiment 84s. | Keep build→smoke in the same job: transfer does not offset another setup/queue. |
+
+For the five after push runs, exact dependency-cache hits are **6/10 eligible job restores**; browser/image hits are **3/5** and **3/5** respectively, including the initial key-seeding misses. Latest warm push hits dependencies 2/2, Chromium 1/1 and images 1/1. Baseline store hit 4/8 overall, 1/2 equivalent full runs. These are not eligible-PR statistics (PR n=0). Cold-cache correctness passed all assertions/browser contracts, while slower cold performance gates failed visibly where exceeded. Only successful full master contracts seed caches; peer failures/cancels/skips/wrong SHA refuse authorization.
+
+## Completeness and failure behavior
+
+[Measured inventories](current-test-files.txt) prove all original [52 files](baseline-test-files.txt) remain in the current 55; only `release.test.mjs`, `verify-runner.test.mjs`, `wait-editor.test.mjs` were added (eight cases). Discovery is compared with actual executed Vitest filenames exactly once; pending/todo/failure is rejected. CI executes all ten canonical phases, including all prototype/verification tests. Every run records a reproducible shuffle seed. All five browser scripts remain; the navigation script now additionally checks opt-in without external CSS. Existing standalone diagnostic gaps are documented, not silently described as canonical tests.
+
+No changed-test selection or sharding is implemented: all inputs get full verification. Selection false-negative experiments are inapplicable; no selected green status exists. No test deletion, automatic test retry, widened timeout, weakened assertion or disabled worker isolation was used. The final aggregate [failure probes](aggregate-probes.json) accept only success/success, with actual-script peer-gate tests covering pending/failure/cancel/skip/wrong SHA. Independent phases finish and retain logs on failure. Old red samples remain red.
+
+[Staged-hook proof](staged-hook-proof.json): 3.175s real partial-staging/space-in-path/Astro fixture; intentional lint failure and overlapping-hunk conflict restored the index and working bytes. Full pre-push is separately measured (~35–41s), verifies clean current master before and after, and rejects dirty/wrong-ref/wrong-SHA candidates. Hooks remain locally bypassable.
+
+## Native-transition diagnosis and proof
+
+Two hosted runs ([44785065118](https://github.com/DarkZeus/yaffw/actions/runs/44785065118), [44786082460](https://github.com/DarkZeus/yaffw/actions/runs/44786082460)) exposed Chromium 158 “ViewTransition opt-in disabled” in storage-unavailable navigation. The complete aggregate failed and caches were not seeded. Initial 4× CPU-throttled probes (40 header and 32 header/footer navigations) did not reproduce it. Provisional-object access alone was an insufficient hypothesis; merely changing that access did not solve the controlled failure.
+
+A delayed-external-CSS fixture then reproduced the exact error: external-only failed, inline-only and inline opt-in + the same external stylesheet passed (eight navigations each). Chromium [resolves inbound opt-in from active styles and skips with `kOptInDisabled`](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/core/view_transition/view_transition_supplement.cc); Chrome documents [pagereveal before the first rendering opportunity](https://developer.chrome.com/docs/web-platform/view-transitions/cross-document). Moving the existing opt-in **and reduced-motion opt-out** inline before external resources fixes that delivery dependency. All animation styling/timing remains external and unchanged.
+
+The deterministic regression aborts incoming external CSS: old build fails native opt-in (`false !== true`), fixed production build passes, and all original browser checks pass. A first 150ms-delay-only regression probe passed the old build and was replaced rather than counted as proof. [Local proof](transition-regression-proof.json), plus the green corrected hosted run above, supports the fix. No runtime error was filtered. Gesture/scroll readiness fixes remain test change detectors; this transition failure exposed production degradation whose introduction date is unknown. [Test-value observations](test-failure-observations.md) cover less than one day, not two weeks; no historical regression-catch rate is claimed.
+
+## Artifact gate and account boundary
+
+[Integrity probes](artifact-integrity-proof.json) used actual immutable archives from 44781530345: original passed, corrupt bytes/wrong run/stale revision failed. Download ZIPs matched GitHub SHA-256 metadata; both exact archives passed pinned Wrangler dry-run (29 editor / 31 landing assets), without rebuild or production write. Lane uploads are candidates; full verification requires both lanes and final aggregate. Optional deployment validates both manifests, independent expected checksums, run/SHA/scope/origin and current remote master before extracting; it deploys those bytes once, without a rebuild.
+
+The production job remains **explicitly skipped**. Master protection is still 404 “Branch not protected” and rulesets empty; direct post-push Actions cannot provide a server-enforced pre-integration gate. Cloudflare Workers Builds remain independent and were observed completing before Verify. Their precise configuration API returns 403; no broad local OAuth secret was exported. Before claiming protection, authorize a candidate-submission/promotion policy, disable both independent deployment paths and alternate credentials, configure scoped production environment secrets, enable the prepared gate and demonstrate that a failed candidate cannot advance production. The [single action/cost list](README.md#remaining-account-and-policy-actions) is the concrete remaining work.
+
+## Cost evidence
+
+Original eight runs: 659s total job wall time (10.98 min), 688s summed workflow elapsed, illustrative per-job ceiling 13 min. Equivalent full-contract old runs were 166/237s job wall time. After five pushes: **613s total runner wall**, empirical per-run p50/p95 **108.00 / 151.20s**. Latest: **108s runner wall** across two lanes + aggregate, versus **61s elapsed to required result** (62s workflow finalization). No skipped deployment time is counted as runner execution.
+
+GitHub timing API reports **0 billable milliseconds before and after**, across all retained Verify runs. This public repository uses standard hosted runners: observed Actions compute cost and expected monthly incremental compute remain **$0** under [GitHub public-runner pricing](https://docs.github.com/en/actions/concepts/billing-and-usage). Auxiliary benchmarks and latency audits add runner wall time but currently $0 standard compute; they are separate from Verify critical paths. No paid runner/service was enabled. Cloudflare invoices or private/paid account charges are unknown, not inferred as zero.
+
+Measured production ZIP artifacts total 3,674,804 bytes/run, retained one day. Diagnostic evidence estimate ~0.3 MB/run, retained 14 days. At 1,000 runs/month uniformly distributed, retained storage is approximately 122.5 + 140 = **262.5 MB**; assumes existing included allocation and unchanged artifact sizes. Cache inventory at this checkpoint: **12 entries / 1,834,924,118 bytes** in its separate cache quota. These are quota/retention estimates, not an invoice; actual account headroom and Cloudflare costs require account review before higher volume. Expected incremental compute before/after is $0, with no spending change authorized or made.
+
+## Complete run inventory
 
 | Event | Success | Failure | Canceled |
 | --- | ---: | ---: | ---: |
-| push | 12 | 2 | 0 |
+| push | 13 | 3 | 0 |
 | pull_request | 0 | 0 | 0 |
-| workflow_dispatch | 4 | 6 | 0 |
+| workflow_dispatch | 5 | 6 | 0 |
 
-Repeated SHAs are intentional manual cache/image/checkout experiments, not duplicate push/PR feedback. No automatic retry converted a failing run into success. Failed experiments retain their original outcome.
+Repeated SHAs are intentional manual setup/cache/image/checkout measurements, not duplicate push/PR feedback or automatic retries. Manual commit age is excluded from change-feedback latency; all manual outcomes remain below.
 
-| Run | SHA | Event / result | Created → required result (s) |
+| Run | Full SHA | Event / outcome | Created→check (s) |
 | --- | --- | --- | ---: |
+| [44787271673](https://github.com/DarkZeus/yaffw/actions/runs/44787271673) | `363030fc331176047e99e179c2ac63b24e3c3be3` | push / success | 61.0 |
+| [44786082460](https://github.com/DarkZeus/yaffw/actions/runs/44786082460) | `40053880cb4de8a981a5e0eb237c2b8f9be3ee01` | push / failure | 69.0 |
+| [44785809793](https://github.com/DarkZeus/yaffw/actions/runs/44785809793) | `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c` | workflow_dispatch / success | 70.0 |
 | [44785065118](https://github.com/DarkZeus/yaffw/actions/runs/44785065118) | `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c` | workflow_dispatch / failure | 68.0 |
 | [44783073667](https://github.com/DarkZeus/yaffw/actions/runs/44783073667) | `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c` | workflow_dispatch / success | 76.0 |
 | [44781530345](https://github.com/DarkZeus/yaffw/actions/runs/44781530345) | `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c` | push / success | 63.0 |
@@ -69,44 +149,3 @@ Repeated SHAs are intentional manual cache/image/checkout experiments, not dupli
 | [43620260538](https://github.com/DarkZeus/yaffw/actions/runs/43620260538) | `0df352932b3e2ae67d2dbec270458448690df06c` | push / success | 45.0 |
 | [42418179456](https://github.com/DarkZeus/yaffw/actions/runs/42418179456) | `8bdeef5f4f75aa3b75e26759c0be807163f35a01` | push / success | 43.0 |
 | [42418035348](https://github.com/DarkZeus/yaffw/actions/runs/42418035348) | `b58ef8dd724c2b78f9cf7bfff272c5bba5dbade5` | push / success | 48.0 |
-
-## Benchmark decisions
-
-| Experiment | Observed evidence | Decision |
-| --- | --- | --- |
-| Matching official Playwright image vs host | Same SHA `cbf4d13`: container initialization alone 27s, then setup 11.62s; all correctness passed, root-lint budget failed. Host also failed; evidence is retained. | Keep hosted image with preinstalled libraries/fonts, exact shell installation and actual launch/font validation. |
-| Shallow vs blobless | Same SHA `61867c3`: warm store shallow setup editor/landing 13.86/28.49s; blobless 12.52/34.50s, including working-tree blob fetch. Both performance gates failed under overlap; no reliable isolated winner. | Keep depth-1 shallow; there is no diff selection requiring history. |
-| pnpm store vs installed modules | Same SHA `61867c3`: store exact hits 2/2 jobs, setup 13.86/28.49s; modules misses 2/2, setup 13.35/32.81s. Later current-SHA modules misses 2/2: 10.78/16.56s. Exact runner-image/Node keys prevent unsafe approximate reuse. | Keep portable content-addressed store, always frozen-install and allocate native canvas; report cache misses rather than calling them restore wins. |
-| Same-job landing build→smoke vs transfer | [44777582348](https://github.com/DarkZeus/yaffw/actions/runs/44777582348), SHA `61867c3`: producer builds once; consumer setup 18.298s, transfer/hash/extract 0.628s, smoke ~28.1s; overall 84s plus source-commit age excluded. | Keep smoke with its one production build; a sub-second transfer does not offset another consumer setup/queue. |
-
-Current successful store push: dependency hits 2/2, Chromium 1/1 eligible landing job, image transforms 1/1. Baseline store hits 4/8 overall and 1/2 equivalent full-contract runs. This observed 100% warm sample is **not** the eligible-PR >95% guarantee (no PR observations). Cold-cache full suites and all browser contracts pass; some cold runs fail only their performance budgets and remain red. Caches save only from successful full master contracts, never from failed peers or PRs.
-
-## Completeness, failures and deployment proof
-
-The baseline 52 files / 347 tests remain; final discovery is 55 files / 355 tests, adding only three infrastructure files (eight cases). Every full run records discovery and checks actual executed filenames exactly once, rejects pending/todo/failed tests and records shuffled seed. All ten canonical phases run across the two hosted jobs. All five browser scripts run against one production build. No selection or sharding is implemented; every input falls back to full verification, so selection false-negative validation is inapplicable. Existing standalone diagnostic gaps are listed in the main audit.
-
-[Aggregate failure probes](aggregate-probes.json) show only success/success returns zero; failure/cancel/skip/missing results cannot turn green. [Staged-hook proof](staged-hook-proof.json) records a 3.175s real partial-staging/space-in-path/Astro fixture; deliberate lint failure and overlapping-hunk conflict restored bytes and returned nonzero. Dirty/wrong-ref/wrong-SHA pre-push probes reject before verification. The real full pre-push hook remains ~35–41s and checks clean HEAD again afterwards.
-
-[Artifact integrity probes](artifact-integrity-proof.json) exercised the actual immutable archives from run 44781530345: original passed, corrupt bytes/wrong run/stale revision failed. Download ZIPs were checked against GitHub artifact SHA-256 metadata. Both exact archives passed pinned Wrangler dry-run (29 editor / 31 landing asset files), without rebuilding or any production write. Production deployment remains disabled; the [account/policy action list](README.md#remaining-account-and-policy-actions) is required before claiming protection.
-
-The fixed gesture/scroll readiness defects are classified as test change detectors, not demonstrated caught product regressions. A residual native-transition failure remains unresolved (below). Observation is less than one day; see [test-failure-observations.md](test-failure-observations.md). No test was deleted, retried automatically, skipped or weakened.
-
-## Cost evidence and storage assumptions
-
-Baseline eight jobs: 659s total runner wall time (10.98 minutes), 688s summed created→workflow-finalized time; illustrative per-job ceiling = 13 minutes. Latest push: 107s total runner wall time (1.78 minutes), 64s workflow elapsed (63s required-result elapsed), illustrative per-job ceiling = 3 minutes. For the two equivalent old full runs, runner wall time was 166/237s; these are the relevant old per-run comparisons, not the eight-run sum. GitHub timing API bills **0ms before and after**; these are public standard hosted runners, so observed compute cost and projected incremental monthly compute are **$0**, not a paid-runner quote. Auxiliary latency-audit/benchmark runs add wall time and currently $0 standard compute; they are separate from Verify timings. No paid service or runner was enabled.
-
-Production ZIP artifacts measured 3,674,804 bytes/run with one-day retention; diagnostic evidence is conservatively ~0.3 MB/run with 14-day retention. At 1,000 runs/month, assuming uniform arrivals, retained storage is about 122.5 MB + 140 MB = 262.5 MB. This is an estimate, not an invoice, and assumes existing included public Actions allocation; archive size/plan usage can change. Cache storage uses a separate quota. Cloudflare invoice, savings from disabling independent builds and private/paid account charges are unknown; no account spend was increased. The exact remaining actions and cost assumptions are consolidated in the main report.
-
-## Residual native-transition failure
-
-The subsequent [installed-cache measurement 44785065118](https://github.com/DarkZeus/yaffw/actions/runs/44785065118), on unchanged SHA `a0045cbfcf638980dbd05e93fedfc81ae1cabf2c`, failed the application-runtime-error assertion in the storage-unavailable navigation scenario: Chromium 158 emitted `Transition was aborted because of invalid state. ViewTransition opt-in disabled`. Both dependency restores missed the exact runner-image key; all other phase correctness passed. Smoke completed the independent scripts and the required aggregate failed; no cache was seeded. This failed sample remains red and is not replaced with a rerun success.
-
-Ranked hypotheses were reveal-before-load readiness, interrupted native transition and storage-induced page-script behavior. Local probes drove 40 header navigations and 32 header/footer navigations on the existing production build under 4× CPU throttling with lifecycle tracing; neither reproduced the abort. Thus its cause/fix is **unproven**. No runtime error is filtered, no assertion is removed and no timeout/retry is added. Awaiting the currently active transition reduced earlier races but is not proven sufficient for this residual failure. Chrome documents that [pagereveal precedes the first rendering opportunity and exposes the inbound transition](https://developer.chrome.com/docs/web-platform/view-transitions/cross-document); that is diagnostic context, not evidence that the first hypothesis caused this run. A further manual installed-cache sample measures exact cache restoration and cannot erase this failure.
-
-### Diagnosed cause and production fix
-
-Subsequent investigation reproduced the exact native error in a minimal real-browser fixture: **external-only CSS failed**, whereas inline opt-in plus the same external stylesheet passed (eight navigations per mode). Merely changing how the transition object was read did not fix opt-out; the earlier provisional-object hypothesis was insufficient. Chromium resolves the inbound opt-in from active styles before the first rendering opportunity. Its [source](https://chromium.googlesource.com/chromium/src/+/main/third_party/blink/renderer/core/view_transition/view_transition_supplement.cc) explicitly skips with `kOptInDisabled` when that rule is not yet active.
-
-The production fix moves the existing `@view-transition` opt-in **and reduced-motion opt-out** to an inline style in `Base.astro` before external resources. The external stylesheet retains all animation styling. No duplicate rule/palette, animation timing, assertion, error filter or timeout change is introduced. A deterministic regression scenario removes incoming external CSS: the **old build fails** the native opt-in assertion (`false !== true`); the **fixed build passes**, and the entire five-script smoke run passes (navigation 21.888s, mobile 15.011s). This protects the same resolution boundary without relying on the timing lottery of a 150ms stylesheet delay. The first delayed-only regression probe passed on the old build; that insufficient probe was replaced, not counted as proof. See [transition-regression-proof.json](transition-regression-proof.json).
-
-The two hosted failures (44785065118 and [44786082460](https://github.com/DarkZeus/yaffw/actions/runs/44786082460)) remain red; a later corrected revision must pass independently. The fix addresses a production transition-delivery defect exposed by faster verification, rather than removing the runtime-error contract.

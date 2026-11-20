@@ -4,7 +4,7 @@ Audit started 2026-11-20. Work remains on `master`; no branches or account setti
 
 ## Latest measured result
 
-See [RESULTS.md](RESULTS.md) for the fixed before/after window, complete run outcomes, phase budgets, benchmark decisions, cost evidence and unmet guarantees. Current hosted Verify is green; the separate latency audit is red for setup overruns. The target and external enforcement guarantees are not claimed complete. Sections below retain the chronological investigation; earlier configurations and counts are historical.
+See [RESULTS.md](RESULTS.md) for the fixed before/after window, complete run outcomes, phase budgets, benchmark decisions, cost evidence and unmet guarantees. Corrected source `363030f` passes hosted Verify in 109s commit-to-result (61s after run creation); the separate latency audit is red for landing setup at 15s against a strict <15s target. Across all five two-job push samples, empirical commit p50/p95 are 121.00/170.80s (including one failure and cold runs). The target and external enforcement guarantees are not claimed complete. Sections below retain the chronological investigation; earlier configurations and counts are historical.
 
 ## Historical evidence
 
