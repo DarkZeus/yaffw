@@ -51,15 +51,15 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 			</header>
 			<div class="demo" data-demo tabindex="-1">
 				<div class="demo__top">
-					<div class="demo__viewer" data-viewer style={`background: ${sceneAt(16.835)}`}>
-						<div class="demo__osd mono"><span>1×</span><output data-out="timecode">00:00:16.835</output></div>
+					<div class="demo__viewer" data-viewer style={`background: ${sceneAt(0)}`}>
+						<div class="demo__osd mono"><span>1×</span><output data-out="timecode">00:00:00.000</output></div>
 					</div>
 					<aside class="demo__out">
 						<h3>Output</h3>
 						<dl>
 							<div><dt>Format</dt><dd>MP4 / H.264 / AAC</dd></div>
-							<div><dt>Range</dt><dd class="mono"><output data-out="start" data-short>00:16.835</output> – <output data-out="end" data-short>01:07.338</output></dd></div>
-							<div><dt>Length</dt><dd class="mono"><output data-out="duration" data-short>00:50.504</output></dd></div>
+							<div><dt>Range</dt><dd class="mono"><output data-out="start" data-short>00:00.000</output> – <output data-out="end" data-short>01:33.525</output></dd></div>
+							<div><dt>Length</dt><dd class="mono"><output data-out="duration" data-short>01:33.525</output></dd></div>
 						</dl>
 						<a class="btn btn--primary demo__export" href={EDITOR_URL}>Start export in the editor</a>
 					</aside>
@@ -67,14 +67,14 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 				<p class="enhancement-note">Static demo. Interactive controls require JavaScript.</p>
 				<div class="transport">
 					<div class="transport__group">
-						<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play selection"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
+						<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
 						<button class="t-btn" type="button" disabled data-seek="-10" aria-label="Back 10 seconds"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4L4 8l4 4M12 4L8 8l4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
 						<button class="t-btn" type="button" disabled data-step="-1" aria-label="Previous frame"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3.5v9M12 4L7 8l5 4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
 						<button class="t-btn" type="button" disabled data-step="1" aria-label="Next frame"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3.5v9M4 4l5 4-5 4z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
 						<button class="t-btn" type="button" disabled data-seek="10" aria-label="Forward 10 seconds"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l4 4-4 4M8 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
-						<button class="t-btn" type="button" disabled data-loop aria-pressed="true" aria-label="Loop selection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+						<button class="t-btn" type="button" disabled data-loop aria-pressed="false" aria-label="Loop selection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
 					</div>
-					<output class="timecode mono" data-out="timecode">00:00:16.835</output>
+					<output class="timecode mono" data-out="timecode">00:00:00.000</output>
 				</div>
 				<div class="demo__tl">
 					<div class="demo__labels" aria-hidden="true">
@@ -291,11 +291,12 @@ import { timelineHTML, sceneAt } from "../scripts/timeline.js";
 			</div>
 			<div class="try__player" data-try tabindex="-1">
 				<p class="enhancement-note">Static demo. Interactive controls require JavaScript.</p>
-				<div class="try__time mono"><output data-out="timecode">00:00:16.835</output></div>
+				<div class="try__time mono"><output data-out="timecode">00:00:00.000</output></div>
 				<Fragment set:html={timelineHTML({ ruler: false, video: false })} />
 				<div class="try__foot">
-					<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play selection"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
-					<span class="mono">Selection <output data-out="start" data-short>00:16.835</output> – <output data-out="end" data-short>01:07.338</output></span>
+					<button class="t-btn t-btn--play" type="button" disabled data-play aria-label="Play"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z" fill="currentColor"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3.5h2.5v9H4.5zM9 3.5h2.5v9H9z" fill="currentColor"/></svg></button>
+					<button class="t-btn" type="button" disabled data-loop aria-pressed="false" aria-label="Loop selection"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 7V6a2 2 0 0 1 2-2h7l-2-2M13 9v1a2 2 0 0 1-2 2H4l2 2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+					<span class="mono try__range">Selection <output data-out="start" data-short>00:00.000</output> – <output data-out="end" data-short>01:33.525</output></span>
 					<span class="try__hint" data-hint></span>
 				</div>
 			</div>

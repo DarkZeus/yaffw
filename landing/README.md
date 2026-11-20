@@ -53,3 +53,5 @@ Headings, command text, timeline illustrations, and demo stills are rendered at 
 Command tabs use automatic activation: Left/Right arrows wrap between Run and Develop, while Home/End select the first/last tab. Tab enters the selected tab once, then moves into its named command panel. Pointer clicks and Enter/Space use the same activation behavior.
 
 Section links use native URL fragments and browser history. Focusable section targets preserve keyboard continuation with or without JavaScript; the fixed-header offset is provided by CSS scroll padding. Navigation does not require session storage.
+
+Both demo timelines start with the full simulated file selected and looping off. Playback and Selection are independent; range-body dragging preserves duration and Playhead, edge dragging previews a boundary until release, and canceled drags discard the draft. Frame steps pause playback, and boundary shortcuts keep a valid range without moving Playhead. The simulation uses a fixed 93.525-second, nominal-30-FPS asset in seconds; it does not decode or export media.

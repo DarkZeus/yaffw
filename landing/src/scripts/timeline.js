@@ -6,7 +6,7 @@ export const isTyping = (e) =>
 
 export const DURATION = 93.525;
 export const FPS = 30;
-const MIN_GAP = 0.5;
+const MIN_GAP = 1 / FPS;
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -149,206 +149,274 @@ export function filmstripHTML() {
 }
 
 /**
- * Wire a timeline inside `root`. Looks for: [data-timeline] (pointer surface),
- * [data-handle=start|end], [data-play], [data-seek=±n], [data-step=±n], [data-loop], [data-reset],
- * and text outputs [data-out=timecode|duration|start|end].
+ * Wire the illustrative timeline. Selection is committed on pointer release;
+ * onChange receives the visible draft during a gesture and the committed state otherwise.
+ * This fixed-30-FPS simulation uses seconds, rather than the editor's media-time core.
  */
-export function createTimeline(
-	root,
-	{ start = 0.18, end = 0.72, onChange, isActive = () => true } = {},
-) {
+export function createTimeline(root, { onChange, isActive = () => true } = {}) {
 	const $ = (s) => root.querySelector(s);
 	const $$ = (s) => [...root.querySelectorAll(s)];
 	const timeline = $("[data-timeline]");
 	const tracks = $$(".playhead-track");
-	const state = {
-		s: DURATION * start,
-		e: DURATION * end,
-		ph: DURATION * start,
-		playing: false,
-		loop: true,
-	};
+	const state = { s: 0, e: DURATION, ph: 0, playing: false, loop: false };
+	let draft = null;
+	let drag = null;
+	let loopEntered = false;
+	let last = 0;
+	let raf = 0;
 	const listeners = new Set(onChange ? [onChange] : []);
 	const offs = [];
 	const on = (el, type, fn, opts) => {
 		el.addEventListener(type, fn, opts);
 		offs.push(() => el.removeEventListener(type, fn, opts));
 	};
-
+	const repositionLoop = () => {
+		loopEntered = state.ph >= state.s && state.ph < state.e;
+	};
+	// Same boundary-command rule as editor-core/selection: honor the requested
+	// edge, moving the opposite edge only as far as the minimum duration requires.
+	const withStart = (selection, time) => {
+		const s = clamp(time, 0, DURATION - MIN_GAP);
+		return { s, e: Math.max(selection.e, s + MIN_GAP) };
+	};
+	const withEnd = (selection, time) => {
+		const e = clamp(time, MIN_GAP, DURATION);
+		return { s: Math.min(selection.s, e - MIN_GAP), e };
+	};
 	const render = (reason) => {
-		const ph = (state.ph / DURATION).toFixed(5);
-		tracks.forEach((t) => t.style.setProperty("--ph", ph));
+		const visible = draft ? { ...state, ...draft } : state;
+		const ph = (visible.ph / DURATION).toFixed(5);
+		tracks.forEach((track) => track.style.setProperty("--ph", ph));
 		root.dataset.playing = String(state.playing);
+		$$("[data-play]").forEach((button) =>
+			button.setAttribute("aria-label", state.playing ? "Pause" : "Play"),
+		);
+		$$("[data-loop]").forEach((button) =>
+			button.setAttribute("aria-pressed", String(state.loop)),
+		);
 		$$("[data-out]").forEach((el) => {
-			const k = el.dataset.out;
-			const short = el.hasAttribute("data-short");
+			const key = el.dataset.out;
 			el.textContent = formatTime(
-				k === "timecode"
-					? state.ph
-					: k === "duration"
-						? state.e - state.s
-						: k === "start"
-							? state.s
-							: state.e,
-				!short,
+				key === "timecode"
+					? visible.ph
+					: key === "duration"
+						? visible.e - visible.s
+						: key === "start"
+							? visible.s
+							: visible.e,
+				!el.hasAttribute("data-short"),
 			);
 		});
-		// Selection and handles only change on user input, never on a playback frame.
 		if (reason !== "tick") {
-			root.style.setProperty("--s", (state.s / DURATION).toFixed(5));
-			root.style.setProperty("--e", (state.e / DURATION).toFixed(5));
-			$$("[data-handle]").forEach((h) => {
-				const v = h.dataset.handle === "start" ? state.s : state.e;
-				h.setAttribute("aria-valuemin", "0");
-				h.setAttribute("aria-valuemax", String(DURATION));
-				h.setAttribute("aria-valuenow", v.toFixed(3));
-				h.setAttribute("aria-valuetext", formatTime(v));
+			root.style.setProperty("--s", (visible.s / DURATION).toFixed(5));
+			root.style.setProperty("--e", (visible.e / DURATION).toFixed(5));
+			$$("[data-handle]").forEach((handle) => {
+				const start = handle.dataset.handle === "start";
+				const value = start ? visible.s : visible.e;
+				handle.setAttribute("aria-valuemin", String(start ? 0 : MIN_GAP));
+				handle.setAttribute(
+					"aria-valuemax",
+					String(start ? DURATION - MIN_GAP : DURATION),
+				);
+				handle.setAttribute("aria-valuenow", String(value));
+				handle.setAttribute("aria-valuetext", formatTime(value));
 			});
 		}
-		listeners.forEach((fn) => fn(state, reason));
+		listeners.forEach((fn) => fn(visible, reason));
 	};
-
+	const updateSelection = (next, reason) => {
+		Object.assign(state, next);
+		repositionLoop();
+		render(reason);
+	};
 	const api = {
 		state,
 		render,
 		subscribe: (fn) => (listeners.add(fn), () => listeners.delete(fn)),
-		setStart: (t) => (
-			(state.s = clamp(t, 0, state.e - MIN_GAP)),
-			render("start")
-		),
-		setEnd: (t) => (
-			(state.e = clamp(t, state.s + MIN_GAP, DURATION)),
-			render("end")
-		),
-		seek: (t) => ((state.ph = clamp(t, 0, DURATION)), render("seek")),
+		setStart: (time) => updateSelection(withStart(state, time), "start"),
+		setEnd: (time) => updateSelection(withEnd(state, time), "end"),
+		seek: (time) => {
+			state.ph = clamp(time, 0, DURATION);
+			repositionLoop();
+			render("seek");
+		},
 		setPlaying,
-		reset: () => ((state.s = 0), (state.e = DURATION), render("reset")),
+		reset: () => updateSelection({ s: 0, e: DURATION }, "reset"),
 	};
-
-	let last = 0;
-	let raf = 0;
 	function tick(now) {
 		const dt = Math.min(0.5, (now - last) / 1000);
 		last = now;
-		state.ph += dt;
-		if (state.ph >= state.e) {
-			if (state.loop) state.ph = state.s + (state.ph - state.e);
-			else {
-				state.ph = state.e;
-				return setPlaying(false);
-			}
+		const previous = state.ph;
+		state.ph = Math.min(DURATION, state.ph + dt);
+		if (state.loop) {
+			if (
+				(state.ph >= state.s && state.ph < state.e) ||
+				(previous < state.s && state.ph >= state.s)
+			)
+				loopEntered = true;
+			if (loopEntered && state.ph >= state.e) state.ph = state.s;
 		}
+		if (state.ph >= DURATION) return setPlaying(false);
 		render("tick");
 		if (state.playing) raf = requestAnimationFrame(tick);
 	}
-	function setPlaying(onoff) {
-		state.playing = onoff;
-		$$("[data-play]").forEach((b) =>
-			b.setAttribute("aria-label", onoff ? "Pause" : "Play selection"),
-		);
+	function setPlaying(playing) {
+		state.playing = playing;
 		cancelAnimationFrame(raf);
-		if (onoff) {
-			if (state.ph < state.s || state.ph >= state.e - 0.02) state.ph = state.s;
+		if (playing) {
+			if (state.ph === DURATION) state.ph = 0;
+			repositionLoop();
 			last = performance.now();
 			raf = requestAnimationFrame(tick);
 		}
 		render("play");
 	}
+	const stepFrame = (direction) => {
+		setPlaying(false);
+		api.seek(state.ph + direction / FPS);
+	};
 
 	if (timeline) {
 		const timeAt = (x) => {
-			const r = timeline.getBoundingClientRect();
-			return clamp((x - r.left) / r.width, 0, 1) * DURATION;
+			const bounds = timeline.getBoundingClientRect();
+			return clamp((x - bounds.left) / bounds.width, 0, 1) * DURATION;
 		};
-		let drag = null;
-		const move = (ev) => {
-			if (!drag) return;
-			const t = timeAt(ev.clientX);
-			if (drag === "start") api.setStart(t);
-			else if (drag === "end") api.setEnd(t);
-			else api.seek(t);
+		const readDraft = (clientX) => {
+			const initial = drag.initial;
+			const delta = timeAt(clientX) - drag.time;
+			if (drag.kind === "range") {
+				const length = initial.e - initial.s;
+				const s = clamp(initial.s + delta, 0, DURATION - length);
+				return { s, e: s + length, ph: initial.ph };
+			}
+			if (drag.kind === "playhead") return { ...initial, ph: timeAt(clientX) };
+			const selection =
+				drag.kind === "start"
+					? withStart(initial, initial.s + delta)
+					: withEnd(initial, initial.e + delta);
+			return { ...selection, ph: selection[drag.kind === "start" ? "s" : "e"] };
 		};
-		on(timeline, "pointerdown", (ev) => {
-			if (ev.button !== 0) return;
-			const handle = ev.target.closest("[data-handle]");
-			drag = handle ? handle.dataset.handle : "playhead";
-			if (handle) handle.dataset.dragging = "true";
-			timeline.setPointerCapture(ev.pointerId);
-			move(ev);
-			if (!handle) ev.preventDefault();
-		});
-		on(timeline, "pointermove", move);
-		const endDrag = () => {
-			$$("[data-dragging]").forEach((h) => delete h.dataset.dragging);
+		const ownsPointer = (event) => drag && event.pointerId === drag.pointerId;
+		const finish = (commit, event) => {
+			if (!drag || (event && !ownsPointer(event))) return;
+			if (commit) Object.assign(state, readDraft(event.clientX));
+			const pointerId = drag.pointerId;
 			drag = null;
+			draft = null;
+			delete root.dataset.dragging;
+			$$("[data-dragging]").forEach((handle) => delete handle.dataset.dragging);
+			if (timeline.hasPointerCapture?.(pointerId))
+				timeline.releasePointerCapture(pointerId);
+			repositionLoop();
+			render(commit ? "commit" : "cancel");
 		};
-		on(timeline, "pointerup", endDrag);
-		on(timeline, "pointercancel", endDrag);
+		on(timeline, "pointerdown", (event) => {
+			if (drag || event.button !== 0 || event.isPrimary === false) return;
+			const handle = event.target.closest("[data-handle]");
+			const body = event.target.closest("[data-selection-body]");
+			const kind = handle ? handle.dataset.handle : body ? "range" : "playhead";
+			setPlaying(false);
+			drag = {
+				kind,
+				pointerId: event.pointerId,
+				time: timeAt(event.clientX),
+				initial: { s: state.s, e: state.e, ph: state.ph },
+			};
+			draft = kind === "playhead" ? readDraft(event.clientX) : drag.initial;
+			root.dataset.dragging = kind;
+			if (handle) handle.dataset.dragging = "true";
+			timeline.setPointerCapture(event.pointerId);
+			(handle || root).focus({ preventScroll: true });
+			event.preventDefault();
+			render("preview");
+		});
+		on(timeline, "pointermove", (event) => {
+			if (!ownsPointer(event)) return;
+			draft = readDraft(event.clientX);
+			render("preview");
+		});
+		on(timeline, "pointerup", (event) => finish(true, event));
+		on(timeline, "pointercancel", (event) => finish(false, event));
+		on(timeline, "lostpointercapture", (event) => finish(false, event));
+		on(window, "blur", () => finish(false));
+		on(document, "keydown", (event) => {
+			if (drag && event.key === "Escape") {
+				event.preventDefault();
+				finish(false);
+			}
+		});
 	}
-
 	$$("[data-handle]").forEach((el) =>
-		on(el, "keydown", (ev) => {
-			const step = ev.shiftKey ? 1 / FPS : 1;
-			const dir = /Left|Down/.test(ev.key)
+		on(el, "keydown", (event) => {
+			if (drag) return;
+			const step = event.shiftKey ? 1 / FPS : 1;
+			const direction = /Left|Down/.test(event.key)
 				? -1
-				: /Right|Up/.test(ev.key)
+				: /Right|Up/.test(event.key)
 					? 1
 					: 0;
-			if (!dir) return;
-			ev.preventDefault();
-			ev.stopPropagation();
-			if (el.dataset.handle === "start") api.setStart(state.s + dir * step);
-			else api.setEnd(state.e + dir * step);
+			if (!direction) return;
+			event.preventDefault();
+			event.stopPropagation();
+			if (el.dataset.handle === "start")
+				api.setStart(state.s + direction * step);
+			else api.setEnd(state.e + direction * step);
 		}),
 	);
-	$$("[data-play]").forEach((b) =>
-		on(b, "click", () => setPlaying(!state.playing)),
+	$$("[data-play]").forEach((button) =>
+		on(button, "click", () => setPlaying(!state.playing)),
 	);
-	$$("[data-loop]").forEach((b) =>
-		on(b, "click", () => {
+	$$("[data-loop]").forEach((button) =>
+		on(button, "click", () => {
 			state.loop = !state.loop;
-			b.setAttribute("aria-pressed", String(state.loop));
+			repositionLoop();
+			render("loop");
 		}),
 	);
-	$$("[data-seek]").forEach((b) =>
-		on(b, "click", () => api.seek(state.ph + Number(b.dataset.seek))),
+	$$("[data-seek]").forEach((button) =>
+		on(button, "click", () => api.seek(state.ph + Number(button.dataset.seek))),
 	);
-	$$("[data-step]").forEach((b) =>
-		on(b, "click", () => api.seek(state.ph + Number(b.dataset.step) / FPS)),
+	$$("[data-step]").forEach((button) =>
+		on(button, "click", () => stepFrame(Number(button.dataset.step))),
 	);
-	$$("[data-reset]").forEach((b) => on(b, "click", api.reset));
+	$$("[data-reset]").forEach((button) => on(button, "click", api.reset));
 
-	// Shortcuts are live while isActive() says so (e.g. the timeline fills most of the viewport).
-	const onKeydown = (ev) => {
-		if (!isActive() || ev.metaKey || ev.ctrlKey || ev.altKey || isTyping(ev))
+	// Shortcuts are live only for the active timeline; typing and native button activation win.
+	on(document, "keydown", (event) => {
+		if (
+			drag ||
+			!isActive() ||
+			event.metaKey ||
+			event.ctrlKey ||
+			event.altKey ||
+			isTyping(event)
+		)
 			return;
 		const onButton = /^(BUTTON|A)$/.test(document.activeElement?.tagName);
-		const k = ev.key;
-		if (k === " ") {
+		const key = event.key;
+		if (key === " ") {
 			if (onButton) return;
 			setPlaying(!state.playing);
-		} else if (k === "k" || k === "K") setPlaying(!state.playing);
-		else if (k === "j" || k === "J") api.seek(state.ph - 10);
-		else if (k === "l" || k === "L") api.seek(state.ph + 10);
-		else if (k === "[") api.setStart(state.ph);
-		else if (k === "]") api.setEnd(state.ph);
+		} else if (/^k$/i.test(key)) setPlaying(!state.playing);
+		else if (/^j$/i.test(key)) api.seek(state.ph - 10);
+		else if (/^l$/i.test(key)) api.seek(state.ph + 10);
+		else if (key === "[") api.setStart(state.ph);
+		else if (key === "]") api.setEnd(state.ph);
 		else if (
-			(k === "ArrowLeft" || k === "ArrowRight") &&
-			!ev.target.closest("[data-handle]")
+			(key === "ArrowLeft" || key === "ArrowRight") &&
+			!event.target.closest("[data-handle]")
 		) {
-			api.seek(
-				state.ph + (k === "ArrowLeft" ? -1 : 1) * (ev.shiftKey ? 1 / FPS : 1),
-			);
+			const direction = key === "ArrowLeft" ? -1 : 1;
+			if (event.shiftKey) stepFrame(direction);
+			else api.seek(state.ph + direction);
 		} else return;
-		ev.preventDefault();
-		root.dispatchEvent(new CustomEvent("tl-key", { detail: ev }));
-	};
-	on(document, "keydown", onKeydown);
-
+		event.preventDefault();
+		root.dispatchEvent(new CustomEvent("tl-key", { detail: event }));
+	});
 	render("init");
 	api.destroy = () => {
 		cancelAnimationFrame(raf);
-		offs.forEach((f) => f());
+		offs.forEach((off) => off());
 		listeners.clear();
 	};
 	return api;
@@ -366,7 +434,7 @@ export function timelineHTML({
 		${audio ? `<div class="lane lane--audio" aria-hidden="true">${waveSVG()}</div>` : ""}
 		<div class="shade shade--l" aria-hidden="true"></div>
 		<div class="shade shade--r" aria-hidden="true"></div>
-		<div class="selection" aria-hidden="true"></div>
+		<div class="selection" data-selection-body aria-hidden="true"></div>
 		<button class="handle handle--start" type="button" disabled role="slider" aria-label="Selection start" data-handle="start"></button>
 		<button class="handle handle--end" type="button" disabled role="slider" aria-label="Selection end" data-handle="end"></button>
 		<div class="playhead-track" aria-hidden="true"><div class="playhead"><i></i></div></div>

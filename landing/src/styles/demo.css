@@ -17,6 +17,11 @@
 	cursor: default;
 	touch-action: auto;
 }
+[data-demo]:not([data-ready]) .selection,
+[data-try]:not([data-ready]) .selection {
+	cursor: default;
+	pointer-events: none;
+}
 .demo {
 	border-radius: 16px;
 	border: 1px solid transparent;
@@ -156,9 +161,9 @@
 }
 .demo,
 .try__player {
-	--s: 0.18;
-	--e: 0.72;
-	--ph: 0.18;
+	--s: 0;
+	--e: 1;
+	--ph: 0;
 	user-select: none;
 	-webkit-user-select: none;
 }
@@ -273,7 +278,11 @@
 	border-top: 2px solid var(--accent);
 	border-bottom: 2px solid var(--accent);
 	background: color-mix(in oklch, var(--accent) 12%, transparent);
-	pointer-events: none;
+	cursor: grab;
+	pointer-events: auto;
+}
+.selection:active {
+	cursor: grabbing;
 }
 .selection::before {
 	/* video lane gets the app's gold frame treatment */

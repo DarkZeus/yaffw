@@ -20,6 +20,7 @@ node verification/landing/tabs-check.mjs
 node verification/landing/links-check.mjs
 node verification/landing/navigation-check.mjs
 node verification/landing/contrast-check.mjs
+node verification/landing/demo-check.mjs
 ```
 
 The checks use `verification/browser.cjs`. Use the Chromium installed by the
@@ -101,5 +102,32 @@ Former faint text now uses `--muted-foreground`; the viewer timecode uses a soli
 failures. Results and the single desktop/phone visual-review batch are written to
 `tmp/landing-contrast/report.json` and `tmp/landing-contrast/{1440,390}-{hero,local,shortcuts,workflow,demo,changelog}.png`.
 
+The demo check exercises both landing timelines through real pointer gestures,
+buttons, keyboard shortcuts and their accessible values/time outputs. It covers
+full-range defaults with Loop off, edge and range-body movement, playback outside
+Selection, crossing Selection end with Loop off, loop entry/wrapping, paused frame
+steps and valid boundary shortcuts that preserve Playhead. Playwright’s clock
+advances the simulated 30 FPS timeline deterministically without long playback
+waits. This checks the landing simulation; real media decoding/export remains the
+editor’s responsibility.
+
 These checks are currently explicit verification commands. Repository-wide Astro
 validation and CI integration are tracked separately in issue #149.
+
+Issue #154 was also compared with the actual built editor on a separate static
+server at port 4175; the user-owned development server at port 3000 was unavailable
+and was not started. A 12-second, video-only fixture was made by stream-copy
+repeating `public/export-correctness-fixtures/tiny-video-only.mp4`:
+
+```sh
+ffmpeg -stream_loop 5 -i public/export-correctness-fixtures/tiny-video-only.mp4 -t 12 -an -c copy /tmp/yaffw-154-editor.mp4
+```
+
+Through the editor's file picker, ruler, keyboard shortcuts, loop control, and
+range gesture, the comparison confirmed full-file/loop-off defaults, playback
+before and after Selection, loop-off playback beyond its end, entry-based wrap,
+and a body move from 2.4–3.6 to 3.0–4.2 seconds preserving duration and Playhead.
+Crossed boundary commands preserved Playhead and a minimum source frame (40ms for
+this 25-FPS fixture), and a frame step paused playback. The landing keeps the
+same interaction rules while deliberately simulating a fixed nominal-30-FPS
+asset; its seconds-based state is not the editor's media-time domain model.
