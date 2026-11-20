@@ -3,9 +3,10 @@
 Marketing site and changelog for YAFFW. Static [Astro](https://astro.build) site in the repo's pnpm workspace, deployed as its own Cloudflare Worker (`yaffw-landing`), separate from the editor.
 
 ```sh
-pnpm install                          # from the repo root
+pnpm install --frozen-lockfile        # from the repo root
 pnpm --filter yaffw-landing dev       # http://localhost:4173
 pnpm --filter yaffw-landing build     # → landing/dist
+pnpm --filter yaffw-landing preview   # preview the built site on port 4173
 ```
 
 ## Deploy
@@ -38,11 +39,11 @@ Entries are sorted by `date`. The file name becomes the entry's link (`/changelo
 - `src/pages/index.astro`: home page
 - `src/pages/changelog.astro`: the hand-written entries in `src/content/changelog/`, newest first
 - `src/layouts/Base.astro`: head, nav, footer
-- `src/styles/`: one file per section, imported in cascade order by `index.css`. The `--workbench-*` palette comes from the editor's `src/workbench-tokens.css`; `<html class="workbench">` applies it.
+- `src/styles/`: one file per section, imported in cascade order by `index.css`. The shared `--workbench-*` palette is owned by `src/workbench-tokens.css` at the repository root and imported by both editor and landing; `<html class="workbench">` applies it.
 - `src/scripts/main.js`: home page behaviour (demo and shortcut timelines, meters, illustrations, repo card)
 - `src/scripts/timeline.js`: selection timeline engine shared by the demo and the shortcut playground
 - `public/assets/`: app icons and the workbench screenshot
-- `DESIGN-NOTES.md`: reference-site research and what was borrowed
+- `DESIGN-NOTES.md`: current visual behavior, demo limitations, historical reference research, and documentation ownership. Later design/demo changes must update affected notes in the same issue.
 
 ## Progressive enhancement
 
