@@ -5,7 +5,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { launchBrowser } from "../browser.cjs";
 
 const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
-const output = resolve("tmp/landing-mobile-navigation");
+const output = resolve(
+	process.env.YAFFW_VERIFICATION_OUTPUT || "tmp/landing-mobile-navigation",
+);
 const browser = await launchBrowser();
 const sections = ["/#demo", "/#local", "/#features", "/#shortcuts", "/#source"];
 

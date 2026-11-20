@@ -461,3 +461,5 @@ Icon?
 
 # Astro generated types
 .astro/
+!docs/verification/ci-latency/
+!docs/verification/ci-latency/**
