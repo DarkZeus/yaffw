@@ -18,7 +18,25 @@ cd landing && npx wrangler deploy
 
 The confirmed HTTPS production **landing** origin is a public deployment setting in `config/deployment.json`. The production command validates it before building. `LANDING_SITE_ORIGIN` can explicitly override it in the build environment; an empty override selects a non-indexable preview and is rejected by the production command.
 
-With Cloudflare Workers Builds, connect the repo a second time with root directory `landing`, build command `pnpm --filter yaffw-landing build:production`, and build watch paths `landing/**` and `src/workbench-tokens.css`.
+### Automatic deployment
+
+Connect the existing `yaffw-landing` Worker to `DarkZeus/yaffw` through **Settings → Builds → Connect** with these settings:
+
+| Setting                   | Value                                 |
+| ------------------------- | ------------------------------------- |
+| Production branch         | `master`                              |
+| Root directory            | `landing`                             |
+| Build command             | `pnpm check && pnpm build:production` |
+| Deploy command            | `npx wrangler deploy`                 |
+| Preview builds            | Disabled                              |
+| Build watch include paths | `*`                                   |
+| Build cache               | Enabled                               |
+
+Each push to `master` runs the landing's formatting, template lint/accessibility, and Astro type checks, builds the production assets, and deploys only if those commands succeed. Watching all paths also covers shared tokens and workspace dependency changes. `landing/.node-version` selects Node.js 24, and the root `packageManager` selects pnpm 10.33.0.
+
+The editor is a separate Worker (`yaffw`) with its own Git build connection. GitHub's **Verify** workflow checks both applications independently of the Cloudflare deployment; its result is not a deployment prerequisite. Check **Workers Builds: yaffw-landing** on the pushed commit and the Worker's active deployment to confirm that a landing update reached production.
+
+The commands above remain available for a manual deployment. `npx wrangler deploy` alone uploads the existing `landing/dist`; it does not rebuild Astro, so run the production build first.
 
 ## Changelog
 
