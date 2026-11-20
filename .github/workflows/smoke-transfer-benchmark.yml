@@ -1,0 +1,74 @@
+name: Landing artifact transfer benchmark
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  DEPENDENCY_CACHE_MODE: store
+  CACHE_SALT: v1
+  CI_RUNNER_IMAGE: host
+  HUSKY: 0
+
+# A scoped experiment, never a replacement for the required full Verify result.
+# Build exactly once; measure a real transfer and the consumer's extra setup.
+jobs:
+  build:
+    name: Build landing for transfer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      digest: ${{ steps.archive.outputs.digest }}
+    steps:
+      - run: echo "CI_SETUP_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/ci-setup
+        with:
+          lane: landing
+          browser: "false"
+      - name: Landing checks
+        run: pnpm --filter yaffw-landing check
+      - name: Production build once
+        run: pnpm --filter yaffw-landing build:production
+      - name: Archive exact production assets
+        id: archive
+        run: |
+          mkdir -p tmp
+          tar -czf tmp/landing-transfer.tar.gz landing/dist
+          node -e 'const fs=require("node:fs"),c=require("node:crypto");fs.appendFileSync(process.env.GITHUB_OUTPUT,"digest="+c.createHash("sha256").update(fs.readFileSync("tmp/landing-transfer.tar.gz")).digest("hex")+"\n")'
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: landing-transfer-${{ github.run_id }}
+          path: tmp/landing-transfer.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  smoke:
+    name: Smoke transferred production build
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - run: echo "CI_SETUP_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: ./.github/actions/ci-setup
+        with:
+          lane: landing
+          images: "false"
+      - name: Record transfer start
+        run: echo "TRANSFER_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: landing-transfer-${{ github.run_id }}
+          path: tmp/transfer
+      - name: Validate and extract transferred assets
+        env:
+          EXPECTED_DIGEST: ${{ needs.build.outputs.digest }}
+        run: |
+          node -e 'const fs=require("node:fs"),c=require("node:crypto");if(c.createHash("sha256").update(fs.readFileSync("tmp/transfer/landing-transfer.tar.gz")).digest("hex")!==process.env.EXPECTED_DIGEST)throw Error("Transferred build checksum mismatch");console.log(JSON.stringify({transferSeconds:(Date.now()-Number(process.env.TRANSFER_STARTED_MS))/1000}))'
+          tar -xzf tmp/transfer/landing-transfer.tar.gz
+      - name: Full built-browser smoke (no rebuild)
+        run: pnpm --filter yaffw-landing test:smoke

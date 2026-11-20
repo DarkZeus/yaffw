@@ -7,6 +7,12 @@ inputs:
   runner-image:
     default: host
     description: host or the exact matching Playwright image
+  browser:
+    default: "true"
+    description: Whether this landing job runs Chromium
+  images:
+    default: "true"
+    description: Whether this landing job builds Astro images
 outputs:
   dependency-key:
     description: Cache identity or observed restore status
@@ -54,26 +60,26 @@ runs:
       shell: bash
       run: pnpm exec node -e 'require("canvas").createCanvas(1, 1)'
     - name: Restore exact Chromium
-      if: inputs.lane == 'landing' && env.DEPENDENCY_CACHE_MODE != 'cold' && inputs.runner-image != 'playwright'
+      if: inputs.lane == 'landing' && inputs.browser == 'true' && env.DEPENDENCY_CACHE_MODE != 'cold' && inputs.runner-image != 'playwright'
       id: browser
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ~/.cache/ms-playwright
         key: ${{ steps.keys.outputs.browser }}
     - name: Install exact headless Chromium
-      if: inputs.lane == 'landing' && inputs.runner-image != 'playwright'
+      if: inputs.lane == 'landing' && inputs.browser == 'true' && inputs.runner-image != 'playwright'
       shell: bash
       run: pnpm exec playwright install --only-shell chromium
     - name: Validate preinstalled matching Chromium
-      if: inputs.lane == 'landing' && inputs.runner-image == 'playwright'
+      if: inputs.lane == 'landing' && inputs.browser == 'true' && inputs.runner-image == 'playwright'
       shell: bash
       run: pnpm exec playwright install --only-shell chromium
     - name: Prove preinstalled browser libraries and fonts
-      if: inputs.lane == 'landing'
+      if: inputs.lane == 'landing' && inputs.browser == 'true'
       shell: bash
       run: node scripts/browser-runtime.mjs
     - name: Restore Astro image transforms
-      if: inputs.lane == 'landing' && env.DEPENDENCY_CACHE_MODE != 'cold'
+      if: inputs.lane == 'landing' && inputs.images == 'true' && env.DEPENDENCY_CACHE_MODE != 'cold'
       id: images
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:

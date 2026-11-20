@@ -22,12 +22,19 @@ const playwrightVersion = JSON.parse(readFileSync("package.json", "utf8"))
 const browserHash = createHash("sha256")
 	.update(readFileSync("pnpm-lock.yaml"))
 	.digest("hex");
-const platform = `${process.platform}-${process.arch}-${process.env.ImageOS}-${process.env.ImageVersion}-${process.env.CI_RUNNER_IMAGE || "host"}`;
+const platform = `${process.platform}-${process.arch}-${process.env.ImageOS}-${process.env.CI_RUNNER_IMAGE || "host"}`;
 const mode = process.env.DEPENDENCY_CACHE_MODE || "store";
 if (!["store", "modules", "cold"].includes(mode))
 	throw new Error("Invalid cache mode");
 const salt = process.env.CACHE_SALT || "v1";
-const dependencyKey = `${mode}-${platform}-node${process.versions.node}-abi${process.versions.modules}-pnpm10.33.0-${digest.digest("hex")}-${salt}`;
+// The content-addressed store and browser/image assets are reusable across
+// runner-image refreshes. Installed dependencies stay image/Node-patch exact.
+// Both paths still run frozen install, native ABI validation and all checks.
+const nativePlatform =
+	mode === "modules"
+		? `${platform}-${process.env.ImageVersion}-node${process.versions.node}`
+		: `${platform}-node${process.versions.node.split(".")[0]}`;
+const dependencyKey = `${mode}-${nativePlatform}-abi${process.versions.modules}-pnpm10.33.0-${digest.digest("hex")}-${salt}`;
 const browserKey = `chromium-${platform}-${playwrightVersion}-${browserHash}-${salt}`;
 const imageKey = `astro-images-${platform}-${createHash("sha256").update(readFileSync("pnpm-lock.yaml")).digest("hex")}-${salt}`;
 const cachePath =
