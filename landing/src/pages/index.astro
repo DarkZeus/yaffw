@@ -1,5 +1,6 @@
 ---
-import { Picture } from "astro:assets";
+import { Image, Picture } from "astro:assets";
+import brandIcon from "../../public/assets/icon-192.png";
 import audioPanel from "../assets/audio-panel.jpg";
 import exportPanel from "../assets/export-panel.jpg";
 import SelectionExample from "../components/SelectionExample.astro";
@@ -35,7 +36,7 @@ import { timelineHTML } from "../scripts/timeline.js";
 						View source
 					</a>
 				</div>
-				<p class="hero__meta">No account. Works in Chrome and Edge.</p>
+				<p class="hero__meta">Free. No account. Works in Chrome and Edge.</p>
 			</div>
 		</div>
 		<figure class="hero__figure">
@@ -411,7 +412,15 @@ import { timelineHTML } from "../scripts/timeline.js";
 			</div>
 			<article class="repo" data-repo>
 				<header class="repo__head">
-					<img src="/assets/icon-192.png" alt="" width="20" height="20" />
+					<Image
+						src={brandIcon}
+						alt=""
+						width={20}
+						height={20}
+						densities={[1, 2, 3]}
+						format="webp"
+						loading="lazy"
+					/>
 					<a href={REPO_URL}>
 						<span class="dim">DarkZeus /</span> <b>yaffw</b>
 					</a>

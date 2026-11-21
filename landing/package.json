@@ -14,9 +14,13 @@
 		"test:smoke": "node scripts/smoke.mjs",
 		"verify": "pnpm check && pnpm build && pnpm test:smoke",
 		"build:production": "node scripts/require-site-origin.mjs && astro build",
-		"test:metadata": "node scripts/smoke.mjs metadata"
+		"test:metadata": "node scripts/smoke.mjs metadata",
+		"test:seo": "node scripts/smoke.mjs metadata seo"
 	},
 	"dependencies": {
+		"@fontsource-variable/geist-mono": "5.3.0",
+		"@fontsource-variable/inter": "5.3.0",
+		"@takumi-rs/core": "2.20.0",
 		"astro": "7.4.11"
 	},
 	"devDependencies": {

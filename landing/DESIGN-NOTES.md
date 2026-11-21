@@ -25,12 +25,14 @@ Deployment serves `landing/dist` through the `yaffw-landing` Cloudflare Worker c
 - A left-aligned hero pairs a direct headline with the explanation and editor action, followed by a complete real editor screenshot. A 1160px content measure, medium-weight Inter headings, restrained 8px radii, and generous chapter transitions establish hierarchy. Media remains undistorted; the Selection chapter deliberately clips a detail from the same screenshot.
 - Audio and Export are real panel captures, with their original semantic colors. Neutral backplates group each screenshot with its explanation. Supporting layout, preset, and preview capabilities use text rather than invented product UI.
 - The local-first chapter uses one pale neutral band and a static file → browser → export explanation. No gradients, glows, floating shadows, pointer lights, or perpetual illustration loops surround the product.
-- Inter supplies the landing's headings, body text, navigation, and buttons; Geist Mono supplies code and media-time readouts. Both have system fallbacks. Product naming and the existing gold icon remain unchanged.
+- Inter supplies the landing's headings, body text, navigation, and buttons; Geist Mono supplies code and media-time readouts. Both are self-hosted through pinned Fontsource packages, retain system fallbacks, and use swap loading; the Latin Inter font is preloaded. Product naming and the existing gold icon remain unchanged. Small icon instances use responsive WebP transforms.
 - Shared navigation, changelog, 404, and footer inherit the light landing system. The editor now also offers a real light appearance, selected through its own persistent Appearance control. Native page transitions remain; the prior hero/reveal and decorative-loop animations are removed.
 
 See [the reference investigation](DESIGN-RESEARCH.md) for the inspected Mahlke/Hume references, the structural diagnosis, and the choices adapted to YAFFW.
 
-`src/assets/workbench-current.jpg` is a capture of the running editor; `audio-panel.jpg` and `export-panel.jpg` are captures of its real panels using the existing repository sample. Astro supplies AVIF/WebP with JPEG fallbacks and reserves intrinsic dimensions. The full hero loads eagerly; Selection details and feature panels load lazily. There is no decorative CTA image. The same current light capture supplies the 1200×630 social-sharing crop, keeping Selection, waveform, and export controls visible.
+`src/assets/workbench-current.jpg` is a capture of the running editor; `audio-panel.jpg` and `export-panel.jpg` are captures of its real panels using the existing repository sample. Astro supplies AVIF/WebP with JPEG fallbacks and reserves intrinsic dimensions. The full hero loads eagerly; Selection details and feature panels load lazily. There is no decorative CTA image. The social-sharing image is a separate 1200×630 typographic PNG. `src/social/card.html` defines its neutral canvas, Inter hierarchy, YAFFW mark and factual copy in HTML/CSS with OKLCH colors. `src/pages/og.png.ts` renders it through Takumi at build time with local assets; social metadata points to `/og.png`.
+
+The screenshot's responsive candidates include 640px and 1400px widths to reduce excess mobile transfer while retaining the existing crop and high-density rendering. The free-access note in the hero matches the application metadata. The SEO audit adds no marketing sections or new visual system.
 
 ## Demonstration fidelity and enhancement
 
@@ -64,7 +66,9 @@ The earlier November 2026 research pass recorded these observations. This is des
 
 ## Page identity
 
-Production identity comes from the confirmed public `config/deployment.json` setting, with an optional explicit `LANDING_SITE_ORIGIN` build override; no request host, preview domain or editor destination supplies it. Home and changelog declare stable canonical paths and page-specific metadata. Explicitly unconfigured previews and the 404 template omit canonical/social identity and emit noindex; production builds require a valid origin. Sharing metadata points to the absolute production URL of the generated crop, with dimensions/type and descriptive alt. See the landing README for the confirmed origin and preview behavior.
+Production identity comes from the confirmed public `config/deployment.json` setting, with an optional explicit `LANDING_SITE_ORIGIN` build override; no request host, preview domain or editor destination supplies it. Home and changelog declare stable canonical paths and page-specific metadata. Explicitly unconfigured previews and the 404 template omit canonical/social identity and emit noindex; production builds require a valid origin. Sharing metadata points to the absolute production URL of the generated social card, with dimensions/type and descriptive alt. See the landing README for the confirmed origin and preview behavior.
+
+The same production identity supplies robots/sitemap discovery and JSON-LD WebPage, WebSite and WebApplication identities. Only public content pages enter the sitemap. Preview builds publish no discovery URLs or structured identities. Cloudflare serves permanent canonical redirects and immutable hashed assets; arbitrary missing pages retain a genuine 404 status. See the [SEO audit](../docs/verification/seo-audit.md).
 
 ## Validation
 

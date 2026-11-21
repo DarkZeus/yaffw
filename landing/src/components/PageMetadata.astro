@@ -1,6 +1,5 @@
 ---
-import { getImage } from "astro:assets";
-import workbench from "../assets/workbench-current.jpg";
+import { EDITOR_URL, REPO_URL } from "../links.js";
 
 interface Props {
 	title: string;
@@ -15,29 +14,62 @@ const {
 	ogDescription = description,
 	canonical,
 } = Astro.props;
-const socialImage = canonical
-	? await getImage({
-			src: workbench,
-			width: 1200,
-			height: 630,
-			fit: "cover",
-			position: "bottom",
-			format: "jpg",
-			quality: 85,
-		})
+const imageUrl = canonical
+	? new URL("/og.png", canonical.origin).href
 	: undefined;
-const imageUrl =
-	socialImage && canonical
-		? new URL(socialImage.src, canonical.origin).href
+const imageAlt = "YAFFW — Edit video in your browser. No uploads. No account.";
+const home = canonical ? new URL("/", canonical).href : undefined;
+const applicationId = home ? `${home}#application` : undefined;
+const structuredData =
+	canonical && home
+		? {
+				"@context": "https://schema.org",
+				"@graph": [
+					{
+						"@type": "WebPage",
+						"@id": `${canonical.href}#webpage`,
+						url: canonical.href,
+						name: title,
+						description,
+						inLanguage: "en",
+						isPartOf: { "@id": `${home}#website` },
+						about: { "@id": applicationId },
+					},
+					// The home page owns the site/application entities; other pages link to them.
+					...(canonical.pathname === "/"
+						? [
+								{
+									"@type": "WebSite",
+									"@id": `${home}#website`,
+									url: home,
+									name: "YAFFW",
+									inLanguage: "en",
+								},
+								{
+									"@type": "WebApplication",
+									"@id": applicationId,
+									name: "YAFFW",
+									url: EDITOR_URL,
+									description,
+									applicationCategory: "MultimediaApplication",
+									browserRequirements:
+										"Requires WebCodecs support, such as Chrome or Edge. Codec support depends on the browser.",
+									isAccessibleForFree: true,
+									image: imageUrl,
+									sameAs: REPO_URL,
+								},
+							]
+						: []),
+				],
+			}
 		: undefined;
-const imageAlt =
-	"YAFFW video editor showing export settings, playback controls, and a Selection timeline with video thumbnails and an audio waveform.";
 ---
 
 <title>{title}</title>
 <meta name="description" content={description} />
 {canonical ? (
 	<>
+		<meta name="robots" content="max-image-preview:large" />
 		<link rel="canonical" href={canonical.href} />
 		<meta property="og:url" content={canonical.href} />
 		<meta property="og:type" content="website" />
@@ -48,12 +80,16 @@ const imageAlt =
 		<meta property="og:image:alt" content={imageAlt} />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
-		<meta property="og:image:type" content="image/jpeg" />
+		<meta property="og:image:type" content="image/png" />
 		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:title" content={title} />
 		<meta name="twitter:description" content={ogDescription} />
 		<meta name="twitter:image" content={imageUrl} />
 		<meta name="twitter:image:alt" content={imageAlt} />
+		<script
+			type="application/ld+json"
+			set:html={JSON.stringify(structuredData).replace(/</g, "\\u003c")}
+		/>
 	</>
 ) : (
 	<meta name="robots" content="noindex,follow" />

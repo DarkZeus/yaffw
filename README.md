@@ -82,6 +82,12 @@ CI runs the portable checks on Linux and real editor browser checks on macOS on 
 
 The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 
+### Search and production routing
+
+The landing and editor have distinct canonical roots and sitemaps. The editor publishes its own title, description, sharing metadata, and no-JavaScript help in the HTML shell. Cloudflare serves unknown editor addresses as real 404 responses; `/editor-next` permanently redirects to `/`. The client redirect remains for local Vite development. If adding another application route, update static hosting routes alongside the client router so direct navigation remains valid. Hashed `/assets/` resources cache immutably, and bundled media test fixtures carry `X-Robots-Tag: noindex`.
+
+`pnpm test:editor seo` checks metadata, discovery files, sharing imagery and fallback HTML in the existing build. Use `YAFFW_SEO_EDGE=1 YAFFW_EDITOR_ORIGIN=... node verification/editor-seo-check.mjs` against Wrangler or the deployed Worker to additionally check HTTP status codes, permanent redirects and headers. Vite preview cannot establish those Cloudflare contracts. The [SEO audit](docs/verification/seo-audit.md) records the complete scope and remaining deployment/Search Console checks.
+
 ## Acknowledgements
 
 Thank you to the developers and contributors behind the libraries that make YAFFW possible:

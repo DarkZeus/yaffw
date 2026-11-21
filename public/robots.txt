@@ -1,3 +1,3 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Sitemap: https://yaffw.serhii-resnyanskyi.workers.dev/sitemap.xml

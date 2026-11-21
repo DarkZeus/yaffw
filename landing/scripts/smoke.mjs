@@ -8,6 +8,7 @@ const availableChecks = [
 	"tabs",
 	"progressive",
 	"metadata",
+	"seo",
 	"copy",
 	"links",
 	"demo",

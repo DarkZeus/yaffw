@@ -7,7 +7,7 @@ const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
 const output = resolve("tmp/landing-images");
 const originalBytes = (await stat("landing/src/assets/workbench-current.jpg"))
 	.size;
-const widths = [480, 800, 1200, 1600];
+const widths = [480, 640, 800, 1200, 1400, 1600];
 const browser = await launchBrowser();
 const results = [];
 

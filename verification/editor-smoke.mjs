@@ -5,6 +5,7 @@ import { preview } from "vite";
 import { launchBrowser } from "./browser.cjs";
 
 const availableChecks = {
+	seo: "editor-seo-check.mjs",
 	session: "editor-session-check.mjs",
 	workflow: "mediabunny-upgrade/app-check.cjs",
 	boundaries: "copy-boundaries/app-check.mjs",

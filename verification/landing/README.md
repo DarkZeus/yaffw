@@ -243,8 +243,8 @@ errors. No application exception filter or product CSS workaround is installed.
 The metadata check verifies home/changelog canonical and social identity against
 the confirmed deployment setting or explicit `LANDING_SITE_ORIGIN` override,
 including query/fragment-independent home identity,
-page-specific titles/descriptions, absolute sharing image URLs, JPEG MIME type,
-actual 1200×630 decoded crop dimensions and descriptive alt text. It resolves the
+page-specific titles/descriptions, absolute sharing image URLs, PNG MIME type,
+actual 1200×630 decoded card dimensions and descriptive alt text. It resolves the
 image path against the local built server to validate pre-deployment assets,
 rather than claiming an unpushed image is already hosted at the production URL.
 The 404 file and an arbitrary missing path must omit canonical/OG/Twitter identity
@@ -257,7 +257,7 @@ pnpm --filter yaffw-landing test:metadata
 
 Keep the origin environment identical to the build being checked. The metadata
 check is part of the existing smoke preview and adds no extra build. The sharing
-crop is saved to `tmp/landing-metadata/social-preview.jpg` for visual inspection
+card is saved to `tmp/landing-metadata/social-preview.png` for visual inspection
 when production identity is configured. #161's production-mode fixture uses a
 reserved test hostname and a temporary build directory; the real production
 origin is owned by `landing/config/deployment.json`, as confirmed by the user,
@@ -269,3 +269,20 @@ The metadata-only command reuses Astro's temporary preview and its 404 fallback.
 The generic Python file server above does not serve the site's 404 template for
 arbitrary missing paths. For an already running Astro preview/Worker, pass its
 origin via `YAFFW_LANDING_ORIGIN` to `node verification/landing/metadata-check.mjs`.
+
+The default smoke runner now includes 12 groups, including SEO. Run
+`pnpm --filter yaffw-landing test:seo` to check metadata and SEO in an existing
+build. The SEO check validates robots/sitemap XML and MIME types, canonical and
+JSON-LD identity, all emitted internal links/fragments, missing-page 404/noindex,
+and self-hosted font loading without JavaScript. An explicitly unconfigured
+preview must emit no structured identity or sitemap locations. This check needs
+Astro preview's error-page fallback; the generic Python server above is not a
+substitute.
+
+For a Wrangler runtime or deployed Worker, `YAFFW_SEO_EDGE=1` additionally checks
+permanent canonical redirects and immutable hashed-asset headers. Ordinary Astro
+preview does not implement those Cloudflare rules. The editor has a separate
+`verification/editor-seo-check.mjs` included in `pnpm test:editor`; its edge mode
+also checks real 404s, the legacy URL redirects and noindex fixture headers.
+See [the SEO audit](../../docs/verification/seo-audit.md) for commands, evidence,
+Lighthouse limits and outstanding Search Console/deployment work.

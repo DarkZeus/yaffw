@@ -1,7 +1,13 @@
 ---
 import "../styles/index.css";
+import "@fontsource-variable/inter/standard.css";
+import "@fontsource-variable/geist-mono";
+import interLatin from "@fontsource-variable/inter/files/inter-latin-standard-normal.woff2?url";
+import { Image } from "astro:assets";
+import brandIcon from "../../public/assets/icon-192.png";
 import PageMetadata from "../components/PageMetadata.astro";
 import { EDITOR_URL, REPO_URL } from "../links.js";
+import type { CanonicalPath } from "../site";
 
 interface Props {
 	title: string;
@@ -9,7 +15,7 @@ interface Props {
 	/** Social preview text, when it should differ from the meta description. */
 	ogDescription?: string;
 	/** Only content pages declare a stable canonical path. */
-	canonicalPath?: "/" | "/changelog/";
+	canonicalPath?: CanonicalPath;
 }
 
 const {
@@ -44,11 +50,12 @@ const sections = [
 			sizes="180x180"
 			href="/assets/apple-touch-icon.png"
 		/>
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
-			href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..700&family=Geist+Mono:wght@400;500&display=swap"
-			rel="stylesheet"
+			rel="preload"
+			href={interLatin}
+			as="font"
+			type="font/woff2"
+			crossorigin
 		/>
 	</head>
 	<body>
@@ -59,7 +66,15 @@ const sections = [
 		<header class="nav" data-nav>
 			<div class="nav__inner">
 				<a class="brand" href="/" aria-label="YAFFW home">
-					<img src="/assets/icon-192.png" alt="" width="24" height="24" />
+					<Image
+						src={brandIcon}
+						alt=""
+						width={24}
+						height={24}
+						densities={[1, 2, 3]}
+						format="webp"
+						loading="eager"
+					/>
 					<span>YAFFW</span>
 				</a>
 				<nav class="nav__links" aria-label="Primary">
@@ -131,7 +146,14 @@ const sections = [
 			<div class="container footer__inner">
 				<div class="footer__brand">
 					<a class="brand" href="/">
-						<img src="/assets/icon-192.png" alt="" width="20" height="20" />
+						<Image
+							src={brandIcon}
+							alt=""
+							width={20}
+							height={20}
+							densities={[1, 2, 3]}
+							format="webp"
+						/>
 						<span>YAFFW</span>
 					</a>
 					<p>A personal, opinionated video editor for the browser.</p>

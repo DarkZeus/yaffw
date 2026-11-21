@@ -8,13 +8,63 @@
 		<meta name="theme-color" content="oklch(0.173042 0 none)" />
 		<meta
 			name="description"
-			content="Edit local video in your browser with YAFFW."
+			content="Open the YAFFW video editor to select a range, adjust audio tracks, and export a local video. Processing stays on your device. No account needed."
 		/>
+		<link
+			rel="canonical"
+			href="https://yaffw.serhii-resnyanskyi.workers.dev/"
+		/>
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="YAFFW" />
+		<meta property="og:title" content="YAFFW video editor" />
+		<meta
+			property="og:description"
+			content="Select, mix, and export a local video in your browser. Your file stays on your device."
+		/>
+		<meta
+			property="og:url"
+			content="https://yaffw.serhii-resnyanskyi.workers.dev/"
+		/>
+		<meta
+			property="og:image"
+			content="https://yaffw.serhii-resnyanskyi.workers.dev/icon-512.png"
+		/>
+		<meta property="og:image:alt" content="YAFFW app icon" />
+		<meta property="og:image:width" content="512" />
+		<meta property="og:image:height" content="512" />
+		<meta property="og:image:type" content="image/png" />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content="YAFFW video editor" />
+		<meta
+			name="twitter:description"
+			content="Select, mix, and export a local video in your browser. Your file stays on your device."
+		/>
+		<meta
+			name="twitter:image"
+			content="https://yaffw.serhii-resnyanskyi.workers.dev/icon-512.png"
+		/>
+		<meta name="twitter:image:alt" content="YAFFW app icon" />
 		<link rel="manifest" href="/manifest.json" />
-		<title>YAFFW</title>
+		<title>YAFFW video editor</title>
 	</head>
 	<body>
 		<div id="app"></div>
+		<noscript>
+			<h1>YAFFW video editor</h1>
+			<p>
+				Open a local video, select what to keep, adjust audio tracks, and
+				export. Your file stays on your device.
+			</p>
+			<p>
+				The editor requires JavaScript and a browser with WebCodecs support,
+				such as Chrome or Edge.
+			</p>
+			<p>
+				<a href="https://yaffw-landing.serhii-resnyanskyi.workers.dev/"
+					>Learn about YAFFW, its features, and limitations</a
+				>
+			</p>
+		</noscript>
 		<script type="module" src="/src/main.tsx"></script>
 	</body>
 </html>

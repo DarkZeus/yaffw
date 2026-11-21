@@ -164,6 +164,14 @@ async function sectionLink(page, compact, javaScriptEnabled) {
 		await layout(page, true);
 		await page.locator('.nav__menu-links a[href="/#features"]').click();
 		await page.waitForURL("**/#features");
+		// Cross-document native fragment focus can settle after the load event
+		// while fonts/layout finish. Await the same observable focus contract.
+		// Poll from Node: page rAF callbacks are disabled in no-JavaScript contexts.
+		for (let attempt = 0; attempt < 100; attempt++) {
+			if (await page.evaluate(() => document.activeElement?.id === "features"))
+				break;
+			await delay(30);
+		}
 		assert.equal(
 			await page.evaluate(() => document.activeElement.id),
 			"features",

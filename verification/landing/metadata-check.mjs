@@ -51,16 +51,17 @@ try {
 			assert.ok((await meta(page, "og:description"))?.length > 15);
 			assert.equal(await meta(page, "twitter:title"), title);
 			assert.equal(await meta(page, "twitter:card"), "summary_large_image");
-			assert.equal(await meta(page, "robots"), null);
+			assert.equal(await meta(page, "robots"), "max-image-preview:large");
 			const image = new URL(await meta(page, "og:image"));
 			assert.equal(image.origin, production);
 			assert.equal(await meta(page, "twitter:image"), image.href);
-			assert.equal(await meta(page, "og:image:type"), "image/jpeg");
+			assert.equal(image.pathname, "/og.png");
+			assert.equal(await meta(page, "og:image:type"), "image/png");
 			assert.equal(await meta(page, "og:image:width"), "1200");
 			assert.equal(await meta(page, "og:image:height"), "630");
 			assert.match(
 				await meta(page, "og:image:alt"),
-				/Selection timeline.*waveform/,
+				/YAFFW.*Edit video in your browser.*No uploads.*No account/,
 			);
 			assert.equal(
 				await meta(page, "twitter:image:alt"),
@@ -72,9 +73,9 @@ try {
 				const localImage = new URL(image.pathname, origin).href;
 				const response = await context.request.get(localImage);
 				assert.equal(response.status(), 200);
-				assert.match(response.headers()["content-type"], /^image\/jpeg/);
+				assert.match(response.headers()["content-type"], /^image\/png/);
 				const bytes = await response.body();
-				await writeFile(resolve(output, "social-preview.jpg"), bytes);
+				await writeFile(resolve(output, "social-preview.png"), bytes);
 				const dimensions = await page.evaluate(async (url) => {
 					const image = new Image();
 					image.src = url;
@@ -83,7 +84,7 @@ try {
 				}, localImage);
 				assert.deepEqual(dimensions, [1200, 630]);
 				console.log(
-					`PASS sharing crop: ${dimensions.join("×")}, ${bytes.length} bytes`,
+					`PASS designed social card: ${dimensions.join("×")}, ${bytes.length} bytes`,
 				);
 				checkedImage = true;
 			}
