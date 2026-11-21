@@ -218,7 +218,7 @@ function PresetConfirmationPopover({
 		<Popover.Portal>
 			<Popover.Positioner
 				align="end"
-				className="workbench dark z-[60]"
+				className="workbench z-[60]"
 				side="top"
 				sideOffset={6}
 			>

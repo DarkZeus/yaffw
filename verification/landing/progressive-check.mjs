@@ -27,7 +27,15 @@ async function readable(page, selector) {
 	);
 }
 
+async function openSelectionExample(page) {
+	if (
+		!(await page.locator("[data-selection-example]").evaluate((el) => el.open))
+	)
+		await page.locator("[data-selection-example] > summary").click();
+}
+
 async function staticContent(page) {
+	await openSelectionExample(page);
 	// The independent, finite CSS hero entrance does not require JavaScript.
 	// Browser rAF polling is unavailable when page JavaScript is disabled.
 	for (let attempt = 0; attempt < 40; attempt++) {
@@ -60,13 +68,6 @@ async function staticContent(page) {
 			`${selector} needs a static Selection`,
 		);
 	}
-	const viewer = await page.locator("[data-viewer]").evaluate((element) => {
-		const layers = [element, ...element.querySelectorAll("*")];
-		return layers.some(
-			(layer) => getComputedStyle(layer).backgroundImage !== "none",
-		);
-	});
-	assert.ok(viewer, "The demo needs a static scene before enhancement");
 	assert.ok(
 		await page
 			.getByRole("link", { name: "Open the editor", exact: true })
@@ -104,6 +105,7 @@ async function controlsUnavailable(page) {
 }
 
 async function enhanced(page) {
+	await openSelectionExample(page);
 	await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
 	await page
 		.locator("[data-try][data-ready]")

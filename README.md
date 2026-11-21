@@ -25,6 +25,7 @@ The initial selection covers the whole video, so you can also use YAFFW to chang
 - **Choose the output:** export to MP4, MOV, MKV, WebM, or MPEG-TS with compatible video and audio codecs. Keep the source resolution or downscale, choose video and audio quality independently, set custom bitrates, or select No audio. Codec choices follow container compatibility; export support depends on your browser.
 - **Reuse settings:** save export presets in your browser, or load Last used settings. Loading a preset updates the settings draft; Apply commits it to the current edit.
 - **Arrange the workbench:** resize Preview, Transport, Selection, Media, Audio, and Export panels. Hold **Alt / Option** and drag panel content to move it into a split or a shared tab group. Right-click a panel to maximize, restore, or reset the layout. Your layout is remembered locally; small screens use a stacked arrangement.
+- **Appearance:** choose Light, Dark, or System from the import header or preview header. The preference is saved in your browser; Dark is the default. Switching appearance keeps the loaded video and editing decisions. Menus and export settings follow the same theme.
 
 ## Keyboard shortcuts
 
@@ -87,3 +88,11 @@ Thank you to the developers and contributors behind the libraries that make YAFF
 - [shadcn/ui](https://ui.shadcn.com/) by [shadcn](https://shadcn.com/), for the UI components.
 - [Tailwind CSS](https://tailwindcss.com/) by [Adam Wathan](https://adamwathan.me/) and the [Tailwind CSS team and contributors](https://github.com/tailwindlabs/tailwindcss/graphs/contributors), for the styling toolkit.
 - [wavesurfer.js](https://wavesurfer.xyz/) by [Ivan K. (katspaugh)](https://github.com/katspaugh), for interactive audio waveforms.
+
+### Appearance verification
+
+With the editor running locally, `node verification/workbench-appearance-check.mjs`
+checks default/restored appearance, changes to OS appearance, loaded-player and
+waveform continuity, portaled menus/dialogs, and the narrow layout. Override the
+URL with `YAFFW_EDITOR_ORIGIN`. Review captures are saved to
+`tmp/workbench-appearance/`. The default media fixture is bundled in the repo.

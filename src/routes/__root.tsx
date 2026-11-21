@@ -8,7 +8,7 @@ export const Route = createRootRoute({
 
 function RootComponent() {
 	return (
-		<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+		<ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
 			<main className="relative flex min-h-svh w-full flex-col overflow-hidden bg-transparent">
 				<Outlet />
 			</main>

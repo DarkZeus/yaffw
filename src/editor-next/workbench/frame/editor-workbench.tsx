@@ -16,6 +16,7 @@ import type { EditorSessionState } from "@/editor-core/session";
 import { cn } from "@/lib/utils";
 import { localVideoFileAccept, useLocalFileDrop } from "./use-local-file-drop";
 import type { LocalFileDropFeedback } from "./use-local-file-drop";
+import { WorkbenchAppearance } from "./workbench-appearance";
 
 export type EditorWorkbenchFrameProps = {
 	activeAsset: ReadyMediaAsset | null;
@@ -53,13 +54,14 @@ export function EditorWorkbenchFrame({
 	runtime,
 }: EditorWorkbenchFrameProps) {
 	return (
-		<main className="workbench dark cinema-workbench">
+		<main className="workbench cinema-workbench">
 			{!activeAsset && (
 				<header aria-label="Editor workbench top bar" className="cinema-header">
 					<div className="cinema-brand">
 						<Scissors aria-hidden="true" className="cinema-mark" />
 						<h1>YAFFW</h1>
 					</div>
+					<WorkbenchAppearance />
 				</header>
 			)}
 			<div className="cinema-stage" data-editing={activeAsset !== null}>

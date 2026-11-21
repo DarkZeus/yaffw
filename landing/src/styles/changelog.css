@@ -16,7 +16,7 @@
 .changelog__title {
 	font-size: clamp(40px, 5.6vw, 72px);
 	line-height: 1;
-	font-weight: 600;
+	font-weight: 500;
 	letter-spacing: -0.04em;
 }
 .changelog__empty {
@@ -57,14 +57,14 @@
 .release__tag {
 	padding: 2px 8px;
 	border-radius: 6px;
-	background: var(--workbench-lane);
+	background: var(--surface);
 	font-size: 12.5px;
 	color: var(--foreground);
 }
 .release__name {
 	font-size: clamp(22px, 2.4vw, 28px);
 	line-height: 1.2;
-	font-weight: 600;
+	font-weight: 500;
 	letter-spacing: -0.025em;
 	text-wrap: balance;
 }
@@ -75,7 +75,7 @@
 	transition: text-decoration-color 150ms var(--ease-out);
 }
 .release__name a:hover {
-	text-decoration-color: oklch(1 0 none / 0.3);
+	text-decoration-color: var(--input);
 }
 
 /* Entry body, rendered from Markdown */
@@ -84,7 +84,7 @@
 	max-width: 68ch;
 	font-size: 15.5px;
 	line-height: 1.65;
-	color: oklch(1 0 none / 0.78);
+	color: var(--muted-foreground);
 }
 .prose > * + * {
 	margin-top: 14px;
@@ -92,7 +92,7 @@
 .prose :is(h1, h2, h3, h4) {
 	margin-top: 28px;
 	font-size: 16px;
-	font-weight: 600;
+	font-weight: 500;
 	letter-spacing: -0.01em;
 	color: var(--foreground);
 }
@@ -108,7 +108,7 @@
 .prose a {
 	color: var(--foreground);
 	text-decoration: underline;
-	text-decoration-color: oklch(1 0 none / 0.3);
+	text-decoration-color: var(--input);
 	text-underline-offset: 3px;
 	transition: text-decoration-color 150ms var(--ease-out);
 }
@@ -118,14 +118,14 @@
 .prose code {
 	padding: 1px 6px;
 	border-radius: 5px;
-	background: var(--workbench-lane);
+	background: var(--surface);
 	font-family: var(--font-mono);
 	font-size: 0.88em;
 }
 .prose pre {
 	padding: 16px;
 	border-radius: 10px;
-	background: var(--workbench);
+	background: var(--surface);
 	border: 1px solid var(--border);
 	overflow-x: auto;
 }

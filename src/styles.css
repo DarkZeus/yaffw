@@ -135,23 +135,23 @@ code {
 
 .workbench,
 .quality-settings-dialog {
-	color-scheme: dark;
+	color-scheme: var(--workbench-color-scheme);
 	--background: var(--workbench);
 	--foreground: var(--workbench-foreground);
 	--card: var(--workbench-inspector);
 	--card-foreground: var(--workbench-foreground);
 	--popover: var(--workbench-inspector);
 	--popover-foreground: var(--workbench-foreground);
-	--primary: oklch(0.970151 0 none);
-	--primary-foreground: oklch(0.173042 0 none);
+	--primary: var(--workbench-control);
+	--primary-foreground: var(--workbench-control-foreground);
 	--secondary: var(--workbench-transport);
 	--secondary-foreground: var(--workbench-foreground);
 	--muted: var(--workbench-hover);
-	--muted-foreground: oklch(1 0 none / 0.56);
+	--muted-foreground: var(--workbench-rail-foreground);
 	--accent: var(--workbench-hover);
 	--accent-foreground: var(--workbench-foreground);
 	--destructive: var(--workbench-destructive);
-	--destructive-foreground: oklch(0.98 0.016 78);
+	--destructive-foreground: var(--workbench-destructive-foreground);
 	--border: var(--workbench-border);
 	--input: var(--workbench-border-strong);
 	--ring: var(--workbench-focus);

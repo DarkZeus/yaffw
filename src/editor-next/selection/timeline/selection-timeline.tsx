@@ -936,7 +936,7 @@ const VideoThumbnailStrip = memo(function VideoThumbnailStrip({
 											draggable={false}
 											src={slot.frame.url}
 										/>
-										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected/85 px-1.5 py-0.5 text-[10px] leading-none text-workbench-selected-foreground tabular-nums">
+										<span className="absolute inset-x-0 bottom-0 z-10 truncate bg-workbench-selected px-1.5 py-0.5 text-[10px] leading-none text-workbench-selected-foreground tabular-nums">
 											{formatVideoThumbnailTime(slot.timestampUs)}
 										</span>
 									</>

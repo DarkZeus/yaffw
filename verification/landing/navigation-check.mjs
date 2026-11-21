@@ -60,7 +60,9 @@ try {
 		{},
 		async (page) => {
 			await page.goto(`${origin}/#source`);
-			await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
+			await page
+				.locator("[data-demo][data-ready]")
+				.waitFor({ state: "attached", timeout: 5000 });
 			await page
 				.locator(".nav__links")
 				.getByRole("link", { name: "Features", exact: true })

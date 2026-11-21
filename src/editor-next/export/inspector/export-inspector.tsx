@@ -435,7 +435,7 @@ function StartExportAction({
 	return (
 		<ExportActionShell>
 			<Button
-				className="h-11 w-full bg-workbench-progress text-workbench-selected-foreground hover:bg-workbench-progress/90"
+				className="h-11 w-full"
 				disabled={disabled}
 				onClick={onStartExport}
 				type="button"

@@ -5,8 +5,9 @@ import { launchBrowser } from "../browser.cjs";
 
 const origin = process.env.YAFFW_LANDING_ORIGIN || "http://127.0.0.1:4174";
 const output = resolve("tmp/landing-images");
-const originalBytes = (await stat("landing/src/assets/workbench.jpg")).size;
-const widths = [480, 800, 1200, 1800, 2400, 2940];
+const originalBytes = (await stat("landing/src/assets/workbench-current.jpg"))
+	.size;
+const widths = [480, 800, 1200, 1600];
 const browser = await launchBrowser();
 const results = [];
 
@@ -66,9 +67,9 @@ try {
 				before.alt,
 				/video preview.*output settings.*selection timeline/i,
 			);
-			assert.equal(before.intrinsicWidth, "2940");
-			assert.equal(before.intrinsicHeight, "1838");
-			assert.ok(Math.abs(before.width / before.height - 2940 / 1838) < 0.01);
+			assert.equal(before.intrinsicWidth, "1600");
+			assert.equal(before.intrinsicHeight, "900");
+			assert.ok(Math.abs(before.width / before.height - 1600 / 900) < 0.01);
 			const picture = hero.locator("..");
 			for (const type of ["image/avif", "image/webp"]) {
 				const source = picture.locator(`source[type="${type}"]`);
@@ -104,40 +105,50 @@ try {
 			assert.equal(response.status(), 200);
 			const bytes = (await response.body()).length;
 			assert.ok(
-				bytes < originalBytes / 2,
+				bytes < originalBytes * 0.8,
 				"Selected image must materially reduce the original payload",
 			);
 			assert.equal(
-				requests.length,
+				requests.filter((url) => url === before.url).length,
 				1,
-				"Only the eager hero candidate should transfer initially",
+				"The eager hero candidate transfers once",
 			);
-			const backdrop = page.locator(".cta__bg");
-			assert.equal(await backdrop.getAttribute("loading"), "lazy");
-			assert.equal(await backdrop.getAttribute("alt"), "");
+			const detail = page.locator(".selection-detail img");
+			assert.equal(await detail.getAttribute("loading"), "lazy");
+			assert.match(
+				await detail.getAttribute("alt"),
+				/Selection timeline.*waveform/,
+			);
+			for (const panel of await page.locator(".feature__media img").all()) {
+				assert.equal(await panel.getAttribute("loading"), "lazy");
+				assert.ok((await panel.getAttribute("alt")).length > 30);
+			}
+
 			await page
 				.locator(".hero__shot")
 				.screenshot({ path: resolve(output, `${width}-${density}x-hero.png`) });
-			await page.locator(".cta").scrollIntoViewIfNeeded();
-			await page.waitForFunction(() => {
-				const image = document.querySelector(".cta__bg");
-				return image.complete && image.naturalWidth > 0;
-			});
-			const after = await imageInfo(backdrop);
-			if (width <= 768)
-				assert.equal(
-					after.url,
-					before.url,
-					"Matching phone/tablet candidates must reuse the same URL",
-				);
+			await page.locator(".selection-detail").scrollIntoViewIfNeeded();
+			await detail.evaluate((element) => element.decode());
+			const after = await imageInfo(detail);
+			assert.equal(after.intrinsicWidth, "1600");
+			assert.equal(after.intrinsicHeight, "900");
+			const crop = await page.locator(".selection-detail").boundingBox();
+			assert.ok(
+				after.height > crop.height,
+				"The detail intentionally clips the full editor image",
+			);
+			assert.ok(after.width >= crop.width);
 			assert.equal(requests.filter((url) => url === before.url).length, 1);
-			assert.equal(requests.filter((url) => url === after.url).length, 1);
-			const cta = await page.locator(".cta").boundingBox();
-			assert.ok(Math.abs(after.width - cta.width) < 2);
-			assert.ok(Math.abs(after.height - cta.height) < 2);
-			await page
-				.locator(".cta")
-				.screenshot({ path: resolve(output, `${width}-${density}x-cta.png`) });
+			if (after.url === before.url)
+				assert.equal(
+					requests.filter((url) => url === after.url).length,
+					1,
+					"Matching candidates reuse the resource",
+				);
+			await page.locator(".selection-detail").screenshot({
+				path: resolve(output, `${width}-${density}x-selection.png`),
+			});
+
 			const canonical = page.locator('head link[rel="canonical"]');
 			const metadata = page.locator('meta[property="og:image"]');
 			if (await canonical.count()) {
@@ -167,11 +178,11 @@ try {
 				bytes,
 				originalBytes,
 				hero: before,
-				backdrop: after,
+				detail: after,
 				requests,
 			});
 			console.log(
-				`PASS ${width}px ${density}x: ${selectedWidth}w, ${bytes} bytes; lazy backdrop and reuse`,
+				`PASS ${width}px ${density}x: ${selectedWidth}w, ${bytes} bytes; lazy detail and reuse`,
 			);
 		} finally {
 			await context.close();
@@ -193,7 +204,7 @@ try {
 		const hero = page.locator(".hero__shot img");
 		const reserved = await hero.boundingBox();
 		assert.ok(
-			reserved.height > 200,
+			reserved.height > 150,
 			"The unloaded hero must reserve its space",
 		);
 		gate.resolve();

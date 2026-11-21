@@ -1,0 +1,60 @@
+/* Real editor views, each paired with the capability it explains. */
+.feature-pair {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 40px;
+}
+.feature__media {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 392px;
+	padding: 32px;
+	overflow: hidden;
+	background: var(--surface);
+	border-radius: 8px;
+}
+.feature__media picture {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	min-width: 0;
+}
+.feature__media img {
+	max-height: 100%;
+	max-width: 100%;
+	height: auto;
+	width: auto;
+	border-radius: 6px;
+}
+.feature h3,
+.feature-notes h3 {
+	margin-top: 24px;
+	font-size: 18px;
+	font-weight: 500;
+	letter-spacing: -0.02em;
+}
+.feature p {
+	margin-top: 10px;
+	max-width: 52ch;
+	font-size: 15px;
+	line-height: 1.65;
+	color: var(--muted-foreground);
+}
+.feature-notes {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 48px;
+	margin-top: 64px;
+}
+.feature-notes h3 {
+	margin-top: 0;
+	font-size: 16px;
+}
+.feature-notes p {
+	margin-top: 12px;
+	font-size: 15px;
+	line-height: 1.65;
+	color: var(--muted-foreground);
+}

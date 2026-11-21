@@ -1,245 +1,52 @@
-/* ───────── Local-first ───────── */
-
-/* ── Statement: one number, one sentence, three facts ── */
-.local__num {
-	font-size: clamp(56px, 10vw, 136px);
-	line-height: 0.95;
-	font-weight: 600;
-	letter-spacing: -0.04em;
+.local-section {
+	margin-top: 128px;
+	padding-block: 88px;
+	background: var(--surface);
 }
-.local__num .mono {
-	color: var(--chart-2);
-	letter-spacing: -0.04em;
+.local {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 96px;
 }
-.local__title {
-	max-width: 760px;
+.local .section__title {
 	margin-top: 32px;
-	font-size: clamp(20px, 2.2vw, 26px);
-	line-height: 1.3;
+}
+.local .chapter-lead {
+	max-width: 38ch;
+}
+.local__details {
+	align-self: center;
+}
+.local__route {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 24px 0 40px;
+	font-size: 14px;
 	font-weight: 500;
-	letter-spacing: -0.02em;
+}
+.local__route span[aria-hidden] {
 	color: var(--muted-foreground);
-	text-wrap: pretty;
+	font-weight: 400;
 }
 .local__facts {
-	list-style: none;
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 32px;
-	margin: 64px 0 0;
-	padding: 24px 0 0;
-	border-top: 1px solid var(--border);
+	gap: 28px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 .local__facts li {
 	display: grid;
-	gap: 4px;
-	font-size: 15px;
+	gap: 6px;
 }
 .local__facts b {
-	font-weight: 600;
+	font-size: 15px;
+	font-weight: 500;
 }
-.local__facts span {
+.local__facts li > span {
+	font-size: 15px;
+	line-height: 1.65;
 	color: var(--muted-foreground);
-}
-
-/* ── Boundary: what's on your computer vs. the web ── */
-.bound {
-	margin-top: 48px;
-	display: grid;
-	justify-items: center;
-}
-.bound__web,
-.bound__pc {
-	position: relative;
-	width: 100%;
-	padding: 40px 24px 24px;
-	border-radius: 16px;
-	border: 1px dashed var(--input);
-}
-.bound__web {
-	width: min(100%, 420px);
-	display: grid;
-	justify-items: center;
-}
-.bound__pc {
-	border-style: solid;
-	border-color: color-mix(in oklch, var(--chart-2) 45%, var(--border));
-	background: color-mix(in oklch, var(--chart-2) 4%, transparent);
-}
-.bound__tag {
-	position: absolute;
-	top: 12px;
-	left: 16px;
-	font-size: 12px;
-	color: var(--muted-foreground);
-}
-.bound__pc .bound__tag {
-	color: var(--chart-2);
-}
-.bound__line {
-	position: relative;
-	width: 2px;
-	height: 56px;
-	background: repeating-linear-gradient(
-		to bottom,
-		var(--input) 0 6px,
-		transparent 6px 10px
-	);
-	overflow: hidden;
-}
-.bound__code {
-	position: absolute;
-	left: 0;
-	width: 2px;
-	height: 16px;
-	background: var(--foreground);
-	translate: 0 -16px;
-}
-/* The editor's code arrives once; after that the web side goes quiet. */
-.bound[data-live] .bound__code {
-	animation: bound-down 800ms var(--ease-in-out) both;
-}
-@keyframes bound-down {
-	to {
-		translate: 0 56px;
-	}
-}
-.bound__web {
-	transition: border-color 400ms var(--ease-out) 900ms;
-}
-.bound[data-live] .bound__web {
-	border-color: var(--border);
-}
-.bound__row {
-	display: grid;
-	grid-template-columns: 1fr 64px 1.2fr 64px 1fr;
-	align-items: center;
-}
-.bound__node {
-	display: grid;
-	justify-items: center;
-	gap: 4px;
-	padding: 20px 16px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: var(--workbench);
-	text-align: center;
-	font-size: 14px;
-}
-.bound__node span {
-	font-size: 13px;
-	color: var(--muted-foreground);
-}
-.bound__node--tab {
-	border-color: var(--input);
-	background: var(--workbench-inspector);
-}
-.bound__node--tab img {
-	border-radius: 7px;
-	margin-bottom: 4px;
-}
-.bound__wire {
-	position: relative;
-	height: 2px;
-	background: repeating-linear-gradient(
-		to right,
-		var(--input) 0 6px,
-		transparent 6px 10px
-	);
-	overflow: hidden;
-}
-.bound__wire i {
-	--p0: -24px 0;
-	--p1: 64px 0;
-	position: absolute;
-	inset: 0 auto 0 0;
-	width: 24px;
-	background: var(--accent);
-	translate: var(--p0);
-}
-/* One cycle: file → tab (tab lights) → download (file lights). Starts after the code lands. */
-.bound[data-live] .bound__wire i,
-.bound[data-live] .bound__node--tab::after,
-.bound[data-live] .bound__node--out::after {
-	animation: 2800ms linear 800ms infinite both;
-}
-.bound[data-live][data-playing="false"] .bound__wire i,
-.bound[data-live][data-playing="false"] .bound__node::after {
-	animation-play-state: paused;
-}
-.bound[data-live] .bound__wire--in i {
-	animation-name: bound-in;
-}
-.bound[data-live] .bound__wire--out i {
-	animation-name: bound-out;
-}
-.bound[data-live] .bound__node--tab::after {
-	animation-name: bound-tab;
-}
-.bound[data-live] .bound__node--out::after {
-	animation-name: bound-done;
-}
-@keyframes bound-in {
-	0% {
-		translate: var(--p0);
-		animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
-	}
-	30%,
-	100% {
-		translate: var(--p1);
-	}
-}
-@keyframes bound-out {
-	0%,
-	52% {
-		translate: var(--p0);
-		animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1);
-	}
-	82%,
-	100% {
-		translate: var(--p1);
-	}
-}
-@keyframes bound-tab {
-	0%,
-	24% {
-		opacity: 0;
-		animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-	}
-	32%,
-	54% {
-		opacity: 1;
-	}
-	70%,
-	100% {
-		opacity: 0;
-	}
-}
-@keyframes bound-done {
-	0%,
-	76% {
-		opacity: 0;
-		animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-	}
-	84% {
-		opacity: 1;
-	}
-	100% {
-		opacity: 0;
-	}
-}
-.bound__node--tab,
-.bound__node--out {
-	position: relative;
-}
-.bound__node--tab::after,
-.bound__node--out::after {
-	content: "";
-	position: absolute;
-	inset: -1px;
-	border-radius: inherit;
-	border: 1px solid var(--accent);
-	box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
-	opacity: 0;
-	pointer-events: none;
 }

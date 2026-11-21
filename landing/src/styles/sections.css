@@ -1,27 +1,114 @@
-/* ───────── Sections ───────── */
-
 .section {
-	padding-block: clamp(96px, 12vw, 160px) 0;
+	padding-top: 128px;
 }
-.section__head {
-	max-width: 880px;
-	margin-bottom: clamp(32px, 5vw, 48px);
+.chapter-head {
+	display: grid;
+	grid-template-columns: 1fr 3fr;
+	gap: 48px;
+	margin-bottom: 48px;
 }
-.section__head--center {
-	margin-inline: auto;
-	text-align: center;
+.chapter-label {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--muted-foreground);
+	padding-top: 8px;
 }
 .section__title {
-	margin-top: 16px;
-	font-size: clamp(28px, 4vw, 48px);
-	line-height: 1.08;
-	font-weight: 600;
-	letter-spacing: -0.035em;
+	margin: 0;
+	font-size: clamp(30px, 3.5vw, 48px);
+	font-weight: 500;
+	line-height: 1.12;
+	letter-spacing: -0.04em;
 	text-wrap: balance;
 }
-.section__title .muted {
-	color: oklch(1 0 none / 0.42);
+.chapter-lead {
+	margin-top: 20px;
+	max-width: 52ch;
+	font-size: 17px;
+	line-height: 1.6;
+	color: var(--muted-foreground);
 }
-
-/* Content is visible by default. scripts/main.js may animate newly entering
-   content after initialization; a missing script never hides the page. */
+.workflow {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 48px;
+	list-style: none;
+	margin: 0 0 40px;
+	padding: 0;
+	counter-reset: none;
+}
+.workflow li::before {
+	display: none;
+}
+.workflow__number {
+	display: block;
+	margin-bottom: 20px;
+	color: var(--muted-foreground);
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+.workflow b {
+	display: block;
+	font-size: 16px;
+	font-weight: 500;
+}
+.workflow p {
+	margin-top: 10px;
+	font-size: 15px;
+	line-height: 1.65;
+	color: var(--muted-foreground);
+}
+.selection-detail {
+	overflow: hidden;
+	height: clamp(160px, 22vw, 280px);
+	border-radius: 8px;
+	background: var(--surface);
+	position: relative;
+}
+.selection-detail picture {
+	display: block;
+	position: absolute;
+	inset: auto 0 0;
+}
+.selection-detail img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+.footnote {
+	margin-top: 16px;
+	max-width: 72ch;
+	font-size: 14px;
+	color: var(--muted-foreground);
+}
+.selection-example {
+	margin-top: 32px;
+}
+.selection-example > summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding-block: 16px;
+	border-block: 1px solid var(--border);
+	cursor: pointer;
+	font-size: 14px;
+	list-style: none;
+}
+.selection-example > summary::-webkit-details-marker {
+	display: none;
+}
+.selection-example > summary span {
+	font-size: 22px;
+}
+.selection-example[open] > summary span {
+	transform: rotate(45deg);
+}
+.example-note {
+	padding-block: 24px;
+	font-size: 14px;
+	color: var(--muted-foreground);
+}
+.example-note a {
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}

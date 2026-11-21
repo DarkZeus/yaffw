@@ -245,17 +245,13 @@ async function enhancedDismissal(page, context) {
 	);
 
 	await summary.click();
-	const outside = page.locator("[data-demo] [data-play]");
+	const outside = page.locator("[data-selection-example] > summary");
 	await outside.click();
 	await expanded(page, false);
 	assert.ok(
 		await outside.evaluate((element) => element === document.activeElement),
 		"Outside pointer dismissal must preserve the clicked control's focus",
 	);
-	if (
-		(await page.locator("[data-demo]").getAttribute("data-playing")) === "true"
-	)
-		await outside.click();
 
 	await summary.click();
 	const initial = page.url();

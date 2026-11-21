@@ -58,13 +58,15 @@ async function essentialContent(page) {
 	for (const meaning of [
 		/open|file/i,
 		/selection|keep|range/i,
-		/audio/i,
+
 		/review/i,
 		/export/i,
 		/download/i,
 	])
 		assert.match(workflow, meaning);
 	assert.ok(await page.locator("#demo .footnote").isVisible());
+	assert.match(await page.locator("#features").textContent(), /audio/i);
+	assert.ok(await page.locator("#features picture").count());
 	const limits = await page.locator("#limits").textContent();
 	for (const meaning of [
 		/WebCodecs|Chrome|Chromium/i,

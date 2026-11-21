@@ -1,101 +1,67 @@
-/* ──────────────────────────────────────────────────────────────
-   YAFFW landing: tokens and base elements.
-   All authored colors are oklch(); achromatic hues use `none`.
-   ────────────────────────────────────────────────────────────── */
-
+/* The landing has its own light canvas; depicted editor surfaces keep their palette. */
 :root {
-	color-scheme: dark;
-
-	/* Workbench palette (--workbench-*) comes from ../../src/workbench-tokens.css via <html class="workbench">. */
-	--chart-2: oklch(0.696 0.17 162.48);
-	--chart-3: oklch(0.769 0.188 70.08);
+	color-scheme: light;
 	--black: oklch(0 0 none);
 	--white: oklch(1 0 none);
-
-	/* Semantic aliases, mapped the same way the app maps them */
-	--background: var(--workbench-viewer);
+	--background: var(--white);
+	--foreground: oklch(0.18 0 none);
+	--surface: oklch(0.975 0 none);
+	--card: var(--white);
+	--primary: var(--foreground);
+	--primary-foreground: var(--white);
+	--muted-foreground: oklch(0 0 none / 0.64);
+	--border: oklch(0 0 none / 0.1);
+	--input: oklch(0 0 none / 0.18);
+	--ring: var(--workbench-focus);
+	--accent: var(--foreground);
+	--chart-2: oklch(0.4 0.1 155);
+	--chart-3: oklch(0.769 0.188 70.08);
+	--radius: 8px;
+	--container: 1160px;
+	--gutter: 40px;
+	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+	--font-sans:
+		"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.product-surface {
+	color-scheme: dark;
+	color: var(--workbench-foreground);
 	--foreground: var(--workbench-foreground);
-	--card: var(--workbench-inspector);
-	--primary: var(--workbench-foreground);
-	--primary-foreground: var(--workbench);
 	--muted-foreground: var(--workbench-rail-foreground);
 	--border: var(--workbench-border);
 	--input: var(--workbench-border-strong);
-	--ring: var(--workbench-focus);
+	--primary: var(--workbench-control);
+	--primary-foreground: var(--workbench-control-foreground);
 	--accent: var(--workbench-selected);
-
-	/* Landing-only derived values */
-	--hairline-top: inset 0 1px 0 oklch(1 0 none / 0.07);
-	--accent-soft: color-mix(in oklch, var(--accent) 14%, transparent);
-	/* Lit rim: brighter where light falls (top), quiet down the sides. Use as a border-box background layer. */
-	--edge: linear-gradient(
-		to bottom,
-		oklch(1 0 none / 0.16),
-		oklch(1 0 none / 0.06) 36%,
-		oklch(1 0 none / 0.07)
-	);
-	/* Product mocks float above the page; cards stay flat. */
-	--shadow-float:
-		0 1px 1px oklch(0 0 none / 0.3), 0 16px 32px -12px oklch(0 0 none / 0.55),
-		0 56px 112px -32px oklch(0 0 none / 0.75);
-
-	--radius: 0.625rem;
-	--container: 1160px;
-	--gutter: clamp(16px, 4vw, 32px);
-	--ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-	--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-	--font-sans:
-		"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-	--font-mono:
-		"Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-		monospace;
 }
-
 *,
 *::before,
 *::after {
 	box-sizing: border-box;
 }
-
-/* Pointer light on bento cards (0 = off). Registered so it can fade. */
-@property --spot {
-	syntax: "<number>";
-	inherits: true;
-	initial-value: 0;
-}
-
 html {
 	scroll-behavior: smooth;
-	scroll-padding-top: var(--nav-offset, calc(4rem + 32px));
+	scroll-padding-top: var(--nav-offset, calc(3.75rem + 16px));
 	-webkit-text-size-adjust: 100%;
-	scrollbar-color: oklch(1 0 none / 0.16) transparent;
 }
-
 body {
 	margin: 0;
 	background: var(--background);
 	color: var(--foreground);
-	font-family: var(--font-sans);
-	font-size: 16px;
-	line-height: 1.55;
+	font: 16px/1.55 var(--font-sans);
 	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
 	text-rendering: optimizeLegibility;
-	caret-color: var(--accent);
-	overflow-x: clip;
 }
-
 img,
 svg {
 	display: block;
 	max-width: 100%;
 }
-
 a {
 	color: inherit;
 	text-decoration: none;
 }
-
 button {
 	font: inherit;
 	color: inherit;
@@ -104,27 +70,20 @@ button {
 	padding: 0;
 	cursor: pointer;
 }
-
 [hidden] {
 	display: none !important;
 }
-
 ::selection {
-	background: color-mix(in oklch, var(--accent) 35%, transparent);
-	color: var(--white);
+	background: oklch(0 0 none / 0.13);
 }
-
 :focus-visible {
 	outline: 2px solid var(--ring);
-	outline-offset: 3px;
-	border-radius: 6px;
+	outline-offset: 4px;
+	border-radius: 4px;
 }
-/* Native section destinations take focus for keyboard continuity. Keep the ring
-   on interactive controls rather than outlining an entire section. */
 [data-scroll-target]:focus {
 	outline: none;
 }
-
 h1,
 h2,
 h3,
@@ -132,39 +91,46 @@ h4,
 p {
 	margin: 0;
 }
-
 kbd {
 	font-family: var(--font-mono);
 }
-
 .mono {
 	font-family: var(--font-mono);
 	font-variant-numeric: tabular-nums;
-	letter-spacing: -0.01em;
 }
-
 .dim {
 	color: var(--muted-foreground);
 }
-
 .container {
 	width: 100%;
 	max-width: calc(var(--container) + var(--gutter) * 2);
 	margin-inline: auto;
 	padding-inline: var(--gutter);
 }
-
 .skip-link {
 	position: absolute;
-	left: 16px;
-	top: -48px;
+	left: 24px;
+	top: -80px;
 	z-index: 100;
-	padding: 8px 12px;
+	padding: 12px 16px;
 	border-radius: 8px;
 	background: var(--primary);
 	color: var(--primary-foreground);
-	font-size: 14px;
 }
 .skip-link:focus {
 	top: 16px;
+}
+.text-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 36px;
+	font-size: 14px;
+	font-weight: 500;
+	text-decoration: underline;
+	text-underline-offset: 5px;
+	text-decoration-color: var(--input);
+	transition: text-decoration-color 150ms ease;
+}
+.text-link:hover {
+	text-decoration-color: currentColor;
 }

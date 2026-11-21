@@ -4,6 +4,10 @@
  */
 .workbench,
 .quality-settings-dialog {
+	--workbench-color-scheme: dark;
+	--workbench-control: oklch(0.970151 0 none);
+	--workbench-control-foreground: oklch(0.173042 0 none);
+	--workbench-destructive-foreground: oklch(0.98 0.016 78);
 	--workbench: oklch(0.173042 0 none);
 	--workbench-foreground: oklch(0.970151 0 none);
 	--workbench-rail: oklch(0.173042 0 none);
@@ -30,4 +34,39 @@
 	--workbench-destructive: oklch(0.752118 0.149073 27.042077);
 	--workbench-waveform: oklch(0.715474 0 none);
 	--workbench-waveform-guide: oklch(0.449533 0 none);
+}
+
+/* The light palette changes chrome, not media or the meaning of semantic colors. */
+.light:is(.workbench, .quality-settings-dialog),
+.light :is(.workbench, .quality-settings-dialog) {
+	--workbench-color-scheme: light;
+	--workbench-control: oklch(0.2 0 none);
+	--workbench-control-foreground: oklch(1 0 none);
+	--workbench-destructive-foreground: oklch(1 0 none);
+	--workbench: oklch(0.97 0 none);
+	--workbench-foreground: oklch(0.2 0 none);
+	--workbench-rail: oklch(0.975 0 none);
+	--workbench-rail-foreground: oklch(0 0 none / 0.64);
+	--workbench-viewer: oklch(0.98 0 none);
+	--workbench-timeline: oklch(0.965 0 none);
+	--workbench-timeline-foreground: oklch(0.2 0 none);
+	--workbench-ruler: oklch(0.94 0 none);
+	--workbench-lane: oklch(0.985 0 none);
+	--workbench-lane-alt: oklch(0.96 0 none);
+	--workbench-lane-foreground: oklch(0.2 0 none);
+	--workbench-inspector: oklch(1 0 none);
+	--workbench-transport: oklch(0.985 0 none);
+	--workbench-border: oklch(0 0 none / 0.1);
+	--workbench-border-strong: oklch(0 0 none / 0.18);
+	--workbench-focus: oklch(0.54 0.12 72);
+	--workbench-hover: oklch(0 0 none / 0.06);
+	--workbench-selected: oklch(0.59 0.12 79.83447);
+	--workbench-selected-foreground: oklch(0.173042 0 none);
+	--workbench-disabled: oklch(0.9 0 none);
+	--workbench-loading: oklch(0.86 0 none);
+	--workbench-progress: oklch(0.23 0 none);
+	--workbench-playhead: oklch(0.57 0.19 27.550625);
+	--workbench-destructive: oklch(0.53 0.19 27.042077);
+	--workbench-waveform: oklch(0.43 0 none);
+	--workbench-waveform-guide: oklch(0.75 0 none);
 }

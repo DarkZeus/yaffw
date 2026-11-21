@@ -16,7 +16,7 @@
 }
 .copy-btn:hover {
 	color: var(--foreground);
-	background: var(--workbench-hover);
+	background: oklch(0 0 none / 0.06);
 }
 .copy-btn[data-copied="true"] {
 	color: var(--chart-2);
@@ -38,13 +38,9 @@
 }
 .repo {
 	position: relative;
-	padding: 20px;
-	border-radius: 16px;
-	border: 1px solid transparent;
-	background:
-		linear-gradient(var(--workbench), var(--workbench)) padding-box,
-		var(--edge) border-box;
-	box-shadow: var(--shadow-float);
+	padding: 24px;
+	border-radius: 8px;
+	background: var(--surface);
 }
 .repo__head {
 	display: flex;

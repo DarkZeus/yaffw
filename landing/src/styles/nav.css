@@ -1,131 +1,88 @@
-/* ───────── Nav ───────── */
-
 .nav {
-	position: fixed;
-	inset: 12px 0 auto;
+	position: sticky;
+	top: 0;
 	z-index: 50;
-	padding-inline: var(--gutter);
-	pointer-events: none;
+	background: var(--background);
 }
 .nav__inner {
-	pointer-events: auto;
-	max-width: 1080px;
-	margin: 0 auto;
-	min-height: 52px;
+	max-width: calc(var(--container) + var(--gutter) * 2);
+	min-height: 60px;
+	padding: 8px var(--gutter);
+	margin: auto;
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	flex-wrap: wrap;
-	padding: 0 10px 0 16px;
-	border-radius: 14px;
-	border: 1px solid transparent;
-	transition:
-		background-color 150ms var(--ease-out),
-		border-color 150ms var(--ease-out),
-		box-shadow 150ms var(--ease-out),
-		backdrop-filter 150ms var(--ease-out);
-}
-.nav[data-scrolled="true"] .nav__inner {
-	background: color-mix(in oklch, var(--workbench-viewer) 85%, transparent);
-	border-color: var(--border);
-	box-shadow:
-		var(--hairline-top),
-		0 8px 24px oklch(0 0 none / 0.06);
-	backdrop-filter: blur(16px) saturate(1.4);
-	-webkit-backdrop-filter: blur(16px) saturate(1.4);
+	gap: 24px;
 }
 .brand {
 	display: inline-flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
+	font-size: 1rem;
 	font-weight: 600;
-	font-size: 15px;
-	letter-spacing: -0.02em;
+	letter-spacing: -0.025em;
 }
 .brand img {
-	border-radius: 6px;
+	border-radius: 5px;
 }
 .nav .brand {
 	min-height: 44px;
-	font-size: 0.9375rem;
 }
 .nav__links {
 	display: flex;
-	flex: 1 1 0;
-	flex-wrap: wrap;
-	justify-content: center;
-	min-width: 0;
-	gap: 4px;
-	margin-inline: auto;
+	align-items: center;
+	gap: 12px;
+	margin-left: auto;
 }
 .nav__sections {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 4px;
-}
-.nav__compact {
-	display: none;
+	gap: 12px;
 }
 .nav__links a {
-	padding: 6px 12px;
-	border-radius: 8px;
-	font-size: 0.84375rem;
+	display: flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 8px;
+	font-size: 0.875rem;
 	color: var(--muted-foreground);
-	transition:
-		color 150ms var(--ease-out),
-		background-color 150ms var(--ease-out);
+	transition: color 150ms ease;
 }
-.nav__links a[aria-current="page"],
-.nav__links a:hover {
+.nav__links a:hover,
+.nav__links a[aria-current="page"] {
 	color: var(--foreground);
-	background: var(--workbench-hover);
 }
 .nav__actions {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 16px;
 }
 .icon-link {
 	display: grid;
 	place-items: center;
-	width: 34px;
-	height: 34px;
-	border-radius: 8px;
+	width: 44px;
+	height: 44px;
 	color: var(--muted-foreground);
-	transition:
-		color 150ms var(--ease-out),
-		background-color 150ms var(--ease-out);
-}
-.icon-link:hover {
-	color: var(--foreground);
-	background: var(--workbench-hover);
+	border-radius: 8px;
 }
 .icon-link svg {
-	width: 18px;
-	height: 18px;
+	width: 19px;
+	height: 19px;
 }
-
-.nav__actions .btn {
-	height: auto;
-	min-height: 44px;
-	padding-block: 6px;
-	font-size: 0.8125rem;
+.icon-link:hover {
+	background: var(--surface);
+	color: var(--foreground);
 }
-
-/* Compact navigation keeps the brand left and the editor/menu controls right.
-   The native disclosure remains usable without JavaScript. */
-@media (max-width: 960px) {
-	/* Keep unenhanced navigation in flow so an open menu cannot obscure a
-	   native fragment destination. Enhancement preserves the header's space. */
-	.nav {
-		position: relative;
-	}
-	.nav[data-enhanced] {
-		position: sticky;
-	}
+.nav__compact {
+	display: none;
+}
+.nav[data-scrolled="true"] {
+	box-shadow: 0 1px 0 var(--border);
+}
+@media (max-width: 1080px) {
 	.nav__inner {
-		gap: 0 8px;
-		padding: 4px 6px;
+		min-height: 60px;
+		padding-block: 8px;
+		flex-wrap: wrap;
+		gap: 12px;
 	}
 	.nav__links,
 	.nav__actions .icon-link {
@@ -138,54 +95,49 @@
 		display: block;
 	}
 	.nav__menu summary {
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		display: grid;
+		place-items: center;
 		width: 44px;
 		min-height: 44px;
 		list-style: none;
 		cursor: pointer;
 		border-radius: 8px;
-		color: var(--muted-foreground);
 	}
 	.nav__menu summary::-webkit-details-marker {
 		display: none;
 	}
 	.nav__menu[open] summary,
 	.nav__menu summary:hover {
-		color: var(--foreground);
-		background: var(--workbench-hover);
+		background: var(--surface);
 	}
 	.nav__menu-links {
-		max-width: 1080px;
 		max-height: min(70vh, 28rem);
-		margin-inline: auto;
 		overflow-y: auto;
-		padding: 8px;
+		padding: 12px;
+		background: var(--background);
 		border: 1px solid var(--border);
-		border-radius: 12px;
-		background: var(--workbench-viewer);
-		box-shadow: 0 12px 24px oklch(0 0 none / 0.25);
+		border-radius: 8px;
 	}
 	.nav__menu-links a {
 		display: flex;
 		align-items: center;
 		min-height: 48px;
 		padding: 10px 12px;
-		border-radius: 8px;
 		font-size: 1rem;
-		color: var(--muted-foreground);
 	}
-	.nav__menu-links a:hover,
-	.nav__menu-links a[aria-current="page"] {
-		color: var(--foreground);
-		background: var(--workbench-hover);
+	.nav__menu-links a:hover {
+		background: var(--surface);
 	}
 	.nav[data-enhanced] .nav__menu-links {
 		position: absolute;
-		inset: calc(100% + 8px) var(--gutter) auto;
+		inset: 100% var(--gutter) auto;
 	}
-	/* Without enhancement the expanded menu gets a full-width row. */
+	.nav:not([data-enhanced]) {
+		position: relative;
+	}
+	.nav:not([data-enhanced]) .nav__inner {
+		flex-wrap: wrap;
+	}
 	.nav:not([data-enhanced]) .nav__compact:has(details[open]) {
 		flex-basis: 100%;
 	}

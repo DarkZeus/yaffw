@@ -8,6 +8,7 @@ import type {
 	Selection,
 } from "@/editor-core/model";
 import { formatMediaTime } from "../../media-time/format/media-time-presentation";
+import { WorkbenchAppearance } from "../../workbench/frame/workbench-appearance";
 import { usePreviewApertureLayout } from "../layout/preview-aperture-layout";
 import { PreviewVideoSkin } from "../player/preview-video-skin";
 
@@ -102,6 +103,7 @@ export function PreviewViewerRegion({
 						>
 							{formatMediaTime(playheadUs)}
 						</span>
+						<WorkbenchAppearance />
 						<Button
 							aria-label="Open fullscreen preview"
 							className="size-7 border-0 bg-transparent text-muted-foreground shadow-none hover:bg-workbench-hover hover:text-foreground"

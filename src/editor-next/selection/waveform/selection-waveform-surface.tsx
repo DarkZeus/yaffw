@@ -211,6 +211,17 @@ function useWavesurferWaveform({
 					),
 				});
 				lifecycle.registerCleanup(() => wavesurfer.destroy());
+				lifecycle.registerCleanup(
+					observeWorkbenchTheme(() => {
+						const currentStyle = getComputedStyle(container);
+						const color = cssTokenColor(
+							currentStyle,
+							"--workbench-waveform",
+							WAVEFORM_COLOR_FALLBACK,
+						);
+						wavesurfer.setOptions({ waveColor: color, progressColor: color });
+					}),
+				);
 				rendererRef.current = { regions, lifecycle, fail: failRenderer };
 				lifecycle.registerCleanup(wavesurfer.on("error", failRenderer));
 				lifecycle.registerCleanup(
@@ -392,11 +403,13 @@ function WaveformCanvasFallback({ samples }: { samples: WaveformSamples }) {
 		}
 
 		drawWaveform();
+		const stopObservingTheme = observeWorkbenchTheme(drawWaveform);
 
 		if (typeof ResizeObserver === "undefined") {
 			window.addEventListener("resize", drawWaveform);
 			return () => {
 				window.removeEventListener("resize", drawWaveform);
+				stopObservingTheme();
 			};
 		}
 
@@ -405,6 +418,7 @@ function WaveformCanvasFallback({ samples }: { samples: WaveformSamples }) {
 
 		return () => {
 			observer.disconnect();
+			stopObservingTheme();
 		};
 	}, [samples]);
 
@@ -505,4 +519,14 @@ function canvasTokenColor(
 	return (
 		getComputedStyle(element).getPropertyValue(tokenName).trim() || fallback
 	);
+}
+
+function observeWorkbenchTheme(onChange: () => void): () => void {
+	if (typeof MutationObserver === "undefined") return () => {};
+	const observer = new MutationObserver(onChange);
+	observer.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["class"],
+	});
+	return () => observer.disconnect();
 }

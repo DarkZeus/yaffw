@@ -61,11 +61,11 @@ Entries are sorted by `date`. The file name becomes the entry's link (`/changelo
 - `src/layouts/Base.astro`: head, nav, footer
 - `src/links.js`: editor and repository destinations shared by pages, layout, and client shortcuts
 - `src/styles/`: one file per section, imported in cascade order by `index.css`. The shared `--workbench-*` palette is owned by `src/workbench-tokens.css` at the repository root and imported by both editor and landing; `<html class="workbench">` applies it.
-- `src/scripts/main.js`: home page behaviour (demo and shortcut timelines, meters, illustrations, repo card)
+- `src/scripts/main.js`: home page behaviour (optional Selection and shortcut timelines, repo commands)
 - `src/scripts/timeline.js`: selection timeline engine shared by the demo and the shortcut playground
 - `public/assets/`: app icons
-- `src/assets/workbench.jpg`: original real workbench screenshot
-- `src/components/WorkbenchScreenshot.astro`: shared responsive image transforms for the eager hero and lazy decorative CTA backdrop
+- `src/assets/workbench-current.jpg`: current real editor capture; Audio and Export panel captures sit beside it. The current capture also supplies the social image.
+- `src/components/WorkbenchScreenshot.astro`: shared responsive image transforms for the eager hero and lazy Selection detail
 - `DESIGN-NOTES.md`: current visual behavior, demo limitations, historical reference research, and documentation ownership. Later design/demo changes must update affected notes in the same issue.
 
 ## Progressive enhancement
@@ -76,15 +76,17 @@ Command tabs use automatic activation: Left/Right arrows wrap between Run and De
 
 Section links use native URL fragments and browser history. Focusable section targets preserve keyboard continuation with or without JavaScript; the fixed-header offset is provided by CSS scroll padding. Navigation does not require session storage.
 
-Both demo timelines start with the full simulated file selected and looping off. Playback and Selection are independent; range-body dragging preserves duration and Playhead, edge dragging previews a boundary until release, and canceled drags discard the draft. Frame steps pause playback, and boundary shortcuts keep a valid range without moving Playhead. The simulation uses a fixed 93.525-second, nominal-30-FPS asset in seconds; it does not decode or export media.
+The Selection example is optional inside Explore Selection controls and explicitly describes its simulated nature. Both demo timelines start with the full simulated file selected and looping off. Playback and Selection are independent; range-body dragging preserves duration and Playhead, edge dragging previews a boundary until release, and canceled drags discard the draft. Frame steps pause playback, and boundary shortcuts keep a valid range without moving Playhead. The simulation uses a fixed 93.525-second, nominal-30-FPS asset in seconds; it does not decode or export media.
 
 The main demo owns the compact editing workflow and full-file Selection note. Keyboard reference and its playground sit behind the native Try keyboard controls disclosure at `#shortcuts`; collapsed content cannot receive focus or handle shortcuts, and closing it stops playback. The native disclosure still opens static help without JavaScript.
 
-Below 960px the header keeps Changelog visible alongside a native Sections disclosure, the home link, and Open editor. The section destinations come from the same list as desktop navigation. Native disclosure and links work without JavaScript; enhancement adds Escape dismissal with focus returned to the summary, outside-pointer/focus dismissal without stealing focus, and closure after unmodified link activation. Modified link activation stays native. Before enhancement, the compact header and open menu stay in document flow so they cannot cover a fragment destination. Enhancement keeps the header sticky and places the dismissible menu below it. Compact header controls have at least 44px targets; the phone home link uses the product icon with its accessible name, and repository access remains in Source. Rem-based header type and a conservative CSS fragment offset accommodate enlarged text without relying on script measurements.
+Below 1080px the header places Changelog and section links inside a native Menu disclosure alongside the home link and Open editor. The section destinations come from the same list as desktop navigation. Native disclosure and links work without JavaScript; enhancement adds Escape dismissal with focus returned to the summary, outside-pointer/focus dismissal without stealing focus, and closure after unmodified link activation. Modified link activation stays native. Before enhancement, the compact header and open menu stay in document flow so they cannot cover a fragment destination. Enhancement keeps the header sticky and places the dismissible menu below it. Compact header controls have at least 44px targets; the phone home link uses the product icon with its accessible name, and repository access remains in Source. Rem-based header type and a conservative CSS fragment offset accommodate enlarged text without relying on script measurements.
 
 ## Workbench imagery
 
-The original screenshot is imported through [Astro’s image pipeline](https://docs.astro.build/en/guides/images/), rather than served unchanged from `public/`. The shared screenshot component generates AVIF/WebP with JPEG fallback at 480, 800, 1200, 1800, 2400 and 2940 pixels, quality 80. The hero sizes match its CSS slot (900px on desktop and the inner page width below 960px); priority keeps it eager/high-priority. The lower decorative backdrop stays lazy and uses the viewport width. Both uses share transforms and URLs, so matching selected resources can be reused from browser cache. Imported dimensions preserve the original 2940:1838 aspect ratio; descriptive hero alt text and the decorative empty alt are retained. Updating the source screenshot requires no hand-maintained derivative files.
+The landing shows a complete capture of the current editor, a clipped Selection detail, and real Audio and Export panel captures. The image components use Astro's image pipeline with AVIF/WebP and JPEG fallback. The hero has 480, 800, 1200 and 1600px candidates, explicit slot sizes, intrinsic 1600×900 dimensions, and eager/high-priority loading. The Selection detail shares those transformed URLs and loads lazily. Feature panel images also load lazily. The CTA has no decorative backdrop.
+
+The product imagery is deliberately separate from the landing tokens. The social image uses the same current light workbench capture with a 1200×630 bottom crop and retained attribution. No reference-site imagery or branding is copied. See [DESIGN-RESEARCH.md](DESIGN-RESEARCH.md) for design provenance.
 
 ## Validation
 
@@ -125,3 +127,5 @@ That preview emits `noindex,follow`. `build:production` rejects an empty overrid
 The normal smoke runner includes the metadata check and adds no extra build. Keep any origin override identical to the build being checked. Production-mode fixtures use an explicit reserved test hostname in a temporary output directory, never the publishable landing output; ordinary production builds use the confirmed deployment setting.
 
 Use `pnpm --filter yaffw-landing test:metadata` to inspect only metadata in an existing build. It starts the same short-lived Astro preview, including its 404 fallback; a generic file server does not reproduce Worker missing-page routing. To check an already running Astro preview or Worker, set `YAFFW_LANDING_ORIGIN` and run `node verification/landing/metadata-check.mjs` directly.
+
+The light workbench imagery is captured from the actual editor using its Light appearance. The native Appearance selector offers Light, Dark, and System; Dark remains the app default. The optional landing control examples use the same light workbench tokens. Theme changes repaint waveform canvases without remounting the media player.

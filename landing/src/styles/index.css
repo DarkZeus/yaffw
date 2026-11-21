@@ -1,4 +1,4 @@
-/* Landing styles, in cascade order. The palette is shared with the editor. */
+/* Landing styles. Editor imagery and control examples retain the shared product palette. */
 @import "../../../src/workbench-tokens.css";
 @import "./base.css";
 @import "./buttons.css";
@@ -7,7 +7,7 @@
 @import "./sections.css";
 @import "./demo.css";
 @import "./local.css";
-@import "./bento.css";
+@import "./features.css";
 @import "./shortcuts.css";
 @import "./limits.css";
 @import "./source.css";

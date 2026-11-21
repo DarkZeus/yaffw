@@ -151,14 +151,15 @@ try {
 			if (path === "/") {
 				await page
 					.locator("[data-demo][data-ready]")
-					.waitFor({ timeout: 5000 });
-				await page.locator(".bound").scrollIntoViewIfNeeded();
-				await delay(1500); // The diagram's persistent post-delivery state follows its delayed transition.
+					.waitFor({ state: "attached", timeout: 5000 });
+				await page.locator("[data-selection-example] > summary").click();
+				await page.locator("#local").scrollIntoViewIfNeeded();
+
 				await page.locator("[data-keyboard-disclosure] > summary").click();
 				await page.locator("[data-try]").scrollIntoViewIfNeeded();
 				for (const [name, selector] of [
 					["hero", ".hero"],
-					["local", ".bound"],
+					["local", "#local"],
 					["shortcuts", ".try"],
 					["workflow", "#demo"],
 					["demo", "[data-demo]"],

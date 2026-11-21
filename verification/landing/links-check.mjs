@@ -48,6 +48,7 @@ try {
 			`${repository}/issues`,
 		);
 		if (path === "/") {
+			await page.locator("[data-selection-example] > summary").click();
 			await destination(
 				page.getByRole("link", {
 					name: "Start export in the editor",
@@ -96,7 +97,9 @@ try {
 	});
 	const page = await context.newPage();
 	await page.goto(origin);
-	await page.locator("[data-demo][data-ready]").waitFor({ timeout: 5000 });
+	await page
+		.locator("[data-demo][data-ready]")
+		.waitFor({ state: "attached", timeout: 5000 });
 	await page.evaluate(() => {
 		document.activeElement.blur();
 		window.scrollTo({ top: 0, behavior: "instant" });

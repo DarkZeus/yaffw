@@ -107,6 +107,8 @@ try {
 		await page.clock.install({ time: new Date("2026-11-20T12:00:00Z") });
 		await page.goto(origin);
 		const root = page.locator(selector);
+		if (selector === "[data-demo]")
+			await page.locator("[data-selection-example] > summary").click();
 		if (selector === "[data-try]")
 			await page.locator("[data-keyboard-disclosure] > summary").click();
 		await page.locator(`${selector}[data-ready]`).waitFor();

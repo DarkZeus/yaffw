@@ -145,7 +145,7 @@ export function WorkbenchPanel({ id }: { id: WorkbenchPanelId }) {
 			</ContextMenuTrigger>
 			<ContextMenuContent
 				aria-label={`${workbenchPanelTitles[id]} layout`}
-				className="workbench dark min-w-56"
+				className="workbench min-w-56"
 			>
 				<ContextMenuGroup>
 					<ContextMenuLabel>{workbenchPanelTitles[id]}</ContextMenuLabel>
