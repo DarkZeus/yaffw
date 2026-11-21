@@ -146,10 +146,13 @@ The optional keyboard summary precedes limitations and Source. Opening it adds
 the reference and practice controls without repeating the primary workflow by
 default.
 
-The navigation, tabs, progressive and metadata checks now run through `pnpm --filter
+All eleven checks listed in `landing/scripts/smoke.mjs` run through `pnpm --filter
 yaffw-landing test:smoke` after a production build and are included in root
-`pnpm verify` and CI. Its Astro preview uses an OS-assigned loopback port and is
-stopped on success or failure. The other checks remain explicit diagnostics.
+`pnpm verify` and Linux CI. This includes clipboard, links, demo, disclosure,
+images, and contrast, which previously required separate commands. Its Astro
+preview uses an OS-assigned loopback port and is stopped on success or failure.
+To run a subset against the same isolated preview, pass check names, for example
+`pnpm --filter yaffw-landing test:smoke demo disclosure`.
 Install the pinned browser with `pnpm exec playwright install chromium`; see
 [landing validation](../../landing/README.md#validation) for tooling coverage and
 limits.

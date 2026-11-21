@@ -12,13 +12,15 @@
 		"serve": "vite preview",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
+		"test:editor": "node verification/editor-smoke.mjs",
 		"format": "oxfmt --write .",
 		"lint": "oxlint --deny-warnings .",
 		"check": "pnpm format:check && pnpm lint",
 		"doctor": "react-doctor",
 		"format:check": "oxfmt --check .",
 		"lint:fix": "oxlint --fix --deny-warnings .",
-		"verify": "pnpm check && pnpm test && pnpm build && pnpm --filter yaffw-landing verify"
+		"verify:checks": "pnpm check && pnpm test && pnpm build && pnpm --filter yaffw-landing verify",
+		"verify": "pnpm verify:checks && pnpm test:editor"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.9.0",

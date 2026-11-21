@@ -44,7 +44,8 @@ abort rejection are covered by the production unit tests:
 ```sh
 pnpm test src/editor-next/media-work/tests/mediabunny-audio-buffer.test.ts \
   src/editor-next/media-work/tests/audio-packet-timeline.test.ts \
-  src/editor-next/media-work/tests/disposable-media-work-scope.test.ts \
+  src/editor-next/media-work/tests/active-media-asset-cleanup-scope.test.ts \
+  src/editor-next/media-work/tests/synchronous-media-work-scope.test.ts \
   src/editor-next/media-work/tests/media-source-failure-boundary.test.ts \
   src/editor-next/audio/tests/bounded-preview-audio-window-provider.test.ts \
   src/editor-next/preview/tests/mediabunny-scrub-frame-provider.test.ts \

@@ -12,7 +12,7 @@ import {
 } from "../harness/export-artifact-harness";
 import { EXPORT_CORRECTNESS_FIXTURES } from "../harness/export-correctness-fixtures";
 
-describe("full-asset export artifact harness", () => {
+describe("full-asset export artifact harness with an injected runner", () => {
 	it("carries a non-default documented profile through artifact inspection and Generated media metadata", async () => {
 		const sourceFixture = requiredFixture("mp4-video-only");
 		const generatedFixture = requiredFixture("webm-video-only");
@@ -115,7 +115,7 @@ describe("full-asset export artifact harness", () => {
 });
 
 describe("fixture catalog export artifact harness", () => {
-	it("measures supported fixtures and reports unsupported fixture export capability", async () => {
+	it("inspects fixture artifacts and reports injected runner failures", async () => {
 		const inspectLocalAsset = vi.fn(async (draft) =>
 			inspectionForFixtureLabel(draft.label),
 		);

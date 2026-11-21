@@ -130,7 +130,8 @@ try {
 		const host = [...root.querySelectorAll("*")].find(
 			(child) => child.shadowRoot,
 		);
-		return host?.shadowRoot.querySelector("canvas")?.toDataURL() !== previous;
+		const current = host?.shadowRoot.querySelector("canvas")?.toDataURL();
+		return Boolean(current && current !== previous);
 	}, lightWaveform);
 	assert.ok(
 		await video.evaluate((el) => el === document.querySelector("video")),

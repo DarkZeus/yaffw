@@ -24,6 +24,7 @@ const mockState = vi.hoisted(() => ({
 		emit: (event: string, ...args: unknown[]) => void;
 		listenerCount: (event: string) => number;
 		options: Record<string, unknown>;
+		setOptions: (options: Record<string, unknown>) => void;
 	}>,
 }));
 
@@ -61,6 +62,9 @@ vi.mock("wavesurfer.js", () => {
 		}
 
 		destroyed = false;
+		setOptions = vi.fn((options: Record<string, unknown>) => {
+			Object.assign(this.options, options);
+		});
 
 		destroy() {
 			this.destroyed = true;
@@ -147,6 +151,8 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	document.documentElement.className = "";
+	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
 });
 
@@ -162,6 +168,59 @@ describe("WaveformSurface", () => {
 		selectionEditingDisabled: false,
 		selectionEditInProgress: false,
 	};
+
+	it("recolors the existing renderer on appearance changes and stops observing after unmount", async () => {
+		const { unmount } = render(<WaveformSurface {...surfaceProps} />);
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+		const renderer = mockState.wavesurfers[0];
+		act(() => renderer.emit("redrawcomplete"));
+		const region = mockState.regionsPlugins[0].regions[0];
+		const host = renderer.options.container as HTMLElement;
+		const color = "oklch(0.45 0.05 190)";
+		host.style.setProperty("--workbench-waveform", color);
+		act(() => document.documentElement.classList.add("light"));
+		await waitFor(() =>
+			expect(renderer.setOptions).toHaveBeenCalledWith({
+				waveColor: color,
+				progressColor: color,
+			}),
+		);
+		expect(mockState.wavesurfers).toHaveLength(1);
+		expect(mockState.regionsPlugins[0].regions).toEqual([region]);
+		expect(region.start).toBe(2);
+		expect(region.end).toBe(6);
+		unmount();
+		const calls = vi.mocked(renderer.setOptions).mock.calls.length;
+		await act(async () => {
+			document.documentElement.classList.replace("light", "dark");
+			await Promise.resolve();
+		});
+		expect(renderer.setOptions).toHaveBeenCalledTimes(calls);
+		expect(renderer.destroyed).toBe(true);
+	});
+
+	it("repaints the canvas fallback on appearance changes and releases its observer", async () => {
+		const { container, unmount } = render(
+			<WaveformSurface {...surfaceProps} />,
+		);
+		await waitFor(() => expect(mockState.wavesurfers).toHaveLength(1));
+		act(() =>
+			mockState.wavesurfers[0].emit("error", new Error("Renderer failed")),
+		);
+		const canvas = container.querySelector("canvas");
+		if (!canvas) throw new Error("Expected the canvas fallback");
+		const context = canvas.getContext("2d");
+		if (!context) throw new Error("Expected a real canvas context");
+		const repaint = vi.spyOn(context, "clearRect");
+		act(() => document.documentElement.classList.add("light"));
+		await waitFor(() => expect(repaint).toHaveBeenCalledTimes(1));
+		unmount();
+		await act(async () => {
+			document.documentElement.classList.replace("light", "dark");
+			await Promise.resolve();
+		});
+		expect(repaint).toHaveBeenCalledTimes(1);
+	});
 
 	it("waits for the committed selection when a drag begins before the renderer is ready", async () => {
 		const onSelectionRegionAvailabilityChange = vi.fn();

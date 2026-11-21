@@ -62,21 +62,23 @@ Open [localhost:3000](http://localhost:3000).
 
 Useful development commands:
 
-| Command          | Purpose                                                                   |
-| ---------------- | ------------------------------------------------------------------------- |
-| `pnpm verify`    | Run editor gates plus landing validation, build, and browser smoke checks |
-| `pnpm check`     | Check formatting with Oxfmt and type-aware lint rules with Oxlint         |
-| `pnpm format`    | Format maintained files and sort imports and Tailwind classes             |
-| `pnpm typecheck` | Check types with TypeScript 7                                             |
-| `pnpm test`      | Run the test suite                                                        |
-| `pnpm run build` | Build to `dist` and check TypeScript                                      |
-| `pnpm run serve` | Preview the production build locally                                      |
+| Command              | Purpose                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `pnpm verify`        | Run all checks, builds, and landing/editor browser checks               |
+| `pnpm verify:checks` | Run portable checks, builds, and landing browser checks                 |
+| `pnpm test:editor`   | Check an existing editor build with real media and independent decoding |
+| `pnpm check`         | Check formatting with Oxfmt and type-aware lint rules with Oxlint       |
+| `pnpm format`        | Format maintained files and sort imports and Tailwind classes           |
+| `pnpm typecheck`     | Check types with TypeScript 7                                           |
+| `pnpm test`          | Run the test suite                                                      |
+| `pnpm run build`     | Build to `dist` and check TypeScript                                    |
+| `pnpm run serve`     | Preview the production build locally                                    |
 
 Linting includes React Hooks, accessibility, and type-aware checks for promises and method binding. React Compiler eligibility rules are excluded because the app does not use React Compiler. Method-binding checks exempt test files so assertions can inspect spies without calling them.
 
-Install the matching browser once before verification: `pnpm exec playwright install chromium` (on Linux, use `--with-deps` to install its system dependencies). The landing check uses Astro’s supported TypeScript 6 toolchain separately from the editor’s TypeScript 7; its Astro lint tools set the declared Node minimum. See [landing validation](landing/README.md#validation) for coverage and limitations.
+Install the matching browser once before verification: `pnpm exec playwright install chromium` (on Linux, use `--with-deps` to install its system dependencies). Full verification also needs `ffmpeg` and `ffprobe` on PATH for independent artifact inspection, and a Chromium runtime with native AAC encoding (CI uses macOS). The app itself needs no FFmpeg installation. `pnpm verify:checks` is the portable subset; missing media capabilities fail the editor checks rather than silently skipping exports. See the [test audit](docs/verification/test-audit.md) for coverage and limits. The landing check uses Astro’s supported TypeScript 6 toolchain separately from the editor’s TypeScript 7.
 
-CI installs Chromium and runs `pnpm verify` on pushes and pull requests. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
+CI runs the portable checks on Linux and real editor browser checks on macOS on pushes and pull requests. Together they cover `pnpm verify`; neither job allows failures. React Doctor remains an advisory check through `pnpm run doctor`. For VS Code, install the recommended Oxc and native TypeScript extensions.
 
 The app uses React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Base UI, and Mediabunny for browser media processing.
 

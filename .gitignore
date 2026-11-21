@@ -428,6 +428,7 @@ docs/images/*
 !docs/verification/
 docs/verification/*
 !docs/verification/test-suite-reduction.md
+!docs/verification/test-audit.md
 
 # API documentation
 api-docs/

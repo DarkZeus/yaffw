@@ -21,7 +21,7 @@ function probe(file) {
 		]),
 	);
 }
-function signal(file, time) {
+function audioSignal(file, time, mixSourceTracks = false) {
 	const pcm = execFileSync("ffmpeg", [
 		"-v",
 		"error",
@@ -31,8 +31,14 @@ function signal(file, time) {
 		String(time),
 		"-t",
 		"0.04",
-		"-map",
-		"0:a:0",
+		...(mixSourceTracks
+			? [
+					"-filter_complex",
+					"[0:a:0][0:a:1]amix=inputs=2:normalize=0[mix]",
+					"-map",
+					"[mix]",
+				]
+			: ["-map", "0:a:0"]),
 		"-ac",
 		"1",
 		"-f",
@@ -40,8 +46,17 @@ function signal(file, time) {
 		"-",
 	]);
 	let peak = 0;
-	for (let offset = 0; offset < pcm.length; offset += 4)
-		peak = Math.max(peak, Math.abs(pcm.readFloatLE(offset)));
+	let squares = 0;
+	assert.ok(pcm.length > 0, "Expected independently decoded PCM");
+	for (let offset = 0; offset < pcm.length; offset += 4) {
+		const sample = pcm.readFloatLE(offset);
+		peak = Math.max(peak, Math.abs(sample));
+		squares += sample * sample;
+	}
+	return { peak, rms: Math.sqrt(squares / (pcm.length / 4)) };
+}
+function signal(file, time) {
+	const audio = audioSignal(file, time);
 	const pixels = execFileSync("ffmpeg", [
 		"-v",
 		"error",
@@ -59,7 +74,7 @@ function signal(file, time) {
 		"rawvideo",
 		"-",
 	]);
-	return { time, peak, luma: pixels[0] };
+	return { time, ...audio, luma: pixels[0] };
 }
 function eventAlignment(file) {
 	const pcm = execFileSync(
@@ -211,6 +226,11 @@ function eventAlignment(file) {
 				await page.waitForFunction(
 					() => document.querySelector("video")?.currentTime > 0.25,
 				);
+				assert.equal(
+					await page.locator("video").evaluate((video) => video.muted),
+					true,
+					"Multitrack Preview must mute the native follower so it cannot duplicate or replace engine audio",
+				);
 				await button("Pause").click();
 				await button("Seek forward 10 seconds").click();
 				await button("Step backward one frame").click();
@@ -269,6 +289,15 @@ function eventAlignment(file) {
 					// separately asserted <0.001 quiet floor, not a mix loudness value.
 					assert.ok(event.peak > 0.01, JSON.stringify(event));
 					assert.ok(event.luma > 240, JSON.stringify(event));
+					const expectedMix = audioSignal(source, event.time + 2, true);
+					assert.ok(
+						expectedMix.rms > 0.01,
+						"The source mix must contain an audible control signal",
+					);
+					assert.ok(
+						Math.abs(event.rms / expectedMix.rms - 1) < 0.15,
+						`Both included source tracks must contribute at 100%: ${JSON.stringify({ event, expectedMix })}`,
+					);
 				}
 				const quiet = signal(output, 1.5);
 				assert.ok(quiet.peak < 0.001);

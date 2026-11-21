@@ -8,6 +8,12 @@ const availableChecks = [
 	"tabs",
 	"progressive",
 	"metadata",
+	"copy",
+	"links",
+	"demo",
+	"disclosure",
+	"images",
+	"contrast",
 ];
 const requestedChecks = process.argv.slice(2);
 const checks = requestedChecks.length ? requestedChecks : availableChecks;
